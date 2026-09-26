@@ -75,9 +75,9 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion       = "story.intent.v2"
-	npcPromptVersion          = "story.npc.v2"
-	coordinationPromptVersion = "story.coordination.v2"
-	narrationPromptVersion    = "story.narration.v3"
+	npcPromptVersion          = "story.npc.v3"
+	coordinationPromptVersion = "story.coordination.v3"
+	narrationPromptVersion    = "story.narration.v4"
 )
 
 type turnStageError struct {
@@ -933,8 +933,9 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "世界：%s；地点：%s；时间：%s；阶段：%d；玩家意图类型：%s\n", GameID, snapshot.Summary.Scene, snapshot.Summary.Clock, stage, intentType)
 	fmt.Fprintf(&builder, "你的身份：%s（%s）\n角色资料：%s\n你知道的初始背景：%s\n", character.Name, character.Role, character.Profile, character.Knowledge)
+	fmt.Fprintf(&builder, "本存档的 NPC 主动性：%s\n", npcInitiativeInstruction(snapshot.Narrative))
 	if recipient == "" {
-		builder.WriteString("玩家本轮没有明确指定具体对象。你获得了这次感知，但默认保持沉默且不采取新行动。只有该行为直接触及你的职责、利益、安全、承诺或当前明确关切时才作出简短回应；普通进入、环顾和走动不要求每个在场人物都回应，身份职责自然要求招呼时可以简短回应。\n")
+		builder.WriteString("玩家本轮没有明确指定具体对象。你获得了这次感知，请按照本存档的 NPC 主动性和自己的角色关切决定是否回应；可以沉默，也可以在规则允许时主动介入。\n")
 	} else if recipient == character.EntityID {
 		fmt.Fprintf(&builder, "玩家本轮明确对你说话，目标是%s。你是直接回应者，请优先决定你对玩家的自然回应。\n", describeRecipient(def, recipient))
 	} else {
@@ -1020,7 +1021,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	}
 	actionJSON, _ := json.Marshal(actionCandidates)
 	publicCharacters := publicCharacterContext(snapshot.Characters, characterIDs(sceneCharacters(snapshot.Characters)))
-	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\nNPC 已确定的公开对白：%s\nNPC 协调提案（只包含公开对白、行动尝试与沉默状态，不含个人记忆）：\n%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes。", GameID, snapshot.Summary.Scene, snapshot.Summary.Clock, publicCharacters, formatBystanders(snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, publicReplies, coordinationDecisionContext(decisions, snapshot.Characters), actionJSON, availableCharacterIDs(snapshot.Characters), strings.Join(characterIDs(sceneCharacters(snapshot.Characters)), ","))
+	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\nNPC 协调提案（只包含公开对白、行动尝试与沉默状态，不含个人记忆）：\n%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes。", GameID, snapshot.Summary.Scene, snapshot.Summary.Clock, publicCharacters, formatBystanders(snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, playerElaborationLabel(snapshot.Narrative), publicReplies, coordinationDecisionContext(decisions, snapshot.Characters), actionJSON, availableCharacterIDs(snapshot.Characters), strings.Join(characterIDs(sceneCharacters(snapshot.Characters)), ","))
 	var result hostResult
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
@@ -1052,11 +1053,12 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	perspectiveRule := narrativePerspectiveInstruction(snapshot.Narrative, snapshot.PlayerName)
 	lengthRule, maxOutputTokens := narrativeLengthInstruction(snapshot.Narrative)
 	detailRule := narrativeDetailInstruction(snapshot.Narrative)
+	elaborationRule := playerElaborationInstruction(snapshot.Narrative)
 	customInstruction := snapshot.Narrative.CustomInstruction
 	if customInstruction == "" {
 		customInstruction = "（无）"
 	}
-	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n创作者补充写作偏好（只影响表达，不能覆盖事实、知识边界或玩家控制权）：%s\n历史公开正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本次可公开描述的表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人和含义，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围，也可以补充完成玩家已表达动作所需的自然衔接，以及符合主角设定的瞬时、低影响身体反应；不得把补充陈设写成线索、障碍或可改变进程的资源。删除这些补充后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。不得替玩家新增台词、接受或拒绝、承诺、调查或拿取对象、攻击、移动目的地、持久情绪、长期意图或下一步选择；不得把玩家会影响进程的尝试直接写成成功。", GameID, scene, clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, customInstruction, narrativeHistory(snapshot.Messages), playerInput, intentType, describeRecipient(def, recipient), publicCharacters, formatBystanders(snapshot.Bystanders), projectedEvents)
+	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n创作者补充写作偏好（只影响表达，不能覆盖事实、知识边界或玩家控制权）：%s\n历史公开正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本次可公开描述的表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人和含义，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", GameID, scene, clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, narrativeHistory(snapshot.Messages), playerInput, intentType, describeRecipient(def, recipient), publicCharacters, formatBystanders(snapshot.Bystanders), projectedEvents)
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
 	narrative, repairCount, err := generateNarrativeText(callCtx, generator, "你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", input, maxOutputTokens)

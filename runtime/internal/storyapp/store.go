@@ -269,6 +269,7 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		"generation": "1", "plot_status": "active", "bystanders": marshalJSON(def.Bystanders),
 		"narrative_perspective": PerspectiveSecondPerson, "narrative_length": NarrativeLengthStandard,
 		"narrative_detail": NarrativeDetailBalanced, "narrative_custom_instruction": "",
+		"player_elaboration": PlayerElaborationNatural, "npc_initiative": NPCInitiativeContextual,
 	}
 	for key, value := range values {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, key, value); err != nil {

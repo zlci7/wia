@@ -138,6 +138,8 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		"perspective":            "omniscient",
 		"length":                 "standard",
 		"detail":                 "balanced",
+		"player_elaboration":     "natural",
+		"npc_initiative":         "contextual",
 		"expected_context_epoch": world.ContextEpoch,
 	})
 	if response.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "invalid_request") {
@@ -147,6 +149,8 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		"perspective":            "third_person",
 		"length":                 "concise",
 		"detail":                 "restrained",
+		"player_elaboration":     "expressive",
+		"npc_initiative":         "proactive",
 		"custom_instruction":     "对白留白。",
 		"expected_context_epoch": world.ContextEpoch,
 	})
@@ -158,7 +162,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		World    storyapp.WorldSummary      `json:"world"`
 	}
 	decodeJSONBody(t, body, &settingsEnvelope)
-	if settingsEnvelope.Settings.Perspective != storyapp.PerspectiveThirdPerson || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
+	if settingsEnvelope.Settings.Perspective != storyapp.PerspectiveThirdPerson || settingsEnvelope.Settings.PlayerElaboration != storyapp.PlayerElaborationExpressive || settingsEnvelope.Settings.NPCInitiative != storyapp.NPCInitiativeProactive || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
 		t.Fatalf("agent settings response = %+v", settingsEnvelope)
 	}
 	world = settingsEnvelope.World

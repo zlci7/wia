@@ -366,7 +366,9 @@ func TestPublicAddressKeepsNPCAttribution(t *testing.T) {
 		"不得使用“没有任何人注意到”",
 		"禁止为了证明仍在场而逐个点名",
 		"可以自由补充临时、低影响",
-		"不得替玩家新增台词、接受或拒绝、承诺",
+		"自然共创",
+		"跟老板打招呼”可以写成点头并说“晚上好",
+		"不把疑问改成承诺",
 	} {
 		if !strings.Contains(hostPrompt, want) {
 			t.Fatalf("narrative prompt missing %q: %s", want, hostPrompt)
@@ -389,7 +391,7 @@ func TestPublicAddressKeepsNPCAttribution(t *testing.T) {
 	}
 }
 
-func TestUnaddressedNPCDefaultsToSilenceAndPassiveIntentIsDropped(t *testing.T) {
+func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *testing.T) {
 	def := lanternDefinition()
 	character, ok := characterByID(def, "npc:mercenary")
 	if !ok {
@@ -397,6 +399,7 @@ func TestUnaddressedNPCDefaultsToSilenceAndPassiveIntentIsDropped(t *testing.T) 
 	}
 	snapshot := worldSnapshot{
 		Summary:      WorldSummary{WorldID: "world-test", Scene: def.Scene, Clock: def.Clock},
+		Narrative:    defaultNarrativeSettings(),
 		Characters:   def.Characters,
 		Perceptions:  map[string][]Perception{},
 		Memories:     map[string][]Memory{},
@@ -404,7 +407,8 @@ func TestUnaddressedNPCDefaultsToSilenceAndPassiveIntentIsDropped(t *testing.T) 
 	}
 	prompt := buildNPCPrompt(snapshot, def, character, "", "act", npcStageInput{PlayerPerception: "走进大门看看"}, "", 1)
 	for _, want := range []string{
-		"默认保持沉默且不采取新行动",
+		"按情境主动",
+		"可以沉默，也可以在规则允许时主动介入",
 		"普通进入、环顾和走动不要求每个在场人物都回应",
 		"继续观察",
 		"不属于 action_intent",
@@ -442,6 +446,8 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 		Perspective:          PerspectiveFirstPerson,
 		Length:               NarrativeLengthConcise,
 		Detail:               NarrativeDetailRich,
+		PlayerElaboration:    PlayerElaborationExpressive,
+		NPCInitiative:        NPCInitiativeProactive,
 		CustomInstruction:    "对白简洁，环境偏冷峻。",
 		ExpectedContextEpoch: world.ContextEpoch,
 	})
@@ -463,16 +469,20 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	generator.mu.Lock()
 	requests := append([]string(nil), generator.requests...)
 	generator.mu.Unlock()
-	var narratorPrompt string
+	var narratorPrompt, npcPrompt string
 	for _, request := range requests {
 		if strings.Contains(request, "本轮玩家可见且已经确定的对白与结果") {
 			narratorPrompt = request
+		}
+		if strings.Contains(request, "你的身份：沈岚") && strings.Contains(request, "阶段：1") {
+			npcPrompt = request
 		}
 	}
 	for _, want := range []string{
 		"使用第一人称有限视角",
 		"通常为 120 至 300 个汉字",
 		"较丰富的感官、环境和动作细节",
+		"小说共创",
 		"对白简洁，环境偏冷峻。",
 		`"actor_id":"player"`,
 		`"actor_name":"岚舟"`,
@@ -481,6 +491,9 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 		if !strings.Contains(narratorPrompt, want) {
 			t.Fatalf("narrator prompt missing %q: %s", want, narratorPrompt)
 		}
+	}
+	if !strings.Contains(npcPrompt, "积极互动") || !strings.Contains(npcPrompt, "主动提问、试探、打趣") {
+		t.Fatalf("NPC prompt does not apply proactive initiative: %s", npcPrompt)
 	}
 
 	reloaded, err := app.ReadWorld(context.Background(), world.WorldID, 20)
@@ -492,6 +505,69 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	}
 }
 
+func TestNarrativeSettingsUseDefaultsWhenExistingWorldLacksInteractionMeta(t *testing.T) {
+	app := newTestApp(t, &scriptedGenerator{})
+	world, err := app.CreateWorld(context.Background(), "旧存档设置", "guided", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _, err := app.worldRecord(context.Background(), world.WorldID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := openWorldDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec(`DELETE FROM meta WHERE key IN ('player_elaboration','npc_initiative')`); err != nil {
+		_ = store.db.Close()
+		t.Fatal(err)
+	}
+	if err := store.db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := app.ReadWorld(context.Background(), world.WorldID, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Narrative.PlayerElaboration != PlayerElaborationNatural || snapshot.Narrative.NPCInitiative != NPCInitiativeContextual {
+		t.Fatalf("legacy narrative settings = %+v", snapshot.Narrative)
+	}
+}
+
+func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
+	elaborationCases := []struct {
+		value string
+		want  string
+	}{
+		{PlayerElaborationRestrained, "优先使用间接叙述"},
+		{PlayerElaborationNatural, "跟老板打招呼"},
+		{PlayerElaborationExpressive, "不得自行补出多轮 NPC 对话"},
+	}
+	for _, tc := range elaborationCases {
+		got := playerElaborationInstruction(NarrativeSettings{PlayerElaboration: tc.value})
+		if !strings.Contains(got, tc.want) {
+			t.Fatalf("player elaboration %q = %q, want %q", tc.value, got, tc.want)
+		}
+	}
+
+	initiativeCases := []struct {
+		value string
+		want  string
+	}{
+		{NPCInitiativeResponsive, "优先保持沉默"},
+		{NPCInitiativeContextual, "按情境主动"},
+		{NPCInitiativeProactive, "主动提问、试探、打趣"},
+	}
+	for _, tc := range initiativeCases {
+		got := npcInitiativeInstruction(NarrativeSettings{NPCInitiative: tc.value})
+		if !strings.Contains(got, tc.want) {
+			t.Fatalf("NPC initiative %q = %q, want %q", tc.value, got, tc.want)
+		}
+	}
+}
+
 func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 	generator := &scriptedGenerator{delay: 80 * time.Millisecond}
 	app := newTestApp(t, generator)
@@ -500,14 +576,26 @@ func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid := UpdateNarrativeSettingsRequest{
-		Perspective: PerspectiveSecondPerson,
-		Length:      NarrativeLengthStandard,
-		Detail:      NarrativeDetailBalanced,
+		Perspective:       PerspectiveSecondPerson,
+		Length:            NarrativeLengthStandard,
+		Detail:            NarrativeDetailBalanced,
+		PlayerElaboration: PlayerElaborationNatural,
+		NPCInitiative:     NPCInitiativeContextual,
 	}
 	invalid := valid
 	invalid.Perspective = "omniscient"
 	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("invalid perspective error = %v", err)
+	}
+	invalid = valid
+	invalid.PlayerElaboration = "unbounded"
+	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("invalid player elaboration error = %v", err)
+	}
+	invalid = valid
+	invalid.NPCInitiative = "chaotic"
+	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("invalid NPC initiative error = %v", err)
 	}
 	stale := valid
 	stale.ExpectedContextEpoch = world.ContextEpoch + 1
@@ -739,9 +827,10 @@ func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantedSettings := NarrativeSettings{Perspective: PerspectiveThirdPerson, Length: NarrativeLengthDetailed, Detail: NarrativeDetailRestrained, CustomInstruction: "对白留白。"}
+	wantedSettings := NarrativeSettings{Perspective: PerspectiveThirdPerson, Length: NarrativeLengthDetailed, Detail: NarrativeDetailRestrained, PlayerElaboration: PlayerElaborationExpressive, NPCInitiative: NPCInitiativeProactive, CustomInstruction: "对白留白。"}
 	if _, _, err := app.UpdateNarrativeSettings(context.Background(), original.WorldID, UpdateNarrativeSettingsRequest{
 		Perspective: wantedSettings.Perspective, Length: wantedSettings.Length, Detail: wantedSettings.Detail,
+		PlayerElaboration: wantedSettings.PlayerElaboration, NPCInitiative: wantedSettings.NPCInitiative,
 		CustomInstruction: wantedSettings.CustomInstruction, ExpectedContextEpoch: original.ContextEpoch,
 	}); err != nil {
 		t.Fatal(err)
@@ -1116,7 +1205,7 @@ func TestSceneHostProposalAndSceneVersionAreCommitted(t *testing.T) {
 			host = request
 		}
 	}
-	if !strings.Contains(host, "NPC 协调提案") || !strings.Contains(host, "action_intent") || strings.Contains(host, "玩家主动向我提供了消息") {
+	if !strings.Contains(host, "NPC 协调提案") || !strings.Contains(host, "action_intent") || !strings.Contains(host, "主角共创边界：当前模式为自然共创") || strings.Contains(host, "玩家主动向我提供了消息") {
 		t.Fatalf("scene host did not receive the full context: %s", host)
 	}
 }

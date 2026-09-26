@@ -19,12 +19,22 @@ const (
 	NarrativeDetailRestrained = "restrained"
 	NarrativeDetailBalanced   = "balanced"
 	NarrativeDetailRich       = "rich"
+
+	PlayerElaborationRestrained = "restrained"
+	PlayerElaborationNatural    = "natural"
+	PlayerElaborationExpressive = "expressive"
+
+	NPCInitiativeResponsive = "responsive"
+	NPCInitiativeContextual = "contextual"
+	NPCInitiativeProactive  = "proactive"
 )
 
 type NarrativeSettings struct {
 	Perspective       string `json:"perspective"`
 	Length            string `json:"length"`
 	Detail            string `json:"detail"`
+	PlayerElaboration string `json:"player_elaboration"`
+	NPCInitiative     string `json:"npc_initiative"`
 	CustomInstruction string `json:"custom_instruction"`
 }
 
@@ -32,15 +42,19 @@ type UpdateNarrativeSettingsRequest struct {
 	Perspective          string `json:"perspective"`
 	Length               string `json:"length"`
 	Detail               string `json:"detail"`
+	PlayerElaboration    string `json:"player_elaboration"`
+	NPCInitiative        string `json:"npc_initiative"`
 	CustomInstruction    string `json:"custom_instruction"`
 	ExpectedContextEpoch int64  `json:"expected_context_epoch"`
 }
 
 func defaultNarrativeSettings() NarrativeSettings {
 	return NarrativeSettings{
-		Perspective: PerspectiveSecondPerson,
-		Length:      NarrativeLengthStandard,
-		Detail:      NarrativeDetailBalanced,
+		Perspective:       PerspectiveSecondPerson,
+		Length:            NarrativeLengthStandard,
+		Detail:            NarrativeDetailBalanced,
+		PlayerElaboration: PlayerElaborationNatural,
+		NPCInitiative:     NPCInitiativeContextual,
 	}
 }
 
@@ -48,6 +62,8 @@ func validateNarrativeSettings(settings NarrativeSettings) (NarrativeSettings, e
 	settings.Perspective = strings.TrimSpace(settings.Perspective)
 	settings.Length = strings.TrimSpace(settings.Length)
 	settings.Detail = strings.TrimSpace(settings.Detail)
+	settings.PlayerElaboration = strings.TrimSpace(settings.PlayerElaboration)
+	settings.NPCInitiative = strings.TrimSpace(settings.NPCInitiative)
 	settings.CustomInstruction = cleanText(settings.CustomInstruction)
 	if settings.Perspective != PerspectiveFirstPerson && settings.Perspective != PerspectiveSecondPerson && settings.Perspective != PerspectiveThirdPerson {
 		return NarrativeSettings{}, ErrInvalidRequest
@@ -56,6 +72,12 @@ func validateNarrativeSettings(settings NarrativeSettings) (NarrativeSettings, e
 		return NarrativeSettings{}, ErrInvalidRequest
 	}
 	if settings.Detail != NarrativeDetailRestrained && settings.Detail != NarrativeDetailBalanced && settings.Detail != NarrativeDetailRich {
+		return NarrativeSettings{}, ErrInvalidRequest
+	}
+	if settings.PlayerElaboration != PlayerElaborationRestrained && settings.PlayerElaboration != PlayerElaborationNatural && settings.PlayerElaboration != PlayerElaborationExpressive {
+		return NarrativeSettings{}, ErrInvalidRequest
+	}
+	if settings.NPCInitiative != NPCInitiativeResponsive && settings.NPCInitiative != NPCInitiativeContextual && settings.NPCInitiative != NPCInitiativeProactive {
 		return NarrativeSettings{}, ErrInvalidRequest
 	}
 	if len([]rune(settings.CustomInstruction)) > 1000 {
@@ -70,6 +92,8 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) NarrativeSettings {
 		"narrative_perspective":        &settings.Perspective,
 		"narrative_length":             &settings.Length,
 		"narrative_detail":             &settings.Detail,
+		"player_elaboration":           &settings.PlayerElaboration,
+		"npc_initiative":               &settings.NPCInitiative,
 		"narrative_custom_instruction": &settings.CustomInstruction,
 	} {
 		if value, err := metaGet(ctx, db, key); err == nil {
@@ -86,6 +110,7 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) NarrativeSettings {
 func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, request UpdateNarrativeSettingsRequest) (NarrativeSettings, WorldSummary, error) {
 	settings, err := validateNarrativeSettings(NarrativeSettings{
 		Perspective: request.Perspective, Length: request.Length, Detail: request.Detail,
+		PlayerElaboration: request.PlayerElaboration, NPCInitiative: request.NPCInitiative,
 		CustomInstruction: request.CustomInstruction,
 	})
 	if err != nil {
@@ -134,6 +159,8 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		"narrative_perspective":        settings.Perspective,
 		"narrative_length":             settings.Length,
 		"narrative_detail":             settings.Detail,
+		"player_elaboration":           settings.PlayerElaboration,
+		"npc_initiative":               settings.NPCInitiative,
 		"narrative_custom_instruction": settings.CustomInstruction,
 		"context_epoch":                strconv.FormatInt(currentEpoch+1, 10),
 		"updated_at":                   nowText(),
@@ -183,6 +210,39 @@ func narrativeDetailInstruction(settings NarrativeSettings) string {
 		return "可以增加较丰富的感官、环境和动作细节，但这些细节不得创造新事实或重复列举没有发生的变化。"
 	default:
 		return "使用平衡的描写密度，以清晰动作和对白为主，补充少量有作用的环境与感官细节。"
+	}
+}
+
+func playerElaborationInstruction(settings NarrativeSettings) string {
+	switch settings.PlayerElaboration {
+	case PlayerElaborationRestrained:
+		return "克制扮演：忠实转述玩家已经表达的内容，只补理解动作所需的必要衔接。玩家没有给出具体台词时优先使用间接叙述，不主动替主角拟写对白或感受。"
+	case PlayerElaborationExpressive:
+		return "小说共创：可以在主角设定和玩家本轮已经选择的方向内，更充分地补充主角的对白、连续日常动作和短暂感受，使段落自然完整；仍不得新增会影响后续的身份信息、秘密、目标、接受或拒绝、承诺、关系变化、关键资源处置、危险行动、移动目的地或下一步选择，也不得自行补出多轮 NPC 对话。"
+	default:
+		return "自然共创：不要机械复述输入。可以把玩家已经明确表达的意图自然补成与其等价的简短台词、日常动作、即时感官或身体反应和必要衔接；例如“跟老板打招呼”可以写成点头并说“晚上好”。补写只能改善当下表达，不得新增会影响后续的身份信息、秘密、目标、接受或拒绝、承诺、关系变化、关键资源处置、危险行动、移动目的地或下一步选择。"
+	}
+}
+
+func playerElaborationLabel(settings NarrativeSettings) string {
+	switch settings.PlayerElaboration {
+	case PlayerElaborationRestrained:
+		return "克制扮演"
+	case PlayerElaborationExpressive:
+		return "小说共创"
+	default:
+		return "自然共创"
+	}
+}
+
+func npcInitiativeInstruction(settings NarrativeSettings) string {
+	switch settings.NPCInitiative {
+	case NPCInitiativeResponsive:
+		return "回应为主：没有被直接交谈或直接触及职责、利益、安全、承诺和当前关切时，优先保持沉默；不要仅因在场就插话或采取新行动。"
+	case NPCInitiativeProactive:
+		return "积极互动：可以依据自己的身份、知识、经历和当前关切主动提问、试探、打趣、转移话题或采取相关行动，不必等待玩家点名；主动行为必须与眼前刺激相关，不抢走其他人物的回答，不凭空知道信息，也不为热闹而反复插话。"
+	default:
+		return "按情境主动：不必等玩家点名；当玩家行为自然触及你的身份职责、兴趣、安全、承诺或当前关切时，可以主动招呼、追问、试探、打趣或采取相关行动。普通进入、环顾和走动不要求每个在场人物都回应，也不要仅因在场而插话。"
 	}
 }
 

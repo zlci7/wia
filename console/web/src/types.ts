@@ -49,11 +49,15 @@ export interface Character {
 export type NarrativePerspective = 'first_person' | 'second_person' | 'third_person'
 export type NarrativeLength = 'concise' | 'standard' | 'detailed'
 export type NarrativeDetail = 'restrained' | 'balanced' | 'rich'
+export type PlayerElaboration = 'restrained' | 'natural' | 'expressive'
+export type NPCInitiative = 'responsive' | 'contextual' | 'proactive'
 
 export interface NarrativeSettings {
   perspective: NarrativePerspective
   length: NarrativeLength
   detail: NarrativeDetail
+  player_elaboration: PlayerElaboration
+  npc_initiative: NPCInitiative
   custom_instruction: string
 }
 
