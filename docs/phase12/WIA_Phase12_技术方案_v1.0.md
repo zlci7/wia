@@ -331,9 +331,9 @@ User、Session、UserPlayState、ActivationRequest、ModelProfileRevision、Worl
 
 | Purpose | 允许来源 |
 | --- | --- |
-| host_orchestrate | 剧本模式、固定事实、相关世界剧情及条件、当前世界时间、作者授权的隐情、场景、相关事件和 NPC 意图，不默认全量读取所有私有记忆 |
-| npc_decide | 本人定义与初始知识、本人感知、本人有效记忆/关切、本阶段新感知、对本人可见的场景 |
-| host_narrate | 带行动者来源与叙事代称的玩家可见事件投影、主角、当前存档的正文表达设置、公开叙事约束、玩家回顾与有效剧情正文尾部；不读取失败或取消输入作为历史，私聊原文只保留为脱敏行动事实 |
+| host_orchestrate | 剧本模式、固定事实、相关世界剧情及条件、当前世界时间、作者授权的隐情、场景、相关事件、NPC 意图及当前主角补写边界；只裁定玩家实际输入与人物已提交行动，不产生表现性补写 |
+| npc_decide | 本人定义与初始知识、本人感知、本人有效记忆/关切、本阶段新感知、对本人可见的场景及当前存档的 NPC 主动性 |
+| host_narrate | 带行动者来源与叙事代称的玩家可见事件投影、主角、当前存档的人称/篇幅/描写密度/主角补写幅度、公开叙事约束、玩家回顾与有效剧情正文尾部；不读取失败或取消输入作为历史，私聊原文只保留为脱敏行动事实 |
 | player_digest | 玩家可见的已提交内容、对应纠正及连续覆盖范围 |
 | character_maintain | 本人已提交感知、本人状态、适用纠正与来源 |
 | suggestions | 已提交玩家可见正文、主角、公开背景和有效玩家回顾 |
@@ -350,6 +350,10 @@ NPC 不读取整份玩家聊天记录、全局回顾或全知场景文本。NPC 
 ### 8.2 快照与来源完整性
 
 一次 run 冻结 owner/game/world、账户 active_revision、基础 heads、context_epoch、内容与角色修订、剧本模式及剧情约束版本、世界时间与节点状态版本、初始场景、模型档案 revision、宿主 generation 与世界运行 generation。阶段快照额外记录 stage、暂存事件水位与引用的场景版本；每条事件和感知保留其实际来源快照。派生结果引用确切 basis，不能混用新旧版本；world_id 相同也不代表旧运行任务仍有提交权。
+
+互动设置按世界保存。底层字段为 player_elaboration（restrained/natural/expressive）和 npc_initiative（responsive/contextual/proactive）；三个互动风格预设只负责成对设置这两个字段，用户单独调整后显示为自定义。默认值为 natural/contextual。设置更新递增 context_epoch，活动 run 期间拒绝修改；另存复制同一组设置。
+
+正文阶段允许的等价台词、日常动作和即时反应属于表现性补写，不创建新的持久事件，也不能被后续协调或 NPC 记忆当作来源。任何会成为后续依据的新身份、秘密、目标、承诺、关系、关键资源变化或危险行动必须在正文前成为有来源事件；最终正文不得自行补出新的 NPC 决定或多轮人物对话。
 
 人物上下文由有效摘要覆盖的连续前缀、未覆盖感知尾部及相关检索组成。自动摘要尚未完成时，尾部补足最近发生的事。相同来源按 ID 去重，当前刺激不重复注入。
 
@@ -600,7 +604,7 @@ Electron 开启隔离与沙箱，禁用页面 Node 能力，限制导航与 IPC�
 | `/api/v1/active-world` | 只读当前账户的 active_world_id、active_revision 和切换状态，供同账户设备同步 |
 | `/api/v1/worlds/{world}/entities` | entity_id 对应的角色实例、可见资料、定义引用、作者修订与路人提升 |
 | `/api/v1/worlds/{world}/messages` | 玩家正文游标分页，历史阅读不提供历史恢复能力 |
-| `/api/v1/worlds/{world}/agent-settings` | 更新当前世界的正文人称、篇幅、描写密度和补充写作偏好；携带 expected_context_epoch，当前回合运行时拒绝修改 |
+| `/api/v1/worlds/{world}/agent-settings` | 更新当前世界的互动风格底层字段、正文人称、篇幅、描写密度和补充写作偏好；携带 expected_context_epoch，当前回合运行时拒绝修改 |
 | `/api/v1/worlds/{world}/runs` | 输入、可选交谈对象 entity_id、幂等键、expected_active_revision 及 expected heads/epoch/运行版本；返回 202/run_id |
 | `/api/v1/worlds/{world}/runs/{run}` | 状态与非剧透阶段；取消/重试使用显式写接口 |
 | `/api/v1/worlds/{world}/corrections` | 纠正对象、范围、版本与重建进度 |
