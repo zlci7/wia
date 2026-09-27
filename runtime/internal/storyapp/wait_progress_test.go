@@ -13,8 +13,9 @@ func (g waitResultGenerator) GenerateText(context.Context, model.TextRequest) (m
 	return model.TextResponse{Text: marshalJSON(g.host)}, nil
 }
 
-func TestWaitingRequiresCurrentInterruptionEvidence(t *testing.T) {
+func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 	s := worldSnapshot{Summary: WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
+	s.Events = []Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
 	events := []Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
 	for _, tc := range []struct {
 		name    string
@@ -23,6 +24,7 @@ func TestWaitingRequiresCurrentInterruptionEvidence(t *testing.T) {
 		valid   bool
 	}{
 		{"boundary", 5, nil, true}, {"shortened", 1, nil, false}, {"wrong source", 1, []string{"another-run"}, false}, {"interrupted", 1, []string{"current-danger"}, true},
+		{"existing danger", 1, []string{"committed-danger"}, true}, {"future plan", 1, []string{"definition:lantern-dusk.plot.v2:courier_window"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := waitResultGenerator{hostResult{TimeMinutes: tc.minutes, Scene: "客栈", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}, InterruptSources: tc.ids}}

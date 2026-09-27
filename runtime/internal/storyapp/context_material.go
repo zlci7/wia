@@ -39,6 +39,7 @@ func composeCoordination(snapshot worldSnapshot, run Run, intent turnIntent, dec
 	input += plotContext(snapshot)
 	if snapshot.Plot != nil && intent.WaitMinutes > 0 {
 		input += fmt.Sprintf("\n本轮已表达的等待目标：%d分钟；当前允许执行到%d分钟。通常令 time_minutes 等于后者，日常添水、闲聊、保持观察等可在等待期间发生，不独立缩短玩家的等待。只有需要玩家即时作关键选择、直接危险或玩家明确指定的中止事件才提前停下。另输出 interrupt_source_ids 数组：提前停止时引用本轮确实造成中止的事件ID，否则为[]。输出实际等候后的情境，不提前解决未来节点。", intent.WaitMinutes, min(intent.WaitMinutes, plotTimeLimit(snapshot)))
+		input += "\n中断依据也可引用提供的已提交历史事件，但只有其影响仍在当前情境中成立时才用于中断；事件发生过不等于危险一直持续。引用真实 event_id，不使用人物ID、view别名或未来 definition 节点作为已经发生的证据。"
 	}
 	input += "\n清单内 player_action_intent 是玩家已经选择的尝试，也必须裁定实际结果，不能仅因玩家说已成功就确认成功；受已知条件、人物决定和本轮时间边界约束。等待仅执行到实际时点。清单外的玩家表达不新增 outcome。"
 	input += "\n完整字段类型：time_minutes 为整数，scene 为自然语言字符串（不是场景视图数组或对象）；scene_characters 为字符串数组；outcomes 为对象数组，每项仅含 action_id 字符串、status 字符串、content 字符串、recipients 字符串数组；scene_updates 为对象数组，每项仅含 content 字符串、source_ids 字符串数组、recipients 字符串数组。没有更新或行动时使用空数组，不使用 null。不输出额外字段。"

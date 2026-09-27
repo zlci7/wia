@@ -82,7 +82,7 @@ const (
 
 	intentPromptVersion       = "story.intent.v5"
 	npcPromptVersion          = "story.npc.v12"
-	coordinationPromptVersion = "story.coordination.v12"
+	coordinationPromptVersion = "story.coordination.v13"
 	narrationPromptVersion    = "story.narration.v11"
 )
 
@@ -1063,7 +1063,9 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	if snapshot.Plot != nil && intent.WaitMinutes > 0 {
 		for _, id := range result.InterruptSources {
 			e, ok := eventByID(events, id)
-			if !ok || e.RunID != run.RunID || e.Stage < 1 || e.Stage > 2 {
+			current := ok && e.RunID == run.RunID && e.Stage >= 1 && e.Stage <= 2
+			_, committed := eventByID(snapshot.Events, id)
+			if !current && !committed {
 				if a.logger != nil {
 					a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_interruption_source", run.RunID)
 				}

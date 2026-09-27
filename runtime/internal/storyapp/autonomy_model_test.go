@@ -25,6 +25,10 @@ func TestPlotRealModelSequence(t *testing.T) {
 	runRealStorySequence(t, []string{"我坐在客栈里静静等一个小时，遇到新的动静先停下来看看，不替我接受任务。", "我决定暂时不参加调查，继续在客栈等待一个小时，遇到新情况就停下。", "我仍不参与，留在客栈休息，等到夜渡离岸。"}, false)
 }
 
+func TestOpenWaitingRealModelSequence(t *testing.T) {
+	runRealStorySequence(t, []string{"我留在客栈等待一个小时，不参加调查；新动静发生时先停下。", "我不介入，继续在客栈等待一个小时，遇到新情况再停下。", "我继续留在客栈，等到末班夜渡离岸。", "我朝老板点头道谢，问她现在还有没有热茶。"}, false, "open")
+}
+
 func TestInterventionRealModelSequence(t *testing.T) {
 	runRealStorySequence(t, []string{"我等待下一次渡船的提醒，遇到新动静就停下。", "我离开客栈，走到码头仓棚门外，看看是否真有人需要帮助。", "我表明愿意帮忙；如果负伤的人愿意随我走，就护送他经侧门到渡船，同时请他自己保管证据。不要替他决定是否接受。", "我在安全处等待半小时，出现必须由我处理的危险就停下。", "我留在安全处等到末班夜渡离岸。", "我返回客栈，向老板问好。"}, false, "open")
 }
