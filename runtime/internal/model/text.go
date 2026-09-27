@@ -34,7 +34,8 @@ type TextRequest struct {
 }
 
 type TextResponse struct {
-	Text string
+	Text       string
+	Diagnostic TextDiagnostic
 }
 
 type TextGenerator interface {

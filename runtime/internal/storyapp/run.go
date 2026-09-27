@@ -53,6 +53,7 @@ type npcStageInput struct {
 }
 
 type narrativeEvent struct {
+	OutcomeStatus      string `json:"outcome_status,omitempty"`
 	EventID            string `json:"event_id"`
 	EventType          string `json:"event_type"`
 	ActorID            string `json:"actor_id"`
@@ -77,9 +78,9 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion       = "story.intent.v4"
-	npcPromptVersion          = "story.npc.v8"
-	coordinationPromptVersion = "story.coordination.v8"
-	narrationPromptVersion    = "story.narration.v8"
+	npcPromptVersion          = "story.npc.v9"
+	coordinationPromptVersion = "story.coordination.v9"
+	narrationPromptVersion    = "story.narration.v9"
 )
 
 type turnStageError struct {
@@ -119,6 +120,20 @@ func classifyTurnFailure(err error) (status, reason, message string) {
 		return "failed", "version_conflict", "the world changed before this turn could be saved"
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
+		return "failed", "generation_timeout", "the model response timed out"
+	}
+	switch model.TextErrorCode(err) {
+	case "network":
+		return "failed", "model_connection_failed", "the model connection failed"
+	case "provider_http":
+		return "failed", "model_service_failed", "the model service rejected the request"
+	case "empty_response":
+		return "failed", "model_empty_response", "the model returned no usable text"
+	case "output_incomplete", "output_limit":
+		return "failed", "model_output_incomplete", "the model output was incomplete"
+	case "invalid_response":
+		return "failed", "model_invalid_response", "the model response was invalid"
+	case "timeout":
 		return "failed", "generation_timeout", "the model response timed out"
 	}
 	if errors.Is(err, ErrModelNotConfigured) {
@@ -362,7 +377,7 @@ func (a *App) logRunFailure(worldID string, run Run, stage, reason string, err e
 	if a.logger == nil || err == nil {
 		return
 	}
-	a.logger.Printf("story turn failed: world_id=%q run_id=%q attempt=%d stage=%q reason=%q error=%v", worldID, run.RunID, run.Attempt, stage, reason, err)
+	a.logger.Printf("story turn failed: world_id=%q run_id=%q attempt=%d stage=%q reason=%q error_code=%q", worldID, run.RunID, run.Attempt, stage, reason, safeTurnErrorCode(err))
 }
 
 func (a *App) logRunStage(worldID string, run Run, stage turnStage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration) {
@@ -400,7 +415,7 @@ func (a *App) Run(ctx context.Context, worldID, runID string) (Run, error) {
 	return run, nil
 }
 
-func (a *App) ListRuns(ctx context.Context, worldID string) ([]Run, error) {
+func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...string) ([]Run, error) {
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return nil, err
@@ -413,6 +428,16 @@ func (a *App) ListRuns(ctx context.Context, worldID string) ([]Run, error) {
 		return nil, err
 	}
 	defer store.db.Close()
+	if len(requestKeys) > 0 && requestKeys[0] != "" {
+		run, found, err := readRunByRequest(ctx, store.db, requestKeys[0])
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return []Run{}, nil
+		}
+		return []Run{run}, nil
+	}
 	rows, err := store.db.QueryContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		return nil, err
@@ -697,7 +722,7 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, o
 		outcome.Status = strings.ToLower(cleanText(outcome.Status))
 		outcome.Content = cleanText(outcome.Content)
 		action, ok := actions[outcome.ActionID]
-		if !ok || seen[outcome.ActionID] || outcome.Content == "" || (outcome.Status != "succeeded" && outcome.Status != "failed" && outcome.Status != "partial") || outcome.Recipients == nil {
+		if !ok || seen[outcome.ActionID] || outcome.Content == "" || (outcome.Status != "succeeded" && outcome.Status != "failed" && outcome.Status != "partial" && outcome.Status != "not_executed") || outcome.Recipients == nil {
 			return nil, fmt.Errorf("%w: invalid outcome at index %d", ErrGenerationFailed, index)
 		}
 		seen[outcome.ActionID] = true
@@ -938,7 +963,7 @@ func normalizeNPCActionIntent(value string) string {
 }
 
 func formatSelfDecision(decision npcDecision) string {
-	return fmt.Sprintf("speech=%q；action_intent=%q；silent=%t；memory=%q", decision.Speech, decision.ActionIntent, decision.Silent, decision.Memory)
+	return fmt.Sprintf("已进入本轮交谈的本人公开对白：%q\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.ActionIntent, decision.Silent, decision.Memory)
 }
 
 func eventByID(events []Event, id string) (Event, bool) {
@@ -1025,7 +1050,11 @@ func narrativeEvents(events []Event, characters []Character, playerName string, 
 		} else if event.SourceType == "player_private" {
 			speechScope = "private_recipient"
 		}
-		result = append(result, narrativeEvent{SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
+		outcomeStatus := ""
+		if event.EventType == "npc_action_result" {
+			outcomeStatus = strings.TrimPrefix(event.SourceType, "action_")
+		}
+		result = append(result, narrativeEvent{OutcomeStatus: outcomeStatus, SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
 	}
 	return result
 }
@@ -1196,10 +1225,15 @@ func generateJSONMetrics(ctx context.Context, generator model.TextGenerator, sys
 }
 
 func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields []string, requiredFields ...string) (int, error) {
+	var lastValidation error
 	for attempt := 0; attempt < 2; attempt++ {
 		requestSystem := system
 		if attempt > 0 {
 			requestSystem += "\n上一次响应不是可接受的完整 JSON。请重新生成，只输出满足字段要求的单个 JSON 对象。"
+			var detail *generationJSONError
+			if errors.As(lastValidation, &detail) {
+				requestSystem += "\n本地字段校验：" + detail.Error() + "。按本地字段类型生成；只使用输出合同列出的字段。"
+			}
 		}
 		response, err := generator.GenerateText(ctx, model.TextRequest{System: requestSystem, Input: input, MaxInputTokens: 12000, MaxOutputTokens: maxOutput, MaxResponseBytes: 1 << 20})
 		if err != nil {
@@ -1208,7 +1242,11 @@ func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.
 			}
 			return attempt, err
 		}
-		if err := decodeGeneratedJSON(response.Text, target, nullableFields, requiredFields); err != nil {
+		lastValidation = decodeGeneratedJSON(response.Text, target, nullableFields, requiredFields)
+		if recorder, ok := generator.(interface{ recordJSONValidation(error) }); ok {
+			recorder.recordJSONValidation(lastValidation)
+		}
+		if err := lastValidation; err != nil {
 			if attempt == 0 {
 				continue
 			}
@@ -1221,12 +1259,12 @@ func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.
 
 func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields []string) error {
 	if err := validateStrictJSON([]byte(text)); err != nil {
-		return err
+		return &generationJSONError{Code: "json_syntax_invalid", Cause: err}
 	}
 	if len(requiredFields) > 0 {
 		var object map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(text), &object); err != nil || object == nil {
-			return ErrGenerationFailed
+			return &generationJSONError{Code: "json_object_required", Cause: ErrGenerationFailed}
 		}
 		nullable := make(map[string]bool, len(nullableFields))
 		for _, field := range nullableFields {
@@ -1235,10 +1273,10 @@ func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields
 		for _, field := range requiredFields {
 			raw, ok := object[field]
 			if !ok {
-				return fmt.Errorf("%w: required field %q is missing", ErrGenerationFailed, field)
+				return &generationJSONError{Code: "json_required_field_missing", Field: field, Cause: ErrGenerationFailed}
 			}
 			if strings.EqualFold(strings.TrimSpace(string(raw)), "null") && !nullable[field] {
-				return fmt.Errorf("%w: required field %q is null", ErrGenerationFailed, field)
+				return &generationJSONError{Code: "json_required_field_null", Field: field, Cause: ErrGenerationFailed}
 			}
 		}
 	}
@@ -1249,7 +1287,7 @@ func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields
 	decoder := json.NewDecoder(strings.NewReader(text))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		return err
+		return generatedDecodeError(err, target)
 	}
 	return nil
 }

@@ -228,6 +228,17 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("runs = %+v", runsEnvelope.Runs)
 	}
 
+	for _, key := range []string{"http-run-1", "missing-key"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs?request_key="+url.QueryEscape(key), nil)
+		decodeJSONBody(t, body, &runsEnvelope)
+		want := 0
+		if key == "http-run-1" {
+			want = 1
+		}
+		if response.StatusCode != http.StatusOK || len(runsEnvelope.Runs) != want {
+			t.Fatalf("request lookup: %d %s", response.StatusCode, body)
+		}
+	}
 	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID), nil)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("read world = %d, body = %s", response.StatusCode, body)

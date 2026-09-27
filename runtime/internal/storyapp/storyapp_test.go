@@ -1080,7 +1080,7 @@ func TestRunFailureRecordsStageReasonAndSafeDiagnostic(t *testing.T) {
 		t.Fatalf("failed run = %+v", finished)
 	}
 	logText := logger.String()
-	for _, want := range []string{`run_id="` + run.RunID + `"`, `stage="intent"`, `reason="intent_generation_failed"`, `required field "intent_type" is missing`} {
+	for _, want := range []string{`run_id="` + run.RunID + `"`, `stage="intent"`, `reason="intent_generation_failed"`, `error_code="json_required_field_missing"`, `field="intent_type"`} {
 		if !strings.Contains(logText, want) {
 			t.Fatalf("failure log %q does not contain %q", logText, want)
 		}
@@ -1540,7 +1540,7 @@ func TestNullableJSONFieldMustExistButMayBeNull(t *testing.T) {
 		[]string{"addressee_id"},
 		"intent_type", "addressee_id", "visibility",
 	)
-	if !errors.Is(err, ErrGenerationFailed) || !strings.Contains(err.Error(), `required field "addressee_id" is missing`) {
+	if !errors.Is(err, ErrGenerationFailed) || safeTurnErrorCode(err) != "json_required_field_missing" {
 		t.Fatalf("missing nullable field error = %v", err)
 	}
 }

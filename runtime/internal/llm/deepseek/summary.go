@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"gameagent/runtime/internal/model"
 	"gameagent/runtime/internal/tokenestimate"
@@ -15,7 +16,18 @@ import (
 
 var _ model.TextGenerator = (*Provider)(nil)
 
-func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
+func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (result model.TextResponse, callErr error) {
+	diagnostic := model.TextDiagnostic{}
+	defer func() {
+		if callErr != nil {
+			if diagnostic.Code == "" {
+				diagnostic.Code = model.TextErrorCode(callErr)
+			}
+			callErr = &model.TextCallError{Diagnostic: diagnostic, Cause: callErr}
+		} else {
+			result.Diagnostic = diagnostic
+		}
+	}()
 	if err := ctx.Err(); err != nil {
 		return model.TextResponse{}, err
 	}
@@ -61,10 +73,13 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (mod
 		return model.TextResponse{}, textRequestError(ctx, err)
 	}
 	defer httpResp.Body.Close()
+	diagnostic.HTTPStatus = httpResp.StatusCode
+	diagnostic.RequestID = model.SafeRequestID(httpResp.Header.Get("x-request-id"))
 	if err := ctx.Err(); err != nil {
 		return model.TextResponse{}, err
 	}
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		diagnostic.Code = "provider_http"
 		return model.TextResponse{}, fmt.Errorf("deepseek response failed: status=%d", httpResp.StatusCode)
 	}
 
@@ -82,11 +97,29 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (mod
 	if len(data) > req.MaxResponseBytes {
 		return model.TextResponse{}, model.ErrTextResponseTooLarge
 	}
+	var envelope struct {
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Status string `json:"status"`
+	}
+	_ = json.Unmarshal(data, &envelope)
+	finish := envelope.Status
+	if len(envelope.Choices) > 0 {
+		finish = envelope.Choices[0].FinishReason
+	}
+	diagnostic.FinishReason = model.SafeFinishReason(finish)
+	if finish == "length" || finish == "incomplete" {
+		diagnostic.Code = "output_incomplete"
+	}
 	resp, err := parseTextResponse(data)
 	if err != nil {
 		return model.TextResponse{}, err
 	}
 	if err := model.ValidateTextResponse(req, resp); err != nil {
+		if strings.TrimSpace(resp.Text) == "" {
+			diagnostic.Code = "empty_response"
+		}
 		if errors.Is(err, model.ErrInvalidTextResponse) {
 			return model.TextResponse{}, fmt.Errorf("%w: response text is empty or invalid UTF-8", err)
 		}
@@ -126,10 +159,10 @@ func parseTextResponse(data []byte) (model.TextResponse, error) {
 	}
 	choice := raw.Choices[0]
 	if choice.FinishReason != "stop" {
-		return model.TextResponse{}, fmt.Errorf("%w: finish_reason is %q", model.ErrInvalidTextResponse, choice.FinishReason)
+		return model.TextResponse{}, fmt.Errorf("%w: finish_reason is %q", model.ErrInvalidTextResponse, model.SafeFinishReason(choice.FinishReason))
 	}
 	if choice.Message.Role != "assistant" {
-		return model.TextResponse{}, fmt.Errorf("%w: message role is %q", model.ErrInvalidTextResponse, choice.Message.Role)
+		return model.TextResponse{}, fmt.Errorf("%w: message role is %q", model.ErrInvalidTextResponse, "invalid")
 	}
 	if choice.Message.Refusal != nil {
 		return model.TextResponse{}, fmt.Errorf("%w: response contains a refusal", model.ErrInvalidTextResponse)
@@ -150,5 +183,5 @@ func textRequestError(ctx context.Context, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return context.DeadlineExceeded
 	}
-	return errors.New("deepseek text request failed")
+	return &model.TextCallError{Diagnostic: model.TextDiagnostic{Code: "network"}, Cause: errors.New("model transport failed")}
 }

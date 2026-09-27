@@ -28,7 +28,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve data root: %v", err)
 	}
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, ModelConfigPath: *modelConfig, UserID: storyapp.LocalUserID, Logger: log.Default()})
+	diagnostics, err := storyapp.OpenDiagnosticLog(root)
+	if err != nil {
+		log.Fatal("open diagnostic log failed")
+	}
+	defer diagnostics.Close()
+	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, ModelConfigPath: *modelConfig, UserID: storyapp.LocalUserID, Logger: diagnostics.Logger(os.Stderr)})
 	if err != nil {
 		log.Fatalf("open World Is Agent: %v", err)
 	}

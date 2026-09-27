@@ -16,7 +16,18 @@ import (
 
 var _ model.TextGenerator = (*Provider)(nil)
 
-func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
+func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (result model.TextResponse, callErr error) {
+	diagnostic := model.TextDiagnostic{}
+	defer func() {
+		if callErr != nil {
+			if diagnostic.Code == "" {
+				diagnostic.Code = model.TextErrorCode(callErr)
+			}
+			callErr = &model.TextCallError{Diagnostic: diagnostic, Cause: callErr}
+		} else {
+			result.Diagnostic = diagnostic
+		}
+	}()
 	if err := ctx.Err(); err != nil {
 		return model.TextResponse{}, err
 	}
@@ -62,10 +73,13 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (mod
 		return model.TextResponse{}, textRequestError(ctx, err)
 	}
 	defer httpResp.Body.Close()
+	diagnostic.HTTPStatus = httpResp.StatusCode
+	diagnostic.RequestID = model.SafeRequestID(httpResp.Header.Get("x-request-id"))
 	if err := ctx.Err(); err != nil {
 		return model.TextResponse{}, err
 	}
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		diagnostic.Code = "provider_http"
 		return model.TextResponse{}, fmt.Errorf("openai response failed: status=%d", httpResp.StatusCode)
 	}
 
@@ -83,11 +97,29 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (mod
 	if len(data) > req.MaxResponseBytes {
 		return model.TextResponse{}, model.ErrTextResponseTooLarge
 	}
+	var envelope struct {
+		Choices []struct {
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Status string `json:"status"`
+	}
+	_ = json.Unmarshal(data, &envelope)
+	finish := envelope.Status
+	if len(envelope.Choices) > 0 {
+		finish = envelope.Choices[0].FinishReason
+	}
+	diagnostic.FinishReason = model.SafeFinishReason(finish)
+	if finish == "length" || finish == "incomplete" {
+		diagnostic.Code = "output_incomplete"
+	}
 	resp, err := parseTextResponse(data)
 	if err != nil {
 		return model.TextResponse{}, err
 	}
 	if err := model.ValidateTextResponse(req, resp); err != nil {
+		if strings.TrimSpace(resp.Text) == "" {
+			diagnostic.Code = "empty_response"
+		}
 		return model.TextResponse{}, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -150,5 +182,5 @@ func textRequestError(ctx context.Context, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return context.DeadlineExceeded
 	}
-	return errors.New("openai text request failed")
+	return &model.TextCallError{Diagnostic: model.TextDiagnostic{Code: "network"}, Cause: errors.New("model transport failed")}
 }

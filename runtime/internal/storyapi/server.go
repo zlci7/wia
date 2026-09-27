@@ -414,7 +414,7 @@ func (s *Server) copyOperation(w http.ResponseWriter, r *http.Request, operation
 }
 func (s *Server) runs(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method == "GET" {
-		runs, err := s.app.ListRuns(r.Context(), id)
+		runs, err := s.app.ListRuns(r.Context(), id, r.URL.Query().Get("request_key"))
 		if err != nil {
 			writeAppError(w, err)
 			return

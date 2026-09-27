@@ -143,9 +143,9 @@ func TestGenerateTextReportsSafeInvalidResponseMetadata(t *testing.T) {
 		body string
 		want string
 	}{
-		{"empty text", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":""}}]}`, "response text is empty"},
-		{"truncated", `{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"partial secret"}}]}`, `finish_reason is "length"`},
-		{"provider error", `{"error":{"message":"secret-body","code":"secret-code"}}`, "provider returned an error object"},
+		{"empty text", `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":""}}]}`, "code=empty_response"},
+		{"truncated", `{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":"partial secret"}}]}`, "code=output_incomplete"},
+		{"provider error", `{"error":{"message":"secret-body","code":"secret-code"}}`, "code=invalid_response"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := newTextTestProvider(t, http.StatusOK, tc.body)
@@ -335,4 +335,23 @@ func (b *textCountingBody) Read(p []byte) (int, error) {
 func (b *textCountingBody) Close() error {
 	b.closed = true
 	return nil
+}
+
+func TestTextCallDiagnosticMetadata(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("x-request-id", "request-123")
+		w.WriteHeader(429)
+		_, _ = io.WriteString(w, "SECRET_PROVIDER_BODY")
+	}))
+	defer server.Close()
+	p := NewProvider("SECRET_KEY", "model", WithBaseURL(server.URL))
+	p.client = server.Client()
+	_, err := p.GenerateText(context.Background(), model.TextRequest{Input: "PRIVATE_PLAYER_INPUT"})
+	var call *model.TextCallError
+	if !errors.As(err, &call) || call.Diagnostic.Code != "provider_http" || call.Diagnostic.HTTPStatus != 429 || call.Diagnostic.RequestID != "request-123" {
+		t.Fatalf("%v", err)
+	}
+	if strings.Contains(err.Error(), "SECRET") || strings.Contains(err.Error(), "PRIVATE") {
+		t.Fatal("unsafe diagnostic")
+	}
 }

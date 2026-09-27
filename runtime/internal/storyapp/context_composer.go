@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"gameagent/runtime/internal/model"
 	"gameagent/runtime/internal/tokenestimate"
@@ -151,6 +152,7 @@ type contextGenerator struct {
 	composer ContextComposer
 	material contextMaterial
 	logger   Logger
+	calls    int
 }
 
 func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot worldSnapshot, run Run, purpose, recipient string, stage int, template string) model.TextGenerator {
@@ -170,7 +172,22 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	if err != nil {
 		return model.TextResponse{}, err
 	}
-	return g.TextGenerator.GenerateText(ctx, req)
+	g.calls++
+	scope := g.composer.Scope
+	started := time.Now()
+	if g.logger != nil {
+		g.logger.Printf("story model call started: world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d call=%d", scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Recipient, scope.Stage, g.calls)
+	}
+	response, callErr := g.TextGenerator.GenerateText(ctx, req)
+	diagnostic := response.Diagnostic
+	var failure *model.TextCallError
+	if errors.As(callErr, &failure) {
+		diagnostic = failure.Diagnostic
+	}
+	if g.logger != nil {
+		g.logger.Printf("story model call finished: world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d call=%d elapsed_ms=%d success=%t error_code=%q http_status=%d provider_request_id=%q finish_reason=%q", scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Recipient, scope.Stage, g.calls, time.Since(started).Milliseconds(), callErr == nil, model.TextErrorCode(callErr), diagnostic.HTTPStatus, model.SafeRequestID(diagnostic.RequestID), model.SafeFinishReason(diagnostic.FinishReason))
+	}
+	return response, callErr
 }
 
 func dialogueSections(snapshot worldSnapshot) []contextSection {
