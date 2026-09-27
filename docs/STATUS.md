@@ -2,7 +2,7 @@
 
 更新时间：2026-09-27。
 
-仓库当前交付 Phase12 M1「核心游玩与可靠存档」。玩家可以从本地 Runtime 进入《暮灯镇的失踪信使》，连接真实 Provider 后连续游玩，并在独立世界之间读取、另存和继续。
+The local playtest build includes Phase12 M1 and M2. Players can run conditional story events, continue personal memories, inspect sources and correct records while keeping independent worlds and original prose. User experience acceptance remains separate from engineering verification.
 
 ## 已验证
 
@@ -42,12 +42,18 @@
 
 ## 已知范围
 
-长期摘要/检索、行动建议、内容编辑与导入、统一纠正、多用户真实登录、跨设备服务端、附件恢复和发行包不属于 M1 当前交付。真实模型的人物自然度、等待体验和连续游玩质量单独记录；现有短样本不能证明长程稳定，结构化生成失败也不归为可接受的创作偏差。
+Action suggestions, full content editing/import, server accounts, cross-device access, attachment recovery and release packaging remain M3/M4 work. M2 memory/correction mechanisms are implemented. Real-model naturalness, latency and continuity are evaluated separately; short successful sequences do not establish a stable failure rate.
 
 详细阶段记录：[Phase12 M1 验收记录](phase12/acceptance/M1.md)。
 
 ### NPC autonomy and behavior policies
 
-Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/acceptance/M1.md). Long-term concerns and conditional world progression remain M2 work.
+Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/acceptance/M1.md). M2 digests maintain scoped beliefs, relationships, concerns and commitments.
 
-Phase12 M2 is in progress. Conditional plot nodes, bounded world-time progression, resolved player interventions and recipient-scoped post-event scenes are connected to atomic turns. Supported reasoning models have a separate internal-reasoning allowance while visible answer limits stay unchanged. The latest two three-turn real-model sequences completed 6/6 turns without truncation, but full plot progression, long-term memory, retrieval and corrections remain unaccepted or unfinished. See [M2 verification](phase12/acceptance/M2.md) for timings and scope; this is not an M2 completion claim.
+### M2 world progression and memory
+
+Conditional nodes, bounded waiting, resolved interventions and recipient-scoped scenes commit atomically with each turn. Supported reasoning models reserve internal reasoning separately from visible output. Guided waiting reached all three plot times. Open-mode waiting and post-event dialogue completed four turns in five attempts, continuing to 20:05 after the final node. A separate ten-turn historical fixture plus real-model continuation verified compaction, a scoped correction, rebuild, copy and restart. A complete real-model rescue route remains unverified; the latest open-mode sample included a roughly 147-second turn.
+
+Each recipient has a continuous source index, a versioned digest and a complete recent tail. Search is scope-limited, and NPC-requested recall is bounded to two queries. Corrections preserve original records, advance the context epoch and use durable rebuild jobs. Required rebuilds block new generation and copying while preserving reading access; failed jobs can be retried.
+
+The browser “回顾与纠正” view supports paging, spoiler-gated author records, frozen editing versions and uncertain-request recovery. Frontend checks pass 24 settings/recovery cases and four memory-session cases. Real-model failures and quality limits remain in [M2 verification](phase12/acceptance/M2.md); M2 is not a stable-release claim.
