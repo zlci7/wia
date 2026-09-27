@@ -99,6 +99,11 @@ export function useExperience() {
   const textarea = ref<HTMLTextAreaElement>(),
     runs = reactive<Record<string, Run | undefined>>({});
   const seenFailures = new Map<string, string>();
+  type PendingSubmission = { key: string; input: string; retryID?: string; payload?: Parameters<typeof submitRun>[1] };
+  const submissions = reactive<Record<string, PendingSubmission | undefined>>({});
+  const pendingSubmission = computed(() => submissions[currentWorld.value?.world_id ?? ""]);
+  const now = ref(Date.now());
+  const waitingSeconds = computed(() => activeRun.value ? Math.max(0, Math.floor((now.value - Date.parse(activeRun.value.created_at)) / 1000)) : 0);
   const runRevisions = new Map<string, number>();
   const reader = useStoryReader(missingWorld),
     { session, viewport } = reader;
@@ -129,6 +134,7 @@ export function useExperience() {
   );
   const saved = computed(
     () =>
+      !pendingSubmission.value &&
       run.value?.status === "completed" &&
       !!run.value.message_seq &&
       (currentWorld.value?.message_head ?? 0) >= run.value.message_seq &&
@@ -148,6 +154,7 @@ export function useExperience() {
       !!currentWorld.value &&
       !session.value.sending &&
       !activeRun.value &&
+      !pendingSubmission.value &&
       !navigating.value,
   );
   const presets = [
@@ -237,6 +244,11 @@ export function useExperience() {
     return (
       (
         {
+          model_connection_failed: "模型连接失败，本轮未保存，输入已保留，可以重试。",
+          model_service_failed: "模型服务未能处理请求，本轮未保存，输入已保留；请检查连接或稍后重试。",
+          model_empty_response: "模型返回了空内容，本轮未保存，输入已保留，可以重试。",
+          model_output_incomplete: "模型输出未完整结束，本轮未保存，输入已保留；可以重试，持续发生时检查模型输出限制。",
+          model_invalid_response: "模型响应格式不可用，本轮未保存，输入已保留，可以重试。",
           narration_generation_failed:
             "故事正文没有成功生成，输入仍保留，可以重试。",
           npc_generation_failed: "有角色未完成回应，输入仍保留，可以重试。",
@@ -299,6 +311,7 @@ export function useExperience() {
   function missingWorld(id: string) {
     reader.forget(id);
     delete runs[id];
+    delete submissions[id];
     if (currentWorld.value?.world_id !== id) return;
     invalidateSettings();
     generation++;
@@ -380,6 +393,12 @@ export function useExperience() {
       if (epoch !== generation || !id || currentWorld.value?.world_id !== id)
         return;
       const runRevision = runRevisions.get(id) ?? 0;
+      const pending = submissions[id];
+      if (pending && !session.value.sending) {
+        const found = (await fetchRuns(id, pending.key))[0];
+        if (epoch !== generation || currentWorld.value?.world_id !== id || runRevision !== (runRevisions.get(id) ?? 0)) return;
+        if (found) settleSubmission(id, pending, found);
+      }
       const latest = (await fetchRuns(id))[0];
       if (epoch !== generation || currentWorld.value?.world_id !== id) return;
       if (session.value.sending || runRevision !== (runRevisions.get(id) ?? 0))
@@ -653,50 +672,62 @@ export function useExperience() {
       dialogBusy.value = false;
     }
   }
-  async function sendInput(retry = false) {
-    const world = currentWorld.value,
-      state = session.value,
-      failed = failedRun.value;
-    if (
-      !world ||
-      state.sending ||
-      activeRun.value ||
-      navigating.value ||
-      (!retry && !state.draft.trim())
-    )
-      return;
-    if (!status.value?.ready) {
-      if (!status.value || connectionError.value) {
-        state.sendError = "暂时无法确认连接状态，请重试连接后继续。";
-        return;
-      }
-      openModel();
-      return;
+  function settleSubmission(id: string, pending: PendingSubmission, result: Run) {
+    if (stopped || submissions[id] !== pending) return;
+    delete submissions[id];
+    const state = reader.sessions[id];
+    if (state) {
+      if (state.draft.trim() === pending.input.trim()) state.draft = "";
+      state.sendError = "";
     }
-    const id = world.world_id,
-      text = state.draft.trim();
+    if (!runs[id] || Date.parse(result.created_at) >= Date.parse(runs[id]!.created_at)) runs[id] = result;
+  }
+  async function sendInput(retry = false) {
+    const world = currentWorld.value, state = session.value, failed = failedRun.value;
+    if (!world || state.sending || navigating.value) return;
+    const id = world.world_id;
+    if (!submissions[id] && (activeRun.value || (!retry && !state.draft.trim()))) return;
+    if (!status.value?.ready && !submissions[id]) {
+      if (!status.value || connectionError.value) {
+        state.sendError = "暂时无法确认连接状态，请重试连接后继续。"; return;
+      }
+      openModel(); return;
+    }
+    if (!submissions[id]) {
+      if (retry && !failed) return;
+      const key = crypto.randomUUID();
+      submissions[id] = { key, input: retry ? failed!.input : state.draft.trim(),
+        retryID: retry ? failed!.run_id : undefined,
+        payload: retry ? undefined : {
+          request_key: key, input: state.draft.trim(), addressee_id: state.addressee || undefined,
+          expected_active_revision: status.value!.active_revision,
+          expected_message_head: world.message_head, expected_event_head: world.event_head,
+          expected_context_epoch: world.context_epoch,
+        },
+      };
+    }
+    const pending = submissions[id]!;
     runRevisions.set(id, (runRevisions.get(id) ?? 0) + 1);
     state.sending = true;
     state.sendError = "";
     try {
-      if (retry && !failed) return;
-      const result = retry
-        ? await retryRun(id, failed!.run_id)
-        : await submitRun(id, {
-            request_key: crypto.randomUUID(),
-            input: text,
-            addressee_id: state.addressee || undefined,
-            expected_active_revision: status.value.active_revision,
-            expected_message_head: world.message_head,
-            expected_event_head: world.event_head,
-            expected_context_epoch: world.context_epoch,
-          });
-      runs[id] = result;
-      if (state.draft.trim() === (retry ? failed!.input.trim() : text))
-        state.draft = "";
+      // Query first. Reusing the exact request key and baseline also covers a
+      // submission that arrives at the server after this lookup returns empty.
+      let result = (await fetchRuns(id, pending.key))[0];
+      if (stopped || currentWorld.value?.world_id !== id) return;
+      if (!result) result = pending.retryID
+        ? await retryRun(id, pending.retryID, pending.key)
+        : await submitRun(id, pending.payload!);
+      settleSubmission(id, pending, result);
       if (currentWorld.value?.world_id === id) await reader.latest();
     } catch (error) {
-      state.sendError = describe(error);
+      if (submissions[id] !== pending || stopped) return;
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+        delete submissions[id];
+        state.sendError = describe(error);
+      } else {
+        state.sendError = "暂时无法确认提交结果，输入已保留。系统会继续查询；再次确认时只使用同一份原请求。";
+      }
     } finally {
       state.sending = false;
       runRevisions.set(id, (runRevisions.get(id) ?? 0) + 1);
@@ -721,6 +752,7 @@ export function useExperience() {
   }
   function inputKeys(event: KeyboardEvent) {
     if (
+      !pendingSubmission.value &&
       event.ctrlKey &&
       event.key === "Enter" &&
       !event.isComposing &&
@@ -782,6 +814,7 @@ export function useExperience() {
       loaded.value = true;
     }
     timer = window.setInterval(() => {
+      now.value = Date.now();
       if (!navigating.value) void refresh();
     }, 1500);
   });
@@ -826,6 +859,8 @@ export function useExperience() {
     storyWorlds,
     recentWorld,
     activeRun,
+    pendingSubmission,
+    waitingSeconds,
     failedRun,
     saved,
     addresseeName,

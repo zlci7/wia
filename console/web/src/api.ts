@@ -18,22 +18,37 @@ export async function exchangeBootstrapToken(): Promise<void> {
   const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const token = fragment.get('token')
   if (!token) return
-  const response = await fetch('/api/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-  window.history.replaceState(null, '', window.location.pathname + window.location.search)
-  if (!response.ok) throw await toApiError(response)
+  try {
+    await request<void>('/api/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+  } finally {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  }
 }
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
+
+export const REQUEST_TIMEOUT_MS = 15000
+async function request<T>(url: string, init?: RequestInit, deadlineMS = REQUEST_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController()
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new ApiError(0, 'request_timeout', '连接等待超时，暂时无法确认操作结果。'))
+      controller.abort()
+    }, deadlineMS)
   })
-  if (!response.ok) throw await toApiError(response)
-  if (response.status === 204) return undefined as T
-  return await response.json() as T
+  try {
+    return await Promise.race([expired, (async () => {
+      const response = await fetch(url, {
+        ...init, signal: controller.signal,
+        headers: { Accept: 'application/json', ...(init?.headers ?? {}) },
+      })
+      if (!response.ok) throw await toApiError(response)
+      if (response.status === 204) return undefined as T
+      return await response.json() as T
+    })()])
+  } finally { clearTimeout(timeout) }
 }
 
 export async function fetchStatus(): Promise<Status> {
@@ -102,8 +117,8 @@ export async function fetchRun(worldID: string, runID: string): Promise<Run> {
   return result.run
 }
 
-export async function fetchRuns(worldID: string): Promise<Run[]> {
-  const result = await request<{ runs: Run[] }>(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs`)
+export async function fetchRuns(worldID: string, requestKey?: string): Promise<Run[]> {
+  const result = await request<{ runs: Run[] }>(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs${requestKey ? "?request_key=" + encodeURIComponent(requestKey) : ""}`)
   return Array.isArray(result.runs) ? result.runs : []
 }
 
@@ -111,9 +126,9 @@ export async function cancelRun(worldID: string, runID: string): Promise<void> {
   await request(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs/${encodeURIComponent(runID)}/cancel`, { method: 'POST' })
 }
 
-export async function retryRun(worldID: string, runID: string): Promise<Run> {
+export async function retryRun(worldID: string, runID: string, requestKey: string = crypto.randomUUID()): Promise<Run> {
   const result = await request<{ run: Run }>(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs/${encodeURIComponent(runID)}/retry`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_key: crypto.randomUUID() }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_key: requestKey }),
   })
   return result.run
 }
@@ -138,7 +153,7 @@ export async function fetchModel(): Promise<{ model: ModelInfo; model_error?: st
 export async function saveModel(candidate: ModelCandidate): Promise<Status> {
   return request('/api/v1/model-profiles', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(candidate),
-  })
+  }, 70000)
 }
 
 async function toApiError(response: Response): Promise<ApiError> {

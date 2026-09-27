@@ -53,7 +53,9 @@ const world = (id, epoch = 1) => ({
   message_head: 0,
   event_head: 0,
 });
-let active, records, pending, sent, experience;
+let active, records, pending, sent, experience, networkHook;
+const realSetTimeout = globalThis.setTimeout;
+const delay = (ms) => new Promise(resolve => realSetTimeout(resolve, ms));
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -61,12 +63,13 @@ function response(body, status = 200) {
   });
 }
 globalThis.fetch = async (url, init = {}) => {
+  if (networkHook) { const value = networkHook(url, init); if (value !== undefined) return value; }
   if (url === "/api/v1/games") return response({ games: [{ id: "demo" }] });
   if (url === "/api/v1/model-profiles")
     return response({ providers: [], model: {} });
   if (url === "/api/v1/status")
     return response({
-      status: { active_world: records[active].world, ready: true, model: {} },
+      status: { active_world: records[active].world, active_revision: 1, ready: true, model: {} },
     });
   if (url === "/api/v1/worlds")
     return response({ worlds: Object.values(records).map((r) => r.world) });
@@ -78,7 +81,7 @@ globalThis.fetch = async (url, init = {}) => {
       pending = resolve;
     });
   }
-  if (resource === "/runs") return response({ runs: [] });
+  if (resource.startsWith("/runs")) return response({ runs: [] });
   if (resource.startsWith("/messages"))
     return response({ messages: [], has_more: false });
   if (records[id]) return response(structuredClone(records[id]));
@@ -86,6 +89,7 @@ globalThis.fetch = async (url, init = {}) => {
 };
 async function setup() {
   active = "A";
+  networkHook = undefined;
   records = Object.fromEntries(
     ["A", "B"].map((id) => [
       id,
@@ -106,6 +110,123 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "pending input never inherits previous saved indicator"(x) {
+    const done = {run_id:"done", status:"completed", message_seq:1, created_at:new Date().toISOString()};
+    records.A.world.message_head = 1;
+    networkHook = (url, init) => {
+      if (url.includes("/runs?")) return response({runs:[]});
+      if (url.endsWith("/runs") && init.method === "POST") throw new TypeError("connection lost");
+      if (url.endsWith("/runs")) return response({runs:[done]});
+      if (url.includes("/messages")) return response({messages:[{seq:1,kind:"narrative",content:"已保存正文"}],has_more:false});
+    };
+    await x.freshRefresh();
+    assert.equal(x.saved.value,true);
+    x.session.value.draft="本次输入";
+    await x.sendInput();
+    assert(x.pendingSubmission.value);
+    assert.equal(x.saved.value,false);
+  },
+  async "hung polling expires and later polling recovers without late overwrite"(x) {
+    globalThis.setTimeout = (fn, ms, ...args) => realSetTimeout(fn, ms === 15000 ? 20 : ms, ...args);
+    let release;
+    networkHook = (url) => url === "/api/v1/status" ? new Promise(resolve => { release = resolve; }) : undefined;
+    await x.freshRefresh();
+    assert.match(x.connectionError.value, /超时/);
+    networkHook = undefined;
+    active = "B";
+    await x.freshRefresh();
+    release(response({status:{active_world: records.A.world}}));
+    await delay(5);
+    assert.equal(x.currentWorld.value.world_id, "B");
+    assert.equal(x.connectionError.value, "");
+  },
+  async "accepted submission with lost response is reconciled without replay"(x) {
+    let accepted, posts = 0;
+    networkHook = (url, init) => {
+      if (url.includes("/runs?")) return response({runs: accepted ? [accepted] : []});
+      if (url.endsWith("/runs") && init.method === "POST") {
+        posts++;
+        const body = JSON.parse(init.body);
+        accepted = {run_id:"r1",request_key:body.request_key,input:body.input,status:"completed",created_at:new Date().toISOString()};
+        throw new TypeError("connection lost");
+      }
+      if (url.endsWith("/runs")) return response({runs:accepted ? [accepted] : []});
+    };
+    x.session.value.draft = "问候";
+    await x.sendInput();
+    assert.equal(x.pendingSubmission.value.input, "问候");
+    assert.equal(x.session.value.draft, "问候");
+    await x.freshRefresh();
+    assert.equal(x.pendingSubmission.value, undefined);
+    assert.equal(x.session.value.draft, "");
+    assert.equal(posts, 1);
+  },
+  async "uncertain resubmission preserves original key payload and edited draft"(x) {
+    const bodies = [];
+    networkHook = (url, init) => {
+      if (url.includes("/runs?")) return response({runs:[]});
+      if (url.endsWith("/runs") && init.method === "POST") {
+        bodies.push(JSON.parse(init.body));
+        if (bodies.length === 1) throw new TypeError("connection lost");
+        return response({run:{run_id:"r1",status:"running",request_key:bodies[1].request_key,input:bodies[1].input,created_at:new Date().toISOString()}},202);
+      }
+    };
+    x.session.value.draft = "原来的问候";
+    await x.sendInput();
+    x.session.value.draft = "下一句话";
+    assert.equal(x.canSubmit.value,false);
+    await x.sendInput();
+    assert.deepEqual(bodies[0],bodies[1]);
+    assert.equal(x.session.value.draft,"下一句话");
+    assert.equal(x.pendingSubmission.value,undefined);
+  },
+  async "late submission response never clears another world draft"(x) {
+    let release;
+    networkHook = (url,init) => {
+      if (url.includes("/runs?")) return response({runs:[]});
+      if (init.method === "POST" && url.endsWith("/runs")) return new Promise(resolve=>{release=resolve;});
+    };
+    x.session.value.draft = "A的行动";
+    const sending=x.sendInput();
+    while(!release) await delay(1);
+    active="B"; await x.freshRefresh();
+    x.session.value.draft="B的行动";
+    release(response({run:{run_id:"a1",status:"running",input:"A的行动",created_at:new Date().toISOString()}},202));
+    await sending;
+    assert.equal(x.currentWorld.value.world_id,"B");
+    assert.equal(x.session.value.draft,"B的行动");
+    assert.equal(x.activeRun.value,undefined);
+  },
+  async "retry with lost response reuses same retry request key"(x) {
+    const failed={run_id:"failed1",status:"failed",input:"重试输入",created_at:new Date().toISOString()};
+    let bodies=[];
+    networkHook=(url,init)=>{
+      if(url.includes("/runs?")) return response({runs:[]});
+      if(url.endsWith("/retry")){
+        bodies.push(JSON.parse(init.body));
+        if(bodies.length===1) throw new TypeError("lost");
+        return response({run:{...failed,run_id:"retry1",status:"running"}},202);
+      }
+      if(url.endsWith("/runs")) return response({runs:[failed]});
+    };
+    await x.freshRefresh();
+    await x.sendInput(true);
+    await x.sendInput();
+    assert.equal(bodies.length,2);
+    assert.deepEqual(bodies[0],bodies[1]);
+  },
+  async "cancel response loss is reconciled from actual terminal run status"(x) {
+    const run={run_id:"r1",status:"running",input:"取消输入",created_at:new Date().toISOString()};
+    networkHook=(url,init)=>{
+      if(url.endsWith("/cancel")) {run.status="cancelled"; throw new TypeError("lost");}
+      if(url.endsWith("/runs")) return response({runs:[run]});
+    };
+    await x.freshRefresh();
+    await x.stopRun();
+    assert.equal(x.activeRun.value,undefined);
+    assert.equal(x.failedRun.value.status,"cancelled");
+    assert.equal(x.session.value.draft,"取消输入");
+  },
   async "policy draft is detached from saved settings and polling"(x) {
     x.openSettings();
     x.settingsForm.behavior_policies.npc = "自定义决定";
@@ -267,6 +388,7 @@ for (const [name, test] of Object.entries(tests)) {
     failures++;
     console.error(`FAIL ${name}: ${error.message}`);
   } finally {
+    globalThis.setTimeout = realSetTimeout;
     app.unmount();
     await nextTick();
   }

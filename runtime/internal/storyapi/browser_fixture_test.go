@@ -132,7 +132,7 @@ func TestBrowserFixture(t *testing.T) {
 			}
 			failPath, delayPath = request.FailPath, request.DelayPath
 			delayMS = 1800
-			if request.DelayMS > 0 && request.DelayMS <= 10000 {
+			if request.DelayMS > 0 && request.DelayMS <= 30000 {
 				delayMS = request.DelayMS
 			}
 			controls.Unlock()

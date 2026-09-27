@@ -22,6 +22,13 @@
 | 设置编辑并发 | 8 项设置逻辑回归及真实 HTTP 浏览器验证通过，覆盖旧版本冲突、跨存档失效和迟到返回 |
 | 真实模型连续游玩 | DeepSeek 上下文专项最新五轮 5/5；连续试验共 18/19 完成，含一次协调失败。叙事偏差与长程质量仍需验收 |
 
+## Turn recovery and diagnostics
+
+- Requests have bounded client waits. Uncertain submissions retain their original idempotency key and payload; polling reconciles accepted work without automatically replaying actions.
+- Model-call and JSON-validation diagnostics are written to rotating, content-free `story-app/logs/runtime.log` files. Provider failures, timeouts, incomplete output and schema failures are distinguished.
+- NPC pending actions are separated from spoken dialogue. Coordination supports sourced `not_executed` outcomes for overlapping or unnecessary proposals.
+- This focused evaluation completed 6 of 7 real-model turns; the latest three-turn sequence completed 3/3. A coordination-format failure and remaining prose continuity deviations are documented in the M1 acceptance record. Frontend recovery/settings checks pass 19/19.
+
 ## M1 能力
 
 - 每个世界一个 SQLite 数据库，保存正文、事件、人物感知、人物记忆和世界时间。

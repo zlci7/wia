@@ -33,6 +33,8 @@ const {
   storyWorlds,
   recentWorld,
   activeRun,
+  pendingSubmission,
+  waitingSeconds,
   failedRun,
   saved,
   addresseeName,
@@ -325,7 +327,7 @@ const policyOptions = [
               </button>
             </div>
           </div>
-          <div v-if="failedRun" class="run-card failed-card">
+          <div v-if="failedRun && !pendingSubmission" class="run-card failed-card">
             <p>{{ failureText(failedRun) }}</p>
             <button
               class="secondary-button"
@@ -365,8 +367,10 @@ const policyOptions = [
             ><span class="save-status">{{
               session.sending
                 ? "正在处理"
-                : activeRun
-                  ? "正在生成"
+                : pendingSubmission
+                  ? "提交结果待确认"
+                  : activeRun
+                  ? `正在生成 · 已等待 ${waitingSeconds} 秒`
                   : failedRun
                     ? failedRun.status === "cancelled"
                       ? "本轮已取消"
@@ -386,9 +390,13 @@ const policyOptions = [
             @keydown="inputKeys"
             @input="resizeInput"
           ></textarea>
-          <p v-if="session.sendError" class="inline-error" role="alert">
+          <p v-if="session.sendError && !pendingSubmission" class="inline-error" role="alert">
             {{ session.sendError }}
           </p>
+          <div v-if="pendingSubmission && !session.sending" class="inline-error" role="status">
+            提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
+            <button type="button" class="secondary-button" @click="sendInput()">确认或重发原请求</button>
+          </div>
           <div class="composer-footer">
             <span>Ctrl + Enter 提交</span
             ><button
