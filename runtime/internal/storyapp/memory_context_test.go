@@ -258,3 +258,39 @@ func TestMemoryPaginationUsesMessageOrderAndExcludesFailedRuns(t *testing.T) {
 		t.Fatal(count)
 	}
 }
+
+func TestSubjectiveMemoryIdentifiesItsOwner(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	w, err := a.CreateWorld(ctx, "主观来源", "open", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedMemoryHistory(t, a, w.WorldID)
+	path, _, _ := a.worldRecord(ctx, w.WorldID)
+	s, err := openWorldDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.db.Exec(`INSERT INTO memories(recipient_id,kind,content,source_event_id,created_at) VALUES('npc:innkeeper','character_judgment','我还不能信任他。','fixture-history-01:input','now')`)
+	s.db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", true, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, source := range v.Sources {
+		if strings.HasPrefix(source.Kind, "subjective:") {
+			found = true
+			if source.Actor != "npc:innkeeper" || source.EventID != "fixture-history-01:input" {
+				t.Fatal("judgment owner confused with triggering speaker", source)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("subjective memory absent")
+	}
+}
