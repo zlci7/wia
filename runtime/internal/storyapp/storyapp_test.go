@@ -575,7 +575,7 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 		value string
 		want  string
 	}{
-		{NPCInitiativeResponsive, "优先保持沉默"},
+		{NPCInitiativeResponsive, "处理必要事务"},
 		{NPCInitiativeContextual, "按情境主动"},
 		{NPCInitiativeProactive, "主动提问、试探、打趣"},
 	}

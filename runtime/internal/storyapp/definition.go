@@ -26,8 +26,8 @@ func lanternDefinition() gameDefinition {
 		Clock:   "第 1 日 19:00",
 		Secret:  "沈岚在柜台下藏着一枚染血的信蜡，知道失踪信使曾在今晚来过；铁杉只注意到有人和沈岚低声交谈过，不知道谈话内容。",
 		Characters: []Character{
-			{EntityID: "npc:innkeeper", DefinitionID: "innkeeper.v1", Name: "沈岚", Role: "客栈老板", Profile: "谨慎、善于观察，不愿让客人恐慌。她熟悉旧渡口的每一条消息，遇到危险时先保护客栈和无辜者。", Knowledge: "知道失踪信使曾在今晚来过；知道柜台下的染血信蜡，但不会主动向陌生人承认。", InScene: true},
-			{EntityID: "npc:mercenary", DefinitionID: "mercenary.v1", Name: "铁杉", Role: "佣兵", Profile: "寡言、务实、对危险敏感。会根据自己看见和听见的迹象判断，不会凭空知道别人的秘密。", Knowledge: "看见客栈里的人进出和异常动静；不知道沈岚藏着什么。", InScene: true},
+			{EntityID: "npc:innkeeper", DefinitionID: "innkeeper.v1", Name: "沈岚", Role: "客栈老板", Profile: "谨慎、善于观察，不愿让客人恐慌。她熟悉旧渡口的每一条消息，遇到危险时先保护客栈和无辜者。", InitialConcerns: "今晚的异常让她担心客栈安全。她希望在打烊前弄清风险，同时保护客人和自己掌握的秘密；对陌生人的可靠程度保持观察。", Knowledge: "知道失踪信使曾在今晚来过；知道柜台下的染血信蜡，但不会主动向陌生人承认。", InScene: true},
+			{EntityID: "npc:mercenary", DefinitionID: "mercenary.v1", Name: "铁杉", Role: "佣兵", Profile: "寡言、务实、对危险敏感。会根据自己看见和听见的迹象判断，不会凭空知道别人的秘密。", InitialConcerns: "想弄清自己察觉的异常是否意味着危险，根据掌握的迹象决定查探、询问、提醒他人或继续观察。", Knowledge: "看见客栈里的人进出和异常动静；不知道沈岚藏着什么。", InScene: true},
 		},
 		Bystanders: []string{"卖花的老人", "戴蓝围巾的学生", "赶车人", "河运工", "带孩子的旅客", "醉酒的木匠", "灰帽商人", "修钟匠", "披斗篷的妇人", "打瞌睡的船夫"},
 	}

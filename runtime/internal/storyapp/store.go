@@ -280,6 +280,9 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		}
 	}
 	for _, c := range def.Characters {
+		if err := metaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`, c.EntityID, c.DefinitionID, c.Name, c.Role, c.Profile, c.Knowledge, boolInt(c.InScene)); err != nil {
 			return err
 		}
@@ -407,7 +410,7 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 }
 
 func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
-	rows, err := db.QueryContext(ctx, `SELECT entity_id,definition_id,name,role,profile,knowledge,in_scene FROM characters ORDER BY entity_id`)
+	rows, err := db.QueryContext(ctx, `SELECT c.entity_id,c.definition_id,c.name,c.role,c.profile,c.knowledge,c.in_scene,COALESCE(m.value,'') FROM characters c LEFT JOIN meta m ON m.key='initial_concerns:' || c.entity_id ORDER BY c.entity_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +419,7 @@ func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
 	for rows.Next() {
 		var c Character
 		var in int
-		if err := rows.Scan(&c.EntityID, &c.DefinitionID, &c.Name, &c.Role, &c.Profile, &c.Knowledge, &in); err != nil {
+		if err := rows.Scan(&c.EntityID, &c.DefinitionID, &c.Name, &c.Role, &c.Profile, &c.Knowledge, &in, &c.InitialConcerns); err != nil {
 			return nil, err
 		}
 		c.InScene = in != 0

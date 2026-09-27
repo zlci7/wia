@@ -122,13 +122,14 @@ type WorldSummary struct {
 }
 
 type Character struct {
-	EntityID     string `json:"entity_id"`
-	DefinitionID string `json:"definition_id"`
-	Name         string `json:"name"`
-	Role         string `json:"role"`
-	Profile      string `json:"profile"`
-	Knowledge    string `json:"knowledge"`
-	InScene      bool   `json:"in_scene"`
+	EntityID        string `json:"entity_id"`
+	DefinitionID    string `json:"definition_id"`
+	Name            string `json:"name"`
+	Role            string `json:"role"`
+	Profile         string `json:"profile"`
+	Knowledge       string `json:"knowledge"`
+	InitialConcerns string `json:"initial_concerns"`
+	InScene         bool   `json:"in_scene"`
 }
 
 // PublicCharacter is the player-facing character projection. Private role

@@ -323,6 +323,9 @@ func TestPrivateSceneViewsSurviveCopyAndRuntimeRestart(t *testing.T) {
 	defer reopened.Close()
 	for _, id := range []string{w.WorldID, op.TargetWorldID} {
 		after := readContextSnapshot(t, reopened, id)
+		if !reflect.DeepEqual(before.Characters, after.Characters) {
+			t.Fatal("character initial concerns changed across restart/copy")
+		}
 		if !reflect.DeepEqual(before.SceneViews, after.SceneViews) {
 			t.Fatal("scene provenance changed across restart/copy")
 		}

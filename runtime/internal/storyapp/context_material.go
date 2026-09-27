@@ -30,7 +30,7 @@ func composeCoordination(snapshot worldSnapshot, run Run, intent turnIntent, dec
 	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\nNPC 协调提案（只包含公开对白、行动尝试与沉默状态，不含个人记忆）：\n%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", GameID, coordinationScene(snapshot), snapshot.Summary.Clock, publicCharacters, formatBystanders(snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, playerElaborationLabel(snapshot.Narrative), publicReplies, coordinationDecisionContext(decisions, snapshot.Characters), actionJSON, availableCharacterIDs(snapshot.Characters), strings.Join(characterIDs(sceneCharacters(snapshot.Characters)), ","))
 
 	input += sceneSourcePrompt(snapshot, run, intent, events)
-	return contextMaterial{System: "你是场景协调 Agent。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。玩家输入、公开对白和此前已提交结果都不另建 outcome，不为它们编造行动 ID。", RequiredSources: append(eventIDs(events), sceneViewSources(snapshot, "")...), Required: input, Optional: coordinationSections(snapshot.Events)}
+	return contextMaterial{System: "你是场景协调 Agent。NPC 可以处理自己的事务，无实际冲突的日常行动可自然完成；不以玩家未请求为由阻止自主行动，存在障碍或风险时依据已知条件裁定。玩家已选择的方向可以自然执行，新重要选择交还玩家。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。玩家输入、公开对白和此前已提交结果都不另建 outcome，不为它们编造行动 ID。", RequiredSources: append(eventIDs(events), sceneViewSources(snapshot, "")...), Required: input, Optional: coordinationSections(snapshot.Events)}
 }
 
 func composeNarration(snapshot worldSnapshot, run Run, def gameDefinition, recipient, intentType string, visibleEvents []Event, clock string, sceneCharacters []string) (contextMaterial, int, error) {
@@ -69,13 +69,14 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "世界：%s；地点：%s；时间：%s；阶段：%d；玩家意图类型：%s\n", GameID, sceneFor(snapshot, character.EntityID), snapshot.Summary.Clock, stage, intentType)
 	fmt.Fprintf(&builder, "你的身份：%s（%s）\n角色资料：%s\n你知道的初始背景：%s\n", character.Name, character.Role, character.Profile, character.Knowledge)
+	fmt.Fprintf(&builder, "你的初始关切（故事开始时的动机，不是固定动作脚本）：%s\n结合已提交经历判断关切是否仍然成立；已经完成的事项保持完成，受阻的计划可以调整、延后或放弃。\n", character.InitialConcerns)
 	fmt.Fprintf(&builder, "本存档的 NPC 主动性：%s\n", npcInitiativeInstruction(snapshot.Narrative))
 	if recipient == "" {
 		builder.WriteString("玩家本轮没有明确指定具体对象。你获得了这次感知，请按照本存档的 NPC 主动性和自己的角色关切决定是否回应；可以沉默，也可以在规则允许时主动介入。\n")
 	} else if recipient == character.EntityID {
 		fmt.Fprintf(&builder, "玩家本轮明确对你说话，目标是%s。你是直接回应者，请优先决定你对玩家的自然回应。\n", describeRecipient(def, recipient))
 	} else {
-		fmt.Fprintf(&builder, "玩家本轮明确对%s说话。你不是直接回应者，不要代替目标人物回答；只有在有自然理由时才公开反应，否则保持沉默。\n", describeRecipient(def, recipient))
+		fmt.Fprintf(&builder, "玩家本轮明确对%s说话。你不是直接回应者，不要代替目标人物回答；只有在有自然理由时才公开反应，是否说话与是否处理自己的事务分别判断。\n", describeRecipient(def, recipient))
 	}
 	if priorTurn != "" {
 		fmt.Fprintf(&builder, "本轮此前你自己的决定：\n%s\n", priorTurn)
@@ -83,7 +84,7 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 	fmt.Fprintf(&builder, "本轮玩家输入中你实际获知的部分：\n%s\n", stageInput.PlayerPerception)
 	if stageInput.NewStimulus == "" {
 		builder.WriteString("本阶段新增外部刺激：\n（暂无）\n")
-		builder.WriteString("本阶段任务：基于玩家本轮输入作出一次自然决定。\n")
+		builder.WriteString("本阶段任务：根据自己的角色资料、初始关切、已提交经历和当前感知决定下一步。玩家输入是处境的一部分，不是行动的唯一依据；你可以回应他人、处理自己的事务、延续已有计划、主动发起互动或保持沉默。沉默只表示没有说话，不影响提出行动尝试；不要求每轮都行动。\n")
 	} else {
 		fmt.Fprintf(&builder, "本阶段新增外部刺激：\n%s\n", stageInput.NewStimulus)
 		builder.WriteString("本阶段任务：玩家输入已经在前一阶段处理过。只判断是否需要对新增外部刺激追加反应，不要重新回答玩家，也不要把自己此前的决定当成新消息。\n")
