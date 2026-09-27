@@ -194,11 +194,11 @@ func narrativePerspectiveInstruction(settings NarrativeSettings, playerName stri
 func narrativeLengthInstruction(settings NarrativeSettings) (string, int) {
 	switch settings.Length {
 	case NarrativeLengthConcise:
-		return "正文保持简短，通常为 120 至 300 个汉字，优先保留本轮变化与关键对白。", 768
+		return "直接呈现关键回应和变化，简单互动可以用几句话结束。篇幅随本轮新增内容决定，不设最低字数，不用重复环境、已完成动作或等待状态填充。", 768
 	case NarrativeLengthDetailed:
-		return "正文可以细致展开，通常为 600 至 1200 个汉字，但不得用重复状态或无意义的否定句填充篇幅。", 3072
+		return "对有信息量的对白、动作和观察充分展开，简单回应仍可简短结束。篇幅随本轮新增内容决定，不设最低字数，不用重复环境、已完成动作或等待状态填充。", 3072
 	default:
-		return "正文使用标准篇幅，通常为 300 至 600 个汉字，完整呈现本轮变化并保持节奏。", 1536
+		return "根据本轮新增内容适度展开，首次观察或重要变化时增加细节，简单问答可以简短结束。不设最低字数，不用重复环境、已完成动作或等待状态填充。", 1536
 	}
 }
 
@@ -207,10 +207,14 @@ func narrativeDetailInstruction(settings NarrativeSettings) string {
 	case NarrativeDetailRestrained:
 		return "描写保持克制，只写理解本轮所需的动作、对白和环境变化。"
 	case NarrativeDetailRich:
-		return "可以增加较丰富的感官、环境和动作细节，但这些细节不得创造新事实或重复列举没有发生的变化。"
+		return "可以增加较丰富的感官、环境和动作细节，补充符合当前情境的临时、低影响表现。影响后续进程的关键事实、人物决定和持续状态，以已有设定及本轮确认结果为依据；细节不与已有内容矛盾，不制造新的后续依据。"
 	default:
 		return "使用平衡的描写密度，以清晰动作和对白为主，补充少量有作用的环境与感官细节。"
 	}
+}
+
+func narrativePacingInstruction() string {
+	return "围绕本轮新增内容展开，在有意义的对白、动作或观察结束处自然收笔。默认以最后一句有内容的对白或动作结束，不另起一段让人物看着主角、等主角回答或解释可以不回答。例如问候可以停在老板的‘晚上好’，观察可以停在一处相关细节；这些结束方式已经把下一步留给玩家。保留玩家控制权，是把尚未选择的重要行动留给玩家，不是每轮提醒轮到玩家操作。仅在等待本身具有剧情意义时呈现等待，例如约定的人迟迟未到；不以‘等你回答——或不答’‘等你多说什么——或不急说’等套话固定收尾。历史正文只提供连续状态，不提供必须模仿的句式或收尾模板；已经完成的动作保持完成，从当前状态接续本轮意图。"
 }
 
 func playerElaborationInstruction(settings NarrativeSettings) string {

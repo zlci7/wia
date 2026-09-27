@@ -56,7 +56,7 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		return model.TextResponse{}, err
 	}
 	g.mu.Lock()
-	g.requests = append(g.requests, req.Input)
+	g.requests = append(g.requests, req.System+"\n"+req.Input)
 	fail := g.fail
 	g.mu.Unlock()
 	if fail {
@@ -480,7 +480,9 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	}
 	for _, want := range []string{
 		"使用第一人称有限视角",
-		"通常为 120 至 300 个汉字",
+		"直接呈现关键回应和变化",
+		"不设最低字数",
+		"仅在等待本身具有剧情意义时呈现等待",
 		"较丰富的感官、环境和动作细节",
 		"小说共创",
 		"对白简洁，环境偏冷峻。",
@@ -494,6 +496,9 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	}
 	if !strings.Contains(npcPrompt, "积极互动") || !strings.Contains(npcPrompt, "主动提问、试探、打趣") {
 		t.Fatalf("NPC prompt does not apply proactive initiative: %s", npcPrompt)
+	}
+	if !strings.Contains(npcPrompt, "speech、action_intent、memory 均为字符串") || !strings.Contains(npcPrompt, "silent 是布尔值") {
+		t.Fatal("NPC prompt missing existing field type contract")
 	}
 
 	reloaded, err := app.ReadWorld(context.Background(), world.WorldID, 20)
