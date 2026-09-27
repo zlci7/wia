@@ -8,6 +8,8 @@ M1「核心游玩与可靠存档」的实现和工程验证已完成，交付物
 
 当前成果包含结构化回合意图解析、明确目标与私聊隔离、NPC 协调结果与玩家叙述分层、带来源与人称代称的玩家行动投影、默认自然共创与三档互动风格、可独立配置的主角补写幅度和 NPC 主动性、存档级叙事人称/篇幅/描写设置、行动结果到人物感知的闭环、阶段内个人上下文延续、场景人物进出与版本原子提交、按输入顺序约束的失败重试、受宿主生命周期管理的可靠另存、首页/剧本详情/游玩三级导航与活动世界解耦、按剧本管理并确认删除存档、原子模型配置发布、单数据根进程互斥、运行状态恢复和本地 Origin 校验。
 
+M1 游玩界面提供持久顶栏与底部输入区、正文双向分页及阅读锚点恢复、每存档独立的页面会话草稿和交谈对象、响应式场景人物栏、简化的故事设置与首次模型连接、默认存档命名、就地操作反馈和统一弹窗交互。工程与浏览器验证分别记录于 [M1 验收记录](acceptance/M1.md)；本轮不改变 NPC 决策、叙事语义、世界时间和存档事务，也不代表 M2 或 M3 整体完成。
+
 ## 阶段状态
 
 | 阶段 | 实现 | 工程验证 | 用户体验验收 | 证据 |
@@ -28,4 +30,6 @@ cd D:\data\project\game-agent\world-is-agent
 
 ## 已知验证边界
 
-最近一次验证已通过：`go test ./... -count=1`、`go test -race ./runtime/internal/storyapp ./runtime/internal/storyapi -count=1`、`go vet ./runtime/internal/storyapp ./runtime/internal/storyapi ./runtime/cmd/server`、`npm run type-check`、`npm run build`、`git diff --check`，并完成 Runtime 本地启动探测。当前开发环境没有预置 DeepSeek 或 OpenAI API Key，因此真实模型的普通对话、私聊、插话等待和连续存读档数据仍保持“待执行”，不以测试注入的 Fake 冒充真实模型体验结论。
+最近一次验证已通过：`go test ./... -count=1`、`go test -race ./runtime/internal/storyapp ./runtime/internal/storyapi -count=1`、`go vet ./runtime/internal/storyapp ./runtime/internal/storyapi ./runtime/cmd/server`、`npm run type-check`、`npm run build`、`git diff --check`。本轮已构建本地可执行文件，启动隔离服务完成浏览器验证；独立可执行文件启动探测受执行环境策略限制，见验收记录。真实模型的普通对话、私聊、插话等待和连续存读档体验仍保持“待执行”，不以测试注入的 Fake 冒充真实模型体验结论。
+
+浏览器验证使用临时世界、真实 HTTP 接口和正式前端构建，模型输出与连接失败采用受控测试替身。覆盖桌面 1280×800、平板 768×1024、手机 390×844 和缩短视口 390×420。手机视口模拟不证明真实软键盘可用性；实体手机键盘、真实 Provider 连续游玩与最终用户体验验收仍待执行。

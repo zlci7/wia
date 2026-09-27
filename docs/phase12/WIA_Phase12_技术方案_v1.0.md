@@ -615,6 +615,40 @@ Electron 开启隔离与沙箱，禁用页面 Node 能力，限制导航与 IPC�
 
 主要错误包括 unauthorized、forbidden、world_busy、version_conflict、idempotency_conflict、world_not_ready、save_failed、model_not_configured、text_generation_unsupported、context_needs_compaction、memory_rebuilding、generation_failed、storage_unavailable、suggestion_stale、quota_exceeded。界面呈现原因和可采取的操作，不要求玩家理解内部字段。
 
+### 17.1 正文读取分页
+
+`GET /api/v1/worlds/{world}/messages` 从已授权且 ready 的世界数据库查询 `messages.seq`，只读取玩家正文，不加载 NPC 记忆，也不改变模型上下文窗口。
+
+| 参数 | 合同 |
+| --- | --- |
+| `limit` | 默认 100；显式值必须是 1–200 的整数 |
+| `before_seq` | 正整数、排他边界，读取该序号之前最近的一页 |
+| `after_seq` | 非负整数、排他边界，读取该序号之后最早的一页；0 从首条开始 |
+| 未指定方向 | 读取最新一页 |
+
+方向互斥，非法值及同时提供两个方向返回 `400 invalid_request`。响应保留 `messages`，新增 `has_more`、可选的 `next_before_seq` 和 `next_after_seq`。所有页面的消息均按 seq 升序排列；空页返回 `messages: []`。使用额外一条记录判断是否还有数据；只有请求方向还有数据时才返回对应游标。最新页采用向前翻阅历史的 `next_before_seq`，另一方向游标省略。
+
+```json
+{
+  "messages": [],
+  "has_more": false
+}
+```
+
+读操作沿用 user/game/world 的所有权及就绪检查；与删除共享世界锁，在持锁后查询世界记录，删除后的请求返回 `404 world_not_found`，不重新创建已删除数据库。分页不迁移数据库、不删除或重写已有消息。
+
+### 17.2 客户端读取与交互状态
+
+`useStoryReader` 按 world_id 管理当前页面内的正文、草稿、交谈对象、历史游标及阅读锚点。首次读取最新 100 条；更早内容以前置消息和相对偏移恢复位置。增量更新从本地最大 seq 发起 `after_seq` 请求，连续补齐所有后续页，以 seq 合并去重并保留已加载历史。初始读取、加载历史和向后补齐的请求状态分开；失败可重试，缓存世界删除后迟到结果被丢弃。
+
+世界资料与正文分别刷新。页面切换使用请求代际校验，发送和重试绑定发起时的 world_id、输入及版本；回合查询再以每世界的提交修订号校验，迟到轮询不会覆盖刚接受的运行状态。旧世界的异步结果只能更新旧世界会话，已删除世界退出游玩页并提示。
+
+阅读容器距底部 ≤80px 时跟随更新，否则保存首个可见消息 ID 与相对位置。显式提交定位当前运行；回复到达前主动上翻则保持位置。页面返回同一存档恢复草稿、对象与阅读锚点，不增加 localStorage 或其他跨刷新草稿存储。
+
+`useExperience` 管理页面、按存档的运行状态和互斥弹窗。模型连接成功只恢复原操作；发送、弹窗操作及连接错误分别展示。`AppDialog` 统一管理焦点圈定、Esc、背景滚动锁定和写入中的关闭限制。故事设置仍使用原有 expected_context_epoch 合同，预设只修改 player_elaboration 与 npc_initiative。只有 completed、世界 message_head 与对应消息读取同时成立时展示“本轮已保存”。
+
+游玩布局以 visualViewport 高度（不可用时取窗口高度）与安全区域控制正文和输入区；小于 860px 使用人物侧面面板。视口模拟不替代手机软键盘实机验收。
+
 ## 18. 实施工作单元
 
 Phase12 是完整产品范围标识。内部工作单元由开发会话自行拆分和验证，按[开发执行指南](WIA_Phase12_开发执行指南.md)的 M1–M4 大阶段向用户交付体验验收，早期演示不代替完整交付。
