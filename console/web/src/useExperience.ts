@@ -15,6 +15,8 @@ import {
   exchangeBootstrapToken,
   fetchCopyOperation,
   fetchGames,
+  fetchGame,
+  fetchWorldGame,
   fetchModel,
   fetchRuns,
   fetchStatus,
@@ -54,6 +56,31 @@ export function useExperience() {
     worlds = ref<WorldSummary[]>([]);
   const currentWorld = ref<WorldSummary | null>(null),
     characters = ref<Character[]>([]);
+  const packIssues = ref<{ file: string; message: string }[]>([]);
+  const selectedGame = ref<GameSummary>();
+  const newGame = ref<GameSummary>();
+  const newRevisionConflict = ref(false);
+  const pendingCreate = ref<Parameters<typeof createWorld>[0]>();
+  const storyEntries = computed(() => {
+    const entries = games.value.map((item) => ({ ...item, available: true }));
+    for (const world of worlds.value)
+      if (!entries.some((item) => item.id === world.game_id)) {
+        entries.push({
+          id: world.game_id,
+          title: world.game_title || world.game_id,
+          description: "剧本包当前不可用，已有存档仍可继续。",
+          mode: world.mode as "open" | "guided",
+          default_mode: world.mode,
+          modes: [world.mode],
+          revision: world.revision,
+          gameplay: "",
+          background: "",
+          player: { name: "", profile: "", requirements: "", editable: false },
+          available: false,
+        });
+      }
+    return entries;
+  });
   const view = ref<"home" | "story" | "play">("home"),
     gameID = ref(""),
     loaded = ref(false);
@@ -69,11 +96,20 @@ export function useExperience() {
     formWorldID = ref("");
   const newWorld = reactive({
     name: "",
-    mode: "guided",
+    game_id: "",
+    expected_revision: "",
+    request_key: "",
     player_name: "旅人",
     player_profile: "一个正在寻找答案的旅人。",
   });
-  type PendingCopy = { key: string; source: string; sourceName: string; name: string; revision: number; operationID?: string };
+  type PendingCopy = {
+    key: string;
+    source: string;
+    sourceName: string;
+    name: string;
+    revision: number;
+    operationID?: string;
+  };
   const copies = reactive<Record<string, PendingCopy | undefined>>({});
   const pendingCopy = computed(() => copies[formWorldID.value]);
   let dialogSession = 0;
@@ -104,17 +140,38 @@ export function useExperience() {
   const textarea = ref<HTMLTextAreaElement>(),
     runs = reactive<Record<string, Run | undefined>>({});
   const seenFailures = new Map<string, string>();
-  type PendingSubmission = { key: string; input: string; retryID?: string; payload?: Parameters<typeof submitRun>[1] };
-  const submissions = reactive<Record<string, PendingSubmission | undefined>>({});
-  const pendingSubmission = computed(() => submissions[currentWorld.value?.world_id ?? ""]);
+  type PendingSubmission = {
+    key: string;
+    input: string;
+    retryID?: string;
+    payload?: Parameters<typeof submitRun>[1];
+  };
+  const submissions = reactive<Record<string, PendingSubmission | undefined>>(
+    {},
+  );
+  const pendingSubmission = computed(
+    () => submissions[currentWorld.value?.world_id ?? ""],
+  );
   const now = ref(Date.now());
-  const waitingSeconds = computed(() => activeRun.value ? Math.max(0, Math.floor((now.value - Date.parse(activeRun.value.created_at)) / 1000)) : 0);
+  const waitingSeconds = computed(() =>
+    activeRun.value
+      ? Math.max(
+          0,
+          Math.floor(
+            (now.value - Date.parse(activeRun.value.created_at)) / 1000,
+          ),
+        )
+      : 0,
+  );
   const runRevisions = new Map<string, number>();
   const reader = useStoryReader(missingWorld),
     { session, viewport } = reader;
   const game = computed(
     () =>
-      games.value.find((item) => item.id === gameID.value) ?? games.value[0],
+      (selectedGame.value?.id === gameID.value
+        ? selectedGame.value
+        : undefined) ??
+      storyEntries.value.find((item) => item.id === gameID.value),
   );
   const storyWorlds = computed(() =>
     worlds.value.filter((item) => item.game_id === game.value?.id),
@@ -194,7 +251,11 @@ export function useExperience() {
     { value: "expressive", label: "充分", note: "在已选方向内完整表现主角" },
   ] as const;
   const initiatives = [
-    { value: "responsive", label: "回应为主", note: "少插话，仍可处理必要事务" },
+    {
+      value: "responsive",
+      label: "回应为主",
+      note: "少插话，仍可处理必要事务",
+    },
     {
       value: "contextual",
       label: "按情境主动",
@@ -236,8 +297,10 @@ export function useExperience() {
           {
             model_not_configured: "请先连接模型，再继续故事。",
             world_busy: "这个存档正在处理上一项操作，请稍候。",
-            memory_rebuilding: "回顾正在重建，请在“回顾与纠正”中查看进度或重试，完成后继续故事。",
-            story_ended: "这段流程故事已结束，可以阅读、另存，或从剧本页开始新的故事。",
+            memory_rebuilding:
+              "回顾正在重建，请在“回顾与纠正”中查看进度或重试，完成后继续故事。",
+            story_ended:
+              "这段流程故事已结束，可以阅读、另存，或从剧本页开始新的故事。",
             version_conflict: "故事状态已更新，请重新打开此操作后重试。",
             storage_unavailable: "存档暂时无法读写，请稍后重试。",
             save_failed: "另存没有完成，原存档没有受到影响。",
@@ -253,11 +316,16 @@ export function useExperience() {
     return (
       (
         {
-          model_connection_failed: "模型连接失败，本轮未保存，输入已保留，可以重试。",
-          model_service_failed: "模型服务未能处理请求，本轮未保存，输入已保留；请检查连接或稍后重试。",
-          model_empty_response: "模型返回了空内容，本轮未保存，输入已保留，可以重试。",
-          model_output_incomplete: "模型输出未完整结束，本轮未保存，输入已保留；可以重试，持续发生时检查模型输出限制。",
-          model_invalid_response: "模型响应格式不可用，本轮未保存，输入已保留，可以重试。",
+          model_connection_failed:
+            "模型连接失败，本轮未保存，输入已保留，可以重试。",
+          model_service_failed:
+            "模型服务未能处理请求，本轮未保存，输入已保留；请检查连接或稍后重试。",
+          model_empty_response:
+            "模型返回了空内容，本轮未保存，输入已保留，可以重试。",
+          model_output_incomplete:
+            "模型输出未完整结束，本轮未保存，输入已保留；可以重试，持续发生时检查模型输出限制。",
+          model_invalid_response:
+            "模型响应格式不可用，本轮未保存，输入已保留，可以重试。",
           narration_generation_failed:
             "故事正文没有成功生成，输入仍保留，可以重试。",
           npc_generation_failed: "有角色未完成回应，输入仍保留，可以重试。",
@@ -265,8 +333,10 @@ export function useExperience() {
             "场景结果未能确定，输入仍保留，可以重试。",
           intent_generation_failed: "未能理解这次输入，输入仍保留，可以重试。",
           generation_timeout: "模型响应超时，输入仍保留，可以重试。",
-          context_capacity_exceeded: "本轮必需内容超出模型可用容量。输入已保留，请缩短本轮输入或在模型设置中选择容量足够的模型。",
-          context_source_missing: "故事所需的来源记录不完整，本轮未保存。输入已保留，请检查存档或恢复完整备份。",
+          context_capacity_exceeded:
+            "本轮必需内容超出模型可用容量。输入已保留，请缩短本轮输入或在模型设置中选择容量足够的模型。",
+          context_source_missing:
+            "故事所需的来源记录不完整，本轮未保存。输入已保留，请检查存档或恢复完整备份。",
         } as Record<string, string>
       )[item.reason ?? ""] ??
       item.error ??
@@ -323,7 +393,10 @@ export function useExperience() {
     delete runs[id];
     delete submissions[id];
     if (currentWorld.value?.world_id !== id) return;
-    if (dialog.value === "memory") { dialog.value = ""; dialogBusy.value = false; }
+    if (dialog.value === "memory") {
+      dialog.value = "";
+      dialogBusy.value = false;
+    }
     invalidateSettings();
     generation++;
     currentWorld.value = null;
@@ -343,7 +416,10 @@ export function useExperience() {
       if (epoch !== generation || status.value?.active_world?.world_id !== id)
         return;
       if (currentWorld.value?.world_id !== id) {
-        if (dialog.value === "memory") { dialog.value = ""; dialogBusy.value = false; }
+        if (dialog.value === "memory") {
+          dialog.value = "";
+          dialogBusy.value = false;
+        }
         reader.remember();
         invalidateSettings();
       }
@@ -388,9 +464,10 @@ export function useExperience() {
           fetchModel(),
         ]);
         if (epoch !== generation) return;
-        games.value = catalog;
+        games.value = catalog.games;
+        packIssues.value = catalog.issues ?? [];
         providers.value = options.providers;
-        if (!gameID.value) gameID.value = catalog[0]?.id ?? "";
+        if (!gameID.value) gameID.value = catalog.games[0]?.id ?? "";
         if (!modelForm.model) changeProvider();
       }
       const id = next.active_world?.world_id ?? "",
@@ -408,7 +485,12 @@ export function useExperience() {
       const pending = submissions[id];
       if (pending && !session.value.sending) {
         const found = (await fetchRuns(id, pending.key))[0];
-        if (epoch !== generation || currentWorld.value?.world_id !== id || runRevision !== (runRevisions.get(id) ?? 0)) return;
+        if (
+          epoch !== generation ||
+          currentWorld.value?.world_id !== id ||
+          runRevision !== (runRevisions.get(id) ?? 0)
+        )
+          return;
         if (found) settleSubmission(id, pending, found);
       }
       const latest = (await fetchRuns(id))[0];
@@ -459,10 +541,22 @@ export function useExperience() {
     moreOpen.value = false;
     if (!dialogBusy.value) showDialog("");
   }
-  function openStory(item: GameSummary) {
+  async function openStory(item: GameSummary) {
     reader.remember();
     gameID.value = item.id;
+    selectedGame.value = item;
     view.value = "story";
+    try {
+      const world = worlds.value.find((w) => w.game_id === item.id);
+      const fresh =
+        item.available === false && world
+          ? await fetchWorldGame(world.world_id)
+          : await fetchGame(item.id);
+      if (gameID.value === item.id && view.value === "story")
+        selectedGame.value = { ...fresh, available: item.available !== false };
+    } catch (error) {
+      if (gameID.value === item.id) notice.value = describe(error);
+    }
   }
   async function switchWorld(world: WorldSummary) {
     if (navigating.value) return;
@@ -495,16 +589,54 @@ export function useExperience() {
     }
   }
   function openNewWorld() {
+    if (pendingCreate.value) {
+      showDialog("new");
+      return;
+    }
+    const source = games.value.find((item) => item.id === gameID.value);
+    if (!source) {
+      notice.value = "该剧本包当前不可用，已有存档仍可继续。";
+      return;
+    }
+    newGame.value =
+      selectedGame.value?.id === source.id &&
+      selectedGame.value.available !== false
+        ? selectedGame.value
+        : source;
+    newRevisionConflict.value = false;
     newWorld.name = `${game.value?.title ?? "新的故事"} · ${dateName()}`;
-    newWorld.mode = game.value?.default_mode ?? "guided";
-    newWorld.player_name = "旅人";
-    newWorld.player_profile = "一个正在寻找答案的旅人。";
+    newWorld.game_id = newGame.value.id;
+    newWorld.expected_revision = newGame.value.revision;
+    newWorld.request_key = crypto.randomUUID();
+    newWorld.player_name = newGame.value.player.name;
+    newWorld.player_profile = newGame.value.player.profile;
     showDialog("new");
+  }
+  async function refreshNewRevision() {
+    if (dialogBusy.value) return;
+    const id = newWorld.game_id;
+    dialogBusy.value = true;
+    try {
+      const fresh = await fetchGame(id);
+      if (newWorld.game_id !== id) return;
+      newGame.value = fresh;
+      newWorld.expected_revision = fresh.revision;
+      newWorld.request_key = crypto.randomUUID();
+      newRevisionConflict.value = false;
+      dialogError.value =
+        "已读取当前版本，请确认下方玩法和主角要求，再开始。原表单已保留。";
+    } catch (error) {
+      dialogError.value = describe(error);
+    } finally {
+      dialogBusy.value = false;
+    }
   }
   function openCopy() {
     if (!currentWorld.value) return;
     formWorldID.value = currentWorld.value.world_id;
-    newWorld.name = pendingCopy.value?.name ?? `${currentWorld.value.name} · 分支 ${dateName()}`;
+    newWorld.name =
+      pendingCopy.value?.name ??
+      `${currentWorld.value.name} · 分支 ${dateName()}`;
     showDialog("copy");
   }
   function openSettings() {
@@ -570,7 +702,10 @@ export function useExperience() {
         throw new Error("活动存档已切换，请重新打开故事设置。");
       const result = await saveAgentSettings(
         editing.worldID,
-        { ...settingsForm, behavior_policies: { ...settingsForm.behavior_policies } },
+        {
+          ...settingsForm,
+          behavior_policies: { ...settingsForm.behavior_policies },
+        },
         editing.epoch,
       );
       if (!ownsDialog()) return;
@@ -604,9 +739,16 @@ export function useExperience() {
     }
   }
   async function createOrCopy() {
+    const editing = dialogSession;
+    const ownsDialog = () =>
+      !stopped && dialogSession === editing && dialog.value === "new";
     if (dialogBusy.value) return;
     const copying = dialog.value === "copy";
-    if (copying) { await resumeCopy(); return; }
+    if (copying) {
+      await resumeCopy();
+      return;
+    }
+    if (newRevisionConflict.value) return;
     if (!copying && !status.value?.ready) {
       if (!status.value || connectionError.value) {
         dialogError.value = "暂时无法确认连接状态，请重试连接后继续。";
@@ -620,60 +762,121 @@ export function useExperience() {
     try {
       {
         ++generation;
-        const world = await createWorld({ ...newWorld });
+        const payload = pendingCreate.value ?? { ...newWorld };
+        pendingCreate.value = payload;
+        const world = await createWorld(payload);
+        pendingCreate.value = undefined;
+        if (!ownsDialog()) return;
+        if (status.value?.active_world?.world_id !== world.world_id) {
+          const current = await fetchStatus();
+          if (!ownsDialog()) return;
+          if (current.active_world?.world_id !== world.world_id)
+            await activateWorld(world.world_id, current.active_revision);
+        }
         await freshRefresh();
+        if (!ownsDialog()) return;
         if (currentWorld.value?.world_id !== world.world_id)
           throw new Error("存档已创建，暂时无法读取，请从存档列表继续。");
         gameID.value = world.game_id;
         view.value = "play";
+        dialogBusy.value = false;
         showDialog("");
         await nextTick();
         await reader.latest();
       }
       await freshRefresh();
     } catch (error) {
-      dialogError.value = describe(error);
+      if (!ownsDialog()) return;
+      if (
+        error instanceof ApiError &&
+        [
+          "version_conflict",
+          "invalid_request",
+          "world_not_found",
+          "idempotency_conflict",
+        ].includes(error.code)
+      ) {
+        pendingCreate.value = undefined;
+        newRevisionConflict.value = error.code === "version_conflict";
+      }
+      dialogError.value = newRevisionConflict.value
+        ? "剧本版本已更新，主角表单已保留。请刷新版本并确认后开始。"
+        : describe(error) +
+          (pendingCreate.value
+            ? " 原创建请求已保留，继续确认不会重复开局。"
+            : "");
     } finally {
-      dialogBusy.value = false;
+      if (ownsDialog()) dialogBusy.value = false;
     }
   }
   async function resumeCopy() {
     const source = formWorldID.value;
     if (!source || dialogBusy.value) return;
     const editing = dialogSession;
-    const ownsDialog = () => !stopped && dialogSession === editing && dialog.value === "copy";
-    const operation = copies[source] ?? (copies[source] = {
-      key: crypto.randomUUID(), source,
-      sourceName: currentWorld.value?.name ?? source,
-      name: newWorld.name.trim(), revision: status.value?.active_revision ?? 0,
-    });
+    const ownsDialog = () =>
+      !stopped && dialogSession === editing && dialog.value === "copy";
+    const operation =
+      copies[source] ??
+      (copies[source] = {
+        key: crypto.randomUUID(),
+        source,
+        sourceName: currentWorld.value?.name ?? source,
+        name: newWorld.name.trim(),
+        revision: status.value?.active_revision ?? 0,
+      });
     dialogBusy.value = true;
     dialogError.value = "";
     try {
       let result = operation.operationID
         ? await fetchCopyOperation(operation.operationID)
-        : await saveAs(operation.source, operation.name, operation.revision, operation.key);
+        : await saveAs(
+            operation.source,
+            operation.name,
+            operation.revision,
+            operation.key,
+          );
       operation.operationID = result.operation_id;
       const deadline = Date.now() + 300000;
-      while (!["ready", "failed"].includes(result.status) && Date.now() < deadline && !stopped) {
-        await new Promise(resolve => window.setTimeout(resolve, 500));
+      while (
+        !["ready", "failed"].includes(result.status) &&
+        Date.now() < deadline &&
+        !stopped
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
         result = await fetchCopyOperation(operation.operationID!);
       }
       if (!["ready", "failed"].includes(result.status))
         throw new Error("另存结果尚未确认，请点击继续确认原操作。");
       delete copies[source];
-      if (result.status === "failed") throw new Error(result.error || "另存失败，原存档未受影响。");
+      if (result.status === "failed")
+        throw new Error(result.error || "另存失败，原存档未受影响。");
       if (!ownsDialog()) return;
       dialogBusy.value = false;
       const stillHere = currentWorld.value?.world_id === source;
       showDialog(stillHere ? "saves" : "");
-      notice.value = `“${operation.sourceName}”已另存为“${result.target_name}”` + (stillHere ? "，当前仍在原存档。" : "，当前存档未改变。");
+      notice.value =
+        `“${operation.sourceName}”已另存为“${result.target_name}”` +
+        (stillHere ? "，当前仍在原存档。" : "，当前存档未改变。");
       await freshRefresh();
     } catch (error) {
       // A definitive rejection before task creation permits a new logical request.
-      if (!operation.operationID && error instanceof ApiError &&
-        ["version_conflict", "world_busy", "world_not_found", "invalid_request"].includes(error.code)) delete copies[source];
-      if (ownsDialog()) dialogError.value = describe(error) + (copies[source] ? " 原另存操作已保留，继续确认不会创建第二份副本。" : "");
+      if (
+        !operation.operationID &&
+        error instanceof ApiError &&
+        [
+          "version_conflict",
+          "world_busy",
+          "world_not_found",
+          "invalid_request",
+        ].includes(error.code)
+      )
+        delete copies[source];
+      if (ownsDialog())
+        dialogError.value =
+          describe(error) +
+          (copies[source]
+            ? " 原另存操作已保留，继续确认不会创建第二份副本。"
+            : "");
     } finally {
       if (ownsDialog()) dialogBusy.value = false;
     }
@@ -704,7 +907,11 @@ export function useExperience() {
       dialogBusy.value = false;
     }
   }
-  function settleSubmission(id: string, pending: PendingSubmission, result: Run) {
+  function settleSubmission(
+    id: string,
+    pending: PendingSubmission,
+    result: Run,
+  ) {
     if (stopped || submissions[id] !== pending) return;
     delete submissions[id];
     const state = reader.sessions[id];
@@ -712,30 +919,49 @@ export function useExperience() {
       if (state.draft.trim() === pending.input.trim()) state.draft = "";
       state.sendError = "";
     }
-    if (!runs[id] || Date.parse(result.created_at) >= Date.parse(runs[id]!.created_at)) runs[id] = result;
+    if (
+      !runs[id] ||
+      Date.parse(result.created_at) >= Date.parse(runs[id]!.created_at)
+    )
+      runs[id] = result;
   }
   async function sendInput(retry = false) {
-    const world = currentWorld.value, state = session.value, failed = failedRun.value;
+    const world = currentWorld.value,
+      state = session.value,
+      failed = failedRun.value;
     if (!world || state.sending || navigating.value) return;
     const id = world.world_id;
-    if (!submissions[id] && (activeRun.value || (!retry && !state.draft.trim()))) return;
+    if (
+      !submissions[id] &&
+      (activeRun.value || (!retry && !state.draft.trim()))
+    )
+      return;
     if (!status.value?.ready && !submissions[id]) {
       if (!status.value || connectionError.value) {
-        state.sendError = "暂时无法确认连接状态，请重试连接后继续。"; return;
+        state.sendError = "暂时无法确认连接状态，请重试连接后继续。";
+        return;
       }
-      openModel(); return;
+      openModel();
+      return;
     }
     if (!submissions[id]) {
       if (retry && !failed) return;
       const key = crypto.randomUUID();
-      submissions[id] = { key, input: retry ? failed!.input : state.draft.trim(),
+      submissions[id] = {
+        key,
+        input: retry ? failed!.input : state.draft.trim(),
         retryID: retry ? failed!.run_id : undefined,
-        payload: retry ? undefined : {
-          request_key: key, input: state.draft.trim(), addressee_id: state.addressee || undefined,
-          expected_active_revision: status.value!.active_revision,
-          expected_message_head: world.message_head, expected_event_head: world.event_head,
-          expected_context_epoch: world.context_epoch,
-        },
+        payload: retry
+          ? undefined
+          : {
+              request_key: key,
+              input: state.draft.trim(),
+              addressee_id: state.addressee || undefined,
+              expected_active_revision: status.value!.active_revision,
+              expected_message_head: world.message_head,
+              expected_event_head: world.event_head,
+              expected_context_epoch: world.context_epoch,
+            },
       };
     }
     const pending = submissions[id]!;
@@ -747,18 +973,24 @@ export function useExperience() {
       // submission that arrives at the server after this lookup returns empty.
       let result = (await fetchRuns(id, pending.key))[0];
       if (stopped || currentWorld.value?.world_id !== id) return;
-      if (!result) result = pending.retryID
-        ? await retryRun(id, pending.retryID, pending.key)
-        : await submitRun(id, pending.payload!);
+      if (!result)
+        result = pending.retryID
+          ? await retryRun(id, pending.retryID, pending.key)
+          : await submitRun(id, pending.payload!);
       settleSubmission(id, pending, result);
       if (currentWorld.value?.world_id === id) await reader.latest();
     } catch (error) {
       if (submissions[id] !== pending || stopped) return;
-      if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      if (
+        error instanceof ApiError &&
+        error.status >= 400 &&
+        error.status < 500
+      ) {
         delete submissions[id];
         state.sendError = describe(error);
       } else {
-        state.sendError = "暂时无法确认提交结果，输入已保留。系统会继续查询；再次确认时只使用同一份原请求。";
+        state.sendError =
+          "暂时无法确认提交结果，输入已保留。系统会继续查询；再次确认时只使用同一份原请求。";
       }
     } finally {
       state.sending = false;
@@ -835,7 +1067,8 @@ export function useExperience() {
         fetchGames(),
         fetchModel(),
       ]);
-      games.value = availableGames;
+      games.value = availableGames.games;
+      packIssues.value = availableGames.issues ?? [];
       gameID.value = games.value[0]?.id ?? "";
       providers.value = availableModels.providers;
       modelForm.provider = providers.value[0]?.provider ?? "deepseek";
@@ -859,6 +1092,12 @@ export function useExperience() {
     window.visualViewport?.removeEventListener("resize", resizeViewport);
   });
   return {
+    storyEntries,
+    packIssues,
+    newGame,
+    newRevisionConflict,
+    pendingCreate,
+    refreshNewRevision,
     status,
     games,
     worlds,

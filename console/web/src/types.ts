@@ -21,9 +21,19 @@ export interface GameSummary {
   description: string
   modes: string[]
   default_mode: string
+	mode: 'guided' | 'open'
+	revision: string
+	gameplay: string
+	background: string
+	cover_url?: string
+	cover_alt?: string
+	player: { name: string; profile: string; requirements: string; editable: boolean }
+	available?: boolean
 }
 
 export interface WorldSummary {
+	game_title: string
+	revision: string
   game_id: string
   world_id: string
   name: string

@@ -32,7 +32,7 @@ func TestRebuildBlocksGenerationAndCopyButAllowsDeletion(t *testing.T) {
 	ctx := context.Background()
 	g := &blockingDigestGenerator{entered: make(chan struct{}), release: make(chan struct{})}
 	a := newTestApp(t, g)
-	w, err := a.CreateWorld(ctx, "blocking", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "blocking", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func waitMemory(t *testing.T, a *App, id string) MemoryJob {
 func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "corrections", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "corrections", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 func TestCorrectionTargetsAndRestart(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "targets", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "targets", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
 	}
 	ctx := context.Background()
 	a := newTestApp(t, &digestGenerator{})
-	w, err := a.CreateWorld(ctx, "个人纠正", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "个人纠正", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

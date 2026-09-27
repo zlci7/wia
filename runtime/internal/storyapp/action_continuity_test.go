@@ -53,7 +53,7 @@ func (g *overlappingActionGenerator) GenerateText(ctx context.Context, req model
 func TestPendingActionsAndNotExecutedResultsSurviveAtomicTurn(t *testing.T) {
 	a := newTestApp(t, &overlappingActionGenerator{})
 	ctx := context.Background()
-	w, _ := a.CreateWorld(ctx, "衔接", "guided", "旅人", "", true)
+	w, _ := a.createFixtureWorld(ctx, "衔接", "guided", "旅人", "", true)
 	r, err := a.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: "overlap", Input: "最近有什么怪事？"})
 	if err != nil {
 		t.Fatal(err)

@@ -45,7 +45,14 @@ func initialSceneViews(snapshot worldSnapshot) []SceneView {
 	for _, id := range recipients {
 		view := SceneView{Recipient: id, Version: snapshot.SceneVersion, SourceIDs: []string{}}
 		if snapshot.Summary.TurnSeq == 0 {
-			view.Content = lanternDefinition().Scene
+			view.Content = snapshot.Definition.Scene
+			if location := snapshot.Definition.InitialLocations[id]; location != "" {
+				for _, loc := range snapshot.Definition.Locations {
+					if loc.ID == location {
+						view.Content = loc.Name + "：" + loc.Description
+					}
+				}
+			}
 			view.SourceIDs = []string{"opening"}
 		} else if id == "player" {
 			for _, event := range snapshot.Events {

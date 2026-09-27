@@ -69,7 +69,7 @@ func seedMemoryHistory(t *testing.T, a *App, id string) {
 func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &digestGenerator{})
-	w, err := a.CreateWorld(ctx, "记忆修订", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "记忆修订", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 func TestMemoryFailureRetry(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &digestGenerator{fail: true})
-	w, err := a.CreateWorld(ctx, "重建失败", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "重建失败", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestM2RealMemoryLifecycle(t *testing.T) {
 	a := newTestApp(t, g)
 	logger := &recordingLogger{}
 	a.logger = logger
-	w, err := a.CreateWorld(ctx, "长期约定验证", "open", "旅人", "谨慎礼貌，不替别人许诺", true)
+	w, err := a.createFixtureWorld(ctx, "长期约定验证", "open", "旅人", "谨慎礼貌，不替别人许诺", true)
 	if err != nil {
 		t.Fatal(err)
 	}

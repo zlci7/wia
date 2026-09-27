@@ -1,0 +1,12 @@
+{
+  "entity_id": "npc:mercenary",
+  "definition_id": "dispatcher.v1",
+  "revision": "1",
+  "name": "许遥",
+  "role": "航班调度员",
+  "appearance": "袖口卷起，身边放着航班记录板。",
+  "profile": "利落、直接，重视班次安排，也愿意解释站内生活。",
+  "knowledge": "知道补给船延迟，掌握今日航班安排和站内公开值班表。",
+  "initial_concerns": "确认到站时间，让工作人员合理安排这一班的事务。",
+  "initial_location": "control"
+}

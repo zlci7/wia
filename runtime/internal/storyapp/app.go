@@ -69,6 +69,10 @@ func Open(ctx context.Context, options Options) (*App, error) {
 	} else {
 		app.loadModelConfig(options.AllowFake)
 	}
+	if err := app.loadPacks(ctx, options.StoryPacksPath); err != nil {
+		app.Close()
+		return nil, err
+	}
 	if err := app.markInterrupted(ctx); err != nil {
 		db.Close()
 		_ = processLock.Release()
@@ -182,65 +186,8 @@ func (a *App) Status(ctx context.Context) (Status, error) {
 	return Status{Ready: ready, Model: info, ModelError: modelErr, UserID: a.userID, ActiveWorld: active, ActiveRevision: revision, DataRoot: a.dataRoot, ModelConfigPath: a.modelPath}, nil
 }
 
-func (a *App) Games() []GameSummary { return []GameSummary{lanternDefinition().Summary} }
-
-func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (WorldSummary, error) {
-	def := lanternDefinition()
-	if mode == "" {
-		mode = def.Summary.DefaultMode
-	}
-	if mode != "open" && mode != "guided" {
-		return WorldSummary{}, ErrInvalidRequest
-	}
-	name = cleanText(name)
-	if name == "" {
-		name = "暮灯镇 · 新存档"
-	}
-	playerName = cleanText(playerName)
-	if playerName == "" {
-		playerName = "旅人"
-	}
-	playerProfile = cleanText(playerProfile)
-	if playerProfile == "" {
-		playerProfile = "一个正在寻找答案的旅人。"
-	}
-	worldID := newID("world")
-	path := a.worldPath(worldID)
-	store, err := openWorldDB(path)
-	if err != nil {
-		return WorldSummary{}, err
-	}
-	if err := initializeWorld(ctx, store, a.userID, worldID, def, mode, playerName, playerProfile); err != nil {
-		store.db.Close()
-		_ = os.Remove(path)
-		return WorldSummary{}, err
-	}
-	if _, err := store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, name); err != nil {
-		store.db.Close()
-		return WorldSummary{}, err
-	}
-	if _, err := store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('updated_at',?)`, nowText()); err != nil {
-		store.db.Close()
-		return WorldSummary{}, err
-	}
-	store.db.Close()
-	now := nowText()
-	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO worlds(user_id,game_id,world_id,name,path,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, a.userID, GameID, worldID, name, path, "ready", now, now); err != nil {
-		return WorldSummary{}, err
-	}
-	if activate {
-		a.activationMu.Lock()
-		if err := a.activate(ctx, worldID, 0); err != nil {
-			a.activationMu.Unlock()
-			return WorldSummary{}, err
-		}
-		a.activationMu.Unlock()
-	}
-	return a.worldSummary(ctx, worldID)
-}
-
 func (a *App) ListWorlds(ctx context.Context) ([]WorldSummary, error) {
-	rows, err := a.appDB.QueryContext(ctx, `SELECT world_id,name,status,updated_at FROM worlds WHERE user_id=? AND game_id=? AND status='ready' ORDER BY updated_at DESC`, a.userID, GameID)
+	rows, err := a.appDB.QueryContext(ctx, `SELECT world_id,name,status,updated_at FROM worlds WHERE user_id=? AND status='ready' ORDER BY updated_at DESC`, a.userID)
 	if err != nil {
 		return nil, err
 	}
@@ -353,25 +300,28 @@ func (a *App) activeWorld(ctx context.Context) (string, int64, error) {
 }
 
 func (a *App) worldRecord(ctx context.Context, worldID string) (string, string, error) {
-	var path, status string
-	err := a.appDB.QueryRowContext(ctx, `SELECT path,status FROM worlds WHERE user_id=? AND game_id=? AND world_id=?`, a.userID, GameID, worldID).Scan(&path, &status)
+	var path, status, gameID string
+	err := a.appDB.QueryRowContext(ctx, `SELECT path,status,game_id FROM worlds WHERE user_id=? AND world_id=?`, a.userID, worldID).Scan(&path, &status, &gameID)
 	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrWorldNotFound
+	}
+	if err == nil && (!packID.MatchString(gameID) || !packID.MatchString(worldID) || filepath.Clean(path) != filepath.Clean(a.worldPathFor(gameID, worldID))) {
 		return "", "", ErrWorldNotFound
 	}
 	return path, status, err
 }
 
-func (a *App) worldPath(worldID string) string {
-	return filepath.Join(a.root, "worlds", a.userID, GameID, worldID, "world.db")
+func (a *App) worldPathFor(gameID, worldID string) string {
+	return filepath.Join(a.root, "worlds", a.userID, gameID, worldID, "world.db")
 }
 
 func (a *App) touchWorld(ctx context.Context, worldID string) error {
-	_, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET updated_at=? WHERE user_id=? AND game_id=? AND world_id=?`, nowText(), a.userID, GameID, worldID)
+	_, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, worldID)
 	return err
 }
 
 func (a *App) markInterrupted(ctx context.Context) error {
-	rows, err := a.appDB.QueryContext(ctx, `SELECT path FROM worlds WHERE user_id=? AND game_id=? AND status='ready'`, a.userID, GameID)
+	rows, err := a.appDB.QueryContext(ctx, `SELECT path FROM worlds WHERE user_id=? AND status='ready'`, a.userID)
 	if err != nil {
 		return err
 	}
@@ -399,7 +349,7 @@ func (a *App) markInterrupted(ctx context.Context) error {
 }
 
 func (a *App) markInterruptedCopies(ctx context.Context) error {
-	rows, err := a.appDB.QueryContext(ctx, `SELECT operation_id,target_world_id FROM copy_operations WHERE user_id=? AND game_id=? AND status='copying'`, a.userID, GameID)
+	rows, err := a.appDB.QueryContext(ctx, `SELECT operation_id,target_world_id FROM copy_operations WHERE user_id=? AND status='copying'`, a.userID)
 	if err != nil {
 		return err
 	}
@@ -421,10 +371,10 @@ func (a *App) markInterruptedCopies(ctx context.Context) error {
 		if recordErr == nil {
 			_ = os.RemoveAll(filepath.Dir(path))
 		}
-		if _, err := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND game_id=? AND operation_id=?`, "另存任务在运行时重启，原存档保持不变", nowText(), a.userID, GameID, ref.operationID); err != nil {
+		if _, err := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, "另存任务在运行时重启，原存档保持不变", nowText(), a.userID, ref.operationID); err != nil {
 			return err
 		}
-		if _, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND game_id=? AND world_id=?`, nowText(), a.userID, GameID, ref.worldID); err != nil {
+		if _, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, ref.worldID); err != nil {
 			return err
 		}
 	}

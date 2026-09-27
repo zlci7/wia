@@ -120,6 +120,10 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 	case "/api/v1/active-world":
 		s.activeWorld(w, r)
 	default:
+		if strings.HasPrefix(r.URL.Path, "/api/v1/games/") {
+			s.gameRoute(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/v1/world-copy-operations/") {
 			s.copyOperation(w, r, strings.TrimPrefix(r.URL.Path, "/api/v1/world-copy-operations/"))
 			return
@@ -145,7 +149,7 @@ func (s *Server) games(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 405, "method_not_allowed", "games are read with GET")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"games": s.app.Games()})
+	writeJSON(w, 200, map[string]any{"games": s.app.Games(), "issues": s.app.PackIssues()})
 }
 func (s *Server) modelProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -182,17 +186,11 @@ func (s *Server) worlds(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, map[string]any{"worlds": worlds})
 	case "POST":
-		var request struct {
-			Name          string `json:"name"`
-			Mode          string `json:"mode"`
-			PlayerName    string `json:"player_name"`
-			PlayerProfile string `json:"player_profile"`
-			Activate      bool   `json:"activate"`
-		}
+		var request storyapp.CreateWorldRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}
-		world, err := s.app.CreateWorld(r.Context(), request.Name, request.Mode, request.PlayerName, request.PlayerProfile, request.Activate)
+		world, err := s.app.CreateStoryWorld(r.Context(), request)
 		if err != nil {
 			writeAppError(w, err)
 			return
@@ -226,6 +224,32 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	worldID := parts[3]
+	if len(parts) == 5 && parts[4] == "cover" {
+		if r.Method != "GET" {
+			writeError(w, 405, "method_not_allowed", "use GET")
+			return
+		}
+		body, mime, err := s.app.WorldCover(r.Context(), worldID)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		serveCover(w, body, mime)
+		return
+	}
+	if len(parts) == 5 && parts[4] == "game" {
+		if r.Method != "GET" {
+			writeError(w, 405, "method_not_allowed", "use GET")
+			return
+		}
+		game, err := s.app.WorldGame(r.Context(), worldID)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"game": game})
+		return
+	}
 	if len(parts) == 5 && (parts[4] == "memory" || parts[4] == "author-memory" || parts[4] == "corrections") {
 		s.memory(w, r, worldID, parts[4])
 		return

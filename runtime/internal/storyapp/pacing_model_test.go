@@ -97,7 +97,7 @@ func TestPacingRealModelComparison(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			probe := &pacingProbe{provider: generator, baseline: baseline}
 			app := newTestApp(t, probe)
-			world, err := app.CreateWorld(context.Background(), "节奏对照", "guided", "旅人", "一位谨慎、礼貌的旅人。", true)
+			world, err := app.createFixtureWorld(context.Background(), "节奏对照", "guided", "旅人", "一位谨慎、礼貌的旅人。", true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -149,7 +149,7 @@ func TestPacingCommittedTeaReplay(t *testing.T) {
 		t.Fatal("text generation unavailable")
 	}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "递茶连续性样本", "guided", "旅人", "礼貌的旅人", true)
+	world, err := app.createFixtureWorld(context.Background(), "递茶连续性样本", "guided", "旅人", "礼貌的旅人", true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,6 @@
 # World Is Agent
 
-World Is Agent 是一个本机运行的 AI 叙事游戏。玩家在浏览器中进入预置调查冒险，与两名有独立经历的重要人物和场景路人互动；每个世界单独保存正文、事件、人物感知与记忆。
+World Is Agent 是一个本机运行的 AI 叙事游戏。玩家在浏览器中选择本地剧本，与有独立经历的重要人物和场景路人互动；每个世界单独保存正文、事件、人物感知与记忆。
 
 The current local build includes Phase12 M1 and M2: reliable story saves, conditional world progression, scoped long-term memory, retrieval and recoverable corrections. The browser workspace connects directly to the local Runtime; no game adapter is required. This is an internal-playtest build, not a stable release.
 
@@ -34,7 +34,7 @@ go build -o wia-runtime.exe ./runtime/cmd/server
 
 ## 可体验内容
 
-- 预置故事《暮灯镇的失踪信使》，支持流程型与开放型开局。
+- Local JSON packs: guided 《暮灯镇的失踪信使》 and open 《远星维修站》. The author owns each story's mode. See [pack authoring](docs/phase12/Story_Pack_Authoring.md).
 - 两名重要 NPC：客栈老板沈岚、佣兵铁杉；开场保留十名场景路人。
 - NPC 并行决策、公开回应后的下一阶段反应、按人物分开的感知和记忆。
 - 私下交谈的旁观隔离：授权人物看到原文，其他人物只看到交谈迹象。

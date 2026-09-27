@@ -12,7 +12,7 @@ import (
 func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(ctx, "", "guided", "", "", true)
+	world, err := app.createFixtureWorld(ctx, "", "guided", "", "", true)
 	if err != nil || world.Name == "" {
 		t.Fatalf("default world: %+v, %v", world, err)
 	}
@@ -93,7 +93,7 @@ func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {
 	if err != nil || empty.Messages == nil || len(empty.Messages) != 0 || empty.HasMore {
 		t.Fatalf("empty: %+v %v", empty, err)
 	}
-	other, err := app.CreateWorld(ctx, "另一个世界", "guided", "", "", false)
+	other, err := app.createFixtureWorld(ctx, "另一个世界", "guided", "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {
 func TestMessagePageOwnershipAndReadiness(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(ctx, "隔离测试", "guided", "", "", false)
+	world, err := app.createFixtureWorld(ctx, "隔离测试", "guided", "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestMessagePageOwnershipAndReadiness(t *testing.T) {
 func TestMessagePagesConcurrentAppendAndDelete(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(ctx, "并发测试", "guided", "", "", false)
+	world, err := app.createFixtureWorld(ctx, "并发测试", "guided", "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestMessagePagesConcurrentAppendAndDelete(t *testing.T) {
 func TestSaveAsUsesDefaultNameAndCopiesHistory(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(ctx, "", "guided", "", "", true)
+	world, err := app.createFixtureWorld(ctx, "", "guided", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

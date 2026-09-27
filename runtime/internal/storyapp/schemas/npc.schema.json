@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "definition_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 84,
+      "pattern": "^npc:[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "appearance": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 2000
+    },
+    "profile": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "knowledge": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 8000
+    },
+    "initial_concerns": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 4000
+    },
+    "initial_location": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    }
+  },
+  "required": [
+    "definition_id",
+    "revision",
+    "entity_id",
+    "name",
+    "role",
+    "profile",
+    "initial_location"
+  ]
+}

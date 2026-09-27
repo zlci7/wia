@@ -68,9 +68,17 @@ export async function fetchStatus(): Promise<Status> {
   return result.status
 }
 
-export async function fetchGames(): Promise<GameSummary[]> {
-  const result = await request<{ games: GameSummary[] }>('/api/v1/games')
-  return result.games
+export async function fetchGames(): Promise<{ games: GameSummary[]; issues: { file: string; message: string }[] }> {
+  return request('/api/v1/games')
+}
+
+export async function fetchGame(id: string): Promise<GameSummary> {
+  const result = await request<{ game: GameSummary }>(`/api/v1/games/${encodeURIComponent(id)}`)
+  return result.game
+}
+export async function fetchWorldGame(world: string): Promise<GameSummary> {
+  const result = await request<{ game: GameSummary }>(`/api/v1/worlds/${encodeURIComponent(world)}/game`)
+  return result.game
 }
 
 export async function fetchWorlds(): Promise<WorldSummary[]> {
@@ -78,7 +86,7 @@ export async function fetchWorlds(): Promise<WorldSummary[]> {
   return result.worlds
 }
 
-export async function createWorld(input: { name: string; mode: string; player_name: string; player_profile: string }): Promise<WorldSummary> {
+export async function createWorld(input: { name: string; game_id: string; expected_revision: string; request_key: string; player_name: string; player_profile: string }): Promise<WorldSummary> {
   const result = await request<{ world: WorldSummary }>('/api/v1/worlds', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

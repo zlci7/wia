@@ -90,7 +90,7 @@ func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T)
 
 func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(context.Background(), "来源窗口", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(context.Background(), "来源窗口", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func (g sceneUpdateGenerator) GenerateText(ctx context.Context, req model.TextRe
 
 func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
 	a := newTestApp(t, sceneUpdateGenerator{base: &scriptedGenerator{}})
-	w, err := a.CreateWorld(context.Background(), "私密场景", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(context.Background(), "私密场景", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestLegacySceneViewsUseOnlyAuthorizedRecords(t *testing.T) {
 func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 	g := &scriptedGenerator{}
 	a := newTestApp(t, g)
-	w, err := a.CreateWorld(context.Background(), "缺失来源", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(context.Background(), "缺失来源", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
 func TestPrivateSceneViewsSurviveCopyAndRuntimeRestart(t *testing.T) {
 	g := sceneUpdateGenerator{base: &scriptedGenerator{}, recipient: "npc:innkeeper"}
 	a := newTestApp(t, g)
-	w, err := a.CreateWorld(context.Background(), "场景保存", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(context.Background(), "场景保存", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

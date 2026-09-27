@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "game_id": "orbital-repair",
+  "revision": "orbital-repair.pack.v1",
+  "mode": "open",
+  "title": "远星维修站",
+  "description": "你抵达一座轨道维修站，在值班室与工程师和调度员共同度过一个工作班次。",
+  "gameplay": "自由交谈、观察与行动。可以参与维修站的日常事务，也可以只了解人物；本样例没有预设通关目标。",
+  "background": "近未来，人类使用轨道维修站维护运输飞船。你刚到站报到，生活舱维持正常重力与供氧。",
+  "rules": "尊重真空、舱门和设备安全。重要维修和资源使用需要已成立的行动结果，交谈不代表接受危险作业。",
+  "author_facts": "工程师发现一份旧检修表被漏签；调度员只知道物资到站延迟，不知道漏签记录。",
+  "player": {
+    "name": "林舟",
+    "profile": "新到站的维修助理，熟悉基础设备，愿意先了解值班情况。",
+    "requirements": "扮演新到站的工作人员，姓名与个人背景可以调整。",
+    "editable": true
+  },
+  "opening": "气闸指示灯转绿，你走进远星维修站的值班室。工程师周宁将检修平板放在桌上，调度员许遥正核对下一班补给船的时间。观察窗外，行星边缘透出一道淡蓝色的光。",
+  "initial_location": "control",
+  "clock": "第 1 日 09:00",
+  "locations": [
+    {
+      "id": "control",
+      "name": "维修站值班室",
+      "description": "值班桌、通信终端与观察窗所在的公共区域。",
+      "connections": [
+        "workshop"
+      ]
+    },
+    {
+      "id": "workshop",
+      "name": "设备检修间",
+      "description": "舱内检修工作区，进入后按设备安全规程作业。",
+      "connections": [
+        "control"
+      ]
+    }
+  ],
+  "npcs": [
+    "npcs/engineer.json",
+    "npcs/dispatcher.json"
+  ],
+  "bystanders": [
+    "正在登记工单的值班员"
+  ]
+}

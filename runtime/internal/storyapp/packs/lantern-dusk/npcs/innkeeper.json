@@ -1,0 +1,12 @@
+{
+  "entity_id": "npc:innkeeper",
+  "definition_id": "innkeeper.v1",
+  "revision": "1",
+  "name": "沈岚",
+  "role": "客栈老板",
+  "appearance": "",
+  "profile": "谨慎、善于观察，不愿让客人恐慌。她熟悉旧渡口的每一条消息，遇到危险时先保护客栈和无辜者。",
+  "knowledge": "知道失踪信使曾在今晚来过；知道柜台下的染血信蜡，但不会主动向陌生人承认。",
+  "initial_concerns": "今晚的异常让她担心客栈安全。她希望在打烊前弄清风险，同时保护客人和自己掌握的秘密；对陌生人的可靠程度保持观察。",
+  "initial_location": "inn"
+}

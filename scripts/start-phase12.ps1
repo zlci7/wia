@@ -21,6 +21,7 @@ param(
     [switch]$NoOpen,
     [string]$DataRoot,
     [string]$ModelConfig,
+    [string]$StoryPacks,
     [string]$HttpAddr = '127.0.0.1:0'
 )
 
@@ -60,6 +61,9 @@ function Resolve-OptionalPath([string]$value, [string]$label) {
 
 $runtimeArgs = @('-http-addr', $HttpAddr)
 if ($NoOpen) { $runtimeArgs += '-no-open' }
+
+$resolvedStoryPacks = Resolve-OptionalPath $StoryPacks 'story packs'
+if ($resolvedStoryPacks) { $runtimeArgs += @('-story-packs', $resolvedStoryPacks) }
 
 $resolvedDataRoot = Resolve-OptionalPath $DataRoot 'data root'
 if ($resolvedDataRoot) { $runtimeArgs += @('-data-root', $resolvedDataRoot) }

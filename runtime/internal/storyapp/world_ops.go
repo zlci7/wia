@@ -14,6 +14,10 @@ import (
 )
 
 func (a *App) ActivateWorld(ctx context.Context, worldID string, expectedRevision int64, requestKeys ...string) (Status, error) {
+	gameID, gameErr := a.worldGame(ctx, worldID)
+	if gameErr != nil {
+		return Status{}, gameErr
+	}
 	requestKey := ""
 	if len(requestKeys) > 0 {
 		requestKey = strings.TrimSpace(requestKeys[0])
@@ -25,7 +29,7 @@ func (a *App) ActivateWorld(ctx context.Context, worldID string, expectedRevisio
 	}
 	requestHash := a.activationHash(worldID, expectedRevision)
 	var existingHash, existingStatus string
-	err := a.appDB.QueryRowContext(ctx, `SELECT request_hash,status FROM activation_operations WHERE user_id=? AND game_id=? AND request_key=?`, a.userID, GameID, requestKey).Scan(&existingHash, &existingStatus)
+	err := a.appDB.QueryRowContext(ctx, `SELECT request_hash,status FROM activation_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey).Scan(&existingHash, &existingStatus)
 	if err == nil {
 		if existingHash != requestHash {
 			return Status{}, ErrIdempotencyConflict
@@ -33,19 +37,19 @@ func (a *App) ActivateWorld(ctx context.Context, worldID string, expectedRevisio
 		if existingStatus == "completed" {
 			return a.Status(ctx)
 		}
-		_, _ = a.appDB.ExecContext(ctx, `DELETE FROM activation_operations WHERE user_id=? AND game_id=? AND request_key=?`, a.userID, GameID, requestKey)
+		_, _ = a.appDB.ExecContext(ctx, `DELETE FROM activation_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return Status{}, err
 	}
 	now := nowText()
-	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO activation_operations(operation_id,request_key,user_id,game_id,target_world_id,expected_revision,request_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, newID("activation"), requestKey, a.userID, GameID, worldID, expectedRevision, requestHash, "accepted", now, now); err != nil {
+	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO activation_operations(operation_id,request_key,user_id,game_id,target_world_id,expected_revision,request_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, newID("activation"), requestKey, a.userID, gameID, worldID, expectedRevision, requestHash, "accepted", now, now); err != nil {
 		return Status{}, err
 	}
 	if err := a.activate(ctx, worldID, expectedRevision); err != nil {
-		_, _ = a.appDB.ExecContext(ctx, `DELETE FROM activation_operations WHERE user_id=? AND game_id=? AND request_key=?`, a.userID, GameID, requestKey)
+		_, _ = a.appDB.ExecContext(ctx, `DELETE FROM activation_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey)
 		return Status{}, err
 	}
-	if _, err := a.appDB.ExecContext(ctx, `UPDATE activation_operations SET status='completed',updated_at=? WHERE user_id=? AND game_id=? AND request_key=?`, nowText(), a.userID, GameID, requestKey); err != nil {
+	if _, err := a.appDB.ExecContext(ctx, `UPDATE activation_operations SET status='completed',updated_at=? WHERE user_id=? AND request_key=?`, nowText(), a.userID, requestKey); err != nil {
 		return Status{}, err
 	}
 	return a.Status(ctx)
@@ -116,7 +120,7 @@ func (a *App) cancelWorldRuns(ctx context.Context, worldID string) {
 func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string, expectedRevision int64) (SaveOperation, error) {
 	name = cleanText(name)
 	if name == "" {
-		name = "另一个暮灯镇存档"
+		name = "故事分支"
 	}
 	requestKey = strings.TrimSpace(requestKey)
 	if requestKey == "" {
@@ -133,7 +137,7 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 	var operation SaveOperation
 	var found bool
 	var err error
-	row := a.appDB.QueryRowContext(ctx, `SELECT operation_id,request_key,source_world_id,target_world_id,target_name,status,error,created_at,updated_at FROM copy_operations WHERE user_id=? AND game_id=? AND request_key=?`, a.userID, GameID, requestKey)
+	row := a.appDB.QueryRowContext(ctx, `SELECT operation_id,request_key,source_world_id,target_world_id,target_name,status,error,created_at,updated_at FROM copy_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey)
 	operation, found, err = scanSaveOperation(row)
 	if err != nil {
 		return SaveOperation{}, err
@@ -178,18 +182,23 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 	}
 	targetID := newID("world")
 	operation = SaveOperation{OperationID: newID("copy"), RequestKey: requestKey, SourceWorldID: sourceWorldID, TargetWorldID: targetID, TargetName: name, Status: "copying", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
-	targetPath := a.worldPath(targetID)
+	gameID, err := a.worldGame(ctx, sourceWorldID)
+	if err != nil {
+		world.mu.Unlock()
+		return SaveOperation{}, err
+	}
+	targetPath := a.worldPathFor(gameID, targetID)
 	tx, err := a.appDB.BeginTx(ctx, nil)
 	if err != nil {
 		world.mu.Unlock()
 		return SaveOperation{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO copy_operations(operation_id,request_key,user_id,game_id,source_world_id,target_world_id,target_name,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, operation.OperationID, operation.RequestKey, a.userID, GameID, sourceWorldID, targetID, name, operation.Status, operation.CreatedAt.Format(time.RFC3339Nano), operation.UpdatedAt.Format(time.RFC3339Nano)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO copy_operations(operation_id,request_key,user_id,game_id,source_world_id,target_world_id,target_name,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, operation.OperationID, operation.RequestKey, a.userID, gameID, sourceWorldID, targetID, name, operation.Status, operation.CreatedAt.Format(time.RFC3339Nano), operation.UpdatedAt.Format(time.RFC3339Nano)); err != nil {
 		_ = tx.Rollback()
 		world.mu.Unlock()
 		return SaveOperation{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO worlds(user_id,game_id,world_id,name,path,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, a.userID, GameID, targetID, name, targetPath, "copying", operation.CreatedAt.Format(time.RFC3339Nano), operation.UpdatedAt.Format(time.RFC3339Nano)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO worlds(user_id,game_id,world_id,name,path,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)`, a.userID, gameID, targetID, name, targetPath, "copying", operation.CreatedAt.Format(time.RFC3339Nano), operation.UpdatedAt.Format(time.RFC3339Nano)); err != nil {
 		_ = tx.Rollback()
 		world.mu.Unlock()
 		return SaveOperation{}, err
@@ -321,8 +330,14 @@ func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, so
 	if err := memoryReady(ctx, source.db); err != nil {
 		return err
 	}
-	targetPath := a.worldPath(operation.TargetWorldID)
+	targetPath, _, err := a.worldRecord(ctx, operation.TargetWorldID)
+	if err != nil {
+		return err
+	}
 	if err := cloneWorld(ctx, source, targetPath, operation.TargetWorldID, operation.TargetName); err != nil {
+		return err
+	}
+	if err := copyWorldCover(source.path, targetPath); err != nil {
 		return err
 	}
 	now := nowText()
@@ -331,7 +346,7 @@ func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, so
 		return err
 	}
 	defer tx.Rollback()
-	worldResult, err := tx.ExecContext(ctx, `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND game_id=? AND world_id=? AND status='copying'`, now, a.userID, GameID, operation.TargetWorldID)
+	worldResult, err := tx.ExecContext(ctx, `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND world_id=? AND status='copying'`, now, a.userID, operation.TargetWorldID)
 	if err != nil {
 		return err
 	}
@@ -356,10 +371,10 @@ func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, so
 
 func (a *App) failCopy(ctx context.Context, operation SaveOperation, err error) (SaveOperation, error) {
 	message := err.Error()
-	if _, e := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND game_id=? AND operation_id=?`, message, nowText(), a.userID, GameID, operation.OperationID); e != nil {
+	if _, e := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, message, nowText(), a.userID, operation.OperationID); e != nil {
 		return SaveOperation{}, e
 	}
-	if _, e := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND game_id=? AND world_id=?`, nowText(), a.userID, GameID, operation.TargetWorldID); e != nil {
+	if _, e := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, operation.TargetWorldID); e != nil {
 		return SaveOperation{}, e
 	}
 	operation.Status = "failed"
@@ -369,7 +384,7 @@ func (a *App) failCopy(ctx context.Context, operation SaveOperation, err error) 
 }
 
 func (a *App) CopyOperation(ctx context.Context, operationID string) (SaveOperation, error) {
-	operation, found, err := scanSaveOperation(a.appDB.QueryRowContext(ctx, `SELECT operation_id,request_key,source_world_id,target_world_id,target_name,status,error,created_at,updated_at FROM copy_operations WHERE user_id=? AND game_id=? AND operation_id=?`, a.userID, GameID, operationID))
+	operation, found, err := scanSaveOperation(a.appDB.QueryRowContext(ctx, `SELECT operation_id,request_key,source_world_id,target_world_id,target_name,status,error,created_at,updated_at FROM copy_operations WHERE user_id=? AND operation_id=?`, a.userID, operationID))
 	if err != nil {
 		return SaveOperation{}, err
 	}
@@ -439,7 +454,7 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 		return err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE worlds SET status='deleting',updated_at=? WHERE user_id=? AND game_id=? AND world_id=? AND status='ready'`, nowText(), a.userID, GameID, worldID)
+	result, err := tx.ExecContext(ctx, `UPDATE worlds SET status='deleting',updated_at=? WHERE user_id=? AND world_id=? AND status='ready'`, nowText(), a.userID, worldID)
 	if err != nil {
 		return err
 	}
@@ -466,10 +481,10 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 	}
 
 	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
-		_, _ = a.appDB.ExecContext(context.Background(), `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND game_id=? AND world_id=? AND status='deleting'`, nowText(), a.userID, GameID, worldID)
+		_, _ = a.appDB.ExecContext(context.Background(), `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND world_id=? AND status='deleting'`, nowText(), a.userID, worldID)
 		return err
 	}
-	if _, err := a.appDB.ExecContext(ctx, `DELETE FROM worlds WHERE user_id=? AND game_id=? AND world_id=? AND status='deleting'`, a.userID, GameID, worldID); err != nil {
+	if _, err := a.appDB.ExecContext(ctx, `DELETE FROM worlds WHERE user_id=? AND world_id=? AND status='deleting'`, a.userID, worldID); err != nil {
 		return err
 	}
 	a.worldMu.Lock()

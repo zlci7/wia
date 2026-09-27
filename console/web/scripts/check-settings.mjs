@@ -65,7 +65,7 @@ function response(body, status = 200) {
 }
 globalThis.fetch = async (url, init = {}) => {
   if (networkHook) { const value = networkHook(url, init); if (value !== undefined) return value; }
-  if (url === "/api/v1/games") return response({ games: [{ id: "demo" }] });
+  if (url === "/api/v1/games") return response({ games: [{ id: "demo", title: "测试剧本", revision: "v1", mode: "guided", player: {name:"旅人",profile:"测试主角",editable:true} }], issues: [] });
   if (url === "/api/v1/model-profiles")
     return response({ providers: [], model: {} });
   if (url === "/api/v1/status")
@@ -111,6 +111,50 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "new story pins revision and preserves form on conflict"(x) {
+    const game = x.storyEntries.value.find(g => g.id === 'demo');
+    networkHook = (url, init) => {
+      if (url === '/api/v1/games/demo') return response({game});
+      if (url === '/api/v1/worlds' && init.method === 'POST') {
+        sent = JSON.parse(init.body);
+        return response({error:{code:'version_conflict',message:'changed'}},409);
+      }
+    };
+    await x.openStory(game); x.openNewWorld();
+    x.newWorld.player_name = '保留姓名';
+    await x.createOrCopy();
+    assert.equal(sent.expected_revision,'v1');
+    assert.equal(sent.game_id,'demo'); assert.equal('mode' in sent,false);
+    assert.equal(x.newWorld.player_name,'保留姓名');
+    assert.equal(x.newRevisionConflict.value,true);
+    assert.equal(x.dialogBusy.value,false);
+  },
+  async "uncertain creation reuses original payload and key"(x) {
+    const game = x.storyEntries.value.find(g => g.id === 'demo');
+    const requests = [];
+    networkHook = (url, init) => {
+      if (url === '/api/v1/games/demo') return response({game});
+      if (url === '/api/v1/worlds' && init.method === 'POST') {
+        requests.push(JSON.parse(init.body));
+        throw new TypeError('response lost');
+      }
+    };
+    await x.openStory(game);x.openNewWorld();await x.createOrCopy();
+    x.newWorld.player_name = 'later edit';await x.createOrCopy();
+    assert.deepEqual(requests[0],requests[1]);assert.ok(x.pendingCreate.value);
+  },
+  async "late creation result leaves newer dialog intact"(x) {
+    const game = x.storyEntries.value.find(g => g.id === 'demo');
+    networkHook = (url, init) => {
+      if (url === '/api/v1/games/demo') return response({game});
+      if (url === '/api/v1/worlds' && init.method === 'POST') return new Promise(resolve => {pending=resolve;});
+    };
+    await x.openStory(game);x.openNewWorld();const saving=x.createOrCopy();
+    x.showDialog('settings');x.dialogError.value='new error';
+    pending(response({world:world('C')}));await saving;
+    assert.equal(x.dialog.value,'settings');assert.equal(x.dialogError.value,'new error');
+    assert.equal(x.currentWorld.value.world_id,'A');
+  },
   async "ended guided story remains readable and blocks another input"(x) {
     records.A.world.story_ended = true;
     records.A.world.message_head++;

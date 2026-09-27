@@ -35,6 +35,7 @@ var (
 )
 
 type Options struct {
+	StoryPacksPath  string
 	DataRoot        string
 	ModelConfigPath string
 	UserID          string
@@ -48,6 +49,10 @@ type Logger interface {
 }
 
 type App struct {
+	packs           map[string]loadedPack
+	packErrors      []PackIssue
+	packRoot        string
+	createMu        sync.Mutex
 	root            string
 	userID          string
 	appDB           *sql.DB
@@ -102,14 +107,23 @@ type Status struct {
 }
 
 type GameSummary struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Modes       []string `json:"modes"`
-	DefaultMode string   `json:"default_mode"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Modes       []string       `json:"modes"`
+	DefaultMode string         `json:"default_mode"`
+	Revision    string         `json:"revision"`
+	Mode        string         `json:"mode"`
+	Gameplay    string         `json:"gameplay"`
+	Background  string         `json:"background"`
+	CoverURL    string         `json:"cover_url,omitempty"`
+	CoverAlt    string         `json:"cover_alt,omitempty"`
+	Player      PlayerDefaults `json:"player"`
 }
 
 type WorldSummary struct {
+	GameTitle    string    `json:"game_title"`
+	Revision     string    `json:"revision"`
 	GameID       string    `json:"game_id"`
 	WorldID      string    `json:"world_id"`
 	Name         string    `json:"name"`
@@ -126,20 +140,23 @@ type WorldSummary struct {
 }
 
 type Character struct {
-	EntityID        string `json:"entity_id"`
-	DefinitionID    string `json:"definition_id"`
-	Name            string `json:"name"`
-	Role            string `json:"role"`
-	Profile         string `json:"profile"`
-	Knowledge       string `json:"knowledge"`
-	InitialConcerns string `json:"initial_concerns"`
-	InScene         bool   `json:"in_scene"`
+	DefinitionRevision string `json:"definition_revision,omitempty"`
+	Appearance         string `json:"appearance,omitempty"`
+	EntityID           string `json:"entity_id"`
+	DefinitionID       string `json:"definition_id"`
+	Name               string `json:"name"`
+	Role               string `json:"role"`
+	Profile            string `json:"profile"`
+	Knowledge          string `json:"knowledge"`
+	InitialConcerns    string `json:"initial_concerns"`
+	InScene            bool   `json:"in_scene"`
 }
 
 // PublicCharacter is the player-facing character projection. Private role
 // material stays inside the story runtime and is never sent through ordinary
 // play routes.
 type PublicCharacter struct {
+	Appearance   string `json:"appearance,omitempty"`
 	EntityID     string `json:"entity_id"`
 	DefinitionID string `json:"definition_id"`
 	Name         string `json:"name"`
@@ -151,7 +168,8 @@ func PublicCharacterViews(characters []Character) []PublicCharacter {
 	views := make([]PublicCharacter, 0, len(characters))
 	for _, character := range characters {
 		views = append(views, PublicCharacter{
-			EntityID: character.EntityID, DefinitionID: character.DefinitionID,
+			Appearance: character.Appearance,
+			EntityID:   character.EntityID, DefinitionID: character.DefinitionID,
 			Name: character.Name, Role: character.Role, InScene: character.InScene,
 		})
 	}

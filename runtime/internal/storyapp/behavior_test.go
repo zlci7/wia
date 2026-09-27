@@ -19,7 +19,7 @@ func TestBehaviorPoliciesReachOnlyTheirModelCalls(t *testing.T) {
 	g := &scriptedGenerator{}
 	a := newTestApp(t, g)
 	ctx := context.Background()
-	w, err := a.CreateWorld(ctx, "策略", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "策略", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,11 +84,11 @@ func TestBehaviorPoliciesReachOnlyTheirModelCalls(t *testing.T) {
 func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "策略", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "策略", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := a.CreateWorld(ctx, "另一世界", "guided", "旅人", "", false)
+	other, err := a.createFixtureWorld(ctx, "另一世界", "guided", "旅人", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, _ := a.CreateWorld(ctx, "旧设置", "guided", "旅人", "", true)
+	w, _ := a.createFixtureWorld(ctx, "旧设置", "guided", "旅人", "", true)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
 	store, err := openWorldDB(path)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 func TestBehaviorPoliciesLimitsBusyAndCapacity(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{delay: 100 * time.Millisecond})
-	w, _ := a.CreateWorld(ctx, "限制", "guided", "旅人", "", true)
+	w, _ := a.createFixtureWorld(ctx, "限制", "guided", "旅人", "", true)
 	for _, text := range []string{strings.Repeat("字", 4001), "bad\x00policy"} {
 		if _, _, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, BehaviorPolicies{NPC: text})); !errors.Is(err, ErrInvalidRequest) {
 			t.Fatal("bad policy accepted", err)

@@ -10,7 +10,7 @@ import (
 func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "关切", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "关切", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

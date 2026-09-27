@@ -115,13 +115,34 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	if !statusEnvelope.Status.Ready || statusEnvelope.Status.ActiveWorld != nil {
 		t.Fatalf("initial status = %+v", statusEnvelope.Status)
 	}
+	for _, route := range []string{"/api/v1/games", "/api/v1/games/orbital-repair", "/api/v1/games/lantern-dusk"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+route, nil)
+		if response.StatusCode != 200 {
+			t.Fatalf("catalog %s: %d", route, response.StatusCode)
+		}
+		for _, private := range []string{"author_facts", "initial_concerns", "knowledge", "漏签", "信蜡", "plot"} {
+			if strings.Contains(string(body), private) {
+				t.Fatalf("catalog exposes %s", private)
+			}
+		}
+	}
+	response, _ = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{"game_id": "orbital-repair", "expected_revision": "old", "request_key": "stale"})
+	if response.StatusCode != 409 {
+		t.Fatalf("version conflict: %d", response.StatusCode)
+	}
+	response, _ = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{"game_id": "orbital-repair", "expected_revision": "orbital-repair.pack.v1", "request_key": "mode", "mode": "guided"})
+	if response.StatusCode != 400 {
+		t.Fatalf("player mode override: %d", response.StatusCode)
+	}
 
 	response, body = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{
-		"name":           "HTTP 冒险",
-		"mode":           "guided",
-		"player_name":    "旅人",
-		"player_profile": "寻找信使",
-		"activate":       true,
+		"name":              "HTTP 冒险",
+		"game_id":           "lantern-dusk",
+		"expected_revision": "lantern-dusk.pack.v1",
+		"request_key":       "http-create-world",
+		"player_name":       "旅人",
+		"player_profile":    "寻找信使",
+		"activate":          true,
 	})
 	if response.StatusCode != http.StatusCreated {
 		t.Fatalf("create world = %d, body = %s", response.StatusCode, body)

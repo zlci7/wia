@@ -4,6 +4,12 @@ import MemoryPanel from "./components/MemoryPanel.vue";
 import { useExperience } from "./useExperience";
 import "./style.css";
 const {
+  storyEntries,
+  packIssues,
+  newGame,
+  newRevisionConflict,
+  pendingCreate,
+  refreshNewRevision,
   status,
   games,
   currentWorld,
@@ -72,9 +78,17 @@ const {
   resizeInput,
 } = useExperience();
 const policyOptions = [
-  { key: "coordination", label: "场景协调策略", note: "行动结果、冲突处理与玩家反应机会。" },
+  {
+    key: "coordination",
+    label: "场景协调策略",
+    note: "行动结果、冲突处理与玩家反应机会。",
+  },
   { key: "narration", label: "正文表达策略", note: "叙事节奏、描写与收尾。" },
-  { key: "npc", label: "NPC 共用决策策略", note: "发送给所有参与决策的 NPC，请勿填写任何人物的秘密或专属背景。" },
+  {
+    key: "npc",
+    label: "NPC 共用决策策略",
+    note: "发送给所有参与决策的 NPC，请勿填写任何人物的秘密或专属背景。",
+  },
 ] as const;
 </script>
 
@@ -123,7 +137,13 @@ const policyOptions = [
           <button class="quiet-button desktop-setting" @click="openModel()">
             模型设置
           </button>
-          <button v-if="currentWorld && view === 'play'" class="quiet-button desktop-setting" @click="showDialog('memory')">回顾与纠正</button>
+          <button
+            v-if="currentWorld && view === 'play'"
+            class="quiet-button desktop-setting"
+            @click="showDialog('memory')"
+          >
+            回顾与纠正
+          </button>
           <div class="more-menu">
             <button
               id="wia-more-menu"
@@ -134,7 +154,12 @@ const policyOptions = [
               更多
             </button>
             <div v-if="moreOpen" class="menu-panel">
-              <button v-if="currentWorld && view === 'play'" @click="showDialog('memory')">回顾与纠正</button>
+              <button
+                v-if="currentWorld && view === 'play'"
+                @click="showDialog('memory')"
+              >
+                回顾与纠正
+              </button>
               <button
                 v-if="currentWorld && view === 'play'"
                 @click="openSettings"
@@ -181,13 +206,34 @@ const policyOptions = [
         </button>
       </section>
       <h2>选择一个剧本</h2>
+      <details v-if="packIssues.length" class="pack-issues">
+        <summary>
+          有 {{ packIssues.length }} 个剧本加载问题；已有存档可继续
+        </summary>
+        <p v-for="issue in packIssues" :key="issue.file">
+          {{ issue.file }}：{{ issue.message }}
+        </p>
+      </details>
+      <p v-if="!storyEntries.length" class="subtle">
+        暂无可用剧本，请检查本地剧本目录。
+      </p>
       <div class="story-grid">
-        <article v-for="item in games" :key="item.id" class="story-card">
-          <div class="story-art" aria-hidden="true">
-            <span class="moon"></span><span class="window-light"></span>
+        <article v-for="item in storyEntries" :key="item.id" class="story-card">
+          <div class="story-art">
+            <img
+              v-if="item.cover_url"
+              class="story-cover"
+              :src="item.cover_url"
+              :alt="item.cover_alt || item.title"
+            />
+            <span v-else class="cover-placeholder" aria-hidden="true">{{
+              item.title.slice(0, 1)
+            }}</span>
           </div>
           <div class="story-card-body">
-            <span class="eyebrow">调查冒险</span>
+            <span class="eyebrow">{{
+              item.mode === "guided" ? "流程型" : "开放型"
+            }}</span>
             <h2>{{ item.title }}</h2>
             <p>{{ item.description }}</p>
             <button class="primary-button" @click="openStory(item)">
@@ -207,6 +253,15 @@ const policyOptions = [
           <span class="eyebrow">选择进入方式</span>
           <h1>{{ game.title }}</h1>
           <p>{{ game.description }}</p>
+          <p class="eyebrow">
+            {{ game.mode === "guided" ? "流程型" : "开放型" }} ·
+            {{ game.revision }}
+          </p>
+          <p v-if="game.background">{{ game.background }}</p>
+          <p v-if="game.gameplay">{{ game.gameplay }}</p>
+          <p v-if="game.player.requirements" class="subtle">
+            {{ game.player.requirements }}
+          </p>
           <div class="button-row">
             <button
               v-if="recentWorld"
@@ -216,6 +271,7 @@ const policyOptions = [
             >
               继续最近进度</button
             ><button
+              v-if="game.available !== false"
               :class="recentWorld ? 'secondary-button' : 'primary-button'"
               @click="openNewWorld"
             >
@@ -223,8 +279,16 @@ const policyOptions = [
             </button>
           </div>
         </div>
-        <div class="story-art" aria-hidden="true">
-          <span class="moon"></span><span class="window-light"></span>
+        <div class="story-art">
+          <img
+            v-if="game.cover_url"
+            class="story-cover"
+            :src="game.cover_url"
+            :alt="game.cover_alt || game.title"
+          />
+          <span v-else class="cover-placeholder" aria-hidden="true">{{
+            game.title.slice(0, 1)
+          }}</span>
         </div>
       </div>
       <section v-if="storyWorlds.length" class="story-saves">
@@ -332,7 +396,10 @@ const policyOptions = [
               </button>
             </div>
           </div>
-          <div v-if="failedRun && !pendingSubmission" class="run-card failed-card">
+          <div
+            v-if="failedRun && !pendingSubmission"
+            class="run-card failed-card"
+          >
             <p>{{ failureText(failedRun) }}</p>
             <button
               class="secondary-button"
@@ -375,14 +442,14 @@ const policyOptions = [
                 : pendingSubmission
                   ? "提交结果待确认"
                   : activeRun
-                  ? `正在生成 · 已等待 ${waitingSeconds} 秒`
-                  : failedRun
-                    ? failedRun.status === "cancelled"
-                      ? "本轮已取消"
-                      : "本轮未完成"
-                    : saved
-                      ? "本轮已保存"
-                      : "进度自动保存"
+                    ? `正在生成 · 已等待 ${waitingSeconds} 秒`
+                    : failedRun
+                      ? failedRun.status === "cancelled"
+                        ? "本轮已取消"
+                        : "本轮未完成"
+                      : saved
+                        ? "本轮已保存"
+                        : "进度自动保存"
             }}</span>
           </div>
           <textarea
@@ -395,15 +462,29 @@ const policyOptions = [
             @keydown="inputKeys"
             @input="resizeInput"
           ></textarea>
-          <p v-if="session.sendError && !pendingSubmission" class="inline-error" role="alert">
+          <p
+            v-if="session.sendError && !pendingSubmission"
+            class="inline-error"
+            role="alert"
+          >
             {{ session.sendError }}
           </p>
-          <div v-if="pendingSubmission && !session.sending" class="inline-error" role="status">
+          <div
+            v-if="pendingSubmission && !session.sending"
+            class="inline-error"
+            role="status"
+          >
             提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
-            <button type="button" class="secondary-button" @click="sendInput()">确认或重发原请求</button>
+            <button type="button" class="secondary-button" @click="sendInput()">
+              确认或重发原请求
+            </button>
           </div>
           <div class="composer-footer">
-            <span>{{ currentWorld?.story_ended ? '本段故事已结束，可另存或开始新故事' : 'Ctrl + Enter 提交' }}</span
+            <span>{{
+              currentWorld?.story_ended
+                ? "本段故事已结束，可另存或开始新故事"
+                : "Ctrl + Enter 提交"
+            }}</span
             ><button
               class="primary-button"
               type="submit"
@@ -417,8 +498,8 @@ const policyOptions = [
                     : currentWorld?.story_ended
                       ? "故事已结束"
                       : status?.ready
-                      ? "继续故事"
-                      : "连接模型并继续"
+                        ? "继续故事"
+                        : "连接模型并继续"
               }}
             </button>
           </div>
@@ -466,7 +547,15 @@ const policyOptions = [
       <p v-if="dialogError" class="inline-error" role="alert">
         {{ dialogError }}
       </p>
-      <MemoryPanel v-if="dialog === 'memory' && currentWorld" :key="currentWorld.world_id" :world-i-d="currentWorld.world_id" :world-name="currentWorld.name" :characters="characters" @busy="dialogBusy = $event" @updated="freshRefresh" />
+      <MemoryPanel
+        v-if="dialog === 'memory' && currentWorld"
+        :key="currentWorld.world_id"
+        :world-i-d="currentWorld.world_id"
+        :world-name="currentWorld.name"
+        :characters="characters"
+        @busy="dialogBusy = $event"
+        @updated="freshRefresh"
+      />
       <template v-if="dialog === 'model'">
         <p class="subtle">
           凭据仅保存在本机。{{
@@ -625,23 +714,59 @@ const policyOptions = [
               </div>
               <details v-if="policyDefaults" class="behavior-settings">
                 <summary>高级行为策略</summary>
-                <p class="guardrail-note">只影响当前存档，从下一轮生效。上方的人称、篇幅、主角表现和主动程度优先；信息范围与关键选择边界保持有效。</p>
-                <div v-for="option in policyOptions" :key="option.key" class="policy-editor">
-                  <label :for="'policy-' + option.key">{{ option.label }}
-                    <small>{{ settingsForm.behavior_policies[option.key] ? '自定义' : '默认 · ' + policyDefaults.version }}</small>
+                <p class="guardrail-note">
+                  只影响当前存档，从下一轮生效。上方的人称、篇幅、主角表现和主动程度优先；信息范围与关键选择边界保持有效。
+                </p>
+                <div
+                  v-for="option in policyOptions"
+                  :key="option.key"
+                  class="policy-editor"
+                >
+                  <label :for="'policy-' + option.key"
+                    >{{ option.label }}
+                    <small>{{
+                      settingsForm.behavior_policies[option.key]
+                        ? "自定义"
+                        : "默认 · " + policyDefaults.version
+                    }}</small>
                   </label>
                   <p class="policy-note">{{ option.note }}</p>
-                  <textarea :id="'policy-' + option.key"
-                    :value="settingsForm.behavior_policies[option.key] || policyDefaults[option.key]"
-                    :maxlength="policyDefaults.max_chars" rows="6"
-                    @input="settingsForm.behavior_policies[option.key] = ($event.target as HTMLTextAreaElement).value"
+                  <textarea
+                    :id="'policy-' + option.key"
+                    :value="
+                      settingsForm.behavior_policies[option.key] ||
+                      policyDefaults[option.key]
+                    "
+                    :maxlength="policyDefaults.max_chars"
+                    rows="6"
+                    @input="
+                      settingsForm.behavior_policies[option.key] = (
+                        $event.target as HTMLTextAreaElement
+                      ).value
+                    "
                   ></textarea>
                   <div class="policy-footer">
-                    <small>{{ [...(settingsForm.behavior_policies[option.key] || policyDefaults[option.key])].length }} / {{ policyDefaults.max_chars }} 字</small>
-                    <button type="button" class="secondary-button" :disabled="!settingsForm.behavior_policies[option.key]"
-                      @click="settingsForm.behavior_policies[option.key] = ''">恢复默认</button>
+                    <small
+                      >{{
+                        [
+                          ...(settingsForm.behavior_policies[option.key] ||
+                            policyDefaults[option.key]),
+                        ].length
+                      }}
+                      / {{ policyDefaults.max_chars }} 字</small
+                    >
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      :disabled="!settingsForm.behavior_policies[option.key]"
+                      @click="settingsForm.behavior_policies[option.key] = ''"
+                    >
+                      恢复默认
+                    </button>
                   </div>
-                  <small>自定义文本替换本项默认策略；清空后使用默认。默认策略随版本更新，自定义内容保留。</small>
+                  <small
+                    >自定义文本替换本项默认策略；清空后使用默认。默认策略随版本更新，自定义内容保留。</small
+                  >
                 </div>
               </details>
             </details>
@@ -711,7 +836,10 @@ const policyOptions = [
         <div class="modal-actions">
           <button
             class="secondary-button"
-            :disabled="dialogBusy"
+            :disabled="
+              dialogBusy ||
+              !games.some((item) => item.id === currentWorld?.game_id)
+            "
             @click="openNewWorld"
           >
             新开一局</button
@@ -727,37 +855,50 @@ const policyOptions = [
       </template>
       <template v-else-if="dialog === 'new' || dialog === 'copy'">
         <form @submit.prevent="createOrCopy">
-          <fieldset :disabled="dialogBusy">
+          <fieldset
+            :disabled="dialogBusy || (dialog === 'new' && !!pendingCreate)"
+          >
             <label
               >存档名称 <small>可直接使用默认名称</small
-              ><input v-model="newWorld.name" :disabled="dialog === 'copy' && !!pendingCopy" /></label
+              ><input
+                v-model="newWorld.name"
+                :disabled="dialog === 'copy' && !!pendingCopy" /></label
             ><template v-if="dialog === 'new'"
-              ><label>主角名字<input v-model="newWorld.player_name" /></label
+              ><label
+                >主角名字<input
+                  v-model="newWorld.player_name"
+                  :readonly="newGame?.player.editable === false" /></label
               ><label
                 >主角简介<textarea
                   v-model="newWorld.player_profile"
+                  :readonly="newGame?.player.editable === false"
                   rows="3"
-                ></textarea></label
-              ><span class="field-label">剧本方式</span>
-              <div class="mode-options">
-                <button
-                  v-for="mode in game?.modes ?? ['guided', 'open']"
-                  :key="mode"
-                  type="button"
-                  :class="{ selected: newWorld.mode === mode }"
-                  @click="newWorld.mode = mode"
-                >
-                  <strong>{{ mode === "guided" ? "流程型" : "开放型" }}</strong
-                  ><span>{{
-                    mode === "guided"
-                      ? "沿着明确矛盾推进，也保留你的选择"
-                      : "世界会继续发生，你可以参加或离开"
-                  }}</span>
-                </button>
-              </div></template
+                ></textarea>
+              </label>
+              <p class="subtle">
+                {{ newGame?.title }} ·
+                {{ newGame?.mode === "guided" ? "流程型" : "开放型" }} ·
+                {{ newWorld.expected_revision }}
+              </p>
+              <p>{{ newGame?.gameplay }}</p>
+              <p class="subtle">{{ newGame?.player.requirements }}</p></template
             >
           </fieldset>
-          <p v-if="dialog === 'copy' && pendingCopy" class="subtle">正在确认原另存操作，名称和源存档已固定；不会新建第二份副本。</p>
+          <button
+            v-if="dialog === 'new' && newRevisionConflict"
+            type="button"
+            class="secondary-button"
+            :disabled="dialogBusy"
+            @click="refreshNewRevision"
+          >
+            刷新剧本版本并确认
+          </button>
+          <p v-if="dialog === 'new' && pendingCreate" class="subtle">
+            正在确认原开局请求，请勿重复创建。
+          </p>
+          <p v-if="dialog === 'copy' && pendingCopy" class="subtle">
+            正在确认原另存操作，名称和源存档已固定；不会新建第二份副本。
+          </p>
           <div class="modal-actions">
             <button
               type="button"
@@ -766,15 +907,24 @@ const policyOptions = [
               @click="closeDialog"
             >
               取消</button
-            ><button class="primary-button" :disabled="dialogBusy">
+            ><button
+              class="primary-button"
+              :disabled="
+                dialogBusy || (dialog === 'new' && newRevisionConflict)
+              "
+            >
               {{
                 dialogBusy
                   ? "正在处理…"
                   : dialog === "copy"
-                    ? pendingCopy ? "继续确认另存" : "创建独立存档"
-                    : status?.ready
-                      ? "开始游玩"
-                      : "连接模型并开始"
+                    ? pendingCopy
+                      ? "继续确认另存"
+                      : "创建独立存档"
+                    : pendingCreate
+                      ? "继续确认开局"
+                      : status?.ready
+                        ? "开始游玩"
+                        : "连接模型并开始"
               }}
             </button>
           </div>

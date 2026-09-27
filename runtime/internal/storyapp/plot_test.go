@@ -133,7 +133,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 
 func TestPlotInterventionUsesResolvedPlayerEvidence(t *testing.T) {
 	app := newTestApp(t, &plotTestGenerator{intervene: true})
-	w, err := app.CreateWorld(context.Background(), "干预", "open", "旅人", "", true)
+	w, err := app.createFixtureWorld(context.Background(), "干预", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestPlotTimelineCommitModesAndIdempotency(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			ctx := context.Background()
 			app := newTestApp(t, &plotTestGenerator{})
-			world, err := app.CreateWorld(ctx, "时间线", mode, "旅人", "", true)
+			world, err := app.createFixtureWorld(ctx, "时间线", mode, "旅人", "", true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -211,7 +211,7 @@ func TestPlotTimelineCommitModesAndIdempotency(t *testing.T) {
 func TestPlotNarrationFailureRollsBackClockAndProgress(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &plotTestGenerator{failNarration: true})
-	w, err := app.CreateWorld(ctx, "失败边界", "guided", "旅人", "", true)
+	w, err := app.createFixtureWorld(ctx, "失败边界", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	ctx := context.Background()
 	g := &plotTestGenerator{wake: true}
 	app := newTestApp(t, g)
-	w, err := app.CreateWorld(ctx, "场外", "open", "旅人", "", true)
+	w, err := app.createFixtureWorld(ctx, "场外", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestPlotSceneSourcesPreserveAudience(t *testing.T) {
 func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &plotTestGenerator{})
-	w, err := app.CreateWorld(ctx, "原存档", "open", "旅人", "", true)
+	w, err := app.createFixtureWorld(ctx, "原存档", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestPlotResolutionReferencesAndAudience(t *testing.T) {
 func TestPlotDeferredChecksAgainWithoutSkippingTimeBoundary(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &plotTestGenerator{deferNode: true})
-	w, err := app.CreateWorld(ctx, "未满足条件", "open", "旅人", "", true)
+	w, err := app.createFixtureWorld(ctx, "未满足条件", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +428,7 @@ func TestPlotDeferredChecksAgainWithoutSkippingTimeBoundary(t *testing.T) {
 func TestPlotRestartAndCopyRemainIndependent(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &plotTestGenerator{})
-	w, err := app.CreateWorld(ctx, "重启前", "open", "旅人", "", true)
+	w, err := app.createFixtureWorld(ctx, "重启前", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

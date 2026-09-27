@@ -21,6 +21,7 @@ func main() {
 	dataRootFlag := flag.String(dataroot.FlagName, "", "World Is Agent data root")
 	httpAddr := flag.String("http-addr", "127.0.0.1:0", "local browser address; must be loopback")
 	modelConfig := flag.String("model-config", "", "optional model configuration path")
+	storyPacks := flag.String("story-packs", "", "local story pack directory (default: data-root/story-app/story-packs)")
 	noOpen := flag.Bool("no-open", false, "do not open the browser automatically")
 	flag.Parse()
 
@@ -33,7 +34,7 @@ func main() {
 		log.Fatal("open diagnostic log failed")
 	}
 	defer diagnostics.Close()
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, ModelConfigPath: *modelConfig, UserID: storyapp.LocalUserID, Logger: diagnostics.Logger(os.Stderr)})
+	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, ModelConfigPath: *modelConfig, StoryPacksPath: *storyPacks, UserID: storyapp.LocalUserID, Logger: diagnostics.Logger(os.Stderr)})
 	if err != nil {
 		log.Fatalf("open World Is Agent: %v", err)
 	}

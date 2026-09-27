@@ -9,7 +9,7 @@ import (
 func TestSecondTurnCoordinationReceivesCommittedActionResults(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "连续状态", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "连续状态", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -48,7 +48,7 @@ func TestContextRealModelSequence(t *testing.T) {
 	a := newTestApp(t, probe)
 	logger := &recordingLogger{}
 	a.logger = logger
-	w, err := a.CreateWorld(context.Background(), "上下文验证", "guided", "旅人", "谨慎而礼貌的旅人", true)
+	w, err := a.createFixtureWorld(context.Background(), "上下文验证", "guided", "旅人", "谨慎而礼貌的旅人", true)
 	if err != nil {
 		t.Fatal(err)
 	}

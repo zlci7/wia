@@ -177,7 +177,7 @@ func waitRun(t *testing.T, app *App, worldID, runID string) Run {
 
 func TestListWorldsReleasesApplicationRowsBeforeLoadingWorlds(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(context.Background(), "列表测试", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "列表测试", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestListWorldsReleasesApplicationRowsBeforeLoadingWorlds(t *testing.T) {
 
 func TestDeleteActiveWorldWaitsForRunThenClearsActiveSelection(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{delay: 80 * time.Millisecond})
-	world, err := app.CreateWorld(context.Background(), "删除中的冒险", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "删除中的冒险", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestDeleteActiveWorldWaitsForRunThenClearsActiveSelection(t *testing.T) {
 func TestCoreTurnKeepsPrivatePerceptionAndCommitsAtomically(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "调查 A", "guided", "旅人", "寻找失踪信使", true)
+	world, err := app.createFixtureWorld(context.Background(), "调查 A", "guided", "旅人", "寻找失踪信使", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestCoreTurnKeepsPrivatePerceptionAndCommitsAtomically(t *testing.T) {
 func TestPublicAddressKeepsNPCAttribution(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "称呼测试", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "称呼测试", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -444,7 +444,7 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "叙事设置", "guided", "岚舟", "寻找答案", true)
+	world, err := app.createFixtureWorld(context.Background(), "叙事设置", "guided", "岚舟", "寻找答案", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +526,7 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 
 func TestNarrativeSettingsUseDefaultsWhenExistingWorldLacksInteractionMeta(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(context.Background(), "旧存档设置", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "旧存档设置", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +590,7 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 	generator := &scriptedGenerator{delay: 80 * time.Millisecond}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "叙事设置冲突", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "叙事设置冲突", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -637,7 +637,7 @@ func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 func TestPrivatePlayerTextIsAvailableToNarratorEvents(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "私聊叙事边界", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "私聊叙事边界", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -673,7 +673,7 @@ func TestObserveIntentUsesActionPerceptionAndMemoryTypes(t *testing.T) {
 	}
 	generator := intentResultGenerator{base: &scriptedGenerator{}, intent: `{"intent_type":"observe","addressee_id":"","visibility":"public"}`}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "观察类型", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "观察类型", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -714,7 +714,7 @@ func TestObserveIntentUsesActionPerceptionAndMemoryTypes(t *testing.T) {
 
 func TestWaitWordingDoesNotOverrideResolvedTime(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(context.Background(), "等待测试", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "等待测试", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -736,11 +736,11 @@ func TestWaitWordingDoesNotOverrideResolvedTime(t *testing.T) {
 
 func TestActivationRequestIsIdempotentAcrossVersionChanges(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	first, err := app.CreateWorld(context.Background(), "存档一", "guided", "旅人", "", true)
+	first, err := app.createFixtureWorld(context.Background(), "存档一", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := app.CreateWorld(context.Background(), "存档二", "open", "旅人", "", false)
+	second, err := app.createFixtureWorld(context.Background(), "存档二", "open", "旅人", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -769,7 +769,7 @@ func TestActivationRequestIsIdempotentAcrossVersionChanges(t *testing.T) {
 
 func TestCancellationDoesNotCommitACompletedTurn(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{delay: 100 * time.Millisecond})
-	world, err := app.CreateWorld(context.Background(), "取消测试", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "取消测试", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -796,7 +796,7 @@ func TestCancellationDoesNotCommitACompletedTurn(t *testing.T) {
 func TestIdempotencyAndFailedInputAreNotHistory(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "调查 B", "open", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "调查 B", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -842,7 +842,7 @@ func TestIdempotencyAndFailedInputAreNotHistory(t *testing.T) {
 
 func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	original, err := app.CreateWorld(context.Background(), "调查 C", "guided", "旅人", "", true)
+	original, err := app.createFixtureWorld(context.Background(), "调查 C", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -923,7 +923,7 @@ func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 
 func TestSaveAsWaitsForTheCurrentRunBoundary(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{delay: 80 * time.Millisecond})
-	original, err := app.CreateWorld(context.Background(), "等待边界", "guided", "旅人", "", true)
+	original, err := app.createFixtureWorld(context.Background(), "等待边界", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -967,7 +967,7 @@ func TestSaveAsWaitsForTheCurrentRunBoundary(t *testing.T) {
 
 func TestSaveAsRejectsASecondPendingCopy(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{delay: 80 * time.Millisecond})
-	world, err := app.CreateWorld(context.Background(), "单一另存预约", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "单一另存预约", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -992,7 +992,7 @@ func TestCloseDrainsPendingCopyBeforeReleasingDataRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world, err := app.CreateWorld(context.Background(), "退出时另存", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "退出时另存", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1067,7 +1067,7 @@ func TestRunFailureRecordsStageReasonAndSafeDiagnostic(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = app.Close() })
-	world, err := app.CreateWorld(context.Background(), "失败诊断", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "失败诊断", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1094,7 +1094,7 @@ func TestSuccessfulRunLogsStageProvenanceWithoutStoryContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = app.Close() })
-	world, err := app.CreateWorld(context.Background(), "成功诊断", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "成功诊断", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1133,7 +1133,7 @@ func TestSuccessfulRunLogsStageProvenanceWithoutStoryContent(t *testing.T) {
 func TestStructuredIntentUsesDirectAddressAndPrivateVisibility(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "目标解析", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "目标解析", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1166,7 +1166,7 @@ func TestStructuredIntentUsesDirectAddressAndPrivateVisibility(t *testing.T) {
 
 func TestOffSceneCharactersDoNotParticipate(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
-	world, err := app.CreateWorld(context.Background(), "在场过滤", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "在场过滤", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1197,7 +1197,7 @@ func TestOffSceneCharactersDoNotParticipate(t *testing.T) {
 func TestSceneHostProposalAndSceneVersionAreCommitted(t *testing.T) {
 	generator := &scriptedGenerator{scene: "客栈后院"}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "场景提交", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "场景提交", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1248,7 +1248,7 @@ func TestSceneRosterTreatsPlayerAsImplicit(t *testing.T) {
 func TestRetryUsesOriginalWorldHead(t *testing.T) {
 	generator := &scriptedGenerator{fail: true}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "重试基线", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "重试基线", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1277,7 +1277,7 @@ func TestRetryUsesOriginalWorldHead(t *testing.T) {
 func TestRetryIsRejectedAfterAnyLaterAcceptedInput(t *testing.T) {
 	generator := &scriptedGenerator{fail: true}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "重试顺序", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "重试顺序", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1303,7 +1303,7 @@ func TestRetryIsRejectedAfterAnyLaterAcceptedInput(t *testing.T) {
 func TestLegacyRunWithoutInputSequenceCannotRetry(t *testing.T) {
 	generator := &scriptedGenerator{fail: true}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "旧重试迁移", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "旧重试迁移", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1330,7 +1330,7 @@ func TestLegacyRunWithoutInputSequenceCannotRetry(t *testing.T) {
 func TestSaveAsFailsWhenTheBoundaryRunFails(t *testing.T) {
 	generator := &scriptedGenerator{fail: true, delay: 40 * time.Millisecond}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "另存失败", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "另存失败", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1461,7 +1461,7 @@ func TestSemanticIntentIsNotOverwrittenByKeywordHints(t *testing.T) {
 	t.Run("mentioned innkeeper does not replace mercenary target", func(t *testing.T) {
 		generator := intentResultGenerator{base: &scriptedGenerator{}, intent: `{"intent_type":"speak","addressee_id":"npc:mercenary","visibility":"private"}`}
 		app := newTestApp(t, generator)
-		world, err := app.CreateWorld(context.Background(), "语义目标", "guided", "旅人", "", true)
+		world, err := app.createFixtureWorld(context.Background(), "语义目标", "guided", "旅人", "", true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1484,7 +1484,7 @@ func TestSemanticIntentIsNotOverwrittenByKeywordHints(t *testing.T) {
 	t.Run("word only does not force private visibility", func(t *testing.T) {
 		generator := intentResultGenerator{base: &scriptedGenerator{}, intent: `{"intent_type":"speak","addressee_id":"npc:innkeeper","visibility":"public"}`}
 		app := newTestApp(t, generator)
-		world, err := app.CreateWorld(context.Background(), "语义可见性", "guided", "旅人", "", true)
+		world, err := app.createFixtureWorld(context.Background(), "语义可见性", "guided", "旅人", "", true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1576,7 +1576,7 @@ func TestGenerateJSONRetriesOnlyInvalidModelOutput(t *testing.T) {
 func TestUnaddressedIntentAcceptsNullAddressee(t *testing.T) {
 	generator := intentResultGenerator{base: &scriptedGenerator{}, intent: `{"intent_type":"observe","addressee_id":null,"visibility":"public"}`}
 	app := newTestApp(t, generator)
-	world, err := app.CreateWorld(context.Background(), "无目标意图", "guided", "旅人", "", true)
+	world, err := app.createFixtureWorld(context.Background(), "无目标意图", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

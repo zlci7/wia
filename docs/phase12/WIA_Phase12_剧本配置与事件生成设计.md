@@ -1,6 +1,6 @@
 # Phase12 剧本配置与事件生成设计
 
-状态：已确认设计，待开发与验证。当前实现事实见[开发状态](WIA_Phase12_开发状态.md)；M2 基线证据见[验收记录](acceptance/M2.md)。
+状态：第一单元“剧本配置化与多剧本运行”已实现；第二至四单元待实施。文件格式与接口见 [Story Pack Authoring](Story_Pack_Authoring.md)，专项证据见[配置化验收记录](acceptance/Story_Packs.md)。当前实现事实见[开发状态](WIA_Phase12_开发状态.md)；M2 基线证据见[验收记录](acceptance/M2.md)。
 
 ## 1. 目标与范围
 

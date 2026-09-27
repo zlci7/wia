@@ -1,6 +1,8 @@
 # 当前状态
 
-更新时间：2026-09-27。
+更新时间：2026-09-28。
+
+Local story packs and multi-story saves are available. The runtime validates JSON schemas and references, pins author-selected modes and revisions, and stores independent definition/cover snapshots. The inn and orbital-station samples share the existing runtime. Evidence and remaining scope: [Story Packs](phase12/acceptance/Story_Packs.md).
 
 The local playtest build includes Phase12 M1 and M2. Players can run conditional story events, continue personal memories, inspect sources and correct records while keeping independent worlds and original prose. User experience acceptance remains separate from engineering verification.
 

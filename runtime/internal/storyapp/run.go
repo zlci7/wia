@@ -583,7 +583,8 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		return turnOutput{}, atTurnStage(turnStageLoad, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
-	def := lanternDefinition()
+	def := snapshot.Definition
+	def.Characters = snapshot.Characters
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {

@@ -17,6 +17,7 @@ import (
 )
 
 type worldSnapshot struct {
+	Definition    gameDefinition
 	Summary       WorldSummary
 	PlayerName    string
 	PlayerProfile string
@@ -118,6 +119,8 @@ func sqliteDSN(path string) string {
 }
 
 const appSchema = `
+CREATE TABLE IF NOT EXISTS pack_revisions (game_id TEXT NOT NULL, revision TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(game_id,revision));
+CREATE TABLE IF NOT EXISTS creation_operations (user_id TEXT NOT NULL, request_key TEXT NOT NULL, request_hash TEXT NOT NULL, world_id TEXT NOT NULL, PRIMARY KEY(user_id,request_key));
 CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS worlds (
   user_id TEXT NOT NULL, game_id TEXT NOT NULL, world_id TEXT NOT NULL,
@@ -275,8 +278,8 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 	}
 	defer tx.Rollback()
 	values := map[string]string{
-		"schema_version": strconv.Itoa(SchemaVersion), "user_id": userID, "game_id": GameID,
-		"world_id": worldID, "game_revision": "lantern-dusk.v1", "mode": mode,
+		"schema_version": strconv.Itoa(SchemaVersion), "user_id": userID, "game_id": def.Summary.ID,
+		"world_id": worldID, "game_revision": def.Revision, "mode": mode,
 		"turn_seq": "0", "message_head": "1", "event_head": "0", "context_epoch": "1",
 		"scene_version": "1", "scene": def.Scene, "clock": def.Clock,
 		"player_name": playerName, "player_profile": playerProfile, "status": "ready",
@@ -285,6 +288,16 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		"narrative_detail": NarrativeDetailBalanced, "narrative_custom_instruction": "",
 		"player_elaboration": PlayerElaborationNatural, "npc_initiative": NPCInitiativeContextual,
 	}
+	settings := def.Settings
+	if settings.Perspective == "" {
+		settings = defaultNarrativeSettings()
+	}
+	values["narrative_perspective"], values["narrative_length"], values["narrative_detail"] = settings.Perspective, settings.Length, settings.Detail
+	values["player_elaboration"], values["npc_initiative"] = settings.PlayerElaboration, settings.NPCInitiative
+	values["behavior_policies"] = marshalJSON(settings.Policies)
+	values["narrative_custom_instruction"] = settings.CustomInstruction
+	values["settings_origin"] = def.SettingsSource
+	values["definition_snapshot"] = marshalJSON(def)
 	for key, value := range values {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, key, value); err != nil {
 			return err
@@ -303,6 +316,12 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		}
 	}
 	for _, c := range def.Characters {
+		if err := metaSetTx(ctx, tx, "appearance:"+c.EntityID, c.Appearance); err != nil {
+			return err
+		}
+		if err := metaSetTx(ctx, tx, "definition_revision:"+c.EntityID, c.DefinitionRevision); err != nil {
+			return err
+		}
 		if err := metaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
 			return err
 		}
@@ -392,13 +411,16 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if value, e := get("bystanders"); e == nil {
 		_ = json.Unmarshal([]byte(value), &out.Bystanders)
 	}
-	if len(out.Bystanders) == 0 {
-		out.Bystanders = append([]string(nil), lanternDefinition().Bystanders...)
-	}
 	out.Characters, err = loadCharacters(ctx, store.db)
 	if err != nil {
 		return out, err
 	}
+	out.Definition, err = snapshotDefinition(ctx, store, out)
+	if err != nil {
+		return out, err
+	}
+	out.Summary.GameTitle = out.Definition.Summary.Title
+	out.Summary.Revision = out.Definition.Revision
 	out.Messages, err = loadMessages(ctx, store.db, limit)
 	if err != nil {
 		return out, err
@@ -459,7 +481,26 @@ func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
 		c.InScene = in != 0
 		result = append(result, c)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for i := range result {
+		revision, revisionErr := metaGet(ctx, db, "definition_revision:"+result[i].EntityID)
+		if revisionErr != nil && !errors.Is(revisionErr, sql.ErrNoRows) {
+			return nil, revisionErr
+		}
+		result[i].DefinitionRevision = revision
+		value, e := metaGet(ctx, db, "appearance:"+result[i].EntityID)
+		if e == nil {
+			result[i].Appearance = value
+		} else if !errors.Is(e, sql.ErrNoRows) {
+			return nil, e
+		}
+	}
+	return result, nil
 }
 
 func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]Message, error) {

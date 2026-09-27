@@ -1,0 +1,12 @@
+{
+  "entity_id": "npc:innkeeper",
+  "definition_id": "engineer.v1",
+  "revision": "1",
+  "name": "周宁",
+  "role": "值班工程师",
+  "appearance": "穿着带工具挂扣的工作服。",
+  "profile": "耐心、注重证据，解释设备问题时习惯先问对方知道多少。",
+  "knowledge": "熟悉维修站的设备；发现旧检修表漏签，还未向调度员说明。",
+  "initial_concerns": "希望确认漏签是否只是记录疏漏，带新人熟悉安全工作方式。",
+  "initial_location": "control"
+}

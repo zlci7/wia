@@ -54,7 +54,7 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool, modes ...s
 	if len(modes) > 0 {
 		mode = modes[0]
 	}
-	w, err := a.CreateWorld(ctx, "自主性评估", mode, "旅人", "谨慎而礼貌的旅人", true)
+	w, err := a.createFixtureWorld(ctx, "自主性评估", mode, "旅人", "谨慎而礼貌的旅人", true)
 	if err != nil {
 		t.Fatal(err)
 	}

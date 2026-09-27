@@ -10,7 +10,7 @@ import (
 func TestDialogueUsesFourCommittedTurns(t *testing.T) {
 	g := &scriptedGenerator{}
 	a := newTestApp(t, g)
-	w, err := a.CreateWorld(context.Background(), "对话来源", "guided", "旅人", "", true)
+	w, err := a.createFixtureWorld(context.Background(), "对话来源", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

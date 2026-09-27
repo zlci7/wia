@@ -18,7 +18,7 @@ func TestMemoryRoutesRequireOwnershipAndExplicitAuthorView(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer app.Close()
-	world, err := app.CreateWorld(ctx, "memory", "open", "旅人", "", true)
+	world, err := app.CreateWorld(ctx, "memory", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

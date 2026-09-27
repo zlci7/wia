@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "game_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "open",
+        "guided"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "gameplay": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "background": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 8000
+    },
+    "rules": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 8000
+    },
+    "author_facts": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 8000
+    },
+    "cover": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^assets/"
+    },
+    "cover_alt": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 300
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "requirements": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "editable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "opening": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "initial_location": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "clock": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^第 [1-9][0-9]{0,3} 日 ([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 4000
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "connections"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 32
+    },
+    "npcs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240,
+        "pattern": "^npcs/.+\\.json$"
+      },
+      "minItems": 1,
+      "maxItems": 16
+    },
+    "bystanders": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "minItems": 0,
+      "maxItems": 40
+    },
+    "plot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+        },
+        "facts": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 8000
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+              },
+              "after": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+                },
+                "minItems": 0,
+                "maxItems": 64
+              },
+              "at_minute": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5256000
+              },
+              "condition": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000
+              },
+              "development": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000
+              },
+              "audience": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 84
+                },
+                "minItems": 0,
+                "maxItems": 17
+              },
+              "terminal": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "after",
+              "condition",
+              "development",
+              "audience"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 64
+        }
+      },
+      "required": [
+        "revision",
+        "nodes"
+      ]
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "perspective": {
+          "type": "string",
+          "enum": [
+            "first_person",
+            "second_person",
+            "third_person"
+          ]
+        },
+        "length": {
+          "type": "string",
+          "enum": [
+            "concise",
+            "standard",
+            "detailed"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "enum": [
+            "restrained",
+            "balanced",
+            "rich"
+          ]
+        },
+        "player_elaboration": {
+          "type": "string",
+          "enum": [
+            "restrained",
+            "natural",
+            "expressive"
+          ]
+        },
+        "npc_initiative": {
+          "type": "string",
+          "enum": [
+            "responsive",
+            "contextual",
+            "proactive"
+          ]
+        },
+        "custom_instruction": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "behavior_policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "coordination": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "narration": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "npc": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            }
+          },
+          "required": []
+        }
+      },
+      "required": []
+    }
+  },
+  "required": [
+    "schema_version",
+    "game_id",
+    "revision",
+    "mode",
+    "title",
+    "description",
+    "gameplay",
+    "opening",
+    "initial_location",
+    "clock",
+    "locations",
+    "npcs"
+  ]
+}

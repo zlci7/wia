@@ -31,7 +31,7 @@ func (g *recallProbe) GenerateText(_ context.Context, r model.TextRequest) (mode
 func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "检索", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "检索", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func (g *digestGenerator) GenerateText(_ context.Context, r model.TextRequest) (
 func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "memory", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "memory", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 func TestMemoryOptionalFailureKeepsCompleteTail(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "保留历史", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "保留历史", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestMemoryTailIsRequiredAndSearchBounded(t *testing.T) {
 func TestMemoryPaginationUsesMessageOrderAndExcludesFailedRuns(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "历史分页", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "历史分页", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestMemoryPaginationUsesMessageOrderAndExcludesFailedRuns(t *testing.T) {
 func TestSubjectiveMemoryIdentifiesItsOwner(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.CreateWorld(ctx, "主观来源", "open", "旅人", "", true)
+	w, err := a.createFixtureWorld(ctx, "主观来源", "open", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

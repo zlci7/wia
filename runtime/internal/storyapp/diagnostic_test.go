@@ -68,7 +68,7 @@ func TestDiagnosticLogRotationAndConcurrentWrites(t *testing.T) {
 func TestFindRunByRequestIsWorldScopedAndBeyondRecentWindow(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
 	ctx := context.Background()
-	w, _ := a.CreateWorld(ctx, "lookup", "guided", "旅人", "", true)
+	w, _ := a.createFixtureWorld(ctx, "lookup", "guided", "旅人", "", true)
 	r, err := a.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: "first-key", Input: "问候"})
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestFindRunByRequestIsWorldScopedAndBeyondRecentWindow(t *testing.T) {
 	if err != nil || len(found) != 1 || found[0].RunID != r.RunID {
 		t.Fatalf("%+v %v", found, err)
 	}
-	other, _ := a.CreateWorld(ctx, "other", "guided", "旅人", "", false)
+	other, _ := a.createFixtureWorld(ctx, "other", "guided", "旅人", "", false)
 	found, err = a.ListRuns(ctx, other.WorldID, "first-key")
 	if err != nil || len(found) != 0 {
 		t.Fatalf("cross-world: %+v %v", found, err)
