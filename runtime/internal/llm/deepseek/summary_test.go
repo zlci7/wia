@@ -19,6 +19,37 @@ import (
 
 const textSuccessBody = `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"Alice did not act.","reasoning_content":"private reasoning"}}]}`
 
+func TestTextReasoningReserveTransportAndVisibleCap(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["max_tokens"] != float64(8224) {
+			t.Errorf("total budget: %v", body["max_tokens"])
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"role": "assistant", "content": strings.Repeat("中", 40)}}}})
+	}))
+	defer server.Close()
+	p := NewProvider("test", "deepseek-v4-flash", WithBaseURL(server.URL), WithModelWindow(model.WindowLimits{ContextTokens: 20000, OutputTokens: 9000}))
+	if p.TextReasoningReserve() != 8192 || NewProvider("test", "custom").TextReasoningReserve() != 0 {
+		t.Fatal("incorrect capability")
+	}
+	_, err := p.GenerateText(context.Background(), model.TextRequest{Input: "facts", MaxOutputTokens: 32, ReasoningReserveTokens: 8192})
+	if !errors.Is(err, model.ErrTextOutputTooLarge) {
+		t.Fatalf("visible cap bypassed: %v", err)
+	}
+	for _, reserve := range []int{-1, int(^uint(0) >> 1), 9000} {
+		_, err = p.GenerateText(context.Background(), model.TextRequest{Input: "facts", MaxOutputTokens: 32, ReasoningReserveTokens: reserve})
+		if err == nil {
+			t.Fatalf("invalid reserve accepted: %d", reserve)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("invalid request sent: %d", calls.Load())
+	}
+}
+
 func TestGenerateTextUsesConfiguredChatProviderWithoutTools(t *testing.T) {
 	for _, outputLimit := range []int{0, 32} {
 		t.Run(strconv.Itoa(outputLimit), func(t *testing.T) {
@@ -154,6 +185,30 @@ func TestGenerateTextReportsSafeInvalidResponseMetadata(t *testing.T) {
 				t.Fatalf("error = %v, want safe metadata %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestGenerateTextReportsUsageWithoutResponseContents(t *testing.T) {
+	for _, finish := range []string{"stop", "length"} {
+		body := `{"choices":[{"finish_reason":"` + finish + `","message":{"role":"assistant","content":"可见","reasoning_content":"hidden thought"}}],"usage":{"prompt_tokens":123,"completion_tokens":44,"completion_tokens_details":{"reasoning_tokens":40}}}`
+		provider := newTextTestProvider(t, http.StatusOK, body)
+		response, err := provider.GenerateText(context.Background(), model.TextRequest{Input: "facts"})
+		d := response.Diagnostic
+		if finish == "length" {
+			var call *model.TextCallError
+			if !errors.As(err, &call) {
+				t.Fatalf("expected diagnostic error: %v", err)
+			}
+			d = call.Diagnostic
+			if response.Text != "" || strings.Contains(err.Error(), "hidden") || strings.Contains(err.Error(), "可见") {
+				t.Fatal("response leaked")
+			}
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if d.InputTokens != 123 || d.OutputTokens != 44 || d.ReasoningTokens != 40 || d.ContentChars != 2 || d.ReasoningChars != 14 {
+			t.Fatalf("usage=%+v", d)
+		}
 	}
 }
 

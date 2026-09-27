@@ -23,14 +23,16 @@ var (
 	ErrInvalidTextResponse  = errors.New("invalid or incomplete text response")
 )
 
-// TextRequest is a tool-free generation request. Zero limits use the defaults;
-// token limits use tokenestimate, and MaxResponseBytes bounds the full response body.
+// TextRequest is a tool-free generation request. Zero Max* limits use defaults;
+// a zero reasoning reserve allocates no additional tokens. Visible token limits
+// use tokenestimate, and MaxResponseBytes bounds the full response body.
 type TextRequest struct {
-	System           string
-	Input            string
-	MaxInputTokens   int
-	MaxOutputTokens  int
-	MaxResponseBytes int
+	System                 string
+	Input                  string
+	MaxInputTokens         int
+	MaxOutputTokens        int
+	ReasoningReserveTokens int
+	MaxResponseBytes       int
 }
 
 type TextResponse struct {
@@ -42,10 +44,16 @@ type TextGenerator interface {
 	GenerateText(context.Context, TextRequest) (TextResponse, error)
 }
 
+// TextReasoningProvider declares an additional internal-reasoning allowance.
+// MaxOutputTokens continues to bound the visible answer.
+type TextReasoningProvider interface{ TextReasoningReserve() int }
+
+func (r TextRequest) TotalOutputTokens() int { return r.MaxOutputTokens + r.ReasoningReserveTokens }
+
 // ValidateTextRequest applies defaults and checks the complete framed input.
 func ValidateTextRequest(req TextRequest) (TextRequest, error) {
 	req = textRequestDefaults(req)
-	if req.MaxInputTokens < 0 || req.MaxOutputTokens < 0 || req.MaxResponseBytes < 0 ||
+	if req.MaxInputTokens < 0 || req.MaxOutputTokens < 0 || req.MaxResponseBytes < 0 || req.ReasoningReserveTokens < 0 || req.ReasoningReserveTokens > int(^uint(0)>>1)-req.MaxOutputTokens ||
 		!utf8.ValidString(req.System) || !utf8.ValidString(req.Input) || strings.TrimSpace(req.Input) == "" {
 		return TextRequest{}, ErrInvalidTextRequest
 	}

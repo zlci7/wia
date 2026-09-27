@@ -9,12 +9,21 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"gameagent/runtime/internal/model"
 	"gameagent/runtime/internal/tokenestimate"
 )
 
 var _ model.TextGenerator = (*Provider)(nil)
+
+func (p *Provider) TextReasoningReserve() int {
+	name := strings.ToLower(strings.TrimSpace(p.model))
+	if strings.HasPrefix(name, "deepseek-v4-") || name == "deepseek-reasoner" {
+		return 8192
+	}
+	return 0
+}
 
 func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (result model.TextResponse, callErr error) {
 	diagnostic := model.TextDiagnostic{}
@@ -48,7 +57,7 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		"model":      p.model,
 		"messages":   messages,
 		"stream":     false,
-		"max_tokens": req.MaxOutputTokens,
+		"max_tokens": req.TotalOutputTokens(),
 	})
 	if err != nil {
 		return model.TextResponse{}, model.ErrInvalidTextRequest
@@ -58,7 +67,7 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		return model.TextResponse{}, model.ErrTextInputTooLarge
 	}
 	if p.window.ContextTokens > 0 {
-		if err := p.window.Check(inputTokens, req.MaxOutputTokens); err != nil {
+		if err := p.window.Check(inputTokens, req.TotalOutputTokens()); err != nil {
 			return model.TextResponse{}, err
 		}
 	}
@@ -100,14 +109,30 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 	var envelope struct {
 		Choices []struct {
 			FinishReason string `json:"finish_reason"`
+			Message      struct {
+				Content   string `json:"content"`
+				Reasoning string `json:"reasoning_content"`
+			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			Input   int `json:"prompt_tokens"`
+			Output  int `json:"completion_tokens"`
+			Details struct {
+				Reasoning int `json:"reasoning_tokens"`
+			} `json:"completion_tokens_details"`
+		} `json:"usage"`
 		Status string `json:"status"`
 	}
 	_ = json.Unmarshal(data, &envelope)
 	finish := envelope.Status
 	if len(envelope.Choices) > 0 {
 		finish = envelope.Choices[0].FinishReason
+		diagnostic.ContentChars = utf8.RuneCountInString(envelope.Choices[0].Message.Content)
+		diagnostic.ReasoningChars = utf8.RuneCountInString(envelope.Choices[0].Message.Reasoning)
 	}
+	diagnostic.InputTokens = max(0, envelope.Usage.Input)
+	diagnostic.OutputTokens = max(0, envelope.Usage.Output)
+	diagnostic.ReasoningTokens = max(0, envelope.Usage.Details.Reasoning)
 	diagnostic.FinishReason = model.SafeFinishReason(finish)
 	if finish == "length" || finish == "incomplete" {
 		diagnostic.Code = "output_incomplete"

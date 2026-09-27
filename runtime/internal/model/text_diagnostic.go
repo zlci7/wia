@@ -9,10 +9,15 @@ import (
 
 // TextDiagnostic contains only bounded transport/validation metadata, never text.
 type TextDiagnostic struct {
-	Code         string
-	HTTPStatus   int
-	RequestID    string
-	FinishReason string
+	Code            string
+	HTTPStatus      int
+	RequestID       string
+	FinishReason    string
+	InputTokens     int
+	OutputTokens    int
+	ReasoningTokens int
+	ContentChars    int
+	ReasoningChars  int
 }
 
 type TextCallError struct {

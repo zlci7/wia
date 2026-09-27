@@ -49,3 +49,5 @@
 ### NPC autonomy and behavior policies
 
 Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/acceptance/M1.md). Long-term concerns and conditional world progression remain M2 work.
+
+Phase12 M2 is in progress. Conditional plot nodes, bounded world-time progression, resolved player interventions and recipient-scoped post-event scenes are connected to atomic turns. Supported reasoning models have a separate internal-reasoning allowance while visible answer limits stay unchanged. The latest two three-turn real-model sequences completed 6/6 turns without truncation, but full plot progression, long-term memory, retrieval and corrections remain unaccepted or unfinished. See [M2 verification](phase12/acceptance/M2.md) for timings and scope; this is not an M2 completion claim.

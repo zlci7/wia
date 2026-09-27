@@ -78,8 +78,8 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion       = "story.intent.v4"
-	npcPromptVersion          = "story.npc.v10"
-	coordinationPromptVersion = "story.coordination.v10"
+	npcPromptVersion          = "story.npc.v11"
+	coordinationPromptVersion = "story.coordination.v11"
 	narrationPromptVersion    = "story.narration.v10"
 )
 
@@ -638,6 +638,9 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 
 	publicReplies := strings.Join(publicReplyLog, "\n")
+	if snapshot.Plot != nil && intent.IntentType != "speak" {
+		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: snapshot.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
+	}
 	coordinationStarted := time.Now()
 	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, snapshot, run, intent, decisions, output.Events, publicReplies)
 	if err != nil {
@@ -672,6 +675,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
 	visibleEvents = append(visibleEvents, plotEvents...)
+	snapshot.SceneViews, snapshot.SceneVersion = output.SceneViews, output.SceneVersion
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
 	result, narrationRepairs, err := a.narrateVisible(ctx, generator, snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
@@ -724,7 +728,7 @@ func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, d
 func appendHostOutcomes(output *turnOutput, run Run, participants []Character, outcomes []hostActionResult) ([]Event, error) {
 	actions := make(map[string]Event)
 	for _, event := range output.Events {
-		if event.EventType == "npc_action_intent" {
+		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
 			actions[event.EventID] = event
 		}
 	}
@@ -758,6 +762,9 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, o
 		recipients[action.ActorID] = true
 		resultID := fmt.Sprintf("%s:result:%d", outcome.ActionID, index+1)
 		resultEvent := Event{EventID: resultID, EventType: "npc_action_result", ActorID: action.ActorID, TargetID: action.TargetID, Content: outcome.Content, RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "action_" + outcome.Status, CreatedAt: time.Now().UTC()}
+		if action.ActorID == "player" {
+			resultEvent.EventType = "player_action_result"
+		}
 		output.Events = append(output.Events, resultEvent)
 		for _, character := range participants {
 			if recipients[character.EntityID] {
@@ -1037,7 +1044,11 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	if err != nil {
 		return narrativeResult{}, 0, err
 	}
-	generator = a.contextGenerator(generator, material, snapshot, run, "narration", "player", 3, narrationPromptVersion)
+	stage := 3
+	if snapshot.Plot != nil {
+		stage = 7
+	}
+	generator = a.contextGenerator(generator, material, snapshot, run, "narration", "player", stage, narrationPromptVersion)
 	input := material.Required
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
@@ -1068,7 +1079,7 @@ func narrativeEvents(events []Event, characters []Character, playerName string, 
 			speechScope = "private_recipient"
 		}
 		outcomeStatus := ""
-		if event.EventType == "npc_action_result" {
+		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
 			outcomeStatus = strings.TrimPrefix(event.SourceType, "action_")
 		}
 		result = append(result, narrativeEvent{OutcomeStatus: outcomeStatus, SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
@@ -1160,7 +1171,7 @@ func parseNarrativeText(text string) (string, error) {
 func coordinationContinuity(events []Event) string {
 	completed := make([]Event, 0)
 	for _, event := range events {
-		if event.EventType == "npc_action_result" {
+		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
 			completed = append(completed, event)
 		}
 	}

@@ -22,7 +22,7 @@ func composeCoordination(snapshot worldSnapshot, run Run, intent turnIntent, dec
 	policy, revision := behaviorPolicy(snapshot.Narrative, "coordination")
 	var actionCandidates []Event
 	for _, event := range events {
-		if event.EventType == "npc_action_intent" {
+		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
 			actionCandidates = append(actionCandidates, event)
 		}
 	}
@@ -34,8 +34,9 @@ func composeCoordination(snapshot worldSnapshot, run Run, intent turnIntent, dec
 	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。对白仅取 NPC 已确定的公开对白，不从行动提案中补造问话、承诺或他人的回应。\n"
 	input += sceneSourcePrompt(snapshot, run, intent, events)
 	input += plotContext(snapshot)
+	input += "\n清单内 player_action_intent 是玩家已经选择的尝试，也必须裁定实际结果，不能仅因玩家说已成功就确认成功；受已知条件、人物决定和本轮时间边界约束。等待仅执行到实际时点。清单外的玩家表达不新增 outcome。"
 	input += "\n完整字段类型：time_minutes 为整数，scene 为自然语言字符串（不是场景视图数组或对象）；scene_characters 为字符串数组；outcomes 为对象数组，每项仅含 action_id 字符串、status 字符串、content 字符串、recipients 字符串数组；scene_updates 为对象数组，每项仅含 content 字符串、source_ids 字符串数组、recipients 字符串数组。没有更新或行动时使用空数组，不使用 null。不输出额外字段。"
-	return contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是场景协调 Agent。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。玩家输入、公开对白和此前已提交结果都不另建 outcome，不为它们编造行动 ID。", RequiredSources: append(eventIDs(events), sceneViewSources(snapshot, "")...), Required: input, Optional: coordinationSections(snapshot.Events)}
+	return contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是场景协调 Agent。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。清单外的输入、公开对白和此前已提交结果不另建 outcome，不编造行动 ID。", RequiredSources: append(eventIDs(events), sceneViewSources(snapshot, "")...), Required: input, Optional: coordinationSections(snapshot.Events)}
 }
 
 func composeNarration(snapshot worldSnapshot, run Run, def gameDefinition, recipient, intentType string, visibleEvents []Event, clock string, sceneCharacters []string) (contextMaterial, int, error) {
@@ -55,7 +56,8 @@ func composeNarration(snapshot worldSnapshot, run Run, def gameDefinition, recip
 	}
 	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n正文表达策略（在明确选项与固定合同内生效）：%s\n玩家可见历史正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本轮自己的完整表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人、含义和可听范围；speech_scope=public_current_scene 的玩家表达或 NPC 对白已按公开范围分发，应呈现为在场者可听见，不改成仅特定人物听见；private_recipient 的玩家表达保持私聊范围。玩家试探语气不能被正文补写成耳语，NPC 公开对白不改成私密回复，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。细节是否越界取决于含义而非动作大小；例如在邀请后推碗、点头可能表示接受，不能替未作决定的人补出这类回应。outcome_status=not_executed 表示没有另行执行，不将该提案写成发生，也不逐项播报未执行清单。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息；可以直接承接而不逐字复述，语气轻缓不等于只有特定人听见；不得通过压低声音或空间描述缩小已确定的公开可听范围。不能把一句陈述改写成多次询问，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", GameID, sceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, "", playerInput, intentType, describeRecipient(def, recipient), publicCharacters, formatBystanders(snapshot.Bystanders), projectedEvents)
 
-	return contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", RequiredSources: append(eventIDs(visibleEvents), sceneViewSources(snapshot, "player")...), Required: input, Optional: narrativeSections(snapshot.Messages)}, maxOutputTokens, nil
+	material := contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", RequiredSources: append(eventIDs(visibleEvents), sceneViewSources(snapshot, "player")...), Required: input, Optional: narrativeSections(snapshot.Messages)}
+	return material, maxOutputTokens, nil
 }
 
 func composeNPC(snapshot worldSnapshot, def gameDefinition, character Character, recipient, intentType string, stageInput npcStageInput, priorTurn string, stage int) contextMaterial {
@@ -63,7 +65,8 @@ func composeNPC(snapshot worldSnapshot, def gameDefinition, character Character,
 	base := snapshot
 	base.Perceptions = nil
 	base.Memories = nil
-	return contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你愿意让在场者听见的公开对白；即使玩家耳语，你也只能选择公开回应或沉默，不在 speech 中声明只有玩家听见；私密信息可以不说，所有对外说出的内容必须放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), sceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, stage), Optional: personalSections(snapshot, character.EntityID)}
+	material := contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你愿意让在场者听见的公开对白；即使玩家耳语，你也只能选择公开回应或沉默，不在 speech 中声明只有玩家听见；私密信息可以不说，所有对外说出的内容必须放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), sceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, stage), Optional: personalSections(snapshot, character.EntityID)}
+	return material
 }
 
 func coordinationScene(snapshot worldSnapshot) string {
@@ -90,6 +93,9 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 		fmt.Fprintf(&builder, "本轮此前你自己的表达与待执行提案：\n%s\n", priorTurn)
 	}
 	fmt.Fprintf(&builder, "本轮玩家输入中你实际获知的部分：\n%s\n", stageInput.PlayerPerception)
+	if stage < 5 {
+		builder.WriteString("玩家本轮表达中的行动与等待尚待场景协调。以当前游戏内时间和已确认结果理解进度；请求等待一小时不等于已经过了一小时，也不代表玩家已到达目标地点或完成行动。\n")
+	}
 	if stageInput.NewStimulus == "" {
 		builder.WriteString("本阶段新增外部刺激：\n（暂无）\n")
 		builder.WriteString("本阶段任务：依据本轮处境作出首次决定，按有效行为策略处理。\n")

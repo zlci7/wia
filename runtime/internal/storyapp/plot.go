@@ -47,6 +47,7 @@ type PlotProgress struct {
 type plotProjection struct {
 	Recipient string `json:"recipient"`
 	Content   string `json:"content"`
+	Scene     string `json:"scene,omitempty"`
 }
 
 type plotResolution struct {
@@ -181,7 +182,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 		return nil, nil
 	}
 	material := composePlot(snapshot, run, node, output)
-	call := a.contextGenerator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v1")
+	call := a.contextGenerator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v2")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
@@ -189,6 +190,9 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 		return nil, err
 	}
 	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story plot validation failed: world_id=%q run_id=%q error_code=%q", snapshot.Summary.WorldID, run.RunID, safeTurnErrorCode(err))
+		}
 		return nil, err
 	}
 	state := PlotNodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
@@ -211,6 +215,20 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 			}
 		}
 	}
+	sources := plotSceneSources(*output, visible)
+	updates := []sceneUpdate{}
+	for i, p := range result.Projections {
+		id := fmt.Sprintf("%s:projection:%d", state.EventID, i)
+		if cleanText(p.Scene) != "" {
+			updates = append(updates, sceneUpdate{Content: p.Scene, SourceIDs: []string{"view:" + p.Recipient, id}, Recipients: []string{p.Recipient}})
+		}
+	}
+	if err = applyPlotSceneUpdates(output, sources, updates); err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story plot scene rejected: world_id=%q run_id=%q constraint=%q", snapshot.Summary.WorldID, run.RunID, err.Error())
+		}
+		return nil, err
+	}
 	output.PlotProgress.Nodes[node.ID] = state
 	output.PlotProgress.Version++
 	if snapshot.Summary.Mode == "guided" && result.Ending != "" {
@@ -227,11 +245,18 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 }
 
 func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOutput) contextMaterial {
-	return contextMaterial{
+	snapshot.SceneViews = output.SceneViews
+	snapshot.Characters = append([]Character{}, snapshot.Characters...)
+	for i := range snapshot.Characters {
+		snapshot.Characters[i].InScene = slices.Contains(output.SceneCharacters, snapshot.Characters[i].EntityID)
+	}
+	material := contextMaterial{
 		System:          behaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
 		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, marshalJSON(node), marshalJSON(snapshot.PlotProgress), marshalJSON(PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), marshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
 		RequiredSources: eventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
+	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
+	return material
 }
 
 func plotEvidenceSections(events []Event) []contextSection {
@@ -292,6 +317,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, node PlotNode, resolution plotResolution, output *turnOutput) ([]Event, error) {
 	base := snapshot
 	base.Summary.Clock = output.Clock
+	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
 	base.Characters = append([]Character{}, snapshot.Characters...)
 	base.Perceptions = map[string][]Perception{}
 	base.Sources = map[string]sourceMetadata{}
@@ -306,6 +332,11 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	}
 	for _, p := range output.Perceptions {
 		base.Perceptions[p.RecipientID] = append(base.Perceptions[p.RecipientID], p)
+	}
+	for _, e := range output.Events {
+		if e.EventType == "npc_dialogue" {
+			base.Perceptions[e.ActorID] = append(base.Perceptions[e.ActorID], Perception{RecipientID: e.ActorID, SourceEventID: e.EventID, SourceType: "own_speech", Content: e.Content, Stage: e.Stage, SceneVersion: e.SceneVersion})
+		}
 	}
 	inputs := map[string]npcStageInput{}
 	for i, p := range resolution.Projections {
@@ -363,12 +394,14 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	if len(allowed) > 0 {
 		material := contextMaterial{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
-		call := a.contextGenerator(generator, material, snapshot, run, "plot_actions", "coordinator", 6, "story.plot-actions.v1")
+		material.Required += "\n另含 scene_updates 数组，每项 content/source_ids/recipients，与场景视图合同相同：每人至多一项，content 为行动后的完整简明情境，来源引用本人 view:ID 或本次 outcome.action_id，只有该结果的获准接收者可引用。当前视图：" + marshalJSON(output.SceneViews)
+		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v2")
 		var resolved struct {
-			Outcomes []hostActionResult `json:"outcomes"`
+			Outcomes     []hostActionResult `json:"outcomes"`
+			SceneUpdates []sceneUpdate      `json:"scene_updates"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		err := generateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes")
+		err := generateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
 		cancel()
 		if err != nil {
 			return nil, err
@@ -397,6 +430,14 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			if extra.Perceptions[i].Stage == 3 {
 				extra.Perceptions[i].Stage = 6
 			}
+		}
+		sources := plotSceneSources(*output, nil)
+		for i, outcome := range resolved.Outcomes {
+			action, _ := eventByID(extra.Events, outcome.ActionID)
+			sources[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
+		}
+		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {
+			return nil, err
 		}
 	}
 	output.Events = append(output.Events, extra.Events...)

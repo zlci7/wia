@@ -43,18 +43,26 @@ type ContextBuildReport struct {
 	Sources, Excluded, Duplicates, InputTokens, OutputTokens int
 	RequiredComplete                                         bool
 	WindowKnown                                              bool
+	ReasoningRequested, ReasoningReserved, TotalOutputTokens int
 }
 
 // ContextComposer has no database, model, or mutable cross-request state.
 type ContextComposer struct {
-	Scope  ContextScope
-	Window model.WindowLimits
+	Scope            ContextScope
+	Window           model.WindowLimits
+	ReasoningReserve int
 }
 
 var ErrContextCapacity = errors.New("story context capacity exceeded")
 
 func (c ContextComposer) Build(material contextMaterial, system string, output int) (model.TextRequest, ContextBuildReport, error) {
 	report := ContextBuildReport{Scope: c.Scope, OutputTokens: output, Sections: []string{"required"}}
+	report.ReasoningRequested = c.ReasoningReserve
+	if c.ReasoningReserve < 0 || output <= 0 || c.ReasoningReserve > int(^uint(0)>>1)-output {
+		report.Failure = "invalid_capacity"
+		return model.TextRequest{}, report, ErrContextCapacity
+	}
+	reasoning := c.ReasoningReserve
 	limit := 12000
 	if c.Window != (model.WindowLimits{}) {
 		report.WindowKnown = true
@@ -66,13 +74,16 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 			report.Failure = "output_reservation"
 			return model.TextRequest{}, report, fmt.Errorf("%w: output reservation exceeds model capacity", ErrContextCapacity)
 		}
-		limit = min(limit, c.Window.ContextTokens-output)
+		reasoning = min(reasoning, c.Window.OutputTokens-output)
+		limit = min(limit, c.Window.ContextTokens-output-reasoning)
 	}
+	report.ReasoningReserved = reasoning
+	report.TotalOutputTokens = output + reasoning
 	if output <= 0 || limit <= 0 {
 		report.Failure = "invalid_capacity"
 		return model.TextRequest{}, report, ErrContextCapacity
 	}
-	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, MaxResponseBytes: 1 << 20}
+	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
 	report.InputTokens = framedContextTokens(req)
 	if _, err := model.ValidateTextRequest(req); err != nil {
 		if !errors.Is(err, model.ErrTextInputTooLarge) {
@@ -160,13 +171,18 @@ func (a *App) contextGenerator(generator model.TextGenerator, material contextMa
 	if provider, ok := generator.(model.WindowProvider); ok {
 		window = provider.ModelWindow()
 	}
-	return &contextGenerator{TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window}}
+	reasoning := 0
+	if provider, ok := generator.(model.TextReasoningProvider); ok {
+		reasoning = provider.TextReasoningReserve()
+	}
+	return &contextGenerator{TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
 }
 
 func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
 	req, report, err := g.composer.Build(g.material, request.System, request.MaxOutputTokens)
 	if g.logger != nil {
 		s := report.Scope
+		g.logger.Printf("story context output budget: world_id=%q run_id=%q purpose=%q recipient=%q visible_tokens=%d reasoning_requested=%d reasoning_reserved=%d total_output_tokens=%d", s.World, s.Run, s.Purpose, s.Recipient, report.OutputTokens, report.ReasoningRequested, report.ReasoningReserved, report.TotalOutputTokens)
 		g.logger.Printf("story context built: owner_id=%q game_id=%q world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d epoch=%d scene_version=%d template=%q policy_revision=%q sections=%q sources=%d excluded=%d duplicates=%d input_tokens=%d output_tokens=%d required_complete=%t window_known=%t success=%t failure=%q excluded_sources=%d selected_source_ids=%q", s.Owner, s.Game, s.World, s.Run, s.Attempt, s.Purpose, s.Recipient, s.Stage, s.Epoch, s.SceneVersion, s.Template, s.PolicyRevision, strings.Join(report.Sections, ","), report.Sources, report.Excluded, report.Duplicates, report.InputTokens, report.OutputTokens, report.RequiredComplete, report.WindowKnown, err == nil, report.Failure, report.ExcludedSources, strings.Join(report.SelectedSources, ","))
 	}
 	if err != nil {
@@ -185,7 +201,7 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 		diagnostic = failure.Diagnostic
 	}
 	if g.logger != nil {
-		g.logger.Printf("story model call finished: world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d call=%d elapsed_ms=%d success=%t error_code=%q http_status=%d provider_request_id=%q finish_reason=%q", scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Recipient, scope.Stage, g.calls, time.Since(started).Milliseconds(), callErr == nil, model.TextErrorCode(callErr), diagnostic.HTTPStatus, model.SafeRequestID(diagnostic.RequestID), model.SafeFinishReason(diagnostic.FinishReason))
+		g.logger.Printf("story model call finished: world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d call=%d elapsed_ms=%d success=%t error_code=%q http_status=%d provider_request_id=%q finish_reason=%q provider_input_tokens=%d provider_output_tokens=%d reasoning_tokens=%d content_chars=%d reasoning_chars=%d", scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Recipient, scope.Stage, g.calls, time.Since(started).Milliseconds(), callErr == nil, model.TextErrorCode(callErr), diagnostic.HTTPStatus, model.SafeRequestID(diagnostic.RequestID), model.SafeFinishReason(diagnostic.FinishReason), diagnostic.InputTokens, diagnostic.OutputTokens, diagnostic.ReasoningTokens, diagnostic.ContentChars, diagnostic.ReasoningChars)
 	}
 	return response, callErr
 }
@@ -289,7 +305,7 @@ func sceneViewSources(snapshot worldSnapshot, recipient string) []string {
 func coordinationSections(events []Event) []contextSection {
 	var groups [][]Event
 	for _, event := range events {
-		if event.EventType != "npc_action_result" {
+		if event.EventType != "npc_action_result" && event.EventType != "player_action_result" {
 			continue
 		}
 		if len(groups) == 0 || groups[len(groups)-1][0].RunID != event.RunID {

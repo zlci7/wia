@@ -18,6 +18,7 @@ type plotTestGenerator struct {
 	failNarration bool
 	wake          bool
 	deferNode     bool
+	intervene     bool
 }
 
 func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
@@ -47,7 +48,20 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 				ids = strings.Split(value, ",")
 			}
 		}
-		return model.TextResponse{Text: marshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}})}, nil
+		var candidates []Event
+		raw := strings.SplitN(strings.SplitN(req.Input, "待裁定行动(JSON)：", 2)[1], "\n", 2)[0]
+		if err := json.Unmarshal([]byte(raw), &candidates); err != nil {
+			return model.TextResponse{}, err
+		}
+		outcomes := []hostActionResult{}
+		for _, candidate := range candidates {
+			content, status := "你等待到下一次铃声响起，尚未经过一个小时。", "partial"
+			if g.intervene {
+				content, status = "你将受伤信使护送至安全处，证据交由本人保管。", "succeeded"
+			}
+			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: status, Content: content, Recipients: []string{"player"}})
+		}
+		return model.TextResponse{Text: marshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	}
 	if strings.Contains(req.System, "世界剧情协调器") {
 		var node PlotNode
@@ -56,6 +70,25 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 			return model.TextResponse{}, err
 		}
 		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:lantern-dusk.plot.v1:" + node.ID}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
+		result.Projections[0].Scene = "你仍在客栈，刚听见码头铃声。"
+		if g.intervene && node.ID == "courier_window" {
+			var events []Event
+			data := strings.SplitN(strings.SplitN(req.Input, "本轮已确认记录：", 2)[1], "\n", 2)[0]
+			if err := json.Unmarshal([]byte(data), &events); err != nil {
+				return model.TextResponse{}, err
+			}
+			found := false
+			for _, e := range events {
+				if e.EventType == "player_action_result" && e.SourceType == "action_succeeded" {
+					result.SourceIDs = []string{e.EventID}
+					found = true
+				}
+			}
+			if !found {
+				return model.TextResponse{}, errors.New("player intervention has no resolved evidence")
+			}
+			result.Status, result.Content = "skipped", "信使已被转移，搜寻者未能找到信使。"
+		}
 		if node.Terminal {
 			result.Ending = "当夜机会结束"
 		}
@@ -83,7 +116,11 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 				outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: "succeeded", Content: "门闩已经查看，锁扣完好。", Recipients: []string{e.ActorID}})
 			}
 		}
-		return model.TextResponse{Text: marshalJSON(map[string]any{"outcomes": outcomes})}, nil
+		updates := []sceneUpdate{}
+		for _, o := range outcomes {
+			updates = append(updates, sceneUpdate{Content: o.Content, SourceIDs: []string{o.ActionID}, Recipients: o.Recipients})
+		}
+		return model.TextResponse{Text: marshalJSON(map[string]any{"outcomes": outcomes, "scene_updates": updates})}, nil
 	}
 	if strings.Contains(req.System, "玩家正文 Agent") {
 		if g.failNarration {
@@ -92,6 +129,32 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		return model.TextResponse{Text: "你听见渡口的铃声，雨还在下。"}, nil
 	}
 	return model.TextResponse{}, errors.New("unexpected plot fixture purpose")
+}
+
+func TestPlotInterventionUsesResolvedPlayerEvidence(t *testing.T) {
+	app := newTestApp(t, &plotTestGenerator{intervene: true})
+	w, err := app.CreateWorld(context.Background(), "干预", "open", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		r, err := app.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: fmt.Sprint(i), Input: "我尝试把受伤信使带到安全处"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done := waitRun(t, app, w.WorldID, r.RunID); done.Status != "completed" {
+			t.Fatal(done)
+		}
+	}
+	s := readContextSnapshot(t, app, w.WorldID)
+	n := s.PlotProgress.Nodes["courier_window"]
+	if n.Status != "skipped" || len(n.Evidence) != 1 {
+		t.Fatalf("intervention=%+v", n)
+	}
+	e, ok := eventByID(s.Events, n.Evidence[0])
+	if !ok || e.EventType != "player_action_result" || e.SourceType != "action_succeeded" {
+		t.Fatal("node used attempt instead of resolved result")
+	}
 }
 
 func TestPlotTimelineCommitModesAndIdempotency(t *testing.T) {
@@ -201,6 +264,9 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 		}
 		if strings.Contains(req.System, "重要 NPC") && strings.Contains(req.Input, "阶段：5") {
 			woken = true
+			if strings.Contains(req.Input, "玩家本轮表达中的行动与等待尚待场景协调") {
+				t.Fatal("post-plot decision reverted resolved actions to pending")
+			}
 			if strings.Contains(req.Input, "作者隐藏事实") || strings.Contains(req.Input, "我保密地等待") {
 				t.Fatal("offscene received unauthorized input")
 			}
@@ -216,6 +282,16 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	if len(ps) < 2 {
 		t.Fatalf("missing observation/result: %+v", ps)
 	}
+	snapshot, err := app.ReadWorld(ctx, w.WorldID, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sceneFor(snapshot, "npc:mercenary") != "门闩已经查看，锁扣完好。" || sceneFor(snapshot, "player") != "你仍在客栈，刚听见码头铃声。" {
+		t.Fatal("plot stage state did not reach recipient views")
+	}
+	if snapshot.SceneVersion < 3 {
+		t.Fatal("scene version did not advance")
+	}
 	history, err := loadDialogue(ctx, store.db)
 	if err != nil {
 		t.Fatal(err)
@@ -224,6 +300,24 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 		if strings.Contains(event.Content, "我会查看门闩") {
 			t.Fatal("offscene speech leaked through future intent history")
 		}
+	}
+}
+
+func TestPlotSceneSourcesPreserveAudience(t *testing.T) {
+	output := turnOutput{SceneVersion: 1, SceneViews: []SceneView{{Recipient: "player", Content: "客栈", Version: 1}, {Recipient: "npc:innkeeper", Content: "柜台", Version: 1}}, Events: []Event{{EventID: "author", Content: "隐藏答案"}}, Perceptions: []Perception{{RecipientID: "npc:innkeeper", SourceEventID: "private", Content: "私人结果", Stage: 4}, {RecipientID: "player", SourceEventID: "public", Content: "铃声", Stage: 4}, {RecipientID: "npc:innkeeper", SourceEventID: "old", Content: "早前私聊", Stage: 1}}}
+	sources := plotSceneSources(output, nil)
+	for _, id := range []string{"author", "private", "old", "view:npc:innkeeper", "future"} {
+		candidate := output
+		err := applyPlotSceneUpdates(&candidate, sources, []sceneUpdate{{Content: "不应成立", SourceIDs: []string{id}, Recipients: []string{"player"}}})
+		if err == nil || candidate.SceneVersion != 1 {
+			t.Fatalf("unauthorized view source=%s", id)
+		}
+	}
+	if err := applyPlotSceneUpdates(&output, sources, []sceneUpdate{{Content: "客栈传来铃声", SourceIDs: []string{"public"}, Recipients: []string{"player"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if output.Scene != "客栈传来铃声" || output.SceneVersion != 2 {
+		t.Fatal("valid view not applied")
 	}
 }
 
@@ -249,6 +343,9 @@ func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 	}
 	if copy.Summary.Clock != "第 1 日 19:05" || len(copy.PlotProgress.Nodes) != 1 {
 		t.Fatalf("bad copy: %+v", copy)
+	}
+	if sceneFor(copy, "player") != "你仍在客栈，刚听见码头铃声。" || copy.SceneVersion < 2 {
+		t.Fatal("copy lost the plot's final scene view")
 	}
 	path, _, _ := app.worldRecord(ctx, w.WorldID)
 	store, err := openWorldDB(path)
@@ -362,6 +459,9 @@ func TestPlotRestartAndCopyRemainIndependent(t *testing.T) {
 		}
 		if s.Summary.Clock != "第 1 日 19:05" || len(s.PlotProgress.Nodes) != 1 {
 			t.Fatal("restart advanced clock or lost node")
+		}
+		if sceneFor(s, "player") != "你仍在客栈，刚听见码头铃声。" {
+			t.Fatal("restart lost the final plot scene")
 		}
 	}
 	if _, err = reopened.ActivateWorld(ctx, op.TargetWorldID, 1, "switch-branch"); err != nil {

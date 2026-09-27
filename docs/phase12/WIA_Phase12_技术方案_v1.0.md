@@ -357,7 +357,9 @@ NPC 不读取整份玩家聊天记录、全局回顾或全知场景文本。NPC 
 
 ### 8.2 构建预算与诊断
 
-ContextComposer.Build 返回最终 TextRequest 与 ContextBuildReport。输入上限为 12,000，并按本轮冻结模型的 ContextTokens 减去本次输出预留收紧；输出档位不自动改变。未提供模型窗口时沿用应用上限，报告 window_known=false。估算包括 System、Input、消息 JSON 包装与保留开销，末端仍通过 ValidateTextRequest 校验；估算不等同于服务商精确 token 计数。
+ContextComposer.Build 返回最终 TextRequest 与 ContextBuildReport。输入上限为 12,000，并按本轮冻结模型的 ContextTokens 减去可见输出及推理预留收紧；可见输出档位不自动改变。TextReasoningProvider 声明额外推理预算，目前 DeepSeek v4 系列与 deepseek-reasoner 预留 8,192 tokens，实际预留不超过模型输出窗口减去可见输出上限。未知模型不自动增加推理额度。未提供模型窗口时沿用应用输入上限，报告 window_known=false。估算包括 System、Input、消息 JSON 包装与保留开销，末端仍通过 ValidateTextRequest 校验；估算不等同于服务商精确 token 计数。
+
+TextRequest 的 MaxOutputTokens 约束可见回答，ReasoningReserveTokens 仅增加服务商生成总额；DeepSeek 的 max_tokens 及窗口检查使用两者之和，回答仍按原可见额度校验。服务商可能自行分配推理与回答用量，预留并非推理硬上限，也不保证不会截断。格式修复使用相同规则重新预算。日志区分请求推理额度、实际预留、总输出额度和服务商实际用量，只记录字符数与 token 计数，不记录推理文本、正文或秘密。
 
 当前规则、身份、获准场景、本轮原文、阶段新刺激和待处理结果是必需材料。历史候选按近期优先保留，相同来源及内容去重；个人行动尝试相关记忆和结果按因果组保留，协调结果按回合分组。容量不足时移除完整的较旧可选组。必需材料不足以容纳时返回 context_capacity_exceeded，不静默删除原话、不自动摘要或更换模型、不提交部分故事。有限格式修复追加的系统说明也重新构建并校验容量。
 

@@ -115,9 +115,13 @@ func applySceneUpdates(snapshot worldSnapshot, run Run, intent turnIntent, outpu
 		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)
 		byID[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
 	}
-	views := append([]SceneView{}, snapshot.SceneViews...)
+	return mergeSceneUpdates(snapshot.SceneViews, snapshot.SceneVersion+1, byID, host.SceneUpdates)
+}
+
+func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]sceneSource, updates []sceneUpdate) ([]SceneView, error) {
+	views := append([]SceneView{}, previous...)
 	seen := map[string]bool{}
-	for _, update := range host.SceneUpdates {
+	for _, update := range updates {
 		if cleanText(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
 			return nil, fmt.Errorf("%w: incomplete scene update", ErrGenerationFailed)
 		}
@@ -145,10 +149,53 @@ func applySceneUpdates(snapshot worldSnapshot, run Run, intent turnIntent, outpu
 					}
 				}
 			}
-			views[index] = SceneView{Recipient: recipient, Content: cleanText(update.Content), SourceIDs: canonical, Version: snapshot.SceneVersion + 1}
+			views[index] = SceneView{Recipient: recipient, Content: cleanText(update.Content), SourceIDs: canonical, Version: version}
 		}
 	}
 	return views, nil
+}
+
+// Later stages read only committed views and the projections already granted in
+// this workspace. An author's plot result is never a scene source for a player.
+func plotSceneSources(output turnOutput, visible []Event) map[string]sceneSource {
+	sources := map[string]sceneSource{}
+	for _, view := range output.SceneViews {
+		sources["view:"+view.Recipient] = sceneSource{ID: "view:" + view.Recipient, Content: view.Content, Recipients: []string{view.Recipient}, Canonical: view.SourceIDs}
+	}
+	for _, p := range output.Perceptions {
+		if p.Stage < 4 {
+			continue
+		}
+		s := sources[p.SourceEventID]
+		s.ID, s.Content, s.Canonical = p.SourceEventID, p.Content, []string{p.SourceEventID}
+		if !containsID(s.Recipients, p.RecipientID) {
+			s.Recipients = append(s.Recipients, p.RecipientID)
+		}
+		sources[p.SourceEventID] = s
+	}
+	for _, e := range visible {
+		s := sources[e.EventID]
+		s.ID, s.Content, s.Canonical = e.EventID, e.Content, []string{e.EventID}
+		if !containsID(s.Recipients, "player") {
+			s.Recipients = append(s.Recipients, "player")
+		}
+		sources[e.EventID] = s
+	}
+	return sources
+}
+
+func applyPlotSceneUpdates(output *turnOutput, sources map[string]sceneSource, updates []sceneUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	views, err := mergeSceneUpdates(output.SceneViews, output.SceneVersion+1, sources, updates)
+	if err != nil {
+		return err
+	}
+	output.SceneVersion++
+	output.SceneViews = views
+	output.Scene = sceneFor(worldSnapshot{SceneViews: views}, "player")
+	return nil
 }
 
 func containsID(ids []string, id string) bool {

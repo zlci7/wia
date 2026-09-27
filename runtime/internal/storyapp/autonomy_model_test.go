@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,12 +71,24 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 			time.Sleep(100 * time.Millisecond)
 		}
 		t.Logf("turn=%d status=%s reason=%s elapsed_ms=%d", i+1, r.Status, r.Reason, time.Since(start).Milliseconds())
+		for _, line := range strings.Split(logger.String(), "\n") {
+			if strings.Contains(line, r.RunID) && (strings.Contains(line, "model call finished") || strings.Contains(line, "context output budget")) {
+				t.Log(line)
+			}
+		}
 		if r.Status != "completed" {
-			t.Log(logger.String())
+			for _, line := range strings.Split(logger.String(), "\n") {
+				if strings.Contains(line, r.RunID) && (strings.Contains(line, "validation failed") || strings.Contains(line, "rejected:") || strings.Contains(line, "turn failed")) {
+					t.Log(line)
+				}
+			}
 			t.Fatal("incomplete real-model turn")
 		}
 		s := readContextSnapshot(t, a, w.WorldID)
 		t.Logf("clock=%s plot_nodes=%d story_ended=%t", s.Summary.Clock, len(s.PlotProgress.Nodes), s.Summary.StoryEnded)
+		for id, state := range s.PlotProgress.Nodes {
+			t.Logf("node=%s status=%s", id, state.Status)
+		}
 		for _, e := range s.Events {
 			if e.RunID == r.RunID && (e.EventType == "npc_action_intent" || e.EventType == "npc_action_result" || e.EventType == "npc_dialogue") {
 				t.Logf("event=%s actor=%s stage=%d type=%s content=%s", e.EventType, e.ActorID, e.Stage, e.SourceType, e.Content)
