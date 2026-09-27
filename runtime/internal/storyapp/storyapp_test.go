@@ -266,8 +266,8 @@ func TestCoreTurnKeepsPrivatePerceptionAndCommitsAtomically(t *testing.T) {
 		if strings.Contains(request, "你的身份：沈岚") && strings.Contains(request, "阶段：2") {
 			recipientRetriggeredByOwnReply = true
 		}
-		if strings.Contains(request, "剧本：") && strings.Contains(request, "今晚有人会来搜查") {
-			t.Fatalf("private text leaked to host prompt: %s", request)
+		if strings.Contains(request, "剧本：") && !strings.Contains(request, "今晚有人会来搜查") {
+			t.Fatalf("player private text missing from player prompt: %s", request)
 		}
 		if strings.Contains(request, "玩家可见且已经确定") && strings.Contains(request, "玩家主动向我提供了消息") {
 			t.Fatalf("private NPC memory leaked to narrative prompt: %s", request)
@@ -620,7 +620,7 @@ func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 	}
 }
 
-func TestPrivatePlayerTextIsRedactedFromNarratorEvents(t *testing.T) {
+func TestPrivatePlayerTextIsAvailableToNarratorEvents(t *testing.T) {
 	generator := &scriptedGenerator{}
 	app := newTestApp(t, generator)
 	world, err := app.CreateWorld(context.Background(), "私聊叙事边界", "guided", "旅人", "", true)
@@ -641,11 +641,11 @@ func TestPrivatePlayerTextIsRedactedFromNarratorEvents(t *testing.T) {
 		if !strings.Contains(request, "本轮玩家可见且已经确定的对白与结果") {
 			continue
 		}
-		if strings.Contains(request, "今晚有人会来搜查") {
-			t.Fatalf("private player text leaked to narrator: %s", request)
+		if !strings.Contains(request, "今晚有人会来搜查") {
+			t.Fatalf("player own text missing from narrator: %s", request)
 		}
-		if !strings.Contains(request, "与沈岚（客栈老板）进行了私下交谈") {
-			t.Fatalf("redacted player event missing: %s", request)
+		if strings.Contains(request, "交谈原文不在正文中复述") {
+			t.Fatalf("player event unexpectedly redacted: %s", request)
 		}
 	}
 }

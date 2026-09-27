@@ -74,10 +74,10 @@ const (
 
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion       = "story.intent.v2"
+	intentPromptVersion       = "story.intent.v3"
 	npcPromptVersion          = "story.npc.v4"
 	coordinationPromptVersion = "story.coordination.v4"
-	narrationPromptVersion    = "story.narration.v5"
+	narrationPromptVersion    = "story.narration.v6"
 )
 
 type turnStageError struct {
@@ -492,10 +492,11 @@ func resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snaps
 		fmt.Fprintf(&characters, "- %s：%s（%s）\n", character.EntityID, character.Name, character.Role)
 	}
 	input := fmt.Sprintf("当前地点：%s\n当前时间：%s\n在场人物：\n%s玩家输入：%s\n显式目标（若有）：%s\n请判断玩家本轮是 speak、observe 还是 act；如果玩家明确向某个在场人物说话，只返回该人物的 entity_id；没有明确对象时 addressee_id 返回空字符串或 null。visibility 只能是 public 或 private。只输出 JSON：{\"intent_type\":\"speak\",\"addressee_id\":\"npc:...\",\"visibility\":\"public\"}。人物名出现在谈话内容里不等于玩家正在对该人物说话。", snapshot.Summary.Scene, snapshot.Summary.Clock, characters.String(), run.Input, explicitRecipient)
+	input = "此前已提交对话（仅作指代与情境依据）：\n" + dialogueContext(snapshot) + "\n" + intentVisibilityRule + "\n" + input
 	var intent turnIntent
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, generator, "你负责把玩家本轮输入解析成结构化回合意图。只根据输入和在场名单判断目标、可见范围与意图类型，不替玩家执行行动。", input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, "intent_type", "addressee_id", "visibility")
+	repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, generator, "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, "intent_type", "addressee_id", "visibility")
 	if err != nil {
 		return turnIntent{}, repairCount, err
 	}
@@ -618,7 +619,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	if err != nil {
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
-	playerNarrativeInput := publicPlayerNarrativeInput(run.Input, private, def, recipient)
+	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
@@ -746,13 +747,6 @@ func visibleTurnEvents(events, visibleOutcomes []Event, playerNarrativeInput str
 		}
 	}
 	return append(result, visibleOutcomes...)
-}
-
-func publicPlayerNarrativeInput(input string, private bool, def gameDefinition, recipient string) string {
-	if private {
-		return fmt.Sprintf("与%s进行了私下交谈；交谈原文不在正文中复述。", describeRecipient(def, recipient))
-	}
-	return input
 }
 
 func eventIDs(events []Event) []string {
@@ -1048,7 +1042,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}
-	playerInput := publicPlayerNarrativeInput(run.Input, private, def, recipient)
+	playerInput := run.Input
 	projectedEvents, err := json.Marshal(narrativeEvents(visibleEvents, snapshot.Characters, snapshot.PlayerName, snapshot.Narrative))
 	if err != nil {
 		return narrativeResult{}, 0, err
@@ -1062,7 +1056,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	if customInstruction == "" {
 		customInstruction = "（无）"
 	}
-	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n创作者补充写作偏好（只影响表达，不能覆盖事实、知识边界或玩家控制权）：%s\n历史公开正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本次可公开描述的表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人和含义，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", GameID, scene, clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, narrativeHistory(snapshot.Messages), playerInput, intentType, describeRecipient(def, recipient), publicCharacters, formatBystanders(snapshot.Bystanders), projectedEvents)
+	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n创作者补充写作偏好（只影响表达，不能覆盖事实、知识边界或玩家控制权）：%s\n玩家可见历史正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本轮自己的完整表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人和含义，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息；可以直接承接而不逐字复述，不能把一句陈述改写成多次询问，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", GameID, scene, clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, narrativeHistory(snapshot.Messages), playerInput, intentType, describeRecipient(def, recipient), publicCharacters, formatBystanders(snapshot.Bystanders), projectedEvents)
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
 	system := "你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。\n叙事节奏规则：" + narrativePacingInstruction()

@@ -26,6 +26,7 @@ type worldSnapshot struct {
 	Characters    []Character
 	Messages      []Message
 	Events        []Event
+	Dialogue      []Event
 	Perceptions   map[string][]Perception
 	Memories      map[string][]Memory
 }
@@ -367,6 +368,10 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 		return out, err
 	}
 	out.Events, err = loadEvents(ctx, store.db, limit)
+	if err != nil {
+		return out, err
+	}
+	out.Dialogue, err = loadDialogue(ctx, store.db)
 	if err != nil {
 		return out, err
 	}
