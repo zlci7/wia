@@ -1,734 +1,790 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import {
-  activateWorld, cancelRun, createWorld, deleteWorld, exchangeBootstrapToken, fetchCopyOperation, fetchGames,
-  fetchModel, fetchRun, fetchRuns, fetchStatus, fetchWorld, fetchWorlds, retryRun, saveAgentSettings, saveAs, saveModel, submitRun,
-} from './api'
-import { ApiError, type Character, type GameSummary, type Message, type ModelInfo, type NarrativeSettings, type Run, type SaveOperation, type Status, type WorldSummary } from './types'
-
-const status = ref<Status | null>(null)
-const games = ref<GameSummary[]>([])
-const worlds = ref<WorldSummary[]>([])
-const currentWorld = ref<WorldSummary | null>(null)
-const characters = ref<Character[]>([])
-const messages = ref<Message[]>([])
-const playerName = ref('旅人')
-const playerProfile = ref('一个正在寻找答案的旅人。')
-const input = ref('')
-const addressee = ref('')
-const activeRun = ref<Run | null>(null)
-const failedRun = ref<Run | null>(null)
-const errorMessage = ref('')
-const connectionError = ref('')
-const loaded = ref(false)
-const busy = ref(false)
-const saveBusy = ref(false)
-const showNewWorld = ref(false)
-const showSaves = ref(false)
-const showModel = ref(false)
-const showAgentSettings = ref(false)
-const currentView = ref<'home' | 'story' | 'play'>('home')
-const selectedGameID = ref('')
-const deleteCandidate = ref<WorldSummary | null>(null)
-const settingsTab = ref<'basic' | 'advanced'>('basic')
-const modelBusy = ref(false)
-const settingsBusy = ref(false)
-const deleteBusy = ref(false)
-const copyOperation = ref<SaveOperation | null>(null)
-const newWorldKind = ref<'new' | 'save'>('new')
-const newWorld = reactive({ name: '', mode: 'guided' })
-const modelForm = reactive({ provider: 'deepseek', model: 'deepseek-v4-flash', base_url: '', api_key: '' })
-const narrativeSettings = ref<NarrativeSettings>({ perspective: 'second_person', length: 'standard', detail: 'balanced', player_elaboration: 'natural', npc_initiative: 'contextual', custom_instruction: '' })
-const settingsForm = reactive<NarrativeSettings>({ perspective: 'second_person', length: 'standard', detail: 'balanced', player_elaboration: 'natural', npc_initiative: 'contextual', custom_instruction: '' })
-const providerOptions = ref<{ provider: string; model: string }[]>([])
-const perspectiveOptions = [
-  { value: 'second_person', label: '第二人称', note: '正文称主角为“你”，默认沉浸式体验' },
-  { value: 'first_person', label: '第一人称', note: '正文由主角以“我”的有限视角呈现' },
-  { value: 'third_person', label: '第三人称', note: '正文使用主角姓名，不使用“来客”等泛称' },
-] as const
-const lengthOptions = [
-  { value: 'concise', label: '简短', note: '约 120–300 字' },
-  { value: 'standard', label: '标准', note: '约 300–600 字' },
-  { value: 'detailed', label: '细致', note: '约 600–1200 字' },
-] as const
-const detailOptions = [
-  { value: 'restrained', label: '克制', note: '聚焦必要动作与对白' },
-  { value: 'balanced', label: '平衡', note: '少量环境与感官细节' },
-  { value: 'rich', label: '丰富', note: '更多氛围与动作描写' },
-] as const
-const interactionPresets = [
-  { value: 'restrained', label: '克制扮演', note: '忠实转述，主角精确控制；NPC 以回应为主', player_elaboration: 'restrained', npc_initiative: 'responsive' },
-  { value: 'natural', label: '自然共创', note: '适度补全表达；NPC 按情境主动', player_elaboration: 'natural', npc_initiative: 'contextual' },
-  { value: 'novel', label: '小说共创', note: '更充分演绎；NPC 更积极发起互动', player_elaboration: 'expressive', npc_initiative: 'proactive' },
-] as const
-const playerElaborationOptions = [
-  { value: 'restrained', label: '克制', note: '主要间接转述，只补必要衔接' },
-  { value: 'natural', label: '自然', note: '补充等价的简短台词、动作和即时反应' },
-  { value: 'expressive', label: '充分', note: '在已选方向内更完整地表现主角' },
-] as const
-const npcInitiativeOptions = [
-  { value: 'responsive', label: '回应为主', note: '没有直接刺激时倾向沉默' },
-  { value: 'contextual', label: '按情境主动', note: '职责或关切被触及时自然介入' },
-  { value: 'proactive', label: '积极互动', note: '主动提问、试探或发起相关行动' },
-] as const
-
-let pollTimer: number | undefined
-let refreshPromise: Promise<void> | undefined
-let queuedForceRefresh = false
-
-const activeWorldID = computed(() => status.value?.active_world?.world_id ?? '')
-const model = computed<ModelInfo>(() => status.value?.model ?? { configured: false })
-const needsModel = computed(() => loaded.value && !status.value?.ready)
-const hasWorld = computed(() => Boolean(currentWorld.value && activeWorldID.value))
-const canSubmit = computed(() => Boolean(input.value.trim()) && !activeRun.value && !busy.value && hasWorld.value && status.value?.ready)
-const modelStatusText = computed(() => model.value.configured ? `${model.value.provider ?? '模型'} · ${model.value.model ?? ''}` : '尚未连接模型')
-const currentGame = computed(() => games.value.find(game => game.id === selectedGameID.value) ?? games.value[0])
-const storyWorlds = computed(() => worlds.value.filter(world => world.game_id === currentGame.value?.id))
-const recentStoryWorld = computed(() => {
-  const active = status.value?.active_world
-  if (active?.game_id === currentGame.value?.id) return active
-  return storyWorlds.value[0] ?? null
-})
-const narrativeSummary = computed(() => {
-  const perspective = { first_person: '第一人称', second_person: '第二人称', third_person: '第三人称' }[narrativeSettings.value.perspective]
-  const length = { concise: '简短', standard: '标准', detailed: '细致' }[narrativeSettings.value.length]
-  const preset = interactionPresets.find(option => option.player_elaboration === narrativeSettings.value.player_elaboration && option.npc_initiative === narrativeSettings.value.npc_initiative)?.value ?? 'custom'
-  const style = preset === 'custom'
-    ? '自定义共创'
-    : { restrained: '克制扮演', natural: '自然共创', novel: '小说共创' }[preset]
-  return `${style} · ${perspective} · ${length}正文`
-})
-
-const currentInteractionPreset = computed<'restrained' | 'natural' | 'novel' | 'custom'>(() => {
-  const matched = interactionPresets.find(option => option.player_elaboration === settingsForm.player_elaboration && option.npc_initiative === settingsForm.npc_initiative)
-  return matched?.value ?? 'custom'
-})
-
-function applyInteractionPreset(value: 'restrained' | 'natural' | 'novel') {
-  const preset = interactionPresets.find(option => option.value === value)
-  if (!preset) return
-  settingsForm.player_elaboration = preset.player_elaboration
-  settingsForm.npc_initiative = preset.npc_initiative
-}
-
-function describe(error: unknown): string {
-  if (error instanceof ApiError) {
-    const labels: Record<string, string> = {
-      model_not_configured: '还没有可用的模型连接。',
-      generation_failed: '这次回应没有完成，输入仍保留，可以重试。',
-      world_busy: '故事正在处理上一项操作，请稍候。',
-      version_conflict: '这个页面的信息已经过期，请刷新后继续。',
-      storage_unavailable: '存档暂时无法写入，请稍后再试。',
-      save_failed: '另存没有完成，原存档没有受到影响。',
-    }
-    return labels[error.code] ?? error.message
-  }
-  return error instanceof Error ? error.message : String(error)
-}
-
-function describeFailedRun(run: Run): string {
-  const labels: Record<string, string> = {
-    generation_failed: '这次回应没有完成，输入仍保留，可以重试。',
-    generation_timeout: '模型响应超时，输入仍保留，可以重试。',
-    intent_generation_failed: '没有成功理解这次输入，输入仍保留，可以重试。',
-    npc_generation_failed: '有角色没有成功完成回应，输入仍保留，可以重试。',
-    coordination_generation_failed: '场景结果没有成功确定，输入仍保留，可以重试。',
-    narration_generation_failed: '故事正文没有成功生成，输入仍保留，可以重试。',
-    model_not_configured: '模型连接当前不可用，请检查模型设置。',
-    version_conflict: '故事状态已经变化，请刷新后继续。',
-    storage_unavailable: '存档暂时无法读取或写入，请稍后再试。',
-  }
-  return labels[run.reason ?? ''] ?? run.error ?? '可以保留输入并重新尝试。'
-}
-
-async function loadModelOptions() {
-  try {
-    const result = await fetchModel()
-    providerOptions.value = result.providers
-    if (!model.value.configured && result.providers.length) {
-      modelForm.provider = result.providers[0].provider
-      modelForm.model = result.providers[0].model
-    }
-  } catch (error) {
-    connectionError.value = describe(error)
-  }
-}
-
-async function loadWorld(worldID: string) {
-  if (!worldID) {
-    currentWorld.value = null
-    characters.value = []
-    messages.value = []
-    narrativeSettings.value = { perspective: 'second_person', length: 'standard', detail: 'balanced', player_elaboration: 'natural', npc_initiative: 'contextual', custom_instruction: '' }
-    if (currentView.value === 'play') currentView.value = 'home'
-    return
-  }
-  const result = await fetchWorld(worldID)
-  if (activeWorldID.value !== worldID) return
-  currentWorld.value = result.world
-  selectedGameID.value = result.world.game_id
-  playerName.value = result.player_name
-  playerProfile.value = result.player_profile
-  narrativeSettings.value = result.narrative_settings
-  characters.value = result.characters.filter(character => character.in_scene)
-  messages.value = result.messages
-}
-
-function openAgentSettings(tab: 'basic' | 'advanced' = 'basic') {
-  Object.assign(settingsForm, narrativeSettings.value)
-  settingsTab.value = tab
-  showAgentSettings.value = true
-}
-
-async function configureAgentSettings() {
-  if (!currentWorld.value || activeRun.value) return
-  settingsBusy.value = true
-  errorMessage.value = ''
-  try {
-    const result = await saveAgentSettings(currentWorld.value.world_id, { ...settingsForm }, currentWorld.value.context_epoch)
-    narrativeSettings.value = result.settings
-    currentWorld.value = result.world
-    showAgentSettings.value = false
-    await refresh(true)
-  } catch (error) {
-    errorMessage.value = describe(error)
-  } finally {
-    settingsBusy.value = false
-  }
-}
-
-async function refreshOnce(forceWorld = false) {
-  try {
-    const nextStatus = await fetchStatus()
-    status.value = nextStatus
-    connectionError.value = ''
-    worlds.value = await fetchWorlds()
-    const nextWorldID = nextStatus.active_world?.world_id ?? ''
-    if (activeRun.value && currentWorld.value?.world_id && nextWorldID !== currentWorld.value.world_id) {
-      activeRun.value = null
-      failedRun.value = null
-    }
-    const nextSummary = nextStatus.active_world
-    const worldChanged = nextSummary && currentWorld.value && (
-      nextSummary.message_head !== currentWorld.value.message_head ||
-      nextSummary.event_head !== currentWorld.value.event_head ||
-      nextSummary.turn_seq !== currentWorld.value.turn_seq ||
-      nextSummary.context_epoch !== currentWorld.value.context_epoch ||
-      nextSummary.clock !== currentWorld.value.clock ||
-      nextSummary.scene !== currentWorld.value.scene
-    )
-    if (forceWorld || nextWorldID !== currentWorld.value?.world_id || worldChanged) await loadWorld(nextWorldID)
-    if (nextWorldID) await restoreRunState(nextWorldID)
-    if (activeRun.value && nextWorldID) await pollRun()
-  } catch (error) {
-    connectionError.value = describe(error)
-  } finally {
-    loaded.value = true
-  }
-}
-
-async function restoreRunState(worldID: string) {
-  const runs = (await fetchRuns(worldID)) ?? []
-  const latest = runs[0]
-  if (!latest) {
-    activeRun.value = null
-    failedRun.value = null
-    return
-  }
-  if (latest.status === 'accepted' || latest.status === 'running') {
-    activeRun.value = latest
-    failedRun.value = null
-  } else if (latest.status === 'failed' || latest.status === 'cancelled' || latest.status === 'interrupted') {
-    const isNewFailure = failedRun.value?.run_id !== latest.run_id
-    activeRun.value = null
-    failedRun.value = latest
-    if (isNewFailure && !input.value.trim()) input.value = latest.input
-  } else {
-    activeRun.value = null
-    failedRun.value = null
-  }
-}
-
-async function pollRun() {
-  const run = activeRun.value
-  const worldID = currentWorld.value?.world_id
-  if (!run || !worldID) return
-  try {
-    const current = await fetchRun(worldID, run.run_id)
-    activeRun.value = current
-    if (current.status === 'completed') {
-      activeRun.value = null
-      await refreshOnce(true)
-    } else if (current.status === 'failed' || current.status === 'cancelled' || current.status === 'interrupted') {
-      activeRun.value = null
-      failedRun.value = current
-      await refreshOnce(true)
-    }
-  } catch (error) {
-    connectionError.value = describe(error)
-  }
-}
-
-function refresh(forceWorld = false): Promise<void> {
-  queuedForceRefresh = queuedForceRefresh || forceWorld
-  if (refreshPromise) return refreshPromise
-  const force = queuedForceRefresh
-  queuedForceRefresh = false
-  refreshPromise = refreshOnce(force).finally(() => {
-    refreshPromise = undefined
-    if (queuedForceRefresh) void refresh()
-  })
-  return refreshPromise
-}
-
-async function configureModel() {
-  if (!modelForm.api_key.trim()) {
-    errorMessage.value = '请输入模型 API Key。'
-    return
-  }
-  modelBusy.value = true
-  errorMessage.value = ''
-  try {
-    status.value = await saveModel({ ...modelForm })
-    modelForm.api_key = ''
-    showModel.value = false
-    await refresh()
-  } catch (error) {
-    errorMessage.value = describe(error)
-  } finally {
-    modelBusy.value = false
-  }
-}
-
-function changeProvider() {
-  const option = providerOptions.value.find(item => item.provider === modelForm.provider)
-  if (option) modelForm.model = option.model
-}
-
-async function startWorld() {
-  busy.value = true
-  errorMessage.value = ''
-  try {
-    await createWorld({ name: newWorld.name, mode: newWorld.mode, player_name: playerName.value, player_profile: playerProfile.value })
-    activeRun.value = null
-    failedRun.value = null
-    newWorld.name = ''
-    showNewWorld.value = false
-    showSaves.value = false
-    await refresh()
-    currentView.value = 'play'
-  } catch (error) {
-    errorMessage.value = describe(error)
-  } finally {
-    busy.value = false
-  }
-}
-
-async function switchWorld(world: WorldSummary) {
-  if (busy.value) return
-  selectedGameID.value = world.game_id
-  if (world.world_id === activeWorldID.value) {
-    currentView.value = 'play'
-    showSaves.value = false
-    return
-  }
-  busy.value = true
-  errorMessage.value = ''
-  try {
-    await activateWorld(world.world_id, status.value?.active_revision ?? 0)
-    activeRun.value = null
-    failedRun.value = null
-    await refresh()
-    showSaves.value = false
-    currentView.value = 'play'
-  } catch (error) {
-    errorMessage.value = describe(error)
-  } finally {
-    busy.value = false
-  }
-}
-
-function returnHome() {
-  currentView.value = 'home'
-  showSaves.value = false
-  showAgentSettings.value = false
-}
-
-function openStory(game: GameSummary) {
-  selectedGameID.value = game.id
-  currentView.value = 'story'
-  showSaves.value = false
-}
-
-function confirmDelete(world: WorldSummary) {
-  deleteCandidate.value = world
-  showSaves.value = false
-}
-
-async function deleteSelectedWorld() {
-  const target = deleteCandidate.value
-  if (!target || !status.value) return
-  if (target.world_id === activeWorldID.value && activeRun.value) {
-    errorMessage.value = '当前故事仍在生成，请先取消或等待本轮完成。'
-    return
-  }
-  deleteBusy.value = true
-  errorMessage.value = ''
-  try {
-    const deletingActive = target.world_id === activeWorldID.value
-    selectedGameID.value = target.game_id
-    await deleteWorld(target.world_id, status.value.active_revision)
-    deleteCandidate.value = null
-    if (deletingActive) {
-      currentView.value = 'story'
-      activeRun.value = null
-      failedRun.value = null
-      input.value = ''
-    }
-    await refresh(true)
-  } catch (error) {
-    errorMessage.value = describe(error)
-    await refresh()
-  } finally {
-    deleteBusy.value = false
-  }
-}
-
-async function sendInput() {
-  if (!canSubmit.value || !currentWorld.value || !status.value) return
-  const text = input.value.trim()
-  const requestKey = crypto.randomUUID()
-  errorMessage.value = ''
-  failedRun.value = null
-  try {
-    const run = await submitRun(currentWorld.value.world_id, {
-      request_key: requestKey,
-      input: text,
-      addressee_id: addressee.value || undefined,
-      expected_active_revision: status.value.active_revision,
-      expected_message_head: currentWorld.value.message_head,
-      expected_event_head: currentWorld.value.event_head,
-      expected_context_epoch: currentWorld.value.context_epoch,
-    })
-    activeRun.value = run
-    input.value = ''
-  } catch (error) {
-    errorMessage.value = describe(error)
-  }
-}
-
-async function stopRun() {
-  if (!activeRun.value || !currentWorld.value) return
-  try {
-    await cancelRun(currentWorld.value.world_id, activeRun.value.run_id)
-  } catch (error) {
-    errorMessage.value = describe(error)
-  }
-}
-
-async function retryFailed() {
-  if (!failedRun.value || !currentWorld.value) return
-  try {
-    activeRun.value = await retryRun(currentWorld.value.world_id, failedRun.value.run_id)
-    failedRun.value = null
-    input.value = ''
-    errorMessage.value = ''
-  } catch (error) {
-    errorMessage.value = describe(error)
-  }
-}
-
-async function saveCurrentAs() {
-  if (!currentWorld.value || !status.value || !newWorld.name.trim()) return
-  saveBusy.value = true
-  errorMessage.value = ''
-  try {
-    copyOperation.value = await saveAs(currentWorld.value.world_id, newWorld.name.trim(), status.value.active_revision)
-    const operationID = copyOperation.value.operation_id
-    for (let i = 0; i < 1500; i += 1) {
-      await new Promise(resolve => window.setTimeout(resolve, 200))
-      copyOperation.value = await fetchCopyOperation(operationID)
-      if (copyOperation.value.status === 'ready' || copyOperation.value.status === 'failed') break
-    }
-    if (copyOperation.value.status === 'failed') throw new Error(copyOperation.value.error || '另存没有完成')
-    if (copyOperation.value.status !== 'ready') throw new Error('另存仍在进行，请稍后再查看存档。')
-    newWorld.name = ''
-    showNewWorld.value = false
-    await refresh()
-  } catch (error) {
-    errorMessage.value = describe(error)
-  } finally {
-    saveBusy.value = false
-  }
-}
-
-function openNewWorld() {
-  newWorldKind.value = 'new'
-  newWorld.name = ''
-  newWorld.mode = currentGame.value?.default_mode ?? 'guided'
-  showNewWorld.value = true
-  showSaves.value = false
-}
-
-function openSaveAs() {
-  newWorldKind.value = 'save'
-  newWorld.name = ''
-  showNewWorld.value = true
-  showSaves.value = false
-}
-
-function displayMessage(message: Message): string {
-  return message.content
-}
-
-function messageClass(message: Message): string {
-  return message.kind === 'player' ? 'message player-message' : 'message narrative-message'
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-onMounted(async () => {
-  try {
-    await exchangeBootstrapToken()
-    games.value = await fetchGames()
-    selectedGameID.value = games.value[0]?.id ?? ''
-    await loadModelOptions()
-    await refresh()
-  } catch (error) {
-    connectionError.value = describe(error)
-    loaded.value = true
-  }
-  pollTimer = window.setInterval(refresh, 1500)
-})
-
-onUnmounted(() => {
-  if (pollTimer !== undefined) window.clearInterval(pollTimer)
-})
+import AppDialog from "./components/AppDialog.vue";
+import { useExperience } from "./useExperience";
+import "./style.css";
+const {
+  status,
+  games,
+  currentWorld,
+  characters,
+  view,
+  game,
+  loaded,
+  connectionError,
+  notice,
+  dialog,
+  dialogError,
+  dialogBusy,
+  navigating,
+  moreOpen,
+  deleteCandidate,
+  newWorld,
+  modelForm,
+  providers,
+  modelAdvanced,
+  settingsForm,
+  detailsOpen,
+  textarea,
+  reader,
+  session,
+  viewport,
+  storyWorlds,
+  recentWorld,
+  activeRun,
+  failedRun,
+  saved,
+  addresseeName,
+  canSubmit,
+  presets,
+  lengths,
+  players,
+  initiatives,
+  presetName,
+  dialogTitle,
+  formatDate,
+  failureText,
+  showDialog,
+  closeDialog,
+  openModel,
+  changeProvider,
+  freshRefresh,
+  returnHome,
+  openStory,
+  switchWorld,
+  openNewWorld,
+  openCopy,
+  openSettings,
+  configureModel,
+  configureSettings,
+  createOrCopy,
+  confirmDelete,
+  removeWorld,
+  sendInput,
+  stopRun,
+  inputKeys,
+  chooseCharacter,
+  resizeInput,
+} = useExperience();
 </script>
 
 <template>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">W</div>
+  <main class="shell" :class="{ 'play-shell': view === 'play' }">
+    <div class="app-header">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">W</span><strong>World Is Agent</strong>
+        </div>
+        <nav class="topbar-actions" aria-label="主导航">
+          <span
+            class="connection-state"
+            :class="{
+              online: status?.ready && !connectionError && !session.error,
+            }"
+            >{{
+              connectionError || (view === "play" && session.error)
+                ? "连接异常"
+                : status?.ready
+                  ? "已连接"
+                  : "未连接模型"
+            }}</span
+          >
+          <button
+            v-if="view !== 'home'"
+            class="quiet-button"
+            @click="returnHome"
+          >
+            返回首页
+          </button>
+          <button
+            v-if="currentWorld && view === 'play'"
+            class="quiet-button"
+            @click="showDialog('saves')"
+          >
+            存档与故事
+          </button>
+          <button
+            v-if="currentWorld && view === 'play'"
+            class="quiet-button desktop-setting"
+            @click="openSettings"
+          >
+            故事设置
+          </button>
+          <button class="quiet-button desktop-setting" @click="openModel()">
+            模型设置
+          </button>
+          <div class="more-menu">
+            <button
+              class="quiet-button"
+              :aria-expanded="moreOpen"
+              @click="moreOpen = !moreOpen"
+            >
+              更多
+            </button>
+            <div v-if="moreOpen" class="menu-panel">
+              <button
+                v-if="currentWorld && view === 'play'"
+                @click="openSettings"
+              >
+                故事设置</button
+              ><button @click="openModel()">模型设置</button>
+            </div>
+          </div>
+        </nav>
+      </header>
+      <div
+        v-if="connectionError || (view === 'play' && session.error)"
+        class="status-banner error"
+        role="alert"
+      >
+        {{ connectionError || session.error }}
+        <button @click="freshRefresh">重试连接</button>
+      </div>
+      <div v-if="notice" class="status-banner" role="status">
+        {{ notice
+        }}<button aria-label="关闭提示" @click="notice = ''">×</button>
+      </div>
+    </div>
+    <div v-if="!loaded" class="loading-page">正在打开故事书…</div>
+
+    <section v-else-if="view === 'home'" class="page-content">
+      <div class="page-heading">
+        <span class="eyebrow">故事首页</span>
+        <h1>今晚，故事从哪里继续？</h1>
+        <p>继续上次旅程，或选择一个故事重新开始。</p>
+      </div>
+      <section v-if="currentWorld" class="continue-panel">
         <div>
-          <div class="brand-name">World Is Agent</div>
-          <div class="brand-subtitle">让故事记得住，也让选择有回应</div>
+          <span class="eyebrow">继续上次故事</span>
+          <h2>{{ currentWorld.name }}</h2>
+          <p>{{ currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</p>
         </div>
+        <button
+          class="primary-button"
+          :disabled="navigating"
+          @click="switchWorld(currentWorld)"
+        >
+          继续故事
+        </button>
+      </section>
+      <h2>选择一个剧本</h2>
+      <div class="story-grid">
+        <article v-for="item in games" :key="item.id" class="story-card">
+          <div class="story-art" aria-hidden="true">
+            <span class="moon"></span><span class="window-light"></span>
+          </div>
+          <div class="story-card-body">
+            <span class="eyebrow">调查冒险</span>
+            <h2>{{ item.title }}</h2>
+            <p>{{ item.description }}</p>
+            <button class="primary-button" @click="openStory(item)">
+              进入这个故事
+            </button>
+          </div>
+        </article>
       </div>
-      <div class="topbar-actions">
-        <span v-if="status" class="model-pill" :class="{ connected: status.ready }"><span class="status-dot"></span>{{ modelStatusText }}</span>
-        <button v-if="currentView !== 'home'" class="quiet-button" type="button" @click="returnHome">返回首页</button>
-        <button v-if="currentWorld && currentView === 'play'" class="quiet-button" type="button" @click="openAgentSettings()">故事设置</button>
-        <button v-if="status?.ready" class="quiet-button" type="button" @click="showModel = true">模型设置</button>
-      </div>
-    </header>
-
-    <div v-if="connectionError" class="alert alert-error">{{ connectionError }}</div>
-    <div v-if="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
-
-    <section v-if="needsModel" class="welcome-grid">
-      <div class="welcome-copy">
-        <span class="section-kicker">第一次进入</span>
-        <h1>把注意力留给故事。</h1>
-        <p>连接一个你可以使用的模型，World Is Agent 会替你组织场景、人物和每个人各自知道的事情。</p>
-        <div class="promise-list">
-          <div><span>01</span><strong>直接进入小型冒险</strong><small>不需要配置 Agent 或记忆参数</small></div>
-          <div><span>02</span><strong>人物保有自己的立场</strong><small>重要人物分别读取自己的经历</small></div>
-          <div><span>03</span><strong>进度自动保存</strong><small>另存之后，各个世界独立继续</small></div>
-        </div>
-      </div>
-      <form class="panel model-panel" @submit.prevent="configureModel">
-        <span class="section-kicker">连接模型</span>
-        <h2>选择一个模型服务</h2>
-        <p class="panel-note">凭据只保存在本机运行时，不会显示在页面或故事存档里。</p>
-        <label>服务商<select v-model="modelForm.provider" @change="changeProvider"><option v-for="option in providerOptions" :key="option.provider" :value="option.provider">{{ option.provider }}</option></select></label>
-        <label>模型<input v-model="modelForm.model" autocomplete="off" /></label>
-        <label>API Key<input v-model="modelForm.api_key" type="password" autocomplete="off" placeholder="粘贴后仅用于本机连接验证" /></label>
-        <label>自定义地址 <span class="optional">可选</span><input v-model="modelForm.base_url" autocomplete="off" placeholder="留空使用服务商默认地址" /></label>
-        <button class="primary-button wide" type="submit" :disabled="modelBusy">{{ modelBusy ? '正在验证连接…' : '验证并保存' }}</button>
-        <p v-if="status?.model_error" class="form-error">{{ status.model_error }}</p>
-      </form>
+      <p v-if="!status?.ready" class="subtle">
+        可以先看看故事，开始游玩前再连接模型。
+      </p>
     </section>
 
-    <template v-else-if="loaded && currentView === 'home'">
-      <section class="page-heading"><span class="section-kicker">故事首页</span><h1>今晚，故事从哪里继续？</h1><p>继续上次旅程，或选择一个故事重新开始。</p></section>
-      <section v-if="currentWorld" class="continue-panel">
-        <div><span class="section-kicker">继续上次故事</span><h2>{{ currentWorld.name }}</h2><p>{{ currentWorld.scene }} · {{ currentWorld.clock }} · 第 {{ currentWorld.turn_seq }} 轮</p></div>
-        <button class="primary-button" type="button" @click="switchWorld(currentWorld)">继续故事</button>
-      </section>
-      <div class="home-section-heading"><div><span class="section-kicker">开始故事</span><h2>选择一个剧本</h2></div></div>
-      <section class="story-grid">
-        <article v-for="game in games" :key="game.id" class="story-card">
-          <div class="story-art"><span class="moon"></span><span class="rain rain-a"></span><span class="rain rain-b"></span><span class="window-light"></span></div>
-          <div class="story-card-body"><div class="story-meta">调查冒险 · {{ game.default_mode === 'guided' ? '流程版' : '开放版' }}</div><h2>{{ game.title }}</h2><p>{{ game.description }}</p><button class="primary-button" type="button" @click="openStory(game)">进入这个故事</button></div>
-        </article>
-      </section>
-    </template>
-
-    <template v-else-if="loaded && currentView === 'story' && currentGame">
-      <section class="story-detail">
-        <div class="story-detail-copy">
-          <span class="section-kicker">选择进入方式</span>
-          <h1>{{ currentGame.title }}</h1>
-          <p>{{ currentGame.description }}</p>
-          <div class="story-detail-actions">
-            <button v-if="recentStoryWorld" class="primary-button" type="button" @click="switchWorld(recentStoryWorld)">继续最近进度</button>
-            <button :class="recentStoryWorld ? 'secondary-button' : 'primary-button'" type="button" @click="openNewWorld">开始新的故事</button>
+    <section v-else-if="view === 'story' && game" class="page-content">
+      <div class="story-detail">
+        <div>
+          <span class="eyebrow">选择进入方式</span>
+          <h1>{{ game.title }}</h1>
+          <p>{{ game.description }}</p>
+          <div class="button-row">
+            <button
+              v-if="recentWorld"
+              class="primary-button"
+              :disabled="navigating"
+              @click="switchWorld(recentWorld)"
+            >
+              继续最近进度</button
+            ><button
+              :class="recentWorld ? 'secondary-button' : 'primary-button'"
+              @click="openNewWorld"
+            >
+              开始新的故事
+            </button>
           </div>
         </div>
-        <div class="story-detail-art"><span class="moon"></span><span class="rain rain-a"></span><span class="rain rain-b"></span><span class="window-light"></span></div>
-      </section>
-      <section v-if="storyWorlds.length" class="story-saves">
-        <div class="home-section-heading"><div><span class="section-kicker">故事进度</span><h2>选择存档</h2></div><span>{{ storyWorlds.length }} 个</span></div>
-        <div class="save-list">
-          <div v-for="world in storyWorlds" :key="world.world_id" class="save-item" :class="{ active: world.world_id === activeWorldID }"><button class="save-open" type="button" @click="switchWorld(world)"><span><strong>{{ world.name }}</strong><small>{{ world.clock }} · {{ world.turn_seq }} 轮 · {{ world.mode === 'guided' ? '流程型' : '开放型' }}</small></span><span>{{ world.world_id === activeWorldID ? '继续' : '读取' }}</span></button><button class="delete-button" type="button" :aria-label="`删除存档 ${world.name}`" @click="confirmDelete(world)">删除</button></div>
+        <div class="story-art" aria-hidden="true">
+          <span class="moon"></span><span class="window-light"></span>
         </div>
-      </section>
-    </template>
-
-    <template v-else-if="currentWorld && currentView === 'play'">
-      <div class="game-layout">
-        <section class="story-column">
-          <div class="story-heading">
-            <div><span class="section-kicker">{{ currentWorld.scene }} · {{ currentWorld.clock }}</span><h1>{{ currentWorld.name }}</h1></div>
-            <button class="quiet-button" type="button" @click="showSaves = !showSaves">存档与故事</button>
-          </div>
-          <div class="notice-line"><span class="save-dot"></span>游玩进度自动保存到当前存档<span class="notice-separator">·</span><span>第 {{ currentWorld.turn_seq }} 轮</span></div>
-          <div class="transcript">
-            <article v-for="message in messages" :key="message.message_id" :class="messageClass(message)">
-              <div v-if="message.kind === 'narrative'" class="narrative-label">故事</div>
-              <div class="message-content">{{ displayMessage(message) }}</div>
-              <time>{{ formatDate(message.created_at) }}</time>
-            </article>
-            <div v-if="activeRun" class="thinking-card"><span class="thinking-icon"><i></i><i></i><i></i></span><div><strong>正在组织回应</strong><p>人物正在根据自己知道的事情做出选择。</p></div><button class="quiet-button" type="button" @click="stopRun">取消</button></div>
-            <div v-if="failedRun" class="failed-card"><div><strong>这一轮没有完成</strong><p>{{ describeFailedRun(failedRun) }}</p></div><button class="secondary-button" type="button" @click="retryFailed">重试</button></div>
-          </div>
-          <form class="composer" @submit.prevent="sendInput">
-            <div class="composer-tools"><label class="address-label">对谁说 <select v-model="addressee"><option value="">让场景判断</option><option v-for="character in characters" :key="character.entity_id" :value="character.entity_id">{{ character.name }}</option></select></label><span class="composer-hint">自由输入 · 说话、观察或行动</span></div>
-            <textarea v-model="input" rows="3" placeholder="你想做什么？" :disabled="Boolean(activeRun)" @keydown.ctrl.enter.prevent="sendInput"></textarea>
-            <div class="composer-footer"><span>Ctrl + Enter 提交</span><button class="primary-button" type="submit" :disabled="!canSubmit">{{ activeRun ? '等待回应' : '继续故事' }}<span aria-hidden="true">↗</span></button></div>
-          </form>
-        </section>
-
-        <aside class="side-column">
-          <section class="side-panel character-panel"><div class="side-title"><span>眼前的人</span><span class="side-count">{{ characters.length }}</span></div><div v-for="character in characters" :key="character.entity_id" class="character-row"><div class="avatar" :class="character.entity_id.includes('mercenary') ? 'avatar-iron' : 'avatar-rose'">{{ character.name.slice(0, 1) }}</div><div><strong>{{ character.name }}</strong><span>{{ character.role }}</span></div><span class="presence"></span></div><p class="side-note">普通客人只作为场景的一部分出现。故事会记住真正与你产生经历的人。</p></section>
-          <section class="side-panel"><div class="side-title"><span>当前剧本</span></div><p class="plot-copy">一封没有寄出的信、一枚染血的信蜡，还有两个人并不相同的沉默。</p><div class="mode-tag">{{ currentWorld.mode === 'guided' ? '流程型' : '开放型' }}剧本</div></section>
-          <section class="side-panel compact-panel"><div class="side-title"><span>叙事方式</span><button class="inline-action" type="button" @click="openAgentSettings()">调整</button></div><strong class="setting-summary">{{ narrativeSummary }}</strong><p class="side-note">正文始终只使用主角能够获知的内容。</p></section>
-          <section class="side-panel compact-panel"><div class="side-title"><span>世界时间</span></div><strong class="clock-value">{{ currentWorld.clock }}</strong><p class="side-note">阅读、设置和等待模型不会让时间自动流逝。</p></section>
-        </aside>
       </div>
-    </template>
-
-    <div v-if="showModel" class="modal-backdrop" @click.self="showModel = false"><form class="modal model-modal" @submit.prevent="configureModel"><div class="modal-header"><div><span class="section-kicker">模型设置</span><h2>更新连接</h2></div><button class="icon-button" type="button" aria-label="关闭" @click="showModel = false">×</button></div><p class="modal-note">新连接验证通过后才会用于下一轮故事。正在进行的回合继续使用原连接。</p><label>服务商<select v-model="modelForm.provider" @change="changeProvider"><option v-for="option in providerOptions" :key="option.provider" :value="option.provider">{{ option.provider }}</option></select></label><label>模型<input v-model="modelForm.model" autocomplete="off" /></label><label>API Key<input v-model="modelForm.api_key" type="password" autocomplete="off" placeholder="输入新的 Key；不会显示在故事里" /></label><label>自定义地址 <span class="optional">可选</span><input v-model="modelForm.base_url" autocomplete="off" placeholder="留空使用服务商默认地址" /></label><div class="modal-actions"><button class="secondary-button" type="button" @click="showModel = false">取消</button><button class="primary-button" type="submit" :disabled="modelBusy || !modelForm.api_key.trim()">{{ modelBusy ? '正在验证连接…' : '验证并保存' }}</button></div></form></div>
-
-    <div v-if="showAgentSettings" class="modal-backdrop" @click.self="showAgentSettings = false">
-      <form class="modal agent-settings-modal" @submit.prevent="configureAgentSettings">
-        <div class="modal-header"><div><span class="section-kicker">故事设置</span><h2>调整叙事 Agent</h2></div><button class="icon-button" type="button" aria-label="关闭" @click="showAgentSettings = false">×</button></div>
-        <p class="modal-note">设置只属于当前存档，并从下一轮开始生效。另存会继承当前设置。</p>
-        <div class="settings-tabs" role="tablist"><button type="button" :class="{ active: settingsTab === 'basic' }" @click="settingsTab = 'basic'">基础体验</button><button type="button" :class="{ active: settingsTab === 'advanced' }" @click="settingsTab = 'advanced'">Agent 配置</button></div>
-        <div v-if="settingsTab === 'basic'" class="settings-section">
-          <div><span class="field-label">互动风格</span><div class="setting-options"><button v-for="option in interactionPresets" :key="option.value" type="button" :class="['setting-option', { selected: currentInteractionPreset === option.value }]" @click="applyInteractionPreset(option.value)"><strong>{{ option.label }}<small v-if="option.value === 'natural'">默认</small></strong><span>{{ option.note }}</span></button></div><p v-if="currentInteractionPreset === 'custom'" class="setting-help">当前使用高级设置中的自定义组合。</p></div>
-          <div><span class="field-label">叙事人称</span><div class="setting-options"><button v-for="option in perspectiveOptions" :key="option.value" type="button" :class="['setting-option', { selected: settingsForm.perspective === option.value }]" @click="settingsForm.perspective = option.value"><strong>{{ option.label }}</strong><span>{{ option.note }}</span></button></div></div>
-          <div><span class="field-label">正文长度</span><div class="setting-options three"><button v-for="option in lengthOptions" :key="option.value" type="button" :class="['setting-option', { selected: settingsForm.length === option.value }]" @click="settingsForm.length = option.value"><strong>{{ option.label }}</strong><span>{{ option.note }}</span></button></div></div>
-          <div><span class="field-label">描写密度</span><div class="setting-options three"><button v-for="option in detailOptions" :key="option.value" type="button" :class="['setting-option', { selected: settingsForm.detail === option.value }]" @click="settingsForm.detail = option.value"><strong>{{ option.label }}</strong><span>{{ option.note }}</span></button></div></div>
-          <div class="guardrail-note"><strong>关键选择始终留给玩家</strong><span>互动风格只改变表达补全与 NPC 主动程度，不授权 AI 接受任务、作出承诺或改变主角的重要目标。</span></div>
+      <section v-if="storyWorlds.length" class="story-saves">
+        <h2>
+          选择存档 <small>{{ storyWorlds.length }} 个</small>
+        </h2>
+        <div
+          v-for="world in storyWorlds"
+          :key="world.world_id"
+          class="save-item"
+          :class="{ active: world.world_id === status?.active_world?.world_id }"
+        >
+          <button
+            class="save-open"
+            :disabled="navigating"
+            @click="switchWorld(world)"
+          >
+            <strong
+              >{{ world.name }}
+              <small v-if="world.world_id === status?.active_world?.world_id"
+                >当前</small
+              ></strong
+            ><span>{{ world.scene }}</span
+            ><small
+              >更新于 {{ formatDate(world.updated_at) }} · 游戏内
+              {{ world.clock }} ·
+              {{ world.mode === "guided" ? "流程型" : "开放型" }}</small
+            ></button
+          ><button
+            class="delete-button"
+            :aria-label="`删除存档 ${world.name}`"
+            @click="confirmDelete(world)"
+          >
+            删除
+          </button>
         </div>
-        <div v-else class="settings-section agent-list">
-          <article class="agent-card"><div><span class="agent-status editable">可配置</span><h3>主角与正文 Agent</h3></div><p>控制正文可以替主角补全多少表达。补写只改善本轮呈现，不会新增后续剧情依据。</p><div class="setting-options"><button v-for="option in playerElaborationOptions" :key="option.value" type="button" :class="['setting-option', { selected: settingsForm.player_elaboration === option.value }]" @click="settingsForm.player_elaboration = option.value"><strong>{{ option.label }}</strong><span>{{ option.note }}</span></button></div><label>补充写作偏好 <span class="optional">可选</span><textarea v-model="settingsForm.custom_instruction" rows="4" maxlength="1000" placeholder="例如：对白简洁，环境描写偏冷峻。不能用来覆盖事实与角色知识边界。"></textarea><small>{{ settingsForm.custom_instruction.length }} / 1000</small></label></article>
-          <article class="agent-card"><div><span class="agent-status editable">可配置</span><h3>NPC Agent</h3></div><p>控制重要人物何时主动招呼、追问、试探或采取相关行动；人物仍只使用自己实际获知的信息。</p><div class="setting-options"><button v-for="option in npcInitiativeOptions" :key="option.value" type="button" :class="['setting-option', { selected: settingsForm.npc_initiative === option.value }]" @click="settingsForm.npc_initiative = option.value"><strong>{{ option.label }}</strong><span>{{ option.note }}</span></button></div></article>
-          <article class="agent-card"><div><span class="agent-status locked">系统约束</span><h3>场景协调 Agent</h3></div><p>裁定行动结果、时间与在场人物。它只确定事实，不直接写玩家正文。</p></article>
-          <div class="guardrail-note"><strong>这些边界不能被自定义覆盖</strong><span>玩家控制权、NPC 私密信息隔离、事件来源和主角有限视角始终由系统保证。</span></div>
+      </section>
+    </section>
+
+    <div v-else-if="currentWorld && view === 'play'" class="game-layout">
+      <section class="story-column">
+        <div class="reading-heading">
+          <div>
+            <h1>{{ currentWorld.name }}</h1>
+            <span class="subtle"
+              >{{ currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</span
+            >
+          </div>
+          <button
+            class="quiet-button scene-toggle"
+            @click="showDialog('scene')"
+          >
+            场景与人物
+          </button>
         </div>
-        <div class="modal-actions"><button class="secondary-button" type="button" @click="showAgentSettings = false">取消</button><button class="primary-button" type="submit" :disabled="settingsBusy || Boolean(activeRun)">{{ activeRun ? '请等待当前回合完成' : settingsBusy ? '正在保存…' : '保存设置' }}</button></div>
-      </form>
+        <div
+          ref="viewport"
+          class="transcript"
+          tabindex="0"
+          aria-label="故事正文"
+          @scroll.passive="reader.remember"
+        >
+          <div class="history-control">
+            <button
+              v-if="session.before !== undefined"
+              class="quiet-button"
+              :disabled="session.loading || session.historyLoading"
+              @click="reader.earlier"
+            >
+              {{
+                session.historyLoading ? "正在读取…" : "加载更早内容"
+              }}</button
+            ><span v-else-if="session.initialized" class="subtle"
+              >故事从这里开始</span
+            ><span v-else class="subtle">正在读取故事…</span>
+          </div>
+          <div v-if="session.historyError" class="inline-error" role="alert">
+            {{ session.historyError
+            }}<button @click="reader.earlier()">重试历史</button>
+          </div>
+          <article
+            v-for="message in session.messages"
+            :key="message.message_id"
+            :data-message-id="message.message_id"
+            class="message"
+            :class="
+              message.kind === 'player' ? 'player-message' : 'narrative-message'
+            "
+          >
+            <div class="message-content">{{ message.content }}</div>
+            <time :datetime="message.created_at">{{
+              formatDate(message.created_at)
+            }}</time>
+          </article>
+          <div v-if="activeRun" class="run-card" role="status">
+            <p class="pending-input">{{ activeRun.input }}</p>
+            <div class="button-row">
+              <span class="pulse-dot"></span><span>正在组织回应</span
+              ><button
+                class="quiet-button"
+                :disabled="session.sending"
+                @click="stopRun"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+          <div v-if="failedRun" class="run-card failed-card">
+            <p>{{ failureText(failedRun) }}</p>
+            <button
+              class="secondary-button"
+              :disabled="session.sending"
+              @click="sendInput(true)"
+            >
+              重试本轮
+            </button>
+          </div>
+        </div>
+        <div v-if="!session.bottom" class="latest-row">
+          <button class="secondary-button" @click="reader.latest">
+            {{ session.unread ? "有新内容 · 回到最新" : "回到最新" }}
+          </button>
+        </div>
+        <form class="composer" @submit.prevent="sendInput()">
+          <div class="composer-tools">
+            <label
+              >对谁说
+              <select v-model="session.addressee" aria-label="交谈对象">
+                <option value="">自动判断</option>
+                <option
+                  v-for="character in characters"
+                  :key="character.entity_id"
+                  :value="character.entity_id"
+                >
+                  {{ character.name }}
+                </option>
+              </select></label
+            ><button
+              v-if="addresseeName"
+              type="button"
+              class="recipient-chip"
+              @click="session.addressee = ''"
+            >
+              对{{ addresseeName }}说 ×</button
+            ><span class="save-status">{{
+              session.sending
+                ? "正在处理"
+                : activeRun
+                  ? "正在生成"
+                  : failedRun
+                    ? failedRun.status === "cancelled"
+                      ? "本轮已取消"
+                      : "本轮未完成"
+                    : saved
+                      ? "本轮已保存"
+                      : "进度自动保存"
+            }}</span>
+          </div>
+          <textarea
+            ref="textarea"
+            v-model="session.draft"
+            aria-label="你的行动"
+            rows="2"
+            placeholder="你想做什么？"
+            :disabled="!!activeRun || session.sending"
+            @keydown="inputKeys"
+            @input="resizeInput"
+          ></textarea>
+          <p v-if="session.sendError" class="inline-error" role="alert">
+            {{ session.sendError }}
+          </p>
+          <div class="composer-footer">
+            <span>Ctrl + Enter 提交</span
+            ><button
+              class="primary-button"
+              type="submit"
+              :disabled="!canSubmit"
+            >
+              {{
+                session.sending
+                  ? "正在提交…"
+                  : activeRun
+                    ? "等待回应"
+                    : status?.ready
+                      ? "继续故事"
+                      : "连接模型并继续"
+              }}
+            </button>
+          </div>
+        </form>
+      </section>
+      <aside class="side-column">
+        <section class="side-panel">
+          <span class="eyebrow">当前场景</span>
+          <h2>{{ currentWorld.scene }}</h2>
+          <span class="subtle">游戏内时间</span>
+          <p class="clock-value">{{ currentWorld.clock }}</p>
+        </section>
+        <section class="side-panel">
+          <h2>眼前的人</h2>
+          <button
+            v-for="character in characters"
+            :key="character.entity_id"
+            class="character-row"
+            :class="{ selected: session.addressee === character.entity_id }"
+            @click="chooseCharacter(character)"
+          >
+            <span class="avatar">{{ character.name.slice(0, 1) }}</span
+            ><span
+              ><strong>{{ character.name }}</strong
+              ><small>{{ character.role }}</small></span
+            >
+          </button>
+          <p v-if="!characters.length" class="subtle">
+            眼前暂时没有可交谈的人物。
+          </p>
+        </section>
+      </aside>
     </div>
 
-    <div v-if="showSaves" class="modal-backdrop" @click.self="showSaves = false"><section class="modal saves-modal"><div class="modal-header"><div><span class="section-kicker">当前剧本</span><h2>存档与故事</h2></div><button class="icon-button" type="button" aria-label="关闭" @click="showSaves = false">×</button></div><p class="modal-note">这里只显示当前剧本的存档。读取后，后续游玩会持续更新所选进度；另存不会离开当前存档。</p><div class="save-list"><div v-for="world in storyWorlds" :key="world.world_id" class="save-item" :class="{ active: world.world_id === activeWorldID }"><button class="save-open" type="button" @click="switchWorld(world)"><span><strong>{{ world.name }}</strong><small>{{ world.clock }} · {{ world.turn_seq }} 轮 · {{ world.mode === 'guided' ? '流程型' : '开放型' }}</small></span><span>{{ world.world_id === activeWorldID ? '当前' : '读取' }}</span></button><button class="delete-button" type="button" :aria-label="`删除存档 ${world.name}`" @click="confirmDelete(world)">删除</button></div></div><div class="save-actions"><button class="secondary-button" type="button" @click="openNewWorld">新开一局</button><button v-if="currentWorld" class="primary-button" type="button" @click="openSaveAs">另存当前进度</button></div></section></div>
-
-    <div v-if="deleteCandidate" class="modal-backdrop" @click.self="deleteCandidate = null"><section class="modal confirm-modal"><div class="modal-header"><div><span class="section-kicker">删除存档</span><h2>确认删除“{{ deleteCandidate.name }}”</h2></div><button class="icon-button" type="button" aria-label="关闭" @click="deleteCandidate = null">×</button></div><p class="modal-note">这个存档及其独立故事进度会从本机删除，其他另存世界不受影响。</p><p v-if="deleteCandidate.world_id === activeWorldID && activeRun" class="form-error">当前故事仍在生成，请先取消或等待本轮完成。</p><div class="modal-actions"><button class="secondary-button" type="button" @click="deleteCandidate = null">保留存档</button><button class="danger-button" type="button" :disabled="deleteBusy || Boolean(deleteCandidate.world_id === activeWorldID && activeRun)" @click="deleteSelectedWorld">{{ deleteBusy ? '正在删除…' : '确认删除' }}</button></div></section></div>
-
-    <div v-if="showNewWorld" class="modal-backdrop" @click.self="showNewWorld = false"><form class="modal new-world-modal" @submit.prevent="newWorldKind === 'save' ? saveCurrentAs() : startWorld()"><div class="modal-header"><div><span class="section-kicker">{{ newWorldKind === 'save' ? '保留一个分支' : '进入故事' }}</span><h2>{{ newWorldKind === 'save' ? '另存当前进度' : '确认你的主角' }}</h2></div><button class="icon-button" type="button" aria-label="关闭" @click="showNewWorld = false">×</button></div><label>存档名称<input v-model="newWorld.name" :placeholder="newWorldKind === 'save' ? '例如：先调查信蜡' : '例如：雨夜的第一晚'" /></label><template v-if="newWorldKind === 'new'"><label>主角名字<input v-model="playerName" /></label><label>主角简介<textarea v-model="playerProfile" rows="3"></textarea></label><div><span class="field-label">剧本方式</span><div class="mode-options"><button v-for="mode in (currentGame?.modes ?? ['guided', 'open'])" :key="mode" type="button" :class="['mode-option', { selected: newWorld.mode === mode }]" @click="newWorld.mode = mode"><strong>{{ mode === 'guided' ? '流程型' : '开放型' }}</strong><span>{{ mode === 'guided' ? '沿着明确矛盾推进，也保留你的选择' : '世界会继续发生，你可以参加或离开' }}</span></button></div></div></template><div class="modal-actions"><button class="secondary-button" type="button" @click="showNewWorld = false">取消</button><button class="primary-button" type="submit" :disabled="busy || saveBusy || !newWorld.name.trim()">{{ saveBusy ? '正在另存…' : busy ? '正在进入…' : newWorldKind === 'save' ? '创建独立存档' : '开始游玩' }}</button></div></form></div>
+    <AppDialog
+      v-if="dialog"
+      :key="dialog"
+      :title="dialogTitle"
+      :busy="dialogBusy"
+      :destructive="dialog === 'delete'"
+      :drawer="dialog === 'scene'"
+      @close="closeDialog"
+    >
+      <p v-if="dialogError" class="inline-error" role="alert">
+        {{ dialogError }}
+      </p>
+      <template v-if="dialog === 'model'">
+        <p class="subtle">
+          凭据仅保存在本机。{{
+            status?.model.configured
+              ? `当前：${status.model.provider} · ${status.model.model}`
+              : "选择服务商并填写密钥，即可开始故事。"
+          }}
+        </p>
+        <form @submit.prevent="configureModel">
+          <fieldset :disabled="dialogBusy">
+            <label
+              >服务商<select
+                v-model="modelForm.provider"
+                @change="changeProvider"
+              >
+                <option
+                  v-for="option in providers"
+                  :key="option.provider"
+                  :value="option.provider"
+                >
+                  {{ option.provider }}
+                </option>
+              </select></label
+            >
+            <p>
+              推荐模型：{{
+                providers.find(
+                  (option) => option.provider === modelForm.provider,
+                )?.model
+              }}
+            </p>
+            <label
+              >API Key<input
+                v-model="modelForm.api_key"
+                type="password"
+                autocomplete="off"
+                placeholder="填写服务商提供的密钥"
+            /></label>
+            <details
+              :open="modelAdvanced"
+              @toggle="
+                modelAdvanced = ($event.target as HTMLDetailsElement).open
+              "
+            >
+              <summary>高级连接设置</summary>
+              <label>模型名称<input v-model="modelForm.model" /></label
+              ><label
+                >自定义地址 <small>可选</small
+                ><input
+                  v-model="modelForm.base_url"
+                  placeholder="留空使用服务商默认地址"
+              /></label>
+            </details>
+          </fieldset>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="secondary-button"
+              :disabled="dialogBusy"
+              @click="closeDialog"
+            >
+              取消</button
+            ><button class="primary-button" :disabled="dialogBusy">
+              {{ dialogBusy ? "正在验证…" : "验证并保存" }}
+            </button>
+          </div>
+        </form>
+      </template>
+      <template v-else-if="dialog === 'settings'">
+        <p class="subtle">只属于当前存档，从下一轮生效；另存会继承设置。</p>
+        <form @submit.prevent="configureSettings">
+          <fieldset :disabled="dialogBusy || !!activeRun">
+            <span class="field-label"
+              >互动风格 <small>{{ presetName }}</small></span
+            >
+            <div class="setting-options">
+              <button
+                v-for="option in presets"
+                :key="option.label"
+                type="button"
+                :class="{ selected: presetName === option.label }"
+                @click="
+                  settingsForm.player_elaboration = option.player_elaboration;
+                  settingsForm.npc_initiative = option.npc_initiative;
+                "
+              >
+                <strong
+                  >{{ option.label
+                  }}{{
+                    option.player_elaboration === "natural" ? " · 默认" : ""
+                  }}</strong
+                ><span>{{ option.note }}</span>
+              </button>
+            </div>
+            <span class="field-label">回复长度</span>
+            <div class="setting-options">
+              <button
+                v-for="option in lengths"
+                :key="option.value"
+                type="button"
+                :class="{ selected: settingsForm.length === option.value }"
+                @click="settingsForm.length = option.value"
+              >
+                <strong>{{ option.label }}</strong
+                ><span>{{ option.note }}</span>
+              </button>
+            </div>
+            <details
+              :open="detailsOpen"
+              @toggle="detailsOpen = ($event.target as HTMLDetailsElement).open"
+            >
+              <summary>详细设置</summary>
+              <label
+                >叙事视角<select v-model="settingsForm.perspective">
+                  <option value="second_person">第二人称 · 你</option>
+                  <option value="first_person">第一人称 · 我</option>
+                  <option value="third_person">第三人称 · 主角姓名</option>
+                </select></label
+              ><label
+                >描写密度<select v-model="settingsForm.detail">
+                  <option value="restrained">克制</option>
+                  <option value="balanced">平衡</option>
+                  <option value="rich">丰富</option>
+                </select></label
+              ><span class="field-label">主角表现</span>
+              <div class="setting-options">
+                <button
+                  v-for="option in players"
+                  :key="option.value"
+                  type="button"
+                  :class="{
+                    selected: settingsForm.player_elaboration === option.value,
+                  }"
+                  @click="settingsForm.player_elaboration = option.value"
+                >
+                  <strong>{{ option.label }}</strong
+                  ><span>{{ option.note }}</span>
+                </button>
+              </div>
+              <span class="field-label">人物主动程度</span>
+              <div class="setting-options">
+                <button
+                  v-for="option in initiatives"
+                  :key="option.value"
+                  type="button"
+                  :class="{
+                    selected: settingsForm.npc_initiative === option.value,
+                  }"
+                  @click="settingsForm.npc_initiative = option.value"
+                >
+                  <strong>{{ option.label }}</strong
+                  ><span>{{ option.note }}</span>
+                </button>
+              </div>
+              <label
+                >写作偏好 <small>可选</small
+                ><textarea
+                  v-model="settingsForm.custom_instruction"
+                  maxlength="1000"
+                  rows="3"
+                  placeholder="例如：对白简洁，环境描写偏冷峻。"
+                ></textarea
+                ><small
+                  >{{ settingsForm.custom_instruction.length }} / 1000</small
+                ></label
+              >
+            </details>
+          </fieldset>
+          <p class="guardrail-note">
+            关键选择留给你，人物依据自己的经历作出回应。
+          </p>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="secondary-button"
+              :disabled="dialogBusy"
+              @click="closeDialog"
+            >
+              取消</button
+            ><button
+              class="primary-button"
+              :disabled="dialogBusy || !!activeRun"
+            >
+              {{
+                activeRun
+                  ? "请等待当前回合完成"
+                  : dialogBusy
+                    ? "正在保存…"
+                    : "保存设置"
+              }}
+            </button>
+          </div>
+        </form>
+      </template>
+      <template v-else-if="dialog === 'saves'">
+        <p class="subtle">
+          {{ game?.title }} · 读取后继续更新所选存档；另存保留独立进度。
+        </p>
+        <p v-if="notice" class="success-note" role="status">{{ notice }}</p>
+        <div
+          v-for="world in storyWorlds"
+          :key="world.world_id"
+          class="save-item"
+          :class="{ active: world.world_id === currentWorld?.world_id }"
+        >
+          <button
+            class="save-open"
+            :disabled="dialogBusy"
+            @click="switchWorld(world)"
+          >
+            <strong
+              >{{ world.name }}
+              <small v-if="world.world_id === currentWorld?.world_id"
+                >当前</small
+              ></strong
+            ><span>{{ world.scene }}</span
+            ><small
+              >更新于 {{ formatDate(world.updated_at) }} · 游戏内
+              {{ world.clock }} ·
+              {{ world.mode === "guided" ? "流程型" : "开放型" }}</small
+            ></button
+          ><button
+            class="delete-button"
+            :disabled="dialogBusy"
+            :aria-label="`删除存档 ${world.name}`"
+            @click="confirmDelete(world)"
+          >
+            删除
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button
+            class="secondary-button"
+            :disabled="dialogBusy"
+            @click="openNewWorld"
+          >
+            新开一局</button
+          ><button
+            class="primary-button"
+            :disabled="dialogBusy || !!activeRun"
+            @click="openCopy"
+          >
+            另存当前进度
+          </button>
+        </div>
+        <p v-if="activeRun" class="subtle">本轮完成后可以另存。</p>
+      </template>
+      <template v-else-if="dialog === 'new' || dialog === 'copy'">
+        <form @submit.prevent="createOrCopy">
+          <fieldset :disabled="dialogBusy">
+            <label
+              >存档名称 <small>可直接使用默认名称</small
+              ><input v-model="newWorld.name" /></label
+            ><template v-if="dialog === 'new'"
+              ><label>主角名字<input v-model="newWorld.player_name" /></label
+              ><label
+                >主角简介<textarea
+                  v-model="newWorld.player_profile"
+                  rows="3"
+                ></textarea></label
+              ><span class="field-label">剧本方式</span>
+              <div class="mode-options">
+                <button
+                  v-for="mode in game?.modes ?? ['guided', 'open']"
+                  :key="mode"
+                  type="button"
+                  :class="{ selected: newWorld.mode === mode }"
+                  @click="newWorld.mode = mode"
+                >
+                  <strong>{{ mode === "guided" ? "流程型" : "开放型" }}</strong
+                  ><span>{{
+                    mode === "guided"
+                      ? "沿着明确矛盾推进，也保留你的选择"
+                      : "世界会继续发生，你可以参加或离开"
+                  }}</span>
+                </button>
+              </div></template
+            >
+          </fieldset>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="secondary-button"
+              :disabled="dialogBusy"
+              @click="closeDialog"
+            >
+              取消</button
+            ><button class="primary-button" :disabled="dialogBusy">
+              {{
+                dialogBusy
+                  ? "正在处理…"
+                  : dialog === "copy"
+                    ? "创建独立存档"
+                    : status?.ready
+                      ? "开始游玩"
+                      : "连接模型并开始"
+              }}
+            </button>
+          </div>
+        </form>
+      </template>
+      <template v-else-if="dialog === 'delete'"
+        ><p>确认删除“{{ deleteCandidate?.name }}”？</p>
+        <p class="subtle">此存档及其独立进度会从本机删除，其他存档不受影响。</p>
+        <div class="modal-actions">
+          <button
+            class="secondary-button"
+            :disabled="dialogBusy"
+            @click="closeDialog"
+          >
+            保留存档</button
+          ><button
+            class="danger-button"
+            :disabled="dialogBusy"
+            @click="removeWorld"
+          >
+            {{ dialogBusy ? "正在删除…" : "确认删除" }}
+          </button>
+        </div></template
+      >
+      <template v-else-if="dialog === 'scene'"
+        ><span class="eyebrow">当前场景</span>
+        <h3>{{ currentWorld?.scene }}</h3>
+        <p class="subtle">游戏内时间 · {{ currentWorld?.clock }}</p>
+        <h3>眼前的人</h3>
+        <button
+          v-for="character in characters"
+          :key="character.entity_id"
+          class="character-row"
+          :class="{ selected: session.addressee === character.entity_id }"
+          @click="chooseCharacter(character)"
+        >
+          <span class="avatar">{{ character.name.slice(0, 1) }}</span
+          ><span
+            ><strong>{{ character.name }}</strong
+            ><small>{{ character.role }}</small></span
+          >
+        </button>
+        <p v-if="!characters.length" class="subtle">
+          眼前暂时没有可交谈的人物。
+        </p></template
+      >
+    </AppDialog>
   </main>
 </template>
-
-<style>
-:root { color-scheme: light; --paper: #f5f1e9; --paper-deep: #ebe4d8; --ink: #25221e; --muted: #7e756b; --line: #ded5c8; --panel: #fffdf8; --accent: #b8503d; --accent-dark: #933b2d; --gold: #b88743; --blue: #405e72; --shadow: 0 18px 50px rgba(70, 53, 36, .08); }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .52; }
-.shell { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 26px 0 64px; }
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
-.brand, .topbar-actions, .model-pill, .composer-tools, .composer-footer, .story-heading, .side-title, .character-row, .modal-header, .modal-actions, .save-actions { display: flex; align-items: center; }
-.brand { gap: 12px; }
-.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: var(--ink); color: var(--paper); font-family: Georgia, serif; font-size: 19px; }
-.brand-name { font: 700 16px/1.1 Georgia, serif; letter-spacing: .01em; }
-.brand-subtitle { margin-top: 3px; color: var(--muted); font-size: 11px; }
-.topbar-actions { gap: 14px; }
-.model-pill { gap: 7px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; }
-.model-pill.connected { color: var(--blue); background: #edf2f1; }
-.status-dot, .save-dot, .presence { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.quiet-button, .icon-button { border: 0; background: transparent; color: var(--muted); }
-.quiet-button { padding: 7px 3px; font-size: 12px; }
-.quiet-button:hover { color: var(--ink); }
-.icon-button { padding: 0 4px; font-size: 26px; line-height: 1; }
-.alert { margin: 18px 0 0; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; }
-.alert-error { border-color: #e8b9ae; background: #fff1ed; color: #984233; }
-.welcome-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: clamp(36px, 8vw, 120px); align-items: center; min-height: 650px; }
-.welcome-copy { padding: 35px 0; }
-.section-kicker { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
-h1, h2, p { margin-top: 0; }
-h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -.025em; }
-.welcome-copy h1 { max-width: 560px; margin: 14px 0 20px; font-size: clamp(46px, 6vw, 76px); line-height: 1.02; }
-.welcome-copy > p { max-width: 480px; margin-bottom: 42px; color: var(--muted); font-size: 17px; }
-.promise-list { display: grid; gap: 19px; max-width: 460px; }
-.promise-list div { display: grid; grid-template-columns: 36px 1fr; column-gap: 10px; }
-.promise-list span { grid-row: span 2; color: var(--gold); font: 12px Georgia, serif; }
-.promise-list strong { font-size: 14px; }
-.promise-list small { color: var(--muted); font-size: 12px; }
-.panel, .side-panel, .composer, .story-card, .story-detail, .modal { border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
-.model-panel { padding: 30px; border-radius: 14px; }
-.model-panel h2 { margin: 9px 0 4px; font-size: 28px; }
-.panel-note, .modal-note { margin: 0 0 24px; color: var(--muted); font-size: 12px; }
-label { display: grid; gap: 6px; margin-top: 15px; color: var(--muted); font-size: 12px; }
-input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 7px; outline: none; background: #fffefa; color: var(--ink); }
-input, select { height: 42px; padding: 0 12px; }
-textarea { padding: 11px 13px; resize: vertical; }
-input:focus, select:focus, textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184, 135, 67, .12); }
-.optional { margin-left: 4px; color: #aaa095; }
-.primary-button, .secondary-button { border-radius: 7px; padding: 10px 16px; font-weight: 700; }
-.primary-button { border: 1px solid var(--accent); background: var(--accent); color: white; }
-.primary-button:hover:not(:disabled) { border-color: var(--accent-dark); background: var(--accent-dark); }
-.secondary-button { border: 1px solid var(--line); background: transparent; color: var(--ink); }
-.secondary-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.wide { width: 100%; margin-top: 23px; }
-.form-error { margin: 13px 0 0; color: var(--accent-dark); font-size: 12px; }
-.page-heading { padding: 72px 0 34px; }
-.page-heading h1 { margin: 10px 0 8px; font-size: 46px; }
-.page-heading p { margin: 0; color: var(--muted); font-size: 16px; }
-.story-grid { display: grid; grid-template-columns: minmax(280px, 450px); gap: 20px; }
-.story-card { overflow: hidden; border-radius: 14px; }
-.story-art, .story-detail-art { position: relative; overflow: hidden; background: linear-gradient(160deg, #273d4c, #151d27 68%); }
-.story-art { height: 190px; }
-.moon { position: absolute; top: 28px; right: 70px; width: 54px; height: 54px; border-radius: 50%; background: #e7c883; box-shadow: 0 0 35px rgba(231, 200, 131, .3); }
-.rain { position: absolute; top: -20px; width: 1px; height: 250px; transform: rotate(18deg); background: linear-gradient(transparent, rgba(213, 230, 229, .35)); }
-.rain-a { left: 58px; }.rain-b { left: 145px; height: 220px; opacity: .55; }
-.window-light { position: absolute; right: 30px; bottom: 0; width: 170px; height: 88px; background: linear-gradient(180deg, #e8b469, #b9583d); opacity: .6; clip-path: polygon(9% 100%, 15% 30%, 90% 10%, 100% 100%); }
-.story-card-body { padding: 24px; }.story-meta { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }.story-card h2 { margin: 8px 0 6px; font-size: 28px; }.story-card p { min-height: 48px; margin-bottom: 20px; color: var(--muted); }
-.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 46px; padding-top: 36px; }
-.story-column { min-width: 0; }.story-heading { justify-content: space-between; gap: 20px; }.story-heading h1 { margin: 7px 0 0; font-size: 36px; }.notice-line { display: flex; align-items: center; gap: 7px; margin: 15px 0 28px; color: var(--muted); font-size: 11px; }.save-dot { color: #6f9b77; }.notice-separator { color: #c4b8aa; }
-.transcript { min-height: 330px; padding-bottom: 20px; }.message { max-width: 86%; margin: 0 0 24px; }.narrative-message { position: relative; padding-left: 18px; border-left: 2px solid #d8b77c; }.player-message { margin-left: auto; padding: 12px 15px; border-radius: 11px 11px 2px 11px; background: #e9e1d5; }.message-content { white-space: pre-wrap; font-size: 15px; }.narrative-label { margin-bottom: 4px; color: var(--accent); font: 12px Georgia, serif; }.message time { display: block; margin-top: 6px; color: #aaa096; font-size: 10px; }.player-message time { text-align: right; }
-.thinking-card, .failed-card { display: flex; align-items: center; gap: 14px; margin: 12px 0 20px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 9px; background: rgba(255, 253, 248, .6); }.thinking-card strong, .failed-card strong { font-size: 13px; }.thinking-card p, .failed-card p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }.thinking-card .quiet-button, .failed-card .secondary-button { margin-left: auto; white-space: nowrap; }.thinking-icon { display: flex; align-items: end; gap: 3px; width: 20px; height: 20px; }.thinking-icon i { display: block; width: 4px; height: 9px; border-radius: 4px; background: var(--gold); animation: pulse 1s infinite ease-in-out; }.thinking-icon i:nth-child(2) { height: 15px; animation-delay: .15s; }.thinking-icon i:nth-child(3) { animation-delay: .3s; } @keyframes pulse { 0%,100% { transform: scaleY(.65); opacity: .5; } 50% { transform: scaleY(1); opacity: 1; } }
-.composer { padding: 16px; border-radius: 12px; }.composer-tools { justify-content: space-between; gap: 15px; }.address-label { display: flex; grid-template-columns: auto 1fr; align-items: center; gap: 6px; margin: 0; }.address-label select { width: auto; height: 28px; padding: 0 7px; border: 0; background: transparent; color: var(--ink); font-size: 12px; }.composer-hint, .composer-footer { color: var(--muted); font-size: 11px; }.composer textarea { min-height: 80px; margin: 10px 0; border: 0; background: transparent; box-shadow: none; font-size: 15px; }.composer textarea:focus { box-shadow: none; }.composer-footer { justify-content: space-between; gap: 12px; }.composer-footer .primary-button { display: flex; gap: 8px; align-items: center; padding: 8px 13px; }
-.side-column { display: grid; align-content: start; gap: 16px; padding-top: 6px; }.side-panel { padding: 18px; border-radius: 10px; box-shadow: none; }.side-title { justify-content: space-between; margin-bottom: 15px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }.side-count { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: var(--paper-deep); color: var(--ink); font-size: 10px; }.character-row { gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }.character-row > div:nth-child(2) { display: grid; gap: 1px; }.character-row strong { font-size: 13px; }.character-row span { color: var(--muted); font-size: 11px; }.avatar { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: white; font: 15px Georgia, serif; }.avatar-rose { background: #ae6659; }.avatar-iron { background: #536b79; }.presence { width: 5px; height: 5px; margin-left: auto; color: #78a482; }.side-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }.plot-copy { margin: 0; font: 16px/1.55 Georgia, serif; }.mode-tag { display: inline-block; margin-top: 15px; padding: 3px 8px; border-radius: 99px; background: var(--paper-deep); color: var(--muted); font-size: 11px; }.clock-value { font: 27px Georgia, serif; }
-.modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(37, 34, 30, .34); }.modal { width: min(100%, 560px); max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 14px; }.modal-header { justify-content: space-between; gap: 20px; }.modal-header h2 { margin: 6px 0 0; font-size: 30px; }.save-list { display: grid; gap: 7px; }.save-item { display: flex; align-items: center; justify-content: space-between; gap: 15px; width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); text-align: left; }.save-item:hover, .save-item.active { border-color: var(--gold); background: #fffbf1; }.save-item span:first-child { display: grid; gap: 2px; }.save-item small { color: var(--muted); }.save-item > span:last-child { color: var(--accent); font-size: 11px; }.save-actions, .modal-actions { justify-content: flex-end; gap: 10px; margin-top: 24px; }.mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }.field-label { display: block; margin: 15px 0 6px; color: var(--muted); font-size: 12px; }.mode-option { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); text-align: left; }.mode-option span { color: var(--muted); font-size: 11px; line-height: 1.45; }.mode-option.selected { border-color: var(--accent); background: #fff4ef; }.mode-option.selected strong { color: var(--accent); }
-.inline-action { padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; }.inline-action:hover { color: var(--accent-dark); }.setting-summary { display: block; font: 18px/1.35 Georgia, serif; }.agent-settings-modal { width: min(100%, 760px); }.settings-tabs { display: flex; gap: 22px; margin: 0 0 22px; border-bottom: 1px solid var(--line); }.settings-tabs button { margin-bottom: -1px; padding: 10px 1px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-weight: 700; }.settings-tabs button.active { border-bottom-color: var(--accent); color: var(--accent); }.settings-section { display: grid; gap: 20px; }.settings-section .field-label { margin-top: 0; }.setting-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }.setting-option { display: grid; align-content: start; gap: 5px; min-height: 88px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); text-align: left; }.setting-option strong { display: flex; align-items: center; gap: 7px; }.setting-option strong small { padding: 1px 5px; border-radius: 99px; background: var(--paper-deep); color: var(--muted); font-size: 9px; }.setting-option span { color: var(--muted); font-size: 11px; line-height: 1.5; }.setting-option:hover { border-color: #c8b59b; }.setting-option.selected { border-color: var(--accent); background: #fff4ef; }.setting-option.selected strong { color: var(--accent); }.setting-help { margin: 7px 0 0; color: var(--muted); font-size: 11px; }.guardrail-note { display: grid; gap: 3px; padding: 13px 15px; border-left: 3px solid var(--gold); background: #faf5ea; }.guardrail-note strong { font-size: 12px; }.guardrail-note span { color: var(--muted); font-size: 11px; }.agent-list { gap: 10px; }.agent-card { padding: 15px; border: 1px solid var(--line); border-radius: 9px; background: #fffefa; }.agent-card > div { display: flex; align-items: center; gap: 9px; }.agent-card h3 { margin: 0; font: 600 17px/1.3 Georgia, serif; }.agent-card p { margin: 8px 0 12px; color: var(--muted); font-size: 12px; }.agent-card label small { justify-self: end; color: #aaa095; }.agent-status { padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 750; }.agent-status.editable { background: #f4e4dd; color: var(--accent-dark); }.agent-status.locked { background: var(--paper-deep); color: var(--muted); }
-.continue-panel { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 48px; padding: 24px; border: 1px solid #d8b77c; border-radius: 12px; background: #fffaf0; }.continue-panel h2, .home-section-heading h2 { margin: 6px 0 2px; font-size: 27px; }.continue-panel p { margin: 0; color: var(--muted); }.home-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 34px 0 14px; }.home-section-heading > span { color: var(--muted); font-size: 12px; }.story-detail { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); min-height: 350px; margin-top: 48px; overflow: hidden; border-radius: 14px; }.story-detail-copy { display: grid; align-content: center; justify-items: start; padding: clamp(32px, 6vw, 70px); }.story-detail h1 { margin: 10px 0 14px; font-size: clamp(38px, 5vw, 58px); line-height: 1.06; }.story-detail-copy > p { max-width: 590px; color: var(--muted); font-size: 16px; }.story-detail-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }.story-saves { max-width: 760px; margin-top: 38px; }.save-item { padding: 0; overflow: hidden; }.save-open { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 15px; min-width: 0; padding: 13px 14px; border: 0; background: transparent; color: var(--ink); text-align: left; }.save-open > span:first-child { display: grid; gap: 2px; min-width: 0; }.save-open > span:last-child { color: var(--accent); font-size: 11px; }.delete-button { align-self: stretch; padding: 0 14px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; }.delete-button:hover { background: #fff1ed; color: var(--accent-dark); }.danger-button { padding: 10px 16px; border: 1px solid var(--accent-dark); border-radius: 7px; background: var(--accent-dark); color: white; font-weight: 700; }.danger-button:hover:not(:disabled) { background: #762d23; }.confirm-modal { width: min(100%, 480px); }
-@media (max-width: 860px) { .shell { width: min(100% - 28px, 680px); padding-top: 18px; }.welcome-grid, .game-layout, .story-detail { grid-template-columns: 1fr; gap: 28px; }.welcome-grid { min-height: auto; padding: 45px 0; }.welcome-copy h1 { font-size: 52px; }.story-detail { gap: 0; }.story-detail-art { min-height: 190px; order: -1; }.side-column { grid-template-columns: 1fr 1fr; }.compact-panel { grid-column: span 2; }.story-heading h1 { font-size: 30px; } }
-@media (max-width: 520px) { .topbar { align-items: flex-start; }.topbar-actions { display: grid; justify-items: end; gap: 4px; }.brand-subtitle { display: none; }.welcome-copy h1 { font-size: 43px; }.side-column { grid-template-columns: 1fr; }.compact-panel { grid-column: auto; }.message { max-width: 94%; }.mode-options, .setting-options { grid-template-columns: 1fr; }.modal { padding: 21px; }.setting-option { min-height: auto; }.settings-tabs { gap: 16px; }.continue-panel { align-items: flex-start; flex-direction: column; }.continue-panel .primary-button { width: 100%; }.delete-button { padding: 0 10px; } }
-</style>
