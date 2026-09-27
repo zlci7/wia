@@ -193,3 +193,40 @@ func TestCorrectionTargetsAndRestart(t *testing.T) {
 		t.Fatal(v, err)
 	}
 }
+
+func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
+	s := worldSnapshot{LongMemory: map[string]memoryContext{
+		"npc:innkeeper": {Archive: []MemorySource{{ID: "p1", EventID: "private", Content: "暗号白鹭"}}},
+		"npc:mercenary": {Archive: []MemorySource{{ID: "p2", EventID: "private", Content: "看见交谈"}}},
+	}}
+	n := correctionNotices(s, Correction{Kind: "event", TargetID: "private", Original: "暗号白鹭", Replacement: "暗号青鹭"}, "run")
+	if n["npc:innkeeper"] != "暗号青鹭" || strings.Contains(n["npc:mercenary"], "青鹭") || n["npc:mercenary"] == "" {
+		t.Fatal(n)
+	}
+	n = correctionNotices(s, Correction{Kind: "perception", Scope: "npc:innkeeper", Replacement: "明早在柜台归还。"}, "")
+	if len(n) != 1 || n["npc:innkeeper"] != "明早在柜台归还。" {
+		t.Fatal(n)
+	}
+	ctx := context.Background()
+	a := newTestApp(t, &digestGenerator{})
+	w, err := a.CreateWorld(ctx, "个人纠正", "open", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedMemoryHistory(t, a, w.WorldID)
+	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "perception", ExpectedEpoch: w.ContextEpoch, Kind: "perception", Scope: "npc:innkeeper", TargetID: "perception:1", Replacement: "明早在柜台归还。"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j := waitMemory(t, a, w.WorldID); j.Status != "completed" {
+		t.Fatal(j)
+	}
+	v, err := a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", true, 0)
+	if err != nil || len(v.Sources) == 0 || v.Sources[0].Kind != "correction:perception" {
+		t.Fatal(v, err)
+	}
+	v, err = a.ReadMemory(ctx, w.WorldID, "npc:mercenary", true, 0)
+	if err != nil || strings.Contains(marshalJSON(v), "柜台归还") {
+		t.Fatal("personal correction leaked", err)
+	}
+}

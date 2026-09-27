@@ -191,7 +191,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	}
 	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
 		if a.logger != nil {
-			a.logger.Printf("story plot validation failed: world_id=%q run_id=%q error_code=%q", snapshot.Summary.WorldID, run.RunID, safeTurnErrorCode(err))
+			a.logger.Printf("story plot validation failed: world_id=%q run_id=%q error_code=%q boundary=%q", snapshot.Summary.WorldID, run.RunID, safeTurnErrorCode(err), err.Error())
 		}
 		return nil, err
 	}
@@ -256,6 +256,7 @@ func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOut
 		RequiredSources: eventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
+	material.Required += "\n接收与唤醒合同：每个 recipient 最多出现一次，只选当前节点 audience 中的ID。decision_requests 只选本次 projections 已提供刺激的重要NPC ID，最多一次；player、背景人物、信使等没有独立Agent的角色不放入 decision_requests。没有符合条件的人物时返回[]。"
 	return material
 }
 
@@ -278,16 +279,16 @@ func plotEvidenceSections(events []Event) []contextSection {
 
 func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOutput, result plotResolution) error {
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
-		return ErrGenerationFailed
+		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
 	}
 	if cleanText(result.Content) == "" || len(result.SourceIDs) == 0 || result.Projections == nil || result.DecisionRequests == nil {
-		return ErrGenerationFailed
+		return fmt.Errorf("%w: plot_required_fields", ErrGenerationFailed)
 	}
 	if result.Ending != "" && (!node.Terminal || result.Status == "deferred") {
-		return ErrGenerationFailed
+		return fmt.Errorf("%w: plot_ending", ErrGenerationFailed)
 	}
 	if result.Status == "deferred" && (len(result.Projections) > 0 || len(result.DecisionRequests) > 0) {
-		return ErrGenerationFailed
+		return fmt.Errorf("%w: plot_deferred_effects", ErrGenerationFailed)
 	}
 	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
 	for _, e := range append(append([]Event{}, snapshot.Events...), output.Events...) {
@@ -301,11 +302,11 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	seen := map[string]bool{}
 	for _, p := range result.Projections {
 		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || cleanText(p.Content) == "" {
-			return ErrGenerationFailed
+			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
 			if _, ok := characterByID(gameDefinition{Characters: snapshot.Characters}, p.Recipient); !ok {
-				return ErrGenerationFailed
+				return fmt.Errorf("%w: plot_unknown_character", ErrGenerationFailed)
 			}
 		}
 		seen[p.Recipient] = true
@@ -313,7 +314,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	wake := map[string]bool{}
 	for _, id := range result.DecisionRequests {
 		if id == "player" || !seen[id] || wake[id] {
-			return ErrGenerationFailed
+			return fmt.Errorf("%w: plot_decision_recipient", ErrGenerationFailed)
 		}
 		wake[id] = true
 	}

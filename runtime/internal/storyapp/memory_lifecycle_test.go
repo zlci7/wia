@@ -222,6 +222,11 @@ func TestM2RealMemoryLifecycle(t *testing.T) {
 	play(a, w.WorldID, "recall", "我低声问沈岚：之前借的那把钥匙，我约好什么时候、在哪里归还？")
 	v, err := a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", true, 0)
 	if err != nil || v.Digest.Through == 0 {
+		for _, line := range strings.Split(logger.String(), "\n") {
+			if strings.Contains(line, "memory") || strings.Contains(line, "JSON validation") {
+				t.Log(line)
+			}
+		}
 		t.Fatal("real compaction missing", err)
 	}
 	t.Logf("digest_revision=%d through=%d sources=%d", v.Digest.Revision, v.Digest.Through, len(v.Sources))

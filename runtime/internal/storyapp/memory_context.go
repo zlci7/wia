@@ -139,7 +139,9 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 		}
 	}
 	material := contextMaterial{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + digestContext(previous) + "\n新增连续经历：\n" + memoryRecordsText(prefix), RequiredSources: sources}
-	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v1")
+	material.Required += "\nsource_ids 的完整合法记录ID列表：" + marshalJSON(sources) + "\n每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
+	material.System += memoryCorrectionRule
+	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v2")
 	var result struct {
 		Content string            `json:"content"`
 		States  []SubjectiveState `json:"states"`
@@ -150,19 +152,28 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 		return d, err
 	}
 	if cleanText(result.Content) == "" || result.States == nil {
+		a.logMemoryValidation(snapshot.Summary.WorldID, scope, "required_fields")
 		return d, ErrGenerationFailed
 	}
 	for _, state := range result.States {
 		if !containsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || cleanText(state.Content) == "" || len(state.Sources) == 0 {
+			a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_fields")
 			return d, ErrGenerationFailed
 		}
 		for _, id := range state.Sources {
 			if !containsID(sources, id) {
+				a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_source")
 				return d, ErrGenerationFailed
 			}
 		}
 	}
 	return MemoryDigest{Scope: scope, Revision: previous.Revision + 1, Epoch: run.BaseContextEpoch, Through: prefix[len(prefix)-1].Seq, Head: prefix[len(prefix)-1].Seq, Content: result.Content, States: result.States, Sources: sources}, nil
+}
+
+func (a *App) logMemoryValidation(world, scope, boundary string) {
+	if a.logger != nil {
+		a.logger.Printf("story memory validation failed: world_id=%q scope=%q boundary=%s", world, scope, boundary)
+	}
 }
 
 func publishDigest(ctx context.Context, store *worldStore, d MemoryDigest, previous, epoch int64) error {
@@ -201,6 +212,7 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 		return material
 	}
 	material.Optional = nil
+	material.System += memoryCorrectionRule
 	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + digestContext(m.Digest) + "\n完整近期经历（均已发生，不重演）：\n" + memoryRecordsText(m.Tail) + "\n本轮职责与刺激：\n" + material.Required
 	material.RequiredSources = append(material.RequiredSources, m.Digest.Sources...)
 	for _, s := range m.Tail {
@@ -209,6 +221,8 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 	material = withRecall(material, m, query)
 	return material
 }
+
+const memoryCorrectionRule = "\n记录类型 correction:* 是对本人资料已经生效的纠正，优先于此前关于同一内容的解释、回忆或自己的旧对白。保留曾经说过旧话这一历史，但后续判断使用纠正后的内容；纠正本身不是故事里新发生的对话，也不授予其他人物这些知识。"
 
 func digestContext(d MemoryDigest) string {
 	return marshalJSON(struct {

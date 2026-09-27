@@ -25,7 +25,11 @@ func TestPlotRealModelSequence(t *testing.T) {
 	runRealStorySequence(t, []string{"我坐在客栈里静静等一个小时，遇到新的动静先停下来看看，不替我接受任务。", "我决定暂时不参加调查，继续在客栈等待一个小时，遇到新情况就停下。", "我仍不参与，留在客栈休息，等到夜渡离岸。"}, false)
 }
 
-func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
+func TestInterventionRealModelSequence(t *testing.T) {
+	runRealStorySequence(t, []string{"我等待下一次渡船的提醒，遇到新动静就停下。", "我离开客栈，走到码头仓棚门外，看看是否真有人需要帮助。", "我表明愿意帮忙；如果负伤的人愿意随我走，就护送他经侧门到渡船，同时请他自己保管证据。不要替他决定是否接受。", "我在安全处等待半小时，出现必须由我处理的危险就停下。", "我留在安全处等到末班夜渡离岸。", "我返回客栈，向老板问好。"}, false, "open")
+}
+
+func runRealStorySequence(t *testing.T, inputs []string, custom bool, modes ...string) {
 	path := os.Getenv("WIA_AUTONOMY_MODEL_CONFIG")
 	if path == "" {
 		t.Skip("opt-in real-model evaluation")
@@ -42,7 +46,11 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 	logger := &recordingLogger{}
 	a.logger = logger
 	ctx := context.Background()
-	w, err := a.CreateWorld(ctx, "自主性评估", "guided", "旅人", "谨慎而礼貌的旅人", true)
+	mode := "guided"
+	if len(modes) > 0 {
+		mode = modes[0]
+	}
+	w, err := a.CreateWorld(ctx, "自主性评估", mode, "旅人", "谨慎而礼貌的旅人", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +79,29 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 			time.Sleep(100 * time.Millisecond)
 		}
 		t.Logf("turn=%d status=%s reason=%s elapsed_ms=%d", i+1, r.Status, r.Reason, time.Since(start).Milliseconds())
+		if r.Status == "failed" && os.Getenv("WIA_REAL_RETRY") == "1" {
+			for _, line := range strings.Split(logger.String(), "\n") {
+				if strings.Contains(line, r.RunID) && strings.Contains(line, "validation failed") {
+					t.Log(line)
+				}
+			}
+			r, err = a.RetryRun(ctx, w.WorldID, r.RunID, fmt.Sprintf("explicit-retry-%d", i))
+			if err != nil {
+				t.Fatal(err)
+			}
+			retryStarted := time.Now()
+			for deadline := time.Now().Add(310 * time.Second); time.Now().Before(deadline); {
+				r, err = a.Run(ctx, w.WorldID, r.RunID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if r.Status != "running" && r.Status != "accepted" {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+			t.Logf("turn=%d explicit_retry=1 status=%s reason=%s elapsed_ms=%d", i+1, r.Status, r.Reason, time.Since(retryStarted).Milliseconds())
+		}
 		for _, line := range strings.Split(logger.String(), "\n") {
 			if strings.Contains(line, r.RunID) && (strings.Contains(line, "model call finished") || strings.Contains(line, "context output budget")) {
 				t.Log(line)

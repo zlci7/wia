@@ -153,6 +153,12 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	}
 	c := Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: cleanText(request.Replacement), CreatedAt: nowText()}
 	c.SceneVersion = snapshot.SceneVersion
+	var eventRun string
+	if c.Kind == "event" {
+		if err = store.db.QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&eventRun); err != nil {
+			return c, err
+		}
+	}
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return c, err
@@ -172,8 +178,8 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 		return c, err
 	}
 	scopes := memoryScopeIDs(snapshot)
-	if c.Kind == "subjective" && strings.HasPrefix(c.TargetID, "state:") {
-		_, err = tx.ExecContext(ctx, `INSERT INTO memory_sources SELECT ?,COALESCE(MAX(seq),0)+1,?,'',?,?,'subjective:correction',?,? FROM memory_sources WHERE scope=?`, c.Scope, fmt.Sprintf("correction:%d", c.Epoch), fmt.Sprintf("correction:%d", c.Epoch), c.Scope, c.Replacement, c.CreatedAt, c.Scope)
+	for scope, content := range correctionNotices(snapshot, c, eventRun) {
+		_, err = tx.ExecContext(ctx, `INSERT INTO memory_sources SELECT ?,COALESCE(MAX(seq),0)+1,?,'',?,'author',?,?,? FROM memory_sources WHERE scope=?`, scope, fmt.Sprintf("correction:%d", c.Epoch), fmt.Sprintf("correction:%d", c.Epoch), "correction:"+c.Kind, content, c.CreatedAt, scope)
 		if err != nil {
 			return c, err
 		}
@@ -186,6 +192,29 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	}
 	schedule = true
 	return c, nil
+}
+
+func correctionNotices(snapshot worldSnapshot, c Correction, eventRun string) map[string]string {
+	if c.Kind == "perception" || c.Kind == "subjective" {
+		return map[string]string{c.Scope: c.Replacement}
+	}
+	notices := map[string]string{}
+	if c.Kind != "event" {
+		return notices
+	}
+	for scope, m := range snapshot.LongMemory {
+		for _, s := range m.Archive {
+			if s.EventID != c.TargetID && !(scope == "player" && s.RunID != "" && s.RunID == eventRun) {
+				continue
+			}
+			if s.Content == c.Original {
+				notices[scope] = c.Replacement
+				break
+			}
+			notices[scope] = "与记录 " + s.ID + " 关联的经历已纠正；原解释及由它得出的判断已失效，尚未获得替代投影。"
+		}
+	}
+	return notices
 }
 
 func correctionOriginal(ctx context.Context, store *worldStore, s worldSnapshot, r CorrectionRequest) (string, error) {

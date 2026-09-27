@@ -126,7 +126,7 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 		fmt.Fprintf(&builder, "本阶段新增外部刺激：\n%s\n", stageInput.NewStimulus)
 		builder.WriteString("本阶段任务：玩家输入已经在前一阶段处理过。只判断是否需要对新增外部刺激追加反应，不要重新回答玩家，也不要把自己此前的决定当成新消息。此前行动尚待协调，即使措辞像已完成也不是执行结果；保留原计划时 action_intent 留空，只有新刺激确实带来新需要才提出增量行动，不重复填写、续做或假定前项已成功。\n")
 	}
-	builder.WriteString("action_intent 只填写会改变外部可观察状态、需要场景协调结果的行动尝试；“继续观察”“保持警惕”“维持原位”和重复已有姿态不属于 action_intent，可以只在 memory 中简短记录。输出 JSON：speech、action_intent、silent、memory。不要输出额外字段。")
+	builder.WriteString("action_intent 只填写会改变外部可观察状态、需要场景协调结果的行动尝试；“继续观察”“保持警惕”“维持原位”和重复已有姿态不属于 action_intent，可以只在 memory 中简短记录。输出 JSON，提供 speech、action_intent、silent、memory；其余只使用本次系统输出合同明确允许的可选字段。")
 	return builder.String()
 }
 

@@ -56,14 +56,14 @@ func indexMemorySources(ctx context.Context, store *worldStore) error {
 		return ErrContextSourceMissing
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT scope,id,event_id,run_id,actor,kind,content,created_at FROM (
- SELECT p.recipient_id scope,'perception:'||p.seq id,e.event_id,e.run_id,e.actor_id actor,'perception:'||p.source_type kind,p.content,p.created_at,e.seq ordering,0 priority FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
+ SELECT p.recipient_id scope,'perception:'||p.seq id,e.event_id,e.run_id,e.actor_id actor,'perception:'||p.source_type kind,p.content,p.created_at,e.seq ordering,0 priority,p.seq tie_seq FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
  UNION ALL
- SELECT m.recipient_id,'memory:'||m.seq,e.event_id,e.run_id,e.actor_id,'subjective:'||m.kind,m.content,m.created_at,e.seq,1 FROM memories m JOIN events e ON e.event_id=m.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
+ SELECT m.recipient_id,'memory:'||m.seq,e.event_id,e.run_id,e.actor_id,'subjective:'||m.kind,m.content,m.created_at,e.seq,1,m.seq FROM memories m JOIN events e ON e.event_id=m.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
  UNION ALL
- SELECT e.actor_id,'speech:'||e.event_id,e.event_id,e.run_id,e.actor_id,'own_speech',e.content,e.created_at,e.seq,2 FROM events e WHERE e.event_type='npc_dialogue' AND EXISTS(SELECT 1 FROM characters c WHERE c.entity_id=e.actor_id) AND EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
+ SELECT e.actor_id,'speech:'||e.event_id,e.event_id,e.run_id,e.actor_id,'own_speech',e.content,e.created_at,e.seq,2,e.seq FROM events e WHERE e.event_type='npc_dialogue' AND EXISTS(SELECT 1 FROM characters c WHERE c.entity_id=e.actor_id) AND EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
  UNION ALL
- SELECT 'player','message:'||m.message_id,'',m.run_id,CASE WHEN m.kind='player' THEN 'player' ELSE 'narrator' END,'message:'||m.kind,m.content,m.created_at,COALESCE((SELECT MAX(e.seq) FROM events e WHERE e.run_id=m.run_id),1),3 FROM messages m WHERE m.message_id='opening' OR m.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=m.run_id AND r.status='completed')
-) ORDER BY ordering,priority,id`)
+ SELECT 'player','message:'||m.message_id,'',m.run_id,CASE WHEN m.kind='player' THEN 'player' ELSE 'narrator' END,'message:'||m.kind,m.content,m.created_at,0,3,m.seq FROM messages m WHERE m.message_id='opening' OR m.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=m.run_id AND r.status='completed')
+) ORDER BY ordering,priority,tie_seq,id`)
 	if err != nil {
 		return err
 	}

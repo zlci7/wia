@@ -669,10 +669,16 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 	visibleOutcomes, err := appendHostOutcomes(&output, run, participants, host.Outcomes)
 	if err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story coordination validation failed: run_id=%q boundary=action_outcomes", run.RunID)
+		}
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
 	output.SceneViews, err = applySceneUpdates(snapshot, run, intent, output, host)
 	if err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story coordination validation failed: run_id=%q boundary=scene_sources", run.RunID)
+		}
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
 	snapshot.SceneViews = output.SceneViews
@@ -1072,10 +1078,16 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 		}
 	}
 	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > plotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
+		if a.logger != nil {
+			a.logger.Printf("story coordination validation failed: run_id=%q boundary=required_fields time_minutes=%d limit=%d", run.RunID, result.TimeMinutes, plotTimeLimit(snapshot))
+		}
 		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", ErrGenerationFailed)
 	}
 	result.SceneCharacters = normalizeSceneCharacters(result.SceneCharacters)
 	if err := validateSceneCharacters(result.SceneCharacters, snapshot.Characters); err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story coordination validation failed: run_id=%q boundary=scene_character_id", run.RunID)
+		}
 		return hostResult{}, repairCount, err
 	}
 	return result, repairCount, nil
