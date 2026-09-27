@@ -133,10 +133,10 @@ export async function retryRun(worldID: string, runID: string, requestKey: strin
   return result.run
 }
 
-export async function saveAs(worldID: string, name: string, expectedRevision: number): Promise<SaveOperation> {
+export async function saveAs(worldID: string, name: string, expectedRevision: number, requestKey: string): Promise<SaveOperation> {
   const result = await request<{ operation: SaveOperation }>(`/api/v1/worlds/${encodeURIComponent(worldID)}/save-as`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, request_key: crypto.randomUUID(), expected_active_revision: expectedRevision }),
+    body: JSON.stringify({ name, request_key: requestKey, expected_active_revision: expectedRevision }),
   })
   return result.operation
 }

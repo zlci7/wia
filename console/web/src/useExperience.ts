@@ -72,6 +72,10 @@ export function useExperience() {
     player_name: "旅人",
     player_profile: "一个正在寻找答案的旅人。",
   });
+  type PendingCopy = { key: string; source: string; sourceName: string; name: string; revision: number; operationID?: string };
+  const copies = reactive<Record<string, PendingCopy | undefined>>({});
+  const pendingCopy = computed(() => copies[formWorldID.value]);
+  let dialogSession = 0;
   const modelForm = reactive({
     provider: "deepseek",
     model: "",
@@ -281,6 +285,7 @@ export function useExperience() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   function showDialog(value: Dialog) {
+    ++dialogSession;
     if (value !== "settings") settingsEdit = undefined;
     moreOpen.value = false;
     dialogError.value = "";
@@ -492,7 +497,7 @@ export function useExperience() {
   function openCopy() {
     if (!currentWorld.value) return;
     formWorldID.value = currentWorld.value.world_id;
-    newWorld.name = `${currentWorld.value.name} · 分支 ${dateName()}`;
+    newWorld.name = pendingCopy.value?.name ?? `${currentWorld.value.name} · 分支 ${dateName()}`;
     showDialog("copy");
   }
   function openSettings() {
@@ -594,6 +599,7 @@ export function useExperience() {
   async function createOrCopy() {
     if (dialogBusy.value) return;
     const copying = dialog.value === "copy";
+    if (copying) { await resumeCopy(); return; }
     if (!copying && !status.value?.ready) {
       if (!status.value || connectionError.value) {
         dialogError.value = "暂时无法确认连接状态，请重试连接后继续。";
@@ -605,29 +611,7 @@ export function useExperience() {
     dialogBusy.value = true;
     dialogError.value = "";
     try {
-      if (copying) {
-        const operation = await saveAs(
-          formWorldID.value,
-          newWorld.name.trim(),
-          status.value?.active_revision ?? 0,
-        );
-        let result = operation;
-        const deadline = Date.now() + 300000;
-        while (
-          !["ready", "failed"].includes(result.status) &&
-          Date.now() < deadline &&
-          !stopped
-        ) {
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
-          result = await fetchCopyOperation(operation.operation_id);
-        }
-        if (result.status === "failed")
-          throw new Error(result.error || "另存失败，原存档未受影响。");
-        if (result.status !== "ready")
-          throw new Error("另存仍在进行，请稍后到存档列表查看。");
-        showDialog("saves");
-        notice.value = `已另存为“${result.target_name}”，当前仍在原存档。`;
-      } else {
+      {
         ++generation;
         const world = await createWorld({ ...newWorld });
         await freshRefresh();
@@ -644,6 +628,47 @@ export function useExperience() {
       dialogError.value = describe(error);
     } finally {
       dialogBusy.value = false;
+    }
+  }
+  async function resumeCopy() {
+    const source = formWorldID.value;
+    if (!source || dialogBusy.value) return;
+    const editing = dialogSession;
+    const ownsDialog = () => !stopped && dialogSession === editing && dialog.value === "copy";
+    const operation = copies[source] ?? (copies[source] = {
+      key: crypto.randomUUID(), source,
+      sourceName: currentWorld.value?.name ?? source,
+      name: newWorld.name.trim(), revision: status.value?.active_revision ?? 0,
+    });
+    dialogBusy.value = true;
+    dialogError.value = "";
+    try {
+      let result = operation.operationID
+        ? await fetchCopyOperation(operation.operationID)
+        : await saveAs(operation.source, operation.name, operation.revision, operation.key);
+      operation.operationID = result.operation_id;
+      const deadline = Date.now() + 300000;
+      while (!["ready", "failed"].includes(result.status) && Date.now() < deadline && !stopped) {
+        await new Promise(resolve => window.setTimeout(resolve, 500));
+        result = await fetchCopyOperation(operation.operationID!);
+      }
+      if (!["ready", "failed"].includes(result.status))
+        throw new Error("另存结果尚未确认，请点击继续确认原操作。");
+      delete copies[source];
+      if (result.status === "failed") throw new Error(result.error || "另存失败，原存档未受影响。");
+      if (!ownsDialog()) return;
+      dialogBusy.value = false;
+      const stillHere = currentWorld.value?.world_id === source;
+      showDialog(stillHere ? "saves" : "");
+      notice.value = `“${operation.sourceName}”已另存为“${result.target_name}”` + (stillHere ? "，当前仍在原存档。" : "，当前存档未改变。");
+      await freshRefresh();
+    } catch (error) {
+      // A definitive rejection before task creation permits a new logical request.
+      if (!operation.operationID && error instanceof ApiError &&
+        ["version_conflict", "world_busy", "world_not_found", "invalid_request"].includes(error.code)) delete copies[source];
+      if (ownsDialog()) dialogError.value = describe(error) + (copies[source] ? " 原另存操作已保留，继续确认不会创建第二份副本。" : "");
+    } finally {
+      if (ownsDialog()) dialogBusy.value = false;
     }
   }
   function confirmDelete(world: WorldSummary) {
@@ -883,6 +908,7 @@ export function useExperience() {
     switchWorld,
     openNewWorld,
     openCopy,
+    pendingCopy,
     openSettings,
     configureModel,
     configureSettings,

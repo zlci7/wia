@@ -29,6 +29,7 @@ globalThis.window = {
     return 1;
   },
   clearInterval() {},
+  setTimeout(fn) { return realSetTimeout(fn, 0); },
 };
 const renderer = createRenderer({
   createComment: () => ({}),
@@ -110,6 +111,78 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "save-as terminal failure releases identity for a new operation"(x) {
+    const keys = [];
+    networkHook = (url, init) => {
+      if (!url.endsWith('/save-as')) return;
+      keys.push(JSON.parse(init.body).request_key);
+      return response({operation:{operation_id:keys.at(-1),status:keys.length === 1 ? 'failed':'ready',target_name:'新副本'}});
+    };
+    x.openCopy();
+    await x.createOrCopy();
+    assert.equal(x.pendingCopy.value, undefined);
+    await x.createOrCopy();
+    assert.notEqual(keys[0], keys[1]);
+  },
+  async "late copy result cannot close another dialog or claim it saved B"(x) {
+    networkHook = (url) => {
+      if (url.endsWith('/save-as')) return new Promise(resolve => { pending = resolve; });
+    };
+    x.openCopy();
+    const saving = x.createOrCopy();
+    active = 'B';
+    await x.freshRefresh();
+    x.showDialog('settings');
+    x.dialogError.value = '新表单错误';
+    pending(response({operation:{operation_id:'copy-A',status:'ready',target_name:'A副本'}}));
+    await saving;
+    assert.equal(x.dialog.value,'settings');
+    assert.equal(x.dialogError.value,'新表单错误');
+    assert.equal(x.notice.value.includes('A副本'),false);
+  },
+  async "lost save-as response resumes one frozen operation"(x) {
+    const requests = [], copies = new Map();
+    networkHook = (url, init) => {
+      if (!url.endsWith('/save-as')) return;
+      const body = JSON.parse(init.body);
+      requests.push(body);
+      if (!copies.has(body.request_key)) copies.set(body.request_key, {
+        operation_id: `copy-${copies.size}`, source_world_id: 'A', target_name: body.name, status: 'ready',
+      });
+      if (requests.length === 1) throw new TypeError('accepted but response lost');
+      return response({operation: copies.get(body.request_key)});
+    };
+    x.openCopy();
+    x.newWorld.name = '分支一';
+    await x.createOrCopy();
+    assert(x.dialogError.value);
+    x.showDialog('');
+    x.openCopy();
+    x.newWorld.name = '不应改变恢复载荷';
+    await x.createOrCopy();
+    assert.deepEqual(requests[1], requests[0]);
+    assert.equal(copies.size, 1);
+    assert.match(x.notice.value, /分支一/);
+  },
+  async "save-as polling failure resumes known task without another POST"(x) {
+    let posts = 0, reads = 0;
+    networkHook = (url) => {
+      if (url.endsWith('/save-as')) {
+        posts++;
+        return response({operation: {operation_id:'copy-one', status:'copying'}});
+      }
+      if (url === '/api/v1/world-copy-operations/copy-one') {
+        if (++reads === 1) throw new TypeError('poll lost');
+        return response({operation:{operation_id:'copy-one',status:'ready',target_name:'唯一副本'}});
+      }
+    };
+    x.openCopy();
+    await x.createOrCopy();
+    await x.createOrCopy();
+    assert.equal(posts, 1);
+    assert.equal(reads, 2);
+    assert.match(x.notice.value, /唯一副本/);
+  },
   async "pending input never inherits previous saved indicator"(x) {
     const done = {run_id:"done", status:"completed", message_seq:1, created_at:new Date().toISOString()};
     records.A.world.message_head = 1;

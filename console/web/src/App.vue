@@ -57,6 +57,7 @@ const {
   switchWorld,
   openNewWorld,
   openCopy,
+  pendingCopy,
   openSettings,
   configureModel,
   configureSettings,
@@ -721,7 +722,7 @@ const policyOptions = [
           <fieldset :disabled="dialogBusy">
             <label
               >存档名称 <small>可直接使用默认名称</small
-              ><input v-model="newWorld.name" /></label
+              ><input v-model="newWorld.name" :disabled="dialog === 'copy' && !!pendingCopy" /></label
             ><template v-if="dialog === 'new'"
               ><label>主角名字<input v-model="newWorld.player_name" /></label
               ><label
@@ -748,6 +749,7 @@ const policyOptions = [
               </div></template
             >
           </fieldset>
+          <p v-if="dialog === 'copy' && pendingCopy" class="subtle">正在确认原另存操作，名称和源存档已固定；不会新建第二份副本。</p>
           <div class="modal-actions">
             <button
               type="button"
@@ -761,7 +763,7 @@ const policyOptions = [
                 dialogBusy
                   ? "正在处理…"
                   : dialog === "copy"
-                    ? "创建独立存档"
+                    ? pendingCopy ? "继续确认另存" : "创建独立存档"
                     : status?.ready
                       ? "开始游玩"
                       : "连接模型并开始"
