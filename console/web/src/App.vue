@@ -126,6 +126,7 @@ const policyOptions = [
           <button v-if="currentWorld && view === 'play'" class="quiet-button desktop-setting" @click="showDialog('memory')">回顾与纠正</button>
           <div class="more-menu">
             <button
+              id="wia-more-menu"
               class="quiet-button"
               :aria-expanded="moreOpen"
               @click="moreOpen = !moreOpen"
@@ -459,6 +460,7 @@ const policyOptions = [
       :busy="dialogBusy"
       :destructive="dialog === 'delete'"
       :drawer="dialog === 'scene'"
+      return-focus-to="#wia-more-menu"
       @close="closeDialog"
     >
       <p v-if="dialogError" class="inline-error" role="alert">

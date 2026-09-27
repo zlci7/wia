@@ -7,6 +7,7 @@ const props = withDefaults(
     busy?: boolean;
     destructive?: boolean;
     drawer?: boolean;
+    returnFocusTo?: string;
   }>(),
   { busy: false, destructive: false, drawer: false },
 );
@@ -75,7 +76,11 @@ onUnmounted(() => {
   document.body.style.overflow = previousOverflow;
   document.removeEventListener("keydown", keys);
   document.removeEventListener("focusin", containFocus);
-  if (previous?.isConnected) previous.focus();
+  if (previous?.isConnected && previous !== document.body && previous.getClientRects().length) previous.focus();
+  else if (props.returnFocusTo) {
+    const target = document.querySelector<HTMLElement>(props.returnFocusTo);
+    if (target?.getClientRects().length) target.focus();
+  }
 });
 </script>
 

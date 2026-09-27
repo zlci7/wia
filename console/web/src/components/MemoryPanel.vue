@@ -3,13 +3,14 @@ import type { CorrectionRequest } from '../types';
 const pendingCorrections = new Map<string, CorrectionRequest>();
 </script>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { correctMemory, fetchMemory, rebuildMemory } from '../api';
 import { ApiError, type MemoryRecord, type MemoryView } from '../types';
 const props = defineProps<{ worldID: string; worldName: string; characters: { entity_id: string; name: string }[] }>();
 const emit = defineEmits<{ busy: [value: boolean]; updated: [] }>();
 const data = ref<MemoryView>(), author = ref(false), scope = ref('player'), error = ref(''), notice = ref('');
 const loading = ref(false), writing = ref(false), editing = ref<MemoryRecord>(), draft = ref('');
+const editor = ref<HTMLTextAreaElement>();
 const pending = ref(pendingCorrections.get(props.worldID));
 let active = true, generation = 0, editingEpoch = 0, timer: ReturnType<typeof setTimeout> | undefined;
 const labels: Record<string, string> = { event: '世界事件', character: '人物设定', perception: '个人感知', subjective: '主观状态', digest: '连续回顾' };
@@ -32,7 +33,7 @@ async function load(earlier = false) {
   } catch (e) { if (active && ticket === generation) error.value = describe(e); }
   finally { if (active && ticket === generation) loading.value = false; }
 }
-function choose(item: MemoryRecord) { editing.value = { ...item }; editingEpoch = data.value!.context_epoch; draft.value = item.content; notice.value = ''; clearTimeout(timer); }
+function choose(item: MemoryRecord) { editing.value = { ...item }; editingEpoch = data.value!.context_epoch; draft.value = item.content; notice.value = ''; clearTimeout(timer); void nextTick(() => { editor.value?.focus(); editor.value?.scrollIntoView({ block: 'center' }); }); }
 function cancelEdit() { editing.value = undefined; draft.value = ''; }
 async function save() {
   if (writing.value || !data.value || (!pending.value && (!editing.value || !draft.value.trim()))) return;
@@ -67,35 +68,35 @@ onUnmounted(() => { active = false; generation++; clearTimeout(timer); });
     <p class="subtle">{{ worldName }} · 原始正文始终保留，纠正影响后续理解。</p>
     <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
-    <p v-if="pending" class="inline-error">上次提交结果尚未确认。<button :disabled="writing" @click="save">确认上次纠正</button></p>
+    <p v-if="pending && !writing" class="inline-error">上次提交结果尚未确认。<button class="secondary-button" @click="save">确认上次纠正</button></p>
     <div class="memory-toolbar">
       <label v-if="author">查看范围 <select v-model="scope" :disabled="writing || !!pending" @change="changeScope"><option v-for="id in data?.scopes ?? ['player']" :key="id" :value="id">{{ name(id) }}</option></select></label>
-      <button :disabled="loading || writing" @click="load()">刷新资料</button>
+      <button class="secondary-button" :disabled="loading || writing" @click="load()">刷新资料</button>
     </div>
     <p v-if="loading && !data" role="status">正在读取经历…</p>
     <template v-if="data">
-      <p v-if="rebuilding" role="status">{{ data.job.status === 'failed' ? '回顾重建未完成，原始记录安全保留。' : '正在按有效来源重建回顾，完成后可以继续故事。' }} <button v-if="data.job.status === 'failed'" :disabled="writing" @click="retry">重试重建</button></p>
+      <p v-if="rebuilding" role="status">{{ data.job.status === 'failed' ? '回顾重建未完成，原始记录安全保留。' : '正在按有效来源重建回顾，完成后可以继续故事。' }} <button v-if="data.job.status === 'failed'" class="secondary-button" :disabled="writing" @click="retry">重试重建</button></p>
       <template v-if="scope !== 'author'">
         <h3>{{ name(scope) }}</h3>
         <p class="memory-prose">{{ data.digest.content || '尚未形成连续回顾，近期经历完整保留在下方。' }}</p>
         <p class="subtle">回顾覆盖至个人记录 {{ data.digest.through_seq }} · 版本 {{ data.context_epoch }}</p>
       </template>
       <form v-if="editing" class="memory-editor" @submit.prevent="save">
-        <label>{{ labels[editing.kind] }} · {{ name(editing.scope) }}<textarea v-model="draft" rows="6" maxlength="8000" :disabled="writing || !!pending" /></label>
+        <label>{{ labels[editing.kind] }} · {{ name(editing.scope) }}<textarea ref="editor" v-model="draft" rows="6" maxlength="8000" :disabled="writing || !!pending" /></label>
         <p class="subtle">只纠正选中的资料，不重演已发生的故事。世界事件的局部感知会撤回旧解释，不向旁观者补发秘密。</p>
         <div class="modal-actions"><button type="button" class="secondary-button" :disabled="writing || !!pending" @click="cancelEdit">取消</button><button class="primary-button" :disabled="writing || !draft.trim()">{{ writing ? '正在记录…' : '记录纠正' }}</button></div>
       </form>
       <details v-if="data.records.length" class="memory-records">
         <summary>可纠正资料 · {{ data.records.length }} 项</summary>
-        <article v-for="item in data.records" :key="`${item.kind}:${item.target_id}`"><div class="memory-record-heading"><strong>{{ labels[item.kind] }}</strong><button :disabled="writing || !!pending || rebuilding" @click="choose(item)">纠正</button></div><p class="memory-prose">{{ item.content || '（空）' }}</p><small>{{ item.target_id }}</small></article>
+        <article v-for="item in data.records" :key="`${item.kind}:${item.target_id}`"><div class="memory-record-heading"><strong>{{ labels[item.kind] }}</strong><button class="secondary-button" :disabled="writing || !!pending || rebuilding" @click="choose(item)">纠正</button></div><p class="memory-prose">{{ item.content || '（空）' }}</p><small>{{ item.target_id }}</small></article>
       </details>
       <h3>已提交经历</h3>
       <details v-if="data.corrections?.length" class="memory-records"><summary>当前范围的纠正记录</summary><article v-for="item in data.corrections" :key="item.epoch"><strong>{{ labels[item.kind] }} · 版本 {{ item.epoch }}</strong><p class="memory-prose">{{ item.replacement }}</p><details><summary>原始内容</summary><p class="memory-prose">{{ item.original }}</p></details></article></details>
       <p v-if="!data.sources.length" class="subtle">暂无此范围的记录。</p>
       <article v-for="source in data.sources" :key="source.id" class="memory-source"><p class="memory-prose">{{ source.content }}</p><details><summary class="subtle">来源 · {{ source.seq }}</summary><small>{{ source.id }} · {{ source.actor }} · {{ source.kind }}<br>{{ source.created_at }}</small></details></article>
-      <button v-if="data.has_more" :disabled="loading || writing" @click="load(true)">{{ loading ? '正在读取…' : '加载更早经历' }}</button>
+      <button v-if="data.has_more" class="secondary-button" :disabled="loading || writing" @click="load(true)">{{ loading ? '正在读取…' : '加载更早经历' }}</button>
     </template>
-    <details v-if="!author" class="memory-spoiler"><summary>创作与纠正（包含剧透）</summary><p>此视图包含人物私密设定、个人记忆与世界真相，不属于主角已知信息。</p><button :disabled="writing || !!pending" @click="author = true; changeScope()">我了解剧透风险，进入创作视图</button></details>
+    <details v-if="!author" class="memory-spoiler"><summary>创作与纠正（包含剧透）</summary><p>此视图包含人物私密设定、个人记忆与世界真相，不属于主角已知信息。</p><button class="secondary-button" :disabled="writing || !!pending" @click="author = true; changeScope()">我了解剧透风险，进入创作视图</button></details>
   </section>
 </template>
 
