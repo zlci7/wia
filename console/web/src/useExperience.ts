@@ -29,6 +29,7 @@ import {
 import {
   ApiError,
   type Character,
+  type BehaviorPolicyCatalog,
   type GameSummary,
   type NarrativeSettings,
   type Run,
@@ -85,8 +86,9 @@ export function useExperience() {
     detail: "balanced",
     player_elaboration: "natural",
     npc_initiative: "contextual",
-    custom_instruction: "",
+    behavior_policies: { coordination: "", narration: "", npc: "" },
   });
+  const policyDefaults = ref<BehaviorPolicyCatalog>();
   const settings = ref(defaults()),
     settingsForm = reactive(defaults()),
     settingsWorldName = ref(""),
@@ -179,11 +181,11 @@ export function useExperience() {
     { value: "expressive", label: "充分", note: "在已选方向内完整表现主角" },
   ] as const;
   const initiatives = [
-    { value: "responsive", label: "回应为主", note: "没有直接刺激时倾向沉默" },
+    { value: "responsive", label: "回应为主", note: "少插话，仍可处理必要事务" },
     {
       value: "contextual",
       label: "按情境主动",
-      note: "职责或关切被触及时介入",
+      note: "结合职责、关切与机会行动",
     },
     { value: "proactive", label: "积极互动", note: "主动提问、试探和相关行动" },
   ] as const;
@@ -330,6 +332,7 @@ export function useExperience() {
         gameID.value = snapshot.world.game_id;
       characters.value = snapshot.characters.filter((item) => item.in_scene);
       settings.value = snapshot.narrative_settings;
+      policyDefaults.value = snapshot.behavior_policy_defaults;
       await reader.select(id);
       if (epoch !== generation || currentWorld.value?.world_id !== id) return;
       if (
@@ -482,7 +485,9 @@ export function useExperience() {
       valid: true,
     };
     settingsWorldName.value = currentWorld.value.name;
-    Object.assign(settingsForm, settings.value);
+    Object.assign(settingsForm, settings.value, {
+      behavior_policies: { ...settings.value.behavior_policies },
+    });
     detailsOpen.value = false;
     showDialog("settings");
   }
@@ -534,7 +539,7 @@ export function useExperience() {
         throw new Error("活动存档已切换，请重新打开故事设置。");
       const result = await saveAgentSettings(
         editing.worldID,
-        { ...settingsForm },
+        { ...settingsForm, behavior_policies: { ...settingsForm.behavior_policies } },
         editing.epoch,
       );
       if (!ownsDialog()) return;
@@ -812,6 +817,7 @@ export function useExperience() {
     modelAdvanced,
     settingsForm,
     settingsWorldName,
+    policyDefaults,
     detailsOpen,
     textarea,
     reader,

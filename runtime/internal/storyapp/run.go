@@ -77,9 +77,9 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion       = "story.intent.v4"
-	npcPromptVersion          = "story.npc.v7"
-	coordinationPromptVersion = "story.coordination.v7"
-	narrationPromptVersion    = "story.narration.v7"
+	npcPromptVersion          = "story.npc.v8"
+	coordinationPromptVersion = "story.coordination.v8"
+	narrationPromptVersion    = "story.narration.v8"
 )
 
 type turnStageError struct {

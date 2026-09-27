@@ -24,6 +24,7 @@ const {
   modelAdvanced,
   settingsForm,
   settingsWorldName,
+  policyDefaults,
   detailsOpen,
   textarea,
   reader,
@@ -66,6 +67,11 @@ const {
   chooseCharacter,
   resizeInput,
 } = useExperience();
+const policyOptions = [
+  { key: "coordination", label: "场景协调策略", note: "行动结果、冲突处理与玩家反应机会。" },
+  { key: "narration", label: "正文表达策略", note: "叙事节奏、描写与收尾。" },
+  { key: "npc", label: "NPC 共用决策策略", note: "发送给所有参与决策的 NPC，请勿填写任何人物的秘密或专属背景。" },
+] as const;
 </script>
 
 <template>
@@ -600,18 +606,27 @@ const {
                   ><span>{{ option.note }}</span>
                 </button>
               </div>
-              <label
-                >写作偏好 <small>可选</small
-                ><textarea
-                  v-model="settingsForm.custom_instruction"
-                  maxlength="1000"
-                  rows="3"
-                  placeholder="例如：对白简洁，环境描写偏冷峻。"
-                ></textarea
-                ><small
-                  >{{ settingsForm.custom_instruction.length }} / 1000</small
-                ></label
-              >
+              <details v-if="policyDefaults" class="behavior-settings">
+                <summary>高级行为策略</summary>
+                <p class="guardrail-note">只影响当前存档，从下一轮生效。上方的人称、篇幅、主角表现和主动程度优先；信息范围与关键选择边界保持有效。</p>
+                <div v-for="option in policyOptions" :key="option.key" class="policy-editor">
+                  <label :for="'policy-' + option.key">{{ option.label }}
+                    <small>{{ settingsForm.behavior_policies[option.key] ? '自定义' : '默认 · ' + policyDefaults.version }}</small>
+                  </label>
+                  <p class="policy-note">{{ option.note }}</p>
+                  <textarea :id="'policy-' + option.key"
+                    :value="settingsForm.behavior_policies[option.key] || policyDefaults[option.key]"
+                    :maxlength="policyDefaults.max_chars" rows="6"
+                    @input="settingsForm.behavior_policies[option.key] = ($event.target as HTMLTextAreaElement).value"
+                  ></textarea>
+                  <div class="policy-footer">
+                    <small>{{ [...(settingsForm.behavior_policies[option.key] || policyDefaults[option.key])].length }} / {{ policyDefaults.max_chars }} 字</small>
+                    <button type="button" class="secondary-button" :disabled="!settingsForm.behavior_policies[option.key]"
+                      @click="settingsForm.behavior_policies[option.key] = ''">恢复默认</button>
+                  </div>
+                  <small>自定义文本替换本项默认策略；清空后使用默认。默认策略随版本更新，自定义内容保留。</small>
+                </div>
+              </details>
             </details>
           </fieldset>
           <p class="guardrail-note">

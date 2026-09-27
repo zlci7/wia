@@ -52,13 +52,22 @@ export type NarrativeDetail = 'restrained' | 'balanced' | 'rich'
 export type PlayerElaboration = 'restrained' | 'natural' | 'expressive'
 export type NPCInitiative = 'responsive' | 'contextual' | 'proactive'
 
+export interface BehaviorPolicies {
+  coordination: string
+  narration: string
+  npc: string
+}
+export interface BehaviorPolicyCatalog extends BehaviorPolicies {
+  version: string
+  max_chars: number
+}
 export interface NarrativeSettings {
   perspective: NarrativePerspective
   length: NarrativeLength
   detail: NarrativeDetail
   player_elaboration: PlayerElaboration
   npc_initiative: NPCInitiative
-  custom_instruction: string
+  behavior_policies: BehaviorPolicies
 }
 
 export interface Message {

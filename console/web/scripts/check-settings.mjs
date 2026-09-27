@@ -43,7 +43,7 @@ const defaults = {
   detail: "balanced",
   player_elaboration: "natural",
   npc_initiative: "contextual",
-  custom_instruction: "",
+  behavior_policies: { coordination: "", narration: "", npc: "" },
 };
 const world = (id, epoch = 1) => ({
   world_id: id,
@@ -89,7 +89,7 @@ async function setup() {
   records = Object.fromEntries(
     ["A", "B"].map((id) => [
       id,
-      { world: world(id), narrative_settings: { ...defaults }, characters: [] },
+      { world: world(id), narrative_settings: structuredClone(defaults), characters: [] },
     ]),
   );
   pending = sent = undefined;
@@ -106,6 +106,40 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "policy draft is detached from saved settings and polling"(x) {
+    x.openSettings();
+    x.settingsForm.behavior_policies.npc = "自定义决定";
+    records.A.narrative_settings.behavior_policies.npc = "远端更新";
+    records.A.world.context_epoch = 2;
+    await x.freshRefresh();
+    assert.equal(x.settingsForm.behavior_policies.npc, "自定义决定");
+    const saving = x.configureSettings();
+    assert.equal(sent.body.behavior_policies.npc, "自定义决定");
+    assert.equal(sent.body.expected_context_epoch, 1);
+    x.settingsForm.behavior_policies.npc = "更晚的编辑";
+    assert.equal(sent.body.behavior_policies.npc, "自定义决定");
+    pending(response({ error: { code: "version_conflict" } }, 409));
+    await saving;
+    assert.equal(x.settingsForm.behavior_policies.npc, "更晚的编辑");
+  },
+  async "cancelled policy edit does not change saved settings"(x) {
+    x.openSettings();
+    x.settingsForm.behavior_policies.npc = "未保存";
+    x.closeDialog();
+    x.openSettings();
+    assert.equal(x.settingsForm.behavior_policies.npc, "");
+  },
+  async "resetting policy submits default marker only for that policy"(x) {
+    records.A.narrative_settings.behavior_policies = { npc: "主动", coordination: "协调", narration: "叙事" };
+    records.A.world.context_epoch = 2;
+    await x.freshRefresh();
+    x.openSettings();
+    x.settingsForm.behavior_policies.npc = "";
+    const saving = x.configureSettings();
+    assert.deepEqual(sent.body.behavior_policies, { npc: "", coordination: "协调", narration: "叙事" });
+    pending(response({ world: world("A", 3), settings: sent.body }));
+    await saving;
+  },
   async "context failures give actionable feedback without altering drafts"(x) {
     x.session.value.draft = "保留这段输入";
     const draft = x.session.value.draft;

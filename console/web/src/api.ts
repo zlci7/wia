@@ -1,6 +1,7 @@
 import {
   ApiError,
   type Character,
+  type BehaviorPolicyCatalog,
   type GameSummary,
   type ModelCandidate,
   type ModelInfo,
@@ -59,7 +60,7 @@ export async function createWorld(input: { name: string; mode: string; player_na
   return result.world
 }
 
-export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; messages: Message[]; characters: Character[] }> {
+export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; behavior_policy_defaults: BehaviorPolicyCatalog; messages: Message[]; characters: Character[] }> {
   return request(`/api/v1/worlds/${encodeURIComponent(worldID)}`)
 }
 

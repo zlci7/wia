@@ -38,3 +38,7 @@
 长期摘要/检索、行动建议、内容编辑与导入、统一纠正、多用户真实登录、跨设备服务端、附件恢复和发行包不属于 M1 当前交付。真实模型的人物自然度、等待体验和连续游玩质量单独记录；现有短样本不能证明长程稳定，结构化生成失败也不归为可接受的创作偏差。
 
 详细阶段记录：[Phase12 M1 验收记录](phase12/acceptance/M1.md)。
+
+### NPC autonomy and behavior policies
+
+Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/acceptance/M1.md). Long-term concerns and conditional world progression remain M2 work.

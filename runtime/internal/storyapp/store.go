@@ -348,7 +348,10 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if err != nil {
 		return out, err
 	}
-	out.Narrative = loadNarrativeSettings(ctx, store.db)
+	out.Narrative, err = loadNarrativeSettings(ctx, store.db)
+	if err != nil {
+		return out, err
+	}
 	for key, target := range map[string]*int64{"turn_seq": &out.Summary.TurnSeq, "message_head": &out.Summary.MessageHead, "event_head": &out.Summary.EventHead, "context_epoch": &out.Summary.ContextEpoch, "scene_version": &out.SceneVersion} {
 		*target, err = metaInt(ctx, store.db, key)
 		if err != nil {

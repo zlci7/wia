@@ -3,6 +3,9 @@ package storyapp
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -30,22 +33,24 @@ const (
 )
 
 type NarrativeSettings struct {
-	Perspective       string `json:"perspective"`
-	Length            string `json:"length"`
-	Detail            string `json:"detail"`
-	PlayerElaboration string `json:"player_elaboration"`
-	NPCInitiative     string `json:"npc_initiative"`
-	CustomInstruction string `json:"custom_instruction"`
+	Perspective       string           `json:"perspective"`
+	Length            string           `json:"length"`
+	Detail            string           `json:"detail"`
+	PlayerElaboration string           `json:"player_elaboration"`
+	NPCInitiative     string           `json:"npc_initiative"`
+	CustomInstruction string           `json:"custom_instruction,omitempty"`
+	Policies          BehaviorPolicies `json:"behavior_policies"`
 }
 
 type UpdateNarrativeSettingsRequest struct {
-	Perspective          string `json:"perspective"`
-	Length               string `json:"length"`
-	Detail               string `json:"detail"`
-	PlayerElaboration    string `json:"player_elaboration"`
-	NPCInitiative        string `json:"npc_initiative"`
-	CustomInstruction    string `json:"custom_instruction"`
-	ExpectedContextEpoch int64  `json:"expected_context_epoch"`
+	Perspective          string            `json:"perspective"`
+	Length               string            `json:"length"`
+	Detail               string            `json:"detail"`
+	PlayerElaboration    string            `json:"player_elaboration"`
+	NPCInitiative        string            `json:"npc_initiative"`
+	CustomInstruction    string            `json:"custom_instruction"`
+	Policies             *BehaviorPolicies `json:"behavior_policies,omitempty"`
+	ExpectedContextEpoch int64             `json:"expected_context_epoch"`
 }
 
 func defaultNarrativeSettings() NarrativeSettings {
@@ -83,10 +88,15 @@ func validateNarrativeSettings(settings NarrativeSettings) (NarrativeSettings, e
 	if len([]rune(settings.CustomInstruction)) > 1000 {
 		return NarrativeSettings{}, ErrInvalidRequest
 	}
+	var err error
+	settings.Policies, err = validateBehaviorPolicies(settings.Policies)
+	if err != nil {
+		return NarrativeSettings{}, err
+	}
 	return settings, nil
 }
 
-func loadNarrativeSettings(ctx context.Context, db *sql.DB) NarrativeSettings {
+func loadNarrativeSettings(ctx context.Context, db *sql.DB) (NarrativeSettings, error) {
 	settings := defaultNarrativeSettings()
 	for key, target := range map[string]*string{
 		"narrative_perspective":        &settings.Perspective,
@@ -98,16 +108,28 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) NarrativeSettings {
 	} {
 		if value, err := metaGet(ctx, db, key); err == nil {
 			*target = value
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return NarrativeSettings{}, err
 		}
 	}
-	validated, err := validateNarrativeSettings(settings)
-	if err != nil {
-		return defaultNarrativeSettings()
+	if value, err := metaGet(ctx, db, "behavior_policies"); err == nil {
+		if err := json.Unmarshal([]byte(value), &settings.Policies); err != nil {
+			return NarrativeSettings{}, fmt.Errorf("invalid stored behavior policies: %w", err)
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return NarrativeSettings{}, err
 	}
-	return validated
+	validated, err := validateNarrativeSettings(migrateWritingPreference(settings))
+	if err != nil {
+		return NarrativeSettings{}, fmt.Errorf("invalid stored story settings: %w", err)
+	}
+	return validated, nil
 }
 
 func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, request UpdateNarrativeSettingsRequest) (NarrativeSettings, WorldSummary, error) {
+	if request.Policies != nil && (request.ExpectedContextEpoch <= 0 || request.CustomInstruction != "") {
+		return NarrativeSettings{}, WorldSummary{}, ErrInvalidRequest
+	}
 	settings, err := validateNarrativeSettings(NarrativeSettings{
 		Perspective: request.Perspective, Length: request.Length, Detail: request.Detail,
 		PlayerElaboration: request.PlayerElaboration, NPCInitiative: request.NPCInitiative,
@@ -134,6 +156,24 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		return NarrativeSettings{}, WorldSummary{}, err
 	}
 	defer store.db.Close()
+	if request.Policies != nil {
+		settings.Policies = *request.Policies
+	} else {
+		current, err := loadNarrativeSettings(ctx, store.db)
+		if err != nil {
+			return NarrativeSettings{}, WorldSummary{}, err
+		}
+		settings.Policies = current.Policies
+		// Legacy clients submit writing preferences through the existing field.
+		if settings.CustomInstruction != "" {
+			settings.Policies.Narration = ""
+		}
+	}
+	settings = migrateWritingPreference(settings)
+	settings, err = validateNarrativeSettings(settings)
+	if err != nil {
+		return NarrativeSettings{}, WorldSummary{}, err
+	}
 	if count, err := countActiveRuns(ctx, store.db); err != nil {
 		return NarrativeSettings{}, WorldSummary{}, err
 	} else if count > 0 {
@@ -156,6 +196,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		return NarrativeSettings{}, WorldSummary{}, ErrVersionConflict
 	}
 	values := map[string]string{
+		"behavior_policies":            marshalJSON(settings.Policies),
 		"narrative_perspective":        settings.Perspective,
 		"narrative_length":             settings.Length,
 		"narrative_detail":             settings.Detail,

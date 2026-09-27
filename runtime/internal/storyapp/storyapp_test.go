@@ -916,7 +916,7 @@ func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 	if originalSnapshot.Summary.TurnSeq != 1 || branchSnapshot.Summary.TurnSeq != 2 {
 		t.Fatalf("turns = %d/%d", originalSnapshot.Summary.TurnSeq, branchSnapshot.Summary.TurnSeq)
 	}
-	if branchSnapshot.Narrative != wantedSettings {
+	if branchSnapshot.Narrative != migrateWritingPreference(wantedSettings) {
 		t.Fatalf("branch narrative settings = %+v, want %+v", branchSnapshot.Narrative, wantedSettings)
 	}
 }

@@ -894,3 +894,9 @@ summary {
     padding: 4px 8px;
   }
 }
+
+.behavior-settings { margin-top: 1.5rem; }
+.policy-editor { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border, #ded4c7); }
+.policy-note { font-size: .875rem; line-height: 1.6; color: #766f65; margin: .5rem 0; }
+.policy-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: .5rem 0; }
+.policy-editor textarea { line-height: 1.65; }

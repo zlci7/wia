@@ -1,0 +1,77 @@
+package storyapp
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"gameagent/runtime/internal/llm"
+	"gameagent/runtime/internal/model"
+)
+
+// Disposable real-model evaluation; narrative quality is reviewed separately.
+func TestAutonomyRealModelSequence(t *testing.T) {
+	path := os.Getenv("WIA_AUTONOMY_MODEL_CONFIG")
+	if path == "" {
+		t.Skip("opt-in real-model evaluation")
+	}
+	provider, config, err := llm.NewProviderFromConfigFile(path)
+	if err != nil {
+		t.Fatal("real provider configuration unavailable")
+	}
+	g, ok := provider.(model.TextGenerator)
+	if !ok || config.Provider == "fake" {
+		t.Fatal("real text model required")
+	}
+	a := newTestApp(t, g)
+	logger := &recordingLogger{}
+	a.logger = logger
+	ctx := context.Background()
+	w, err := a.CreateWorld(ctx, "自主性评估", "guided", "旅人", "谨慎而礼貌的旅人", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("provider=%s model=%s", config.Provider, config.Model)
+	for i, input := range []string{"我走进客栈，朝老板点头问好。", "我沉默片刻，选择不回复。", "我继续安静地观察，不打断他们各自的事情。"} {
+		if i == 2 {
+			s := readContextSnapshot(t, a, w.WorldID)
+			p := BehaviorPolicies{NPC: "依据自己的动机和眼前机会处理事务；可以保持沉默，不为活跃气氛强行插话。已经完成的行动保持完成。", Narration: "简洁呈现本轮新增内容，以有意义的动作或对白收尾。"}
+			if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(s.Summary.ContextEpoch, p)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		start := time.Now()
+		r, err := a.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: fmt.Sprint(i), Input: input})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for deadline := time.Now().Add(310 * time.Second); time.Now().Before(deadline); {
+			r, err = a.Run(ctx, w.WorldID, r.RunID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "accepted" && r.Status != "running" {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Logf("turn=%d status=%s reason=%s elapsed_ms=%d", i+1, r.Status, r.Reason, time.Since(start).Milliseconds())
+		if r.Status != "completed" {
+			t.Log(logger.String())
+			t.Fatal("incomplete real-model turn")
+		}
+		s := readContextSnapshot(t, a, w.WorldID)
+		for _, e := range s.Events {
+			if e.RunID == r.RunID && (e.EventType == "npc_action_intent" || e.EventType == "npc_action_result") {
+				t.Logf("event=%s actor=%s content=%s", e.EventType, e.ActorID, e.Content)
+			}
+		}
+		for _, m := range s.Messages {
+			if m.RunID == r.RunID && m.Kind == "narrative" {
+				t.Logf("narrative=%s", m.Content)
+			}
+		}
+	}
+}

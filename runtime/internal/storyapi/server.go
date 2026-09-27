@@ -276,7 +276,7 @@ func (s *Server) world(w http.ResponseWriter, r *http.Request, id string) {
 			writeAppError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "messages": snapshot.Messages, "characters": storyapp.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders})
+		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": storyapp.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": storyapp.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders})
 	case "DELETE":
 		raw := strings.TrimSpace(r.URL.Query().Get("expected_active_revision"))
 		expectedRevision, err := strconv.ParseInt(raw, 10, 64)
