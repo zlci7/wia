@@ -31,6 +31,8 @@ type worldSnapshot struct {
 	Sources       map[string]sourceMetadata
 	Perceptions   map[string][]Perception
 	Memories      map[string][]Memory
+	Plot          *PlotDefinition
+	PlotProgress  PlotProgress
 }
 
 type worldStore struct {
@@ -279,6 +281,18 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 			return err
 		}
 	}
+	if def.Plot != nil {
+		state := PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}
+		if err := validatePlot(*def.Plot, state); err != nil {
+			return err
+		}
+		if err := metaSetTx(ctx, tx, "plot_definition", marshalJSON(def.Plot)); err != nil {
+			return err
+		}
+		if err := metaSetTx(ctx, tx, "plot_progress", marshalJSON(state)); err != nil {
+			return err
+		}
+	}
 	for _, c := range def.Characters {
 		if err := metaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
 			return err
@@ -352,6 +366,11 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if err != nil {
 		return out, err
 	}
+	out.Plot, out.PlotProgress, err = readPlot(ctx, store.db)
+	if err != nil {
+		return out, err
+	}
+	out.Summary.StoryEnded = out.Summary.Mode == "guided" && out.PlotProgress.Ending != ""
 	for key, target := range map[string]*int64{"turn_seq": &out.Summary.TurnSeq, "message_head": &out.Summary.MessageHead, "event_head": &out.Summary.EventHead, "context_epoch": &out.Summary.ContextEpoch, "scene_version": &out.SceneVersion} {
 		*target, err = metaInt(ctx, store.db, key)
 		if err != nil {
@@ -566,7 +585,7 @@ func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
 	return count, err
 }
 
-func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView) (int64, error) {
+func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress) (int64, error) {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -642,6 +661,11 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 	}
 	if err := metaSetTx(ctx, tx, "clock", clock); err != nil {
 		return 0, err
+	}
+	if plotState != nil {
+		if err := metaSetTx(ctx, tx, "plot_progress", marshalJSON(plotState)); err != nil {
+			return 0, err
+		}
 	}
 	if scene == "" {
 		scene, _ = metaGetTx(ctx, tx, "scene")

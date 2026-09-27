@@ -1,0 +1,406 @@
+package storyapp
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+
+	"gameagent/runtime/internal/model"
+)
+
+// Plot content is frozen with each world. Conditions are narrative material,
+// while dependencies, time boundaries, publication and audience are code contracts.
+type PlotDefinition struct {
+	Revision string     `json:"revision"`
+	Facts    string     `json:"facts"`
+	Nodes    []PlotNode `json:"nodes"`
+}
+
+type PlotNode struct {
+	ID          string   `json:"id"`
+	After       []string `json:"after"`
+	AtMinute    int      `json:"at_minute"`
+	Condition   string   `json:"condition"`
+	Development string   `json:"development"`
+	Audience    []string `json:"audience"`
+	Terminal    bool     `json:"terminal"`
+}
+
+type PlotNodeState struct {
+	Status    string   `json:"status"`
+	EventID   string   `json:"event_id,omitempty"`
+	Content   string   `json:"content,omitempty"`
+	NextCheck int      `json:"next_check"`
+	Evidence  []string `json:"evidence"`
+}
+
+type PlotProgress struct {
+	Version int64                    `json:"version"`
+	Nodes   map[string]PlotNodeState `json:"nodes"`
+	Ending  string                   `json:"ending,omitempty"`
+}
+
+type plotProjection struct {
+	Recipient string `json:"recipient"`
+	Content   string `json:"content"`
+}
+
+type plotResolution struct {
+	Status           string           `json:"status"` // occurred, deferred, skipped
+	Content          string           `json:"content"`
+	SourceIDs        []string         `json:"source_ids"`
+	Projections      []plotProjection `json:"projections"`
+	DecisionRequests []string         `json:"decision_requests"`
+	Ending           string           `json:"ending"`
+}
+
+func clockMinute(clock string) (int, error) {
+	var day, hour, minute int
+	if n, err := fmt.Sscanf(clock, "第 %d 日 %d:%d", &day, &hour, &minute); err != nil || n != 3 || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return 0, fmt.Errorf("%w: invalid world clock", ErrStorageUnavailable)
+	}
+	return (day-1)*1440 + hour*60 + minute, nil
+}
+
+func readPlot(ctx context.Context, db *sql.DB) (*PlotDefinition, PlotProgress, error) {
+	var def PlotDefinition
+	var state PlotProgress
+	raw, err := metaGet(ctx, db, "plot_definition")
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, state, nil
+	}
+	if err != nil {
+		return nil, state, err
+	}
+	if err = json.Unmarshal([]byte(raw), &def); err != nil {
+		return nil, state, err
+	}
+	raw, err = metaGet(ctx, db, "plot_progress")
+	if err != nil {
+		return nil, state, err
+	}
+	if err = json.Unmarshal([]byte(raw), &state); err != nil {
+		return nil, state, err
+	}
+	if err = validatePlot(def, state); err != nil {
+		return nil, state, err
+	}
+	return &def, state, nil
+}
+
+func validatePlot(def PlotDefinition, state PlotProgress) error {
+	if def.Revision == "" || len(def.Nodes) == 0 || len(def.Nodes) > 32 || state.Version < 1 || state.Nodes == nil {
+		return ErrStorageUnavailable
+	}
+	known := map[string]bool{}
+	for _, n := range def.Nodes {
+		if n.ID == "" || known[n.ID] || n.AtMinute < 0 || n.Condition == "" || n.Development == "" || n.Audience == nil {
+			return ErrStorageUnavailable
+		}
+		for _, dep := range n.After {
+			if !known[dep] {
+				return ErrStorageUnavailable
+			}
+		}
+		known[n.ID] = true
+	}
+	for id, n := range state.Nodes {
+		if !known[id] || (n.Status != "occurred" && n.Status != "deferred" && n.Status != "skipped") || (n.Status != "deferred" && n.EventID == "") {
+			return ErrStorageUnavailable
+		}
+	}
+	return nil
+}
+
+func nextPlotNode(snapshot worldSnapshot) (PlotNode, int, bool) {
+	if snapshot.Plot == nil || (snapshot.Summary.Mode == "guided" && snapshot.PlotProgress.Ending != "") {
+		return PlotNode{}, 0, false
+	}
+	var chosen PlotNode
+	var due int
+	found := false
+	for _, node := range snapshot.Plot.Nodes {
+		state := snapshot.PlotProgress.Nodes[node.ID]
+		if state.Status == "occurred" || state.Status == "skipped" {
+			continue
+		}
+		eligible := true
+		for _, dep := range node.After {
+			s := snapshot.PlotProgress.Nodes[dep].Status
+			if s != "occurred" && s != "skipped" {
+				eligible = false
+			}
+		}
+		at := max(node.AtMinute, state.NextCheck)
+		if eligible && (!found || at < due) {
+			chosen, due, found = node, at, true
+		}
+	}
+	return chosen, due, found
+}
+
+func plotTimeLimit(snapshot worldSnapshot) int {
+	_, due, ok := nextPlotNode(snapshot)
+	if !ok {
+		return 120
+	}
+	current, err := clockMinute(snapshot.Summary.Clock)
+	if err != nil {
+		return 0
+	}
+	return min(120, max(0, due-current))
+}
+
+func plotContext(snapshot worldSnapshot) string {
+	if snapshot.Plot == nil {
+		return ""
+	}
+	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", plotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, marshalJSON(snapshot.PlotProgress))
+}
+
+// A single node is settled per turn. The clock stops at that node; a subsequent
+// input can continue waiting against the newly committed consequences.
+func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, output *turnOutput) ([]Event, error) {
+	if snapshot.Plot == nil {
+		return nil, nil
+	}
+	output.PlotProgress = &PlotProgress{Version: snapshot.PlotProgress.Version, Ending: snapshot.PlotProgress.Ending, Nodes: map[string]PlotNodeState{}}
+	for id, state := range snapshot.PlotProgress.Nodes {
+		output.PlotProgress.Nodes[id] = state
+	}
+	node, due, ok := nextPlotNode(snapshot)
+	current, err := clockMinute(output.Clock)
+	if err != nil {
+		return nil, err
+	}
+	if !ok || current < due {
+		return nil, nil
+	}
+	material := composePlot(snapshot, run, node, output)
+	call := a.contextGenerator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v1")
+	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	var result plotResolution
+	if err = generateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
+		return nil, err
+	}
+	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
+		return nil, err
+	}
+	state := PlotNodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
+	var visible []Event
+	if result.Status != "deferred" {
+		state.EventID = "plot:" + snapshot.Plot.Revision + ":" + node.ID
+		event := Event{EventID: state.EventID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
+		output.Events = append(output.Events, event)
+		for i, p := range result.Projections {
+			// Projection IDs have their own text. Possessing their ID never grants the
+			// receiving character access to the author's complete plot result.
+			projection := event
+			projection.EventID = fmt.Sprintf("%s:projection:%d", state.EventID, i)
+			projection.EventType, projection.TargetID, projection.Content = "plot_perceived", p.Recipient, p.Content
+			projection.SourceType = "plot_observed"
+			output.Events = append(output.Events, projection)
+			output.Perceptions = append(output.Perceptions, Perception{RecipientID: p.Recipient, SourceEventID: projection.EventID, SourceType: "plot_observed", Content: p.Content, Stage: 4, SceneVersion: output.SceneVersion, CreatedAt: event.CreatedAt})
+			if p.Recipient == "player" {
+				visible = append(visible, projection)
+			}
+		}
+	}
+	output.PlotProgress.Nodes[node.ID] = state
+	output.PlotProgress.Version++
+	if snapshot.Summary.Mode == "guided" && result.Ending != "" {
+		output.PlotProgress.Ending = result.Ending
+	}
+	if len(result.DecisionRequests) > 0 {
+		npcVisible, err := a.respondToPlot(ctx, generator, snapshot, run, node, result, output)
+		if err != nil {
+			return nil, err
+		}
+		visible = append(visible, npcVisible...)
+	}
+	return visible, nil
+}
+
+func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOutput) contextMaterial {
+	return contextMaterial{
+		System:          behaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
+		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, marshalJSON(node), marshalJSON(snapshot.PlotProgress), marshalJSON(PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), marshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
+		RequiredSources: eventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
+	}
+}
+
+func plotEvidenceSections(events []Event) []contextSection {
+	var result []contextSection
+	for _, e := range events {
+		if e.EventType == "turn_settled" {
+			continue
+		}
+		result = append(result, contextSection{Name: "plot_evidence", Text: marshalJSON(e), Sources: []string{e.EventID}})
+	}
+	return result
+}
+
+func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOutput, result plotResolution) error {
+	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
+		return ErrGenerationFailed
+	}
+	if cleanText(result.Content) == "" || len(result.SourceIDs) == 0 || result.Projections == nil || result.DecisionRequests == nil {
+		return ErrGenerationFailed
+	}
+	if result.Ending != "" && (!node.Terminal || result.Status == "deferred") {
+		return ErrGenerationFailed
+	}
+	if result.Status == "deferred" && (len(result.Projections) > 0 || len(result.DecisionRequests) > 0) {
+		return ErrGenerationFailed
+	}
+	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
+	for _, e := range append(append([]Event{}, snapshot.Events...), output.Events...) {
+		known[e.EventID] = true
+	}
+	for _, id := range result.SourceIDs {
+		if !known[id] {
+			return ErrContextSourceMissing
+		}
+	}
+	seen := map[string]bool{}
+	for _, p := range result.Projections {
+		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || cleanText(p.Content) == "" {
+			return ErrGenerationFailed
+		}
+		if p.Recipient != "player" {
+			if _, ok := characterByID(gameDefinition{Characters: snapshot.Characters}, p.Recipient); !ok {
+				return ErrGenerationFailed
+			}
+		}
+		seen[p.Recipient] = true
+	}
+	wake := map[string]bool{}
+	for _, id := range result.DecisionRequests {
+		if id == "player" || !seen[id] || wake[id] {
+			return ErrGenerationFailed
+		}
+		wake[id] = true
+	}
+	return nil
+}
+
+func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, node PlotNode, resolution plotResolution, output *turnOutput) ([]Event, error) {
+	base := snapshot
+	base.Summary.Clock = output.Clock
+	base.Characters = append([]Character{}, snapshot.Characters...)
+	base.Perceptions = map[string][]Perception{}
+	base.Sources = map[string]sourceMetadata{}
+	for id, source := range snapshot.Sources {
+		base.Sources[id] = source
+	}
+	for _, e := range output.Events {
+		base.Sources[e.EventID] = sourceMetadata{ID: e.EventID, Actor: e.ActorID, Kind: e.EventType, RunID: e.RunID, Stage: e.Stage, SceneVersion: e.SceneVersion}
+	}
+	for id, items := range snapshot.Perceptions {
+		base.Perceptions[id] = append([]Perception{}, items...)
+	}
+	for _, p := range output.Perceptions {
+		base.Perceptions[p.RecipientID] = append(base.Perceptions[p.RecipientID], p)
+	}
+	inputs := map[string]npcStageInput{}
+	for i, p := range resolution.Projections {
+		if slices.Contains(resolution.DecisionRequests, p.Recipient) {
+			inputs[p.Recipient] = npcStageInput{NewStimulus: p.Content, SourceEventIDs: []string{fmt.Sprintf("plot:%s:%s:projection:%d", snapshot.Plot.Revision, node.ID, i)}}
+		}
+	}
+	// Inputs, not global presence, select this bounded response round. Characters
+	// outside the player's scene receive only their own projection and history.
+	for i := range base.Characters {
+		base.Characters[i].InScene = inputs[base.Characters[i].EntityID].NewStimulus != ""
+	}
+	decisions := map[string]npcDecision{}
+	if err := a.decideNPCs(ctx, generator, base, gameDefinition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
+		return nil, err
+	}
+	extra := turnOutput{SceneVersion: output.SceneVersion}
+	allowed := map[string][]string{}
+	var visible []Event
+	for _, c := range snapshot.Characters {
+		d, ok := decisions[c.EntityID]
+		if !ok {
+			continue
+		}
+		observers := []Character{c}
+		audience := []string{c.EntityID}
+		if slices.Contains(output.SceneCharacters, c.EntityID) {
+			observers = nil
+			for _, other := range snapshot.Characters {
+				if slices.Contains(output.SceneCharacters, other.EntityID) {
+					observers = append(observers, other)
+				}
+			}
+			audience = append([]string{"player"}, characterIDs(observers)...)
+		}
+		start := len(extra.Events)
+		appendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)
+		if !slices.Contains(audience, "player") {
+			for i := start; i < len(extra.Events); i++ {
+				if extra.Events[i].EventType == "npc_dialogue" {
+					extra.Events[i].SourceType = "offscene_dialogue"
+					extra.Events[i].TargetID = c.EntityID
+				}
+			}
+		}
+		for _, e := range extra.Events[start:] {
+			if e.EventType == "npc_dialogue" && slices.Contains(audience, "player") {
+				visible = append(visible, e)
+			}
+			if e.EventType == "npc_action_intent" {
+				allowed[e.EventID] = audience
+			}
+		}
+	}
+	if len(allowed) > 0 {
+		material := contextMaterial{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
+			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
+		call := a.contextGenerator(generator, material, snapshot, run, "plot_actions", "coordinator", 6, "story.plot-actions.v1")
+		var resolved struct {
+			Outcomes []hostActionResult `json:"outcomes"`
+		}
+		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		err := generateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes")
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		for _, outcome := range resolved.Outcomes {
+			for _, id := range outcome.Recipients {
+				if !slices.Contains(allowed[outcome.ActionID], id) {
+					return nil, ErrGenerationFailed
+				}
+			}
+		}
+		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, resolved.Outcomes)
+		if err != nil {
+			return nil, err
+		}
+		for i := range results {
+			results[i].Stage = 6
+		}
+		visible = append(visible, results...)
+		for i := range extra.Events {
+			if extra.Events[i].EventType == "npc_action_result" {
+				extra.Events[i].Stage = 6
+			}
+		}
+		for i := range extra.Perceptions {
+			if extra.Perceptions[i].Stage == 3 {
+				extra.Perceptions[i].Stage = 6
+			}
+		}
+	}
+	output.Events = append(output.Events, extra.Events...)
+	output.Perceptions = append(output.Perceptions, extra.Perceptions...)
+	output.Memories = append(output.Memories, extra.Memories...)
+	return visible, nil
+}

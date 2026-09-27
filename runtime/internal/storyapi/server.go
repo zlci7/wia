@@ -596,6 +596,9 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrWorldBusy):
 		status = 409
 		code = "world_busy"
+	case errors.Is(err, storyapp.ErrStoryEnded):
+		status = 409
+		code = "story_ended"
 	case errors.Is(err, storyapp.ErrAppBusy):
 		status = 409
 		code = "app_busy"

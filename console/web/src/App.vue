@@ -399,7 +399,7 @@ const policyOptions = [
             <button type="button" class="secondary-button" @click="sendInput()">确认或重发原请求</button>
           </div>
           <div class="composer-footer">
-            <span>Ctrl + Enter 提交</span
+            <span>{{ currentWorld?.story_ended ? '本段故事已结束，可另存或开始新故事' : 'Ctrl + Enter 提交' }}</span
             ><button
               class="primary-button"
               type="submit"
@@ -410,7 +410,9 @@ const policyOptions = [
                   ? "正在提交…"
                   : activeRun
                     ? "等待回应"
-                    : status?.ready
+                    : currentWorld?.story_ended
+                      ? "故事已结束"
+                      : status?.ready
                       ? "继续故事"
                       : "连接模型并继续"
               }}

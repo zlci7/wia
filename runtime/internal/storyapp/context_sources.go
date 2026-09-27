@@ -45,6 +45,14 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot)
 			add(id)
 		}
 	}
+	for _, node := range snapshot.PlotProgress.Nodes {
+		add(node.EventID)
+		for _, id := range node.Evidence {
+			if !strings.HasPrefix(id, "definition:") {
+				add(id)
+			}
+		}
+	}
 	result := map[string]sourceMetadata{}
 	for start := 0; start < len(ids); start += 200 {
 		end := min(start+200, len(ids))

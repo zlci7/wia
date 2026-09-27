@@ -78,9 +78,9 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion       = "story.intent.v4"
-	npcPromptVersion          = "story.npc.v9"
-	coordinationPromptVersion = "story.coordination.v9"
-	narrationPromptVersion    = "story.narration.v9"
+	npcPromptVersion          = "story.npc.v10"
+	coordinationPromptVersion = "story.coordination.v10"
+	narrationPromptVersion    = "story.narration.v10"
 )
 
 type turnStageError struct {
@@ -164,6 +164,7 @@ type turnOutput struct {
 	SceneVersion    int64
 	SceneCharacters []string
 	SceneViews      []SceneView
+	PlotProgress    *PlotProgress
 	Events          []Event
 	Perceptions     []Perception
 	Memories        []Memory
@@ -218,6 +219,9 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
 		return Run{}, err
+	}
+	if snapshot.Summary.StoryEnded {
+		return Run{}, ErrStoryEnded
 	}
 	if (request.requireBaseline || request.ExpectedMessageHead > 0) && request.ExpectedMessageHead != snapshot.Summary.MessageHead {
 		return Run{}, ErrVersionConflict
@@ -358,7 +362,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
 		return
 	}
 	commitStarted := time.Now()
-	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews); err != nil {
+	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress); err != nil {
 		err = atTurnStage(turnStageCommit, err)
 		status, reason, message := classifyTurnFailure(err)
 		if status == "failed" {
@@ -640,7 +644,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageCoordination, "coordinate_scene", "scene", 0, coordinationPromptVersion, eventIDs(output.Events), recipient, coordinationRepairs, time.Since(coordinationStarted))
-	output.Clock = advanceClock(snapshot.Summary.Clock, run.Input, host.TimeMinutes)
+	output.Clock = advanceClock(snapshot.Summary.Clock, host.TimeMinutes)
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
 	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || sceneFor(snapshot, "player") != snapshot.Summary.Scene {
 		output.SceneVersion = snapshot.SceneVersion + 1
@@ -658,6 +662,16 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	snapshot.SceneVersion = output.SceneVersion
 	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
+	if snapshot.Plot != nil {
+		elapsed := Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
+		output.Events = append(output.Events, elapsed)
+		visibleEvents = append(visibleEvents, elapsed)
+	}
+	plotEvents, err := a.advancePlot(ctx, generator, snapshot, run, &output)
+	if err != nil {
+		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+	}
+	visibleEvents = append(visibleEvents, plotEvents...)
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
 	result, narrationRepairs, err := a.narrateVisible(ctx, generator, snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
@@ -666,7 +680,13 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageNarration, "render_player_text", "scene", 0, narrationPromptVersion, eventIDs(visibleEvents), recipient, narrationRepairs, time.Since(narrationStarted))
 	output.Narrative = result.Narrative
-	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
+	settledStage := 3
+	for _, event := range output.Events {
+		if event.Stage >= 4 {
+			settledStage = 7
+		}
+	}
+	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
 	for _, character := range participants {
 		kind, memory := playerExperienceMemory(intent.IntentType, private, character.EntityID, recipient, run.Input, def)
 		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
@@ -831,12 +851,9 @@ func mergeNPCDecision(previous, current npcDecision) npcDecision {
 	return current
 }
 
-func advanceClock(clock, input string, minutes int) string {
-	if minutes == 0 && !strings.Contains(input, "等待") && !strings.Contains(strings.ToLower(input), "wait") {
-		return clock
-	}
+func advanceClock(clock string, minutes int) string {
 	if minutes == 0 {
-		minutes = 30
+		return clock
 	}
 	var day, hour, minute int
 	if _, err := fmt.Sscanf(clock, "第 %d 日 %d:%d", &day, &hour, &minute); err != nil || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
@@ -1002,7 +1019,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 		return hostResult{}, repairCount, err
 	}
 	result.Scene = cleanText(result.Scene)
-	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > 120 || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
+	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > plotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
 		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", ErrGenerationFailed)
 	}
 	result.SceneCharacters = normalizeSceneCharacters(result.SceneCharacters)

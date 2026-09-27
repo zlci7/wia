@@ -20,6 +20,10 @@ func TestContinuityRealModelSequence(t *testing.T) {
 	runRealStorySequence(t, []string{"进门看看环境", "想找你问问，最近有没有发生什么怪事", "我沉默片刻，暂时不回复"}, false)
 }
 
+func TestPlotRealModelSequence(t *testing.T) {
+	runRealStorySequence(t, []string{"我坐在客栈里静静等一个小时，遇到新的动静先停下来看看，不替我接受任务。", "我决定暂时不参加调查，继续在客栈等待一个小时，遇到新情况就停下。", "我仍不参与，留在客栈休息，等到夜渡离岸。"}, false)
+}
+
 func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 	path := os.Getenv("WIA_AUTONOMY_MODEL_CONFIG")
 	if path == "" {
@@ -71,6 +75,7 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 			t.Fatal("incomplete real-model turn")
 		}
 		s := readContextSnapshot(t, a, w.WorldID)
+		t.Logf("clock=%s plot_nodes=%d story_ended=%t", s.Summary.Clock, len(s.PlotProgress.Nodes), s.Summary.StoryEnded)
 		for _, e := range s.Events {
 			if e.RunID == r.RunID && (e.EventType == "npc_action_intent" || e.EventType == "npc_action_result" || e.EventType == "npc_dialogue") {
 				t.Logf("event=%s actor=%s stage=%d type=%s content=%s", e.EventType, e.ActorID, e.Stage, e.SourceType, e.Content)

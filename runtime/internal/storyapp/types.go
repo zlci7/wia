@@ -22,6 +22,7 @@ var (
 	ErrWorldNotFound       = errors.New("world not found")
 	ErrWorldNotReady       = errors.New("world not ready")
 	ErrWorldBusy           = errors.New("world is busy")
+	ErrStoryEnded          = errors.New("guided story has ended")
 	ErrAppBusy             = errors.New("story app is already open for this data root")
 	ErrVersionConflict     = errors.New("version conflict")
 	ErrIdempotencyConflict = errors.New("idempotency conflict")
@@ -118,6 +119,7 @@ type WorldSummary struct {
 	Clock        string    `json:"clock"`
 	Scene        string    `json:"scene"`
 	Status       string    `json:"status"`
+	StoryEnded   bool      `json:"story_ended"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 

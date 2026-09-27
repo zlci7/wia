@@ -111,6 +111,14 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "ended guided story remains readable and blocks another input"(x) {
+    records.A.world.story_ended = true;
+    records.A.world.message_head++;
+    await x.freshRefresh();
+    x.session.value.draft = '继续看看';
+    assert.equal(x.canSubmit.value, false);
+    assert.equal(x.currentWorld.value.world_id, 'A');
+  },
   async "save-as terminal failure releases identity for a new operation"(x) {
     const keys = [];
     networkHook = (url, init) => {

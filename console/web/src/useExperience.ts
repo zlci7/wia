@@ -156,6 +156,7 @@ export function useExperience() {
     () =>
       !!session.value.draft.trim() &&
       !!currentWorld.value &&
+      !currentWorld.value.story_ended &&
       !session.value.sending &&
       !activeRun.value &&
       !pendingSubmission.value &&
@@ -233,6 +234,7 @@ export function useExperience() {
           {
             model_not_configured: "请先连接模型，再继续故事。",
             world_busy: "这个存档正在处理上一项操作，请稍候。",
+            story_ended: "这段流程故事已结束，可以阅读、另存，或从剧本页开始新的故事。",
             version_conflict: "故事状态已更新，请重新打开此操作后重试。",
             storage_unavailable: "存档暂时无法读写，请稍后重试。",
             save_failed: "另存没有完成，原存档没有受到影响。",

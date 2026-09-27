@@ -712,7 +712,7 @@ func TestObserveIntentUsesActionPerceptionAndMemoryTypes(t *testing.T) {
 	}
 }
 
-func TestWaitAdvancesWorldClockOnlyAfterCommit(t *testing.T) {
+func TestWaitWordingDoesNotOverrideResolvedTime(t *testing.T) {
 	app := newTestApp(t, &scriptedGenerator{})
 	world, err := app.CreateWorld(context.Background(), "等待测试", "guided", "旅人", "", true)
 	if err != nil {
@@ -729,7 +729,7 @@ func TestWaitAdvancesWorldClockOnlyAfterCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Summary.Clock != "第 1 日 19:30" {
+	if snapshot.Summary.Clock != "第 1 日 19:00" {
 		t.Fatalf("clock = %q", snapshot.Summary.Clock)
 	}
 }

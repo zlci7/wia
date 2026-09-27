@@ -35,6 +35,7 @@ export interface WorldSummary {
   clock: string
   scene: string
   status: string
+  story_ended?: boolean
   updated_at: string
 }
 
