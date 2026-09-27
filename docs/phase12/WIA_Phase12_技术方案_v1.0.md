@@ -181,6 +181,8 @@ NPC 初始资料由 `Profile`、`Knowledge` 和 `InitialConcerns` 组成。初�
 
 剧本规模和剧情类型独立。GameDefinitionRevision 声明作者指定的唯一 `mode`（open 或 guided）及其约束；世界创建时由服务端继承该类型并固定完整内容和资源快照，前端不能覆盖。玩家通过公开详情了解玩法后选择剧本，不在开局切换类型。已有世界保留原类型及有效修订，不从新版包自动回填；当前世界资料纠正仍走显式修订及失效流程。
 
+公开详情携带 revision，新建请求用 expected_revision 绑定玩家确认的版本；不匹配时提示重新确认并保留表单。同一 game_id + revision 绑定规范化定义与资源摘要，冲突内容拒绝发布。候选包完整校验后才可新建，坏包不影响无关存档；完整快照和必要资源副本支持源包移除后的继续与另存。
+
 | 模式 | 世界运行合同 |
 | --- | --- |
 | open | 可包含多条世界剧情；玩家可选择参与、干预、忽略全部预设事件或发展自己的目标；世界按事实、人物目标和条件演进 |
@@ -656,7 +658,7 @@ Electron 开启隔离与沙箱，禁用页面 Node 能力，限制导航与 IPC�
 | `/api/v1/model-profiles` | 授权模型、连接验证和修订，凭据不回显 |
 | `/api/v1/games` | game_id 对应的公开剧本库、内容版本、唯一类型、封面、简介与玩法；作者约束不随普通接口返回 |
 | `/api/v1/games/{game}/definitions` | 授权作者视图中的 NPC 初始模板与版本；普通游玩仅获取公开人物投影 |
-| `/api/v1/worlds` | 从选定剧本版本创建快照，类型由后端继承；按授权剧本/世界归属列出存档、元信息、删除与导出；当前时间按玩家可见范围呈现 |
+| `/api/v1/worlds` | 以 game_id 与 expected_revision 创建匹配的快照，版本变化返回冲突，类型由后端继承；按授权剧本/世界归属列出存档、元信息、删除与导出；当前时间按玩家可见范围呈现 |
 | `/api/v1/worlds/{world}/save-as` | 手动另存活动世界当前进度，携带 expected_active_revision；幂等创建目标 world_id，返回任务及目标标识，不切换当前世界 |
 | `/api/v1/world-copy-operations/{operation}` | 授权读取另存状态与失败原因，ready 前目标不可游玩 |
 | `/api/v1/worlds/{world}/activate` | 以 request_key/expected_active_revision 显式切换账户的活动世界；重复当前目标不取消任务，过期请求不切回旧世界 |
