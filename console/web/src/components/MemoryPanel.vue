@@ -17,7 +17,7 @@ const labels: Record<string, string> = { event: '世界事件', character: '人�
 const rebuilding = computed(() => !!data.value && !['completed', 'superseded'].includes(data.value.job.status));
 function name(id: string) { return id === 'player' ? '我的回顾' : id === 'author' ? '世界事件（剧透）' : props.characters.find(c => c.entity_id === id)?.name ?? id; }
 function describe(e: unknown) {
-  if (e instanceof ApiError) return ({ version_conflict: '此存档已更新。请刷新资料，再核对并提交纠正。', world_busy: '故事正在生成或另存，请完成后再纠正。', memory_rebuilding: '回顾正在重建，请稍候。', invalid_request: '纠正对象已变化，请刷新后重新选择。' } as Record<string,string>)[e.code] ?? e.message;
+  if (e instanceof ApiError) return ({ version_conflict: '存档已更新。请先保留草稿，取消编辑后刷新资料，再重新选择要纠正的条目。', world_busy: '故事正在生成或另存，请完成后再纠正。', memory_rebuilding: '回顾正在重建，请稍候。', invalid_request: '纠正对象已变化，请取消编辑并刷新资料，再重新选择。' } as Record<string,string>)[e.code] ?? e.message;
   return e instanceof Error ? e.message : String(e);
 }
 async function load(earlier = false) {
