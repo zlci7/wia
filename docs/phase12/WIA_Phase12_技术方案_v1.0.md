@@ -353,6 +353,15 @@ NPC 不读取整份玩家聊天记录、全局回顾或全知场景文本。NPC 
 
 ### 8.2 快照与来源完整性
 
+故事上下文由 storyapp 内的 ContextComposer 统一构建，覆盖 intent、npc、coordination、narration 四种用途。材料分为本轮必需内容与完整因果组的可选历史；模板和来源选择集中管理。构建器没有数据库、模型调用或跨请求可变状态。StoryService 冻结世界、run/attempt/stage、context epoch、场景版本和模型，负责读取及提交。
+
+个人感知与记忆的来源按引用批量补取事件元数据，窗口外来源仍可保留身份与顺序；该读取不向人物提供事件原文。真正缺失的引用使构建失败，不按空历史继续。
+
+协调 JSON 包含 scene_updates 数组，每项为 content、source_ids、recipients。content 是对应接收者结束时的自然语言情境，source_ids 引用本轮表达、公开对白、已裁定行动或本人此前视图。新结果使用 outcome.action_id，程序在验证后转为正式结果 ID。每位接收者最多更新一次，每个引用均须允许该接收者获知；无变化使用空数组。scene 仅是协调记录，玩家与 NPC 使用自己的 SceneView。
+
+SceneView 在现有 meta 的 scene_views 中与回合一起原子保存，包含 recipient、content、source_ids、version。另存复制这些资料。旧存档在读取时从获准结果和个人感知建立视图，不广播旧的无来源场景全文，不重写旧消息或记忆；信息不足时明确未知而不推定回到开场。对外 scene 仍是玩家可见情境。
+
+
 一次 run 冻结 owner/game/world、账户 active_revision、基础 heads、context_epoch、内容与角色修订、剧本模式及剧情约束版本、世界时间与节点状态版本、初始场景、模型档案 revision、宿主 generation 与世界运行 generation。阶段快照额外记录 stage、暂存事件水位与引用的场景版本；每条事件和感知保留其实际来源快照。派生结果引用确切 basis，不能混用新旧版本；world_id 相同也不代表旧运行任务仍有提交权。
 
 互动设置按世界保存。底层字段为 player_elaboration（restrained/natural/expressive）和 npc_initiative（responsive/contextual/proactive）；三个互动风格预设只负责成对设置这两个字段，用户单独调整后显示为自定义。默认值为 natural/contextual。设置更新递增 context_epoch，活动 run 期间拒绝修改；另存复制同一组设置。

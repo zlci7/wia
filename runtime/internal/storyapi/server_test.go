@@ -37,7 +37,7 @@ func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest)
 		for _, candidate := range candidates {
 			outcomes = append(outcomes, map[string]any{"action_id": candidate.EventID, "status": "succeeded", "content": "行动已经完成。", "recipients": []string{"player", "npc:innkeeper", "npc:mercenary"}})
 		}
-		data, _ := json.Marshal(map[string]any{"time_minutes": 0, "scene": "旧渡口客栈", "scene_characters": []string{"npc:innkeeper", "npc:mercenary"}, "outcomes": outcomes})
+		data, _ := json.Marshal(map[string]any{"time_minutes": 0, "scene": "旧渡口客栈", "scene_characters": []string{"npc:innkeeper", "npc:mercenary"}, "outcomes": outcomes, "scene_updates": []any{}})
 		return model.TextResponse{Text: string(data)}, nil
 	}
 	if strings.Contains(request.System, "玩家正文 Agent") {

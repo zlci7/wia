@@ -119,7 +119,21 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		} else if scene != "旧渡口客栈" {
 			characters = []string{}
 		}
-		data, _ := json.Marshal(hostResult{TimeMinutes: 0, Scene: scene, SceneCharacters: characters, Outcomes: outcomes})
+		updates := []sceneUpdate{}
+		if g.scene != "" {
+			var sources []sceneSource
+			start := strings.Index(req.Input, "场景来源(JSON)：") + len("场景来源(JSON)：")
+			end := strings.Index(req.Input[start:], "\n")
+			if end >= 0 && json.Unmarshal([]byte(req.Input[start:start+end]), &sources) == nil {
+				for _, source := range sources {
+					if strings.HasSuffix(source.ID, ":input") {
+						updates = append(updates, sceneUpdate{Content: scene, SourceIDs: []string{source.ID}, Recipients: []string{"player"}})
+						break
+					}
+				}
+			}
+		}
+		data, _ := json.Marshal(hostResult{TimeMinutes: 0, Scene: scene, SceneCharacters: characters, Outcomes: outcomes, SceneUpdates: updates})
 		return model.TextResponse{Text: string(data)}, nil
 	}
 	if strings.Contains(req.System, "玩家正文 Agent") {
@@ -868,6 +882,11 @@ func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 	}
 	if operation.Status != "ready" {
 		t.Fatalf("copy status = %+v", operation)
+	}
+	originalViews, _ := json.Marshal(readContextSnapshot(t, app, original.WorldID).SceneViews)
+	copiedViews, _ := json.Marshal(readContextSnapshot(t, app, operation.TargetWorldID).SceneViews)
+	if string(originalViews) != string(copiedViews) {
+		t.Fatal("scene views changed during copy/reopen")
 	}
 	if _, err := app.ActivateWorld(context.Background(), operation.TargetWorldID, status.ActiveRevision); err != nil {
 		t.Fatal(err)

@@ -27,6 +27,8 @@ type worldSnapshot struct {
 	Messages      []Message
 	Events        []Event
 	Dialogue      []Event
+	SceneViews    []SceneView
+	Sources       map[string]sourceMetadata
 	Perceptions   map[string][]Perception
 	Memories      map[string][]Memory
 }
@@ -387,6 +389,24 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 			return out, err
 		}
 	}
+	raw, sceneErr := get("scene_views")
+	if errors.Is(sceneErr, sql.ErrNoRows) {
+		out.SceneViews = initialSceneViews(out)
+	} else {
+		if sceneErr != nil {
+			return out, sceneErr
+		}
+		if err = json.Unmarshal([]byte(raw), &out.SceneViews); err != nil {
+			return out, err
+		}
+		if err = validateSceneViews(out); err != nil {
+			return out, err
+		}
+	}
+	out.Sources, err = loadSourceMetadata(ctx, store.db, out)
+	if err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -544,7 +564,7 @@ func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
 	return count, err
 }
 
-func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string) (int64, error) {
+func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView) (int64, error) {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -623,6 +643,13 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 	}
 	if scene == "" {
 		scene, _ = metaGetTx(ctx, tx, "scene")
+	}
+	viewsJSON, err := json.Marshal(sceneViews)
+	if err != nil {
+		return 0, err
+	}
+	if err := metaSetTx(ctx, tx, "scene_views", string(viewsJSON)); err != nil {
+		return 0, err
 	}
 	if err := metaSetTx(ctx, tx, "scene", scene); err != nil {
 		return 0, err
