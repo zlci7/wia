@@ -36,9 +36,9 @@ func lanternDefinition() gameDefinition {
 }
 
 func lanternPlotDefinition() *PlotDefinition {
-	return &PlotDefinition{Revision: "lantern-dusk.plot.v1", Facts: "故事限于旧渡口客栈、码头、渡口仓棚。失踪信使名为陆舟，负伤后藏在仓棚，携带河运账目被篡改的证据，信蜡留在沈岚柜台下。沈岚只知道他来过和信蜡；铁杉只知道客栈异常，不自动知道信使位置。追索账目的陌生人会在渡船离岸前寻找信使。固定事实不得为了满足预设结局改写。未来节点是可受玩家和人物行动改变的计划。",
+	return &PlotDefinition{Revision: "lantern-dusk.plot.v2", Facts: "故事限于旧渡口客栈、码头、渡口仓棚。末班夜渡在第一日20:00离岸。失踪信使名为陆舟，负伤后藏在仓棚，携带河运账目被篡改的证据，信蜡留在沈岚柜台下。沈岚只知道他来过和信蜡；铁杉只知道客栈异常，不自动知道信使位置。追索账目的陌生人会在渡船离岸前寻找信使。固定事实不得为了满足预设结局改写。未来节点是可受玩家和人物行动改变的计划。",
 		Nodes: []PlotNode{
-			{ID: "dock_warning", AtMinute: 19*60 + 5, After: []string{}, Audience: []string{"player", "npc:innkeeper", "npc:mercenary"}, Condition: "码头夜渡准备开始，未曾发生本节点。", Development: "外部新刺激：码头传来催渡铃，河运工在他实际在场处提醒末班船半小时内离岸，并提及仓棚有人需要帮助。只向实际听到者投影消息；玩家已离开且未获知时不全知广播。重要NPC若要查看、提醒或处置，先交给本人作决定，节点本身不预写其选择。"},
+			{ID: "dock_warning", AtMinute: 19*60 + 5, After: []string{}, Audience: []string{"player", "npc:innkeeper", "npc:mercenary"}, Condition: "码头夜渡准备开始，未曾发生本节点。", Development: "外部新刺激：码头传来催渡铃，河运工在他实际在场处提醒末班船将在戌初（20:00）离岸，并提及仓棚有人需要帮助。只向实际听到者投影消息；玩家已离开且未获知时不全知广播。重要NPC若要查看、提醒或处置，先交给本人作决定，节点本身不预写其选择。"},
 			{ID: "courier_window", AtMinute: 19*60 + 30, After: []string{"dock_warning"}, Audience: []string{"player", "npc:innkeeper", "npc:mercenary"}, Condition: "确认信使在这个时点的处境：依据此前已经成立的营救、转移、预警、阻拦或未干预。", Development: "未干预时，寻人的陌生人到仓棚外，信使仍有走侧门到渡船的机会；已经转移或有人阻拦时，追索者按实际线索行动，不强行把信使移回仓棚。只呈现当前外部事件与风险，不替玩家接受任务。相关重要NPC需要新的选择时请求本人。只让目击者或实际收到消息者知道，不把未来去向直接广播。"},
 			{ID: "night_outcome", AtMinute: 20 * 60, After: []string{"courier_window"}, Audience: []string{"player", "npc:innkeeper", "npc:mercenary"}, Terminal: true, Condition: "夜渡离岸，依据已提交行动和证据确认本段调查的阶段结果。", Development: "已救出信使并取得证据时可形成证据保全的结束；干预阻止追索而未取证时保留相应真实结果。完全不参与时，信使可沿侧门自行上船离开，追索者失去踪迹，玩家错过当夜当面调查机会；如已发生受伤、受阻等改变则依据实际结果，不强行离开。流程型可在本段结果成立时结束，开放型仅结束这一事件，世界仍可继续。仅通过实际可感知的船离岸、目击或转述告知玩家；未获知具体去向不能在正文揭示。"},
 		}}

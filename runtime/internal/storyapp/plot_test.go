@@ -69,7 +69,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		if err := json.Unmarshal([]byte(raw), &node); err != nil {
 			return model.TextResponse{}, err
 		}
-		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:lantern-dusk.plot.v1:" + node.ID}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
+		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:" + lanternPlotDefinition().Revision + ":" + node.ID}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
 		result.Projections[0].Scene = "你仍在客栈，刚听见码头铃声。"
 		if g.intervene && node.ID == "courier_window" {
 			var events []Event

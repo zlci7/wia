@@ -15,6 +15,7 @@ import (
 )
 
 type npcDecision struct {
+	RecallQuery  string `json:"recall_query,omitempty"`
 	Speech       string `json:"speech"`
 	ActionIntent string `json:"action_intent"`
 	Silent       bool   `json:"silent"`
@@ -22,17 +23,19 @@ type npcDecision struct {
 }
 
 type turnIntent struct {
+	WaitMinutes int    `json:"wait_minutes,omitempty"`
 	IntentType  string `json:"intent_type"`
 	AddresseeID string `json:"addressee_id"`
 	Visibility  string `json:"visibility"`
 }
 
 type hostResult struct {
-	TimeMinutes     int                `json:"time_minutes"`
-	Scene           string             `json:"scene"`
-	SceneCharacters []string           `json:"scene_characters"`
-	SceneUpdates    []sceneUpdate      `json:"scene_updates"`
-	Outcomes        []hostActionResult `json:"outcomes"`
+	InterruptSources []string           `json:"interrupt_source_ids,omitempty"`
+	TimeMinutes      int                `json:"time_minutes"`
+	Scene            string             `json:"scene"`
+	SceneCharacters  []string           `json:"scene_characters"`
+	SceneUpdates     []sceneUpdate      `json:"scene_updates"`
+	Outcomes         []hostActionResult `json:"outcomes"`
 }
 
 type hostActionResult struct {
@@ -77,10 +80,10 @@ const (
 
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion       = "story.intent.v4"
-	npcPromptVersion          = "story.npc.v11"
-	coordinationPromptVersion = "story.coordination.v11"
-	narrationPromptVersion    = "story.narration.v10"
+	intentPromptVersion       = "story.intent.v5"
+	npcPromptVersion          = "story.npc.v12"
+	coordinationPromptVersion = "story.coordination.v12"
+	narrationPromptVersion    = "story.narration.v11"
 )
 
 type turnStageError struct {
@@ -215,6 +218,9 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	}
 	if world.savePending {
 		return Run{}, ErrWorldBusy
+	}
+	if err := memoryReady(ctx, store.db); err != nil {
+		return Run{}, err
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
@@ -536,6 +542,9 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 		return turnIntent{}, repairCount, err
 	}
 	intent.IntentType = strings.ToLower(cleanText(intent.IntentType))
+	if intent.WaitMinutes < 0 || intent.WaitMinutes > 120 {
+		return turnIntent{}, repairCount, ErrGenerationFailed
+	}
 	intent.Visibility = strings.ToLower(cleanText(intent.Visibility))
 	intent.AddresseeID = cleanText(intent.AddresseeID)
 	if explicitRecipient != "" {
@@ -565,6 +574,12 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	loadStarted := time.Now()
 	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
+		return turnOutput{}, atTurnStage(turnStageLoad, err)
+	}
+	if err = a.prepareLongMemory(ctx, store, &snapshot, run, generator); err != nil {
+		return turnOutput{}, atTurnStage(turnStageLoad, err)
+	}
+	if err = loadCoordinationEvidence(ctx, store, &snapshot, run.Input); err != nil {
 		return turnOutput{}, atTurnStage(turnStageLoad, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
@@ -940,6 +955,19 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
 			defer callCancel()
 			repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+			for recall := 0; err == nil && cleanText(decision.RecallQuery) != ""; recall++ {
+				if recall >= 2 || len([]rune(decision.RecallQuery)) > 256 {
+					err = ErrGenerationFailed
+					break
+				}
+				material = withRecall(material, snapshot.LongMemory[character.EntityID], decision.RecallQuery)
+				material.Required += fmt.Sprintf("\n已完成第%d次只读检索；无新增结果表示没有命中。最多两次，随后根据已获准资料完成决定。", recall+1)
+				callGenerator = a.contextGenerator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
+				decision = npcDecision{}
+				var repairs int
+				repairs, err = generateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+				repairCount += repairs
+			}
 			if err != nil {
 				errMu.Lock()
 				if firstErr == nil {
@@ -1026,6 +1054,23 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 		return hostResult{}, repairCount, err
 	}
 	result.Scene = cleanText(result.Scene)
+	if snapshot.Plot != nil && intent.WaitMinutes > 0 {
+		for _, id := range result.InterruptSources {
+			e, ok := eventByID(events, id)
+			if !ok || e.RunID != run.RunID || e.Stage < 1 || e.Stage > 2 {
+				if a.logger != nil {
+					a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_interruption_source", run.RunID)
+				}
+				return hostResult{}, repairCount, fmt.Errorf("%w: invalid wait interruption source", ErrGenerationFailed)
+			}
+		}
+		if result.TimeMinutes < min(intent.WaitMinutes, plotTimeLimit(snapshot)) && len(result.InterruptSources) == 0 {
+			if a.logger != nil {
+				a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_shortened", run.RunID)
+			}
+			return hostResult{}, repairCount, fmt.Errorf("%w: waiting shortened without interruption evidence", ErrGenerationFailed)
+		}
+	}
 	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > plotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
 		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", ErrGenerationFailed)
 	}
@@ -1253,6 +1298,9 @@ func generateJSONMetrics(ctx context.Context, generator model.TextGenerator, sys
 }
 
 func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields []string, requiredFields ...string) (int, error) {
+	if t := reflect.TypeOf(target); t != nil && t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
+		system += "\n机器可读字段合同（对象只使用以下字段；string表示字符串，[]表示数组，boolean表示布尔值，integer表示整数）：" + generatedFieldContract(t)
+	}
 	var lastValidation error
 	for attempt := 0; attempt < 2; attempt++ {
 		requestSystem := system
@@ -1283,6 +1331,33 @@ func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.
 		return attempt, nil
 	}
 	return 1, ErrGenerationFailed
+}
+
+func generatedFieldContract(t reflect.Type) string {
+	if t.Kind() == reflect.Pointer {
+		return generatedFieldContract(t.Elem())
+	}
+	switch t.Kind() {
+	case reflect.Struct:
+		fields := []string{}
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			name := strings.Split(f.Tag.Get("json"), ",")[0]
+			if name == "" || name == "-" {
+				continue
+			}
+			fields = append(fields, fmt.Sprintf("%q:%s", name, generatedFieldContract(f.Type)))
+		}
+		return "{" + strings.Join(fields, ",") + "}"
+	case reflect.Slice:
+		return "[" + generatedFieldContract(t.Elem()) + "]"
+	case reflect.String:
+		return "string"
+	case reflect.Bool:
+		return "boolean"
+	default:
+		return "integer"
+	}
 }
 
 func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields []string) error {

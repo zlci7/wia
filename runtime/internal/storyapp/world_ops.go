@@ -167,6 +167,15 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 		world.mu.Unlock()
 		return SaveOperation{}, ErrWorldBusy
 	}
+	checkStore, checkErr := openWorldDB(sourcePath)
+	if checkErr == nil {
+		checkErr = memoryReady(ctx, checkStore.db)
+		checkStore.db.Close()
+	}
+	if checkErr != nil {
+		world.mu.Unlock()
+		return SaveOperation{}, checkErr
+	}
 	targetID := newID("world")
 	operation = SaveOperation{OperationID: newID("copy"), RequestKey: requestKey, SourceWorldID: sourceWorldID, TargetWorldID: targetID, TargetName: name, Status: "copying", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	targetPath := a.worldPath(targetID)
@@ -309,6 +318,9 @@ func (a *App) clearSavePending(worldID, operationID string) {
 }
 
 func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, source *worldStore) error {
+	if err := memoryReady(ctx, source.db); err != nil {
+		return err
+	}
 	targetPath := a.worldPath(operation.TargetWorldID)
 	if err := cloneWorld(ctx, source, targetPath, operation.TargetWorldID, operation.TargetName); err != nil {
 		return err

@@ -226,6 +226,28 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	worldID := parts[3]
+	if len(parts) == 5 && (parts[4] == "memory" || parts[4] == "author-memory" || parts[4] == "corrections") {
+		s.memory(w, r, worldID, parts[4])
+		return
+	}
+	if len(parts) == 6 && parts[4] == "memory" && parts[5] == "rebuild" {
+		if r.Method != "POST" {
+			writeError(w, 405, "method_not_allowed", "use POST")
+			return
+		}
+		var request struct {
+			Epoch int64 `json:"expected_context_epoch"`
+		}
+		if !decodeJSON(w, r, &request) {
+			return
+		}
+		if err := s.app.RetryMemory(r.Context(), worldID, request.Epoch); err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 202, map[string]bool{"accepted": true})
+		return
+	}
 	if len(parts) == 4 {
 		s.world(w, r, worldID)
 		return
@@ -292,6 +314,57 @@ func (s *Server) world(w http.ResponseWriter, r *http.Request, id string) {
 	default:
 		writeError(w, 405, "method_not_allowed", "world uses GET or DELETE")
 	}
+}
+
+func (s *Server) memory(w http.ResponseWriter, r *http.Request, id, route string) {
+	if route == "corrections" {
+		switch r.Method {
+		case "POST":
+			var request storyapp.CorrectionRequest
+			if !decodeJSON(w, r, &request) {
+				return
+			}
+			correction, err := s.app.Correct(r.Context(), id, request)
+			if err != nil {
+				writeAppError(w, err)
+				return
+			}
+			writeJSON(w, 202, map[string]any{"correction": correction})
+		case "GET":
+			items, job, err := s.app.Corrections(r.Context(), id)
+			if err != nil {
+				writeAppError(w, err)
+				return
+			}
+			writeJSON(w, 200, map[string]any{"corrections": items, "job": job})
+		default:
+			writeError(w, 405, "method_not_allowed", "use GET or POST")
+		}
+		return
+	}
+	if r.Method != "GET" {
+		writeError(w, 405, "method_not_allowed", "use GET")
+		return
+	}
+	scope := r.URL.Query().Get("scope")
+	if scope == "" {
+		scope = "player"
+	}
+	var before int64
+	if raw := r.URL.Query().Get("before_seq"); raw != "" {
+		var err error
+		before, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || before < 1 {
+			writeAppError(w, storyapp.ErrInvalidRequest)
+			return
+		}
+	}
+	view, err := s.app.ReadMemory(r.Context(), id, scope, route == "author-memory", before)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, 200, view)
 }
 
 func (s *Server) agentSettings(w http.ResponseWriter, r *http.Request, id string) {
@@ -596,6 +669,9 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrWorldBusy):
 		status = 409
 		code = "world_busy"
+	case errors.Is(err, storyapp.ErrMemoryRebuilding):
+		status = 409
+		code = "memory_rebuilding"
 	case errors.Is(err, storyapp.ErrStoryEnded):
 		status = 409
 		code = "story_ended"

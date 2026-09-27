@@ -20,6 +20,7 @@ type contextSection struct {
 }
 
 type contextMaterial struct {
+	RecallSources   []string
 	PolicyRevision  string
 	RequiredSources []string
 	System          string

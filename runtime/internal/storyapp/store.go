@@ -33,6 +33,7 @@ type worldSnapshot struct {
 	Memories      map[string][]Memory
 	Plot          *PlotDefinition
 	PlotProgress  PlotProgress
+	LongMemory    map[string]memoryContext
 }
 
 type worldStore struct {
@@ -84,6 +85,14 @@ func openWorldDB(path string) (*worldStore, error) {
 		return nil, err
 	}
 	if _, err := db.Exec(worldSchema); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(memorySchema); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(correctionSchema); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -427,6 +436,9 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 		if err = validateSceneViews(out); err != nil {
 			return out, err
 		}
+	}
+	if err = applySnapshotCorrections(ctx, store, &out); err != nil {
+		return out, err
 	}
 	return out, nil
 }

@@ -79,6 +79,10 @@ func Open(ctx context.Context, options Options) (*App, error) {
 		_ = processLock.Release()
 		return nil, err
 	}
+	if err := app.resumeMemoryJobs(ctx); err != nil {
+		app.Close()
+		return nil, err
+	}
 	return app, nil
 }
 

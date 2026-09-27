@@ -156,6 +156,9 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		return NarrativeSettings{}, WorldSummary{}, err
 	}
 	defer store.db.Close()
+	if err := memoryReady(ctx, store.db); err != nil {
+		return NarrativeSettings{}, WorldSummary{}, err
+	}
 	if request.Policies != nil {
 		settings.Policies = *request.Policies
 	} else {

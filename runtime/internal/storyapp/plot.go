@@ -265,7 +265,13 @@ func plotEvidenceSections(events []Event) []contextSection {
 		if e.EventType == "turn_settled" {
 			continue
 		}
-		result = append(result, contextSection{Name: "plot_evidence", Text: marshalJSON(e), Sources: []string{e.EventID}})
+		name := "plot_evidence:" + e.RunID
+		if len(result) == 0 || result[len(result)-1].Name != name {
+			result = append(result, contextSection{Name: name})
+		}
+		group := &result[len(result)-1]
+		group.Text += marshalJSON(e) + "\n"
+		group.Sources = append(group.Sources, e.EventID)
 	}
 	return result
 }
@@ -394,8 +400,8 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	if len(allowed) > 0 {
 		material := contextMaterial{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
-		material.Required += "\n另含 scene_updates 数组，每项 content/source_ids/recipients，与场景视图合同相同：每人至多一项，content 为行动后的完整简明情境，来源引用本人 view:ID 或本次 outcome.action_id，只有该结果的获准接收者可引用。当前视图：" + marshalJSON(output.SceneViews)
-		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v2")
+		material.Required += plotActionSceneContract(*output, allowed)
+		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v3")
 		var resolved struct {
 			Outcomes     []hostActionResult `json:"outcomes"`
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`
@@ -409,12 +415,18 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		for _, outcome := range resolved.Outcomes {
 			for _, id := range outcome.Recipients {
 				if !slices.Contains(allowed[outcome.ActionID], id) {
+					if a.logger != nil {
+						a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=outcome_audience", run.RunID)
+					}
 					return nil, ErrGenerationFailed
 				}
 			}
 		}
 		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, resolved.Outcomes)
 		if err != nil {
+			if a.logger != nil {
+				a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)
+			}
 			return nil, err
 		}
 		for i := range results {
@@ -437,6 +449,9 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			sources[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
 		}
 		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {
+			if a.logger != nil {
+				a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=scene_sources detail=%q", run.RunID, err.Error())
+			}
 			return nil, err
 		}
 	}
@@ -444,4 +459,13 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	output.Perceptions = append(output.Perceptions, extra.Perceptions...)
 	output.Memories = append(output.Memories, extra.Memories...)
 	return visible, nil
+}
+
+func plotActionSceneContract(output turnOutput, allowed map[string][]string) string {
+	sources := map[string]sceneSource{}
+	for _, v := range output.SceneViews {
+		id := "view:" + v.Recipient
+		sources[id] = sceneSource{ID: id, Content: v.Content, Recipients: []string{v.Recipient}}
+	}
+	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + marshalJSON(sources) + "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）：" + marshalJSON(allowed)
 }

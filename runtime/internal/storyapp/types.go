@@ -69,6 +69,8 @@ type App struct {
 	copyCancel      context.CancelFunc
 	copyMu          sync.Mutex
 	copyWG          sync.WaitGroup
+	memoryWorkers   map[string]bool
+	memoryWake      map[string]bool
 	closing         bool
 	logger          Logger
 	closed          chan struct{}

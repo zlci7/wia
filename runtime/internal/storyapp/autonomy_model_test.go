@@ -78,7 +78,7 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool) {
 		}
 		if r.Status != "completed" {
 			for _, line := range strings.Split(logger.String(), "\n") {
-				if strings.Contains(line, r.RunID) && (strings.Contains(line, "validation failed") || strings.Contains(line, "rejected:") || strings.Contains(line, "turn failed")) {
+				if strings.Contains(line, r.RunID) && (strings.Contains(line, "story JSON validation:") || strings.Contains(line, "validation failed") || strings.Contains(line, "rejected:") || strings.Contains(line, "turn failed")) {
 					t.Log(line)
 				}
 			}
