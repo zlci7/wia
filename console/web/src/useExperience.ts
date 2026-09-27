@@ -89,8 +89,11 @@ export function useExperience() {
   });
   const settings = ref(defaults()),
     settingsForm = reactive(defaults()),
-    settingsEpoch = ref(0),
+    settingsWorldName = ref(""),
     detailsOpen = ref(false);
+  let settingsEdit:
+    | { worldID: string; name: string; epoch: number; valid: boolean }
+    | undefined;
   const textarea = ref<HTMLTextAreaElement>(),
     runs = reactive<Record<string, Run | undefined>>({});
   const seenFailures = new Map<string, string>();
@@ -166,9 +169,9 @@ export function useExperience() {
     },
   ] as const;
   const lengths = [
-    { value: "concise", label: "简短", note: "约 120–300 字" },
-    { value: "standard", label: "标准", note: "约 300–600 字" },
-    { value: "detailed", label: "细致", note: "约 600–1200 字" },
+    { value: "concise", label: "简短", note: "直接呈现关键回应和变化" },
+    { value: "standard", label: "标准", note: "按本轮新增内容适度展开" },
+    { value: "detailed", label: "细致", note: "充分描写有信息量的内容" },
   ] as const;
   const players = [
     { value: "restrained", label: "克制", note: "间接转述，只补必要衔接" },
@@ -262,6 +265,7 @@ export function useExperience() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   function showDialog(value: Dialog) {
+    if (value !== "settings") settingsEdit = undefined;
     moreOpen.value = false;
     dialogError.value = "";
     dialog.value = value;
@@ -292,6 +296,7 @@ export function useExperience() {
     reader.forget(id);
     delete runs[id];
     if (currentWorld.value?.world_id !== id) return;
+    invalidateSettings();
     generation++;
     currentWorld.value = null;
     characters.value = [];
@@ -311,11 +316,13 @@ export function useExperience() {
         return;
       if (currentWorld.value?.world_id !== id) {
         reader.remember();
-        if (dialog.value === "settings" && !dialogBusy.value) {
-          showDialog("");
-          notice.value = "活动存档已切换，请重新打开故事设置。";
-        }
+        invalidateSettings();
       }
+      if (
+        currentWorld.value?.world_id === id &&
+        snapshot.world.context_epoch < currentWorld.value.context_epoch
+      )
+        return;
       currentWorld.value = snapshot.world;
       if (view.value === "play" || !gameID.value)
         gameID.value = snapshot.world.game_id;
@@ -341,6 +348,8 @@ export function useExperience() {
       const [next, list] = await Promise.all([fetchStatus(), fetchWorlds()]);
       if (epoch !== generation || stopped) return;
       status.value = next;
+      if (settingsEdit && next.active_world?.world_id !== settingsEdit.worldID)
+        invalidateSettings();
       worlds.value = list;
       connectionError.value = "";
       if (!games.value.length) {
@@ -463,12 +472,25 @@ export function useExperience() {
     showDialog("copy");
   }
   function openSettings() {
-    if (!currentWorld.value) return;
-    formWorldID.value = currentWorld.value.world_id;
-    settingsEpoch.value = currentWorld.value.context_epoch;
+    if (!currentWorld.value || dialogBusy.value) return;
+    settingsEdit = {
+      worldID: currentWorld.value.world_id,
+      name: currentWorld.value.name,
+      epoch: currentWorld.value.context_epoch,
+      valid: true,
+    };
+    settingsWorldName.value = currentWorld.value.name;
     Object.assign(settingsForm, settings.value);
     detailsOpen.value = false;
     showDialog("settings");
+  }
+  function invalidateSettings() {
+    if (!settingsEdit) return;
+    settingsEdit.valid = false;
+    if (!dialogBusy.value) {
+      showDialog("");
+      notice.value = "活动存档已切换，请重新打开故事设置。";
+    }
   }
   async function configureModel() {
     if (dialogBusy.value) return;
@@ -493,29 +515,54 @@ export function useExperience() {
     }
   }
   async function configureSettings() {
-    if (dialogBusy.value || activeRun.value) return;
+    const editing = settingsEdit;
+    if (
+      dialogBusy.value ||
+      activeRun.value ||
+      !editing ||
+      dialog.value !== "settings"
+    )
+      return;
+    const ownsDialog = () =>
+      !stopped && settingsEdit === editing && dialog.value === "settings";
     dialogBusy.value = true;
     dialogError.value = "";
-    const id = formWorldID.value;
     try {
-      if (currentWorld.value?.world_id !== id)
+      if (!editing.valid || currentWorld.value?.world_id !== editing.worldID)
         throw new Error("活动存档已切换，请重新打开故事设置。");
       const result = await saveAgentSettings(
-        id,
+        editing.worldID,
         { ...settingsForm },
-        settingsEpoch.value,
+        editing.epoch,
       );
-      if (currentWorld.value?.world_id === id) {
+      if (!ownsDialog()) return;
+      const superseded =
+        currentWorld.value?.world_id === editing.worldID &&
+        result.world.context_epoch < currentWorld.value.context_epoch;
+      if (
+        editing.valid &&
+        currentWorld.value?.world_id === editing.worldID &&
+        result.world.context_epoch >= currentWorld.value.context_epoch
+      ) {
         settings.value = result.settings;
         currentWorld.value = result.world;
       }
+      dialogBusy.value = false;
       showDialog("");
-      notice.value = "故事设置已保存，从下一轮生效。";
+      notice.value = superseded
+        ? `“${editing.name}”的设置提交已完成，当前设置已有更新。`
+        : `“${editing.name}”的故事设置已保存，从下一轮生效。`;
       await freshRefresh();
     } catch (error) {
-      dialogError.value = describe(error);
+      if (!ownsDialog()) return;
+      if (editing.valid) dialogError.value = describe(error);
+      else
+        notice.value = `“${editing.name}”的故事设置未保存：${describe(error)}`;
     } finally {
-      dialogBusy.value = false;
+      if (ownsDialog()) {
+        dialogBusy.value = false;
+        if (!editing.valid) showDialog("");
+      }
     }
   }
   async function createOrCopy() {
@@ -762,6 +809,7 @@ export function useExperience() {
     providers,
     modelAdvanced,
     settingsForm,
+    settingsWorldName,
     detailsOpen,
     textarea,
     reader,

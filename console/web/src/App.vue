@@ -23,6 +23,7 @@ const {
   providers,
   modelAdvanced,
   settingsForm,
+  settingsWorldName,
   detailsOpen,
   textarea,
   reader,
@@ -512,7 +513,9 @@ const {
         </form>
       </template>
       <template v-else-if="dialog === 'settings'">
-        <p class="subtle">只属于当前存档，从下一轮生效；另存会继承设置。</p>
+        <p class="subtle">
+          属于“{{ settingsWorldName }}”，从下一轮生效；另存会继承设置。
+        </p>
         <form @submit.prevent="configureSettings">
           <fieldset :disabled="dialogBusy || !!activeRun">
             <span class="field-label"

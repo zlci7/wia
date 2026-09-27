@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "node scripts/prepare-dist.mjs && vite build",
     "type-check": "vue-tsc --noEmit",
+    "test:settings": "node scripts/check-settings.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
