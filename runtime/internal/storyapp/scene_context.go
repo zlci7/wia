@@ -77,6 +77,9 @@ func sceneSources(snapshot worldSnapshot, run Run, intent turnIntent, events []E
 	}
 	public := append([]string{"player"}, characterIDs(sceneCharacters(snapshot.Characters))...)
 	for _, event := range events {
+		if event.RunID != run.RunID || event.Stage < 1 || event.Stage > 2 {
+			continue
+		}
 		var recipients []string
 		switch event.EventType {
 		case "player_attempt":
@@ -106,7 +109,7 @@ func applySceneUpdates(snapshot worldSnapshot, run Run, intent turnIntent, outpu
 	}
 	for i, outcome := range host.Outcomes {
 		action, ok := eventByID(output.Events, outcome.ActionID)
-		if !ok {
+		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
 			return nil, ErrGenerationFailed
 		}
 		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)

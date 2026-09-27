@@ -242,6 +242,8 @@ export function useExperience() {
             "场景结果未能确定，输入仍保留，可以重试。",
           intent_generation_failed: "未能理解这次输入，输入仍保留，可以重试。",
           generation_timeout: "模型响应超时，输入仍保留，可以重试。",
+          context_capacity_exceeded: "本轮必需内容超出模型可用容量。输入已保留，请缩短本轮输入或在模型设置中选择容量足够的模型。",
+          context_source_missing: "故事所需的来源记录不完整，本轮未保存。输入已保留，请检查存档或恢复完整备份。",
         } as Record<string, string>
       )[item.reason ?? ""] ??
       item.error ??

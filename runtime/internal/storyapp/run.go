@@ -60,6 +60,7 @@ type narrativeEvent struct {
 	ActorRole          string `json:"actor_role,omitempty"`
 	NarrativeReference string `json:"narrative_reference"`
 	Stage              int    `json:"stage"`
+	SpeechScope        string `json:"speech_scope,omitempty"`
 	Content            string `json:"content"`
 }
 
@@ -75,10 +76,10 @@ const (
 
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion       = "story.intent.v3"
-	npcPromptVersion          = "story.npc.v5"
-	coordinationPromptVersion = "story.coordination.v5"
-	narrationPromptVersion    = "story.narration.v6"
+	intentPromptVersion       = "story.intent.v4"
+	npcPromptVersion          = "story.npc.v6"
+	coordinationPromptVersion = "story.coordination.v6"
+	narrationPromptVersion    = "story.narration.v7"
 )
 
 type turnStageError struct {
@@ -105,6 +106,12 @@ func stageOf(err error) string {
 }
 
 func classifyTurnFailure(err error) (status, reason, message string) {
+	if errors.Is(err, ErrContextCapacity) || errors.Is(err, model.ErrTextInputTooLarge) {
+		return "failed", "context_capacity_exceeded", "required story context exceeds available model capacity"
+	}
+	if errors.Is(err, ErrContextSourceMissing) {
+		return "failed", "context_source_missing", "story context references are incomplete"
+	}
 	if errors.Is(err, context.Canceled) {
 		return "cancelled", "cancelled", "the turn was cancelled"
 	}
@@ -527,7 +534,7 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 
 func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, generator model.TextGenerator) (turnOutput, error) {
 	loadStarted := time.Now()
-	snapshot, err := loadWorldSnapshot(ctx, store, 40)
+	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
 		return turnOutput{}, atTurnStage(turnStageLoad, err)
 	}
@@ -547,7 +554,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	output := turnOutput{
 		Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
 		SceneCharacters: characterIDs(participants),
-		Events:          []Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player", CreatedAt: now}},
+		Events:          []Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
 		Memories:        []Memory{}, Perceptions: []Perception{},
 	}
 	decisions := make(map[string]npcDecision)
@@ -955,17 +962,6 @@ func characterDisplayName(characters []Character, id string) string {
 	return id
 }
 
-func joinMemories(items []Memory) string {
-	var parts []string
-	for _, item := range items {
-		parts = append(parts, item.Kind+"："+item.Content)
-	}
-	if len(parts) == 0 {
-		return "（暂无）"
-	}
-	return strings.Join(parts, "\n")
-}
-
 func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, intent turnIntent, decisions map[string]npcDecision, events []Event, publicReplies string) (hostResult, int, error) {
 	if generator == nil {
 		return hostResult{}, 0, ErrModelNotConfigured
@@ -1023,7 +1019,13 @@ func narrativeEvents(events []Event, characters []Character, playerName string, 
 				break
 			}
 		}
-		result = append(result, narrativeEvent{EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
+		speechScope := ""
+		if event.EventType == "npc_dialogue" || event.SourceType == "player_public" {
+			speechScope = "public_current_scene"
+		} else if event.SourceType == "player_private" {
+			speechScope = "private_recipient"
+		}
+		result = append(result, narrativeEvent{SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
 	}
 	return result
 }
@@ -1121,23 +1123,6 @@ func coordinationContinuity(events []Event) string {
 	}
 	data, _ := json.Marshal(completed)
 	return "连续状态规则：scene 是本轮结束后的简明状态快照，写人物位置、物件状态及仍成立的环境，不是动作回放或对白记录。此前已提交行动结果是连续状态的依据；按时间顺序接续，较新的明确结果覆盖同一事项的旧状态。上一场景中取碗、斟茶、递物等进行式描述，若对应结果已经完成，应写为完成后的状态，不能再次执行。输入与已完成动作重叠时，结合当前状态承接新意图。本轮未提出或未确认的新行动不能借 scene 补出；没有动作变化时沿用完成状态，不把人物移回原位置。\n此前已提交行动结果（仅作状态依据，不属于本轮待裁定行动）：" + string(data) + "\n"
-}
-
-func narrativeHistory(messages []Message) string {
-	var parts []string
-	for i := len(messages) - 1; i >= 0 && len(parts) < 8; i-- {
-		message := messages[i]
-		if message.Kind == "narrative" && cleanText(message.Content) != "" {
-			parts = append(parts, message.Content)
-		}
-	}
-	if len(parts) == 0 {
-		return "（暂无）"
-	}
-	for left, right := 0, len(parts)-1; left < right; left, right = left+1, right-1 {
-		parts[left], parts[right] = parts[right], parts[left]
-	}
-	return strings.Join(parts, "\n")
 }
 
 func coordinationDecisionContext(decisions map[string]npcDecision, characters []Character) string {

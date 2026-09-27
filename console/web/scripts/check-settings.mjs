@@ -106,6 +106,13 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "context failures give actionable feedback without altering drafts"(x) {
+    x.session.value.draft = "保留这段输入";
+    const draft = x.session.value.draft;
+    assert.match(x.failureText({ status: "failed", reason: "context_capacity_exceeded" }), /容量.*输入已保留/);
+    assert.match(x.failureText({ status: "failed", reason: "context_source_missing" }), /来源记录不完整.*本轮未保存/);
+    assert.equal(x.session.value.draft, draft);
+  },
   async "polling preserves draft epoch and conflict"(x) {
     x.openSettings();
     x.settingsForm.length = "concise";

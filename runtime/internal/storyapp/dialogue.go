@@ -10,7 +10,7 @@ import (
 // Dialogue is sourced from committed events, never UI messages or failed inputs.
 func loadDialogue(ctx context.Context, db *sql.DB) ([]Event, error) {
 	rows, err := db.QueryContext(ctx, `SELECT e.event_id,e.event_type,e.actor_id,e.target_id,e.content,e.run_id,
-	CASE WHEN EXISTS(SELECT 1 FROM perceptions p WHERE p.source_event_id=e.event_id AND p.source_type='direct_private_message') THEN 'private' ELSE 'public' END
+	CASE WHEN EXISTS(SELECT 1 FROM perceptions p WHERE p.source_event_id=e.event_id AND p.source_type IN ('direct_private_message','observed_private_conversation')) THEN 'private' ELSE 'public' END
 	FROM events e WHERE e.run_id IN (SELECT run_id FROM runs WHERE status='completed' ORDER BY input_seq DESC,created_at DESC LIMIT 4)
 	AND e.event_type IN ('player_attempt','npc_dialogue') ORDER BY e.seq`)
 	if err != nil {

@@ -403,10 +403,6 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 			return out, err
 		}
 	}
-	out.Sources, err = loadSourceMetadata(ctx, store.db, out)
-	if err != nil {
-		return out, err
-	}
 	return out, nil
 }
 

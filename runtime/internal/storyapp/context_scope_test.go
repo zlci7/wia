@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"gameagent/runtime/internal/model"
 )
@@ -29,7 +30,7 @@ func readContextSnapshot(t *testing.T, a *App, id string) worldSnapshot {
 		t.Fatal(err)
 	}
 	defer store.db.Close()
-	s, err := loadWorldSnapshot(context.Background(), store, 40)
+	s, err := loadTurnSnapshot(context.Background(), store, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +41,7 @@ func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
 	s := contextFixture()
 	run := Run{RunID: "run"}
 	intent := turnIntent{Visibility: "private", AddresseeID: "npc:innkeeper"}
-	output := turnOutput{Events: []Event{{EventID: "run:input", EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
+	output := turnOutput{Events: []Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
 	for _, test := range []struct {
 		name            string
 		ids, recipients []string
@@ -129,9 +130,12 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	}
 }
 
-type invalidSceneGenerator struct{ base *scriptedGenerator }
+type sceneUpdateGenerator struct {
+	base      *scriptedGenerator
+	recipient string
+}
 
-func (g invalidSceneGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
+func (g sceneUpdateGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
 	response, err := g.base.GenerateText(ctx, req)
 	if err != nil {
 		return response, err
@@ -147,7 +151,11 @@ func (g invalidSceneGenerator) GenerateText(ctx context.Context, req model.TextR
 		_ = json.Unmarshal([]byte(req.Input[start:start+end]), &sources)
 		for _, source := range sources {
 			if strings.HasSuffix(source.ID, ":input") {
-				host.SceneUpdates = []sceneUpdate{{Content: "隐藏原文", SourceIDs: []string{source.ID}, Recipients: []string{"npc:mercenary"}}}
+				recipient := g.recipient
+				if recipient == "" {
+					recipient = "npc:mercenary"
+				}
+				host.SceneUpdates = []sceneUpdate{{Content: "隐藏原文", SourceIDs: []string{source.ID}, Recipients: []string{recipient}}}
 			}
 		}
 		data, _ := json.Marshal(host)
@@ -157,7 +165,7 @@ func (g invalidSceneGenerator) GenerateText(ctx context.Context, req model.TextR
 }
 
 func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
-	a := newTestApp(t, invalidSceneGenerator{base: &scriptedGenerator{}})
+	a := newTestApp(t, sceneUpdateGenerator{base: &scriptedGenerator{}})
 	w, err := a.CreateWorld(context.Background(), "私密场景", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
@@ -191,6 +199,132 @@ func TestLegacySceneViewsUseOnlyAuthorizedRecords(t *testing.T) {
 	for _, id := range []string{"player", "npc:mercenary"} {
 		if sceneFor(s, id) != "茶在桌上。" {
 			t.Fatalf("%s: %s", id, sceneFor(s, id))
+		}
+	}
+}
+
+func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
+	g := &scriptedGenerator{}
+	a := newTestApp(t, g)
+	w, err := a.CreateWorld(context.Background(), "缺失来源", "guided", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _, _ := a.worldRecord(context.Background(), w.WorldID)
+	store, err := openWorldDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('npc:mercenary','missing','observed','交谈迹象',1,1,?)`, nowText())
+	store.db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.ReadWorld(context.Background(), w.WorldID, 100); err != nil {
+		t.Fatalf("history unavailable: %v", err)
+	}
+	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: "missing", Input: "打招呼"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done := waitRun(t, a, w.WorldID, r.RunID); done.Status != "failed" || done.Reason != "context_source_missing" {
+		t.Fatalf("%+v", done)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.requests) != 0 {
+		t.Fatal("model called with incomplete sources")
+	}
+}
+
+func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
+	events := narrativeEvents([]Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", NarrativeSettings{})
+	if len(events) != 1 || events[0].SpeechScope != "public_current_scene" {
+		t.Fatalf("%+v", events)
+	}
+}
+
+func TestNarrativeEventsPreservePlayerAudibility(t *testing.T) {
+	for _, test := range []struct{ source, scope string }{{"player_public", "public_current_scene"}, {"player_private", "private_recipient"}} {
+		events := narrativeEvents([]Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", NarrativeSettings{})
+		if len(events) != 1 || events[0].SpeechScope != test.scope {
+			t.Fatalf("%+v", events)
+		}
+	}
+}
+
+func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
+	s := contextFixture()
+	events := []Event{
+		{EventID: "valid", RunID: "current", Stage: 1, EventType: "player_attempt"},
+		{EventID: "foreign", RunID: "foreign", Stage: 1, EventType: "player_attempt"},
+		{EventID: "future", RunID: "current", Stage: 9, EventType: "npc_dialogue"},
+	}
+	sources := sceneSources(s, Run{RunID: "current"}, turnIntent{Visibility: "public"}, events)
+	var valid bool
+	for _, source := range sources {
+		if source.ID == "foreign" || source.ID == "future" {
+			t.Fatal("invalid stage/run source admitted")
+		}
+		if source.ID == "valid" {
+			valid = true
+		}
+	}
+	if !valid {
+		t.Fatal("current source missing")
+	}
+}
+
+func TestPrivateSceneViewsSurviveCopyAndRuntimeRestart(t *testing.T) {
+	g := sceneUpdateGenerator{base: &scriptedGenerator{}, recipient: "npc:innkeeper"}
+	a := newTestApp(t, g)
+	w, err := a.CreateWorld(context.Background(), "场景保存", "guided", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: "private", Input: "私下向老板说隐藏原文"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done := waitRun(t, a, w.WorldID, r.RunID); done.Status != "completed" {
+		t.Fatalf("%+v", done)
+	}
+	before := readContextSnapshot(t, a, w.WorldID)
+	if sceneFor(before, "npc:innkeeper") != "隐藏原文" || strings.Contains(sceneFor(before, "npc:mercenary"), "隐藏原文") {
+		t.Fatal("invalid scoped scene")
+	}
+	status, err := a.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	op, err := a.SaveAs(context.Background(), w.WorldID, "分支", "scene-copy", status.ActiveRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && op.Status != "ready" {
+		op, err = a.CopyOperation(context.Background(), op.OperationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if op.Status != "ready" {
+		t.Fatalf("%+v", op)
+	}
+	root := a.DataRoot()
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(context.Background(), Options{DataRoot: root, UserID: LocalUserID, Generator: g})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	for _, id := range []string{w.WorldID, op.TargetWorldID} {
+		after := readContextSnapshot(t, reopened, id)
+		if !reflect.DeepEqual(before.SceneViews, after.SceneViews) {
+			t.Fatal("scene provenance changed across restart/copy")
 		}
 	}
 }
