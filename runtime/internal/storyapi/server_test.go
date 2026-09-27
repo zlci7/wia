@@ -131,6 +131,18 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	}
 	decodeJSONBody(t, body, &worldEnvelope)
 	world := worldEnvelope.World
+	for _, query := range []string{"limit=0", "limit=201", "limit=no", "limit=", "before_seq=0", "before_seq=-1", "before_seq=bad", "after_seq=-1", "after_seq=", "after_seq=9223372036854775808", "before_seq=2&after_seq=0"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages?"+query, nil)
+		if response.StatusCode != http.StatusBadRequest {
+			t.Fatalf("invalid cursor %s: %d %s", query, response.StatusCode, body)
+		}
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages?after_seq=0&limit=1", nil)
+	var messagePage storyapp.MessagePage
+	decodeJSONBody(t, body, &messagePage)
+	if response.StatusCode != http.StatusOK || len(messagePage.Messages) != 1 || messagePage.Messages[0].Seq != 1 || messagePage.HasMore {
+		t.Fatalf("message page: %d %s", response.StatusCode, body)
+	}
 	if world.WorldID == "" || world.MessageHead != 1 || world.EventHead != 1 {
 		t.Fatalf("created world = %+v", world)
 	}
@@ -289,6 +301,10 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID), nil)
 	if response.StatusCode != http.StatusNotFound {
 		t.Fatalf("deleted active world remains readable = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages", nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("deleted messages remain readable = %d, body = %s", response.StatusCode, body)
 	}
 	response, body = requestJSON(t, client, http.MethodDelete, server.URL()+"/api/v1/worlds/"+url.PathEscape(operation.TargetWorldID)+"?expected_active_revision=2", nil)
 	if response.StatusCode != http.StatusNoContent {

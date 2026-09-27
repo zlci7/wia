@@ -5,6 +5,7 @@ import {
   type ModelCandidate,
   type ModelInfo,
   type Message,
+  type MessagePage,
   type NarrativeSettings,
   type Run,
   type SaveOperation,
@@ -60,6 +61,13 @@ export async function createWorld(input: { name: string; mode: string; player_na
 
 export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; messages: Message[]; characters: Character[] }> {
   return request(`/api/v1/worlds/${encodeURIComponent(worldID)}`)
+}
+
+export async function fetchMessages(worldID: string, cursor: { before_seq?: number; after_seq?: number } = {}): Promise<MessagePage> {
+  const query = new URLSearchParams({ limit: '100' })
+  if (cursor.before_seq !== undefined) query.set('before_seq', String(cursor.before_seq))
+  if (cursor.after_seq !== undefined) query.set('after_seq', String(cursor.after_seq))
+  return request(`/api/v1/worlds/${encodeURIComponent(worldID)}/messages?${query}`)
 }
 
 export async function saveAgentSettings(worldID: string, settings: NarrativeSettings, expectedContextEpoch: number): Promise<{ settings: NarrativeSettings; world: WorldSummary }> {

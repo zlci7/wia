@@ -316,18 +316,37 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request, id string) {
 		writeError(w, 405, "method_not_allowed", "messages are read with GET")
 		return
 	}
-	limit := 100
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 && n < 500 {
-			limit = n
+	query := r.URL.Query()
+	request := storyapp.MessagePageRequest{Limit: 100}
+	if query.Has("limit") {
+		n, err := strconv.Atoi(query.Get("limit"))
+		if err != nil || n < 1 || n > 200 {
+			writeError(w, 400, "invalid_request", "limit must be between 1 and 200")
+			return
+		}
+		request.Limit = n
+	}
+	for _, key := range []string{"before_seq", "after_seq"} {
+		if !query.Has(key) {
+			continue
+		}
+		seq, err := strconv.ParseInt(query.Get(key), 10, 64)
+		if err != nil || seq < 0 || (key == "before_seq" && seq == 0) {
+			writeError(w, 400, "invalid_request", "invalid message cursor")
+			return
+		}
+		if key == "before_seq" {
+			request.BeforeSeq = &seq
+		} else {
+			request.AfterSeq = &seq
 		}
 	}
-	messages, err := s.app.ReadMessages(r.Context(), id, limit)
+	page, err := s.app.ReadMessagePage(r.Context(), id, request)
 	if err != nil {
 		writeAppError(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"messages": messages})
+	writeJSON(w, 200, page)
 }
 func (s *Server) entities(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method != "GET" {

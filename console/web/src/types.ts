@@ -70,6 +70,13 @@ export interface Message {
   created_at: string
 }
 
+export interface MessagePage {
+  messages: Message[]
+  has_more: boolean
+  next_before_seq?: number
+  next_after_seq?: number
+}
+
 export interface Run {
   run_id: string
   request_key: string
