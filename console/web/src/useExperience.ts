@@ -46,7 +46,8 @@ type Dialog =
   | "new"
   | "copy"
   | "delete"
-  | "scene";
+  | "scene"
+  | "memory";
 export function useExperience() {
   const status = ref<Status | null>(null),
     games = ref<GameSummary[]>([]),
@@ -219,6 +220,7 @@ export function useExperience() {
         copy: "另存当前进度",
         delete: "删除存档",
         scene: "场景与人物",
+        memory: "回顾与纠正",
         "": "",
       })[dialog.value],
   );
@@ -234,6 +236,7 @@ export function useExperience() {
           {
             model_not_configured: "请先连接模型，再继续故事。",
             world_busy: "这个存档正在处理上一项操作，请稍候。",
+            memory_rebuilding: "回顾正在重建，请在“回顾与纠正”中查看进度或重试，完成后继续故事。",
             story_ended: "这段流程故事已结束，可以阅读、另存，或从剧本页开始新的故事。",
             version_conflict: "故事状态已更新，请重新打开此操作后重试。",
             storage_unavailable: "存档暂时无法读写，请稍后重试。",
@@ -320,6 +323,7 @@ export function useExperience() {
     delete runs[id];
     delete submissions[id];
     if (currentWorld.value?.world_id !== id) return;
+    if (dialog.value === "memory") { dialog.value = ""; dialogBusy.value = false; }
     invalidateSettings();
     generation++;
     currentWorld.value = null;
@@ -339,6 +343,7 @@ export function useExperience() {
       if (epoch !== generation || status.value?.active_world?.world_id !== id)
         return;
       if (currentWorld.value?.world_id !== id) {
+        if (dialog.value === "memory") { dialog.value = ""; dialogBusy.value = false; }
         reader.remember();
         invalidateSettings();
       }

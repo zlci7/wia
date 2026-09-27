@@ -13,6 +13,18 @@ import {
   type Status,
   type WorldSummary,
 } from './types'
+import type { MemoryView, CorrectionRequest } from './types'
+
+export function fetchMemory(world: string, author = false, scope = 'player', before = 0): Promise<MemoryView> {
+  const query = new URLSearchParams({ scope }); if (before) query.set('before_seq', String(before));
+  return request(`/api/v1/worlds/${encodeURIComponent(world)}/${author ? 'author-memory' : 'memory'}?${query}`)
+}
+export function correctMemory(world: string, payload: CorrectionRequest): Promise<unknown> {
+  return request(`/api/v1/worlds/${encodeURIComponent(world)}/corrections`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+}
+export function rebuildMemory(world: string, epoch: number): Promise<unknown> {
+  return request(`/api/v1/worlds/${encodeURIComponent(world)}/memory/rebuild`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_context_epoch: epoch }) })
+}
 
 export async function exchangeBootstrapToken(): Promise<void> {
   const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))

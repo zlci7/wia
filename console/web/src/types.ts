@@ -126,3 +126,15 @@ export class ApiError extends Error {
     super(message)
   }
 }
+
+export interface MemoryRecord { kind: string; scope: string; target_id: string; content: string }
+export interface MemorySource { scope: string; seq: number; id: string; event_id: string; run_id: string; actor: string; kind: string; content: string; created_at: string }
+export interface MemoryView {
+	corrections: { epoch: number; kind: string; scope: string; target_id: string; original: string; replacement: string }[];
+  world_id: string; context_epoch: number; scope: string; scopes: string[];
+  digest: { revision: number; through_seq: number; content: string; states: { kind: string; content: string; source_ids: string[] }[]; source_ids: string[] };
+  sources: MemorySource[]; records: MemoryRecord[];
+  job: { epoch: number; status: string; completed: number; scopes: string[] | null; error: string };
+  has_more: boolean; next_before_seq?: number;
+}
+export interface CorrectionRequest { request_key: string; expected_context_epoch: number; kind: string; scope: string; target_id: string; replacement: string }
