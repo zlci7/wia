@@ -145,7 +145,7 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	material := contextMaterial{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + digestContext(previous) + "\n新增连续经历：\n" + memoryRecordsText(prefix), RequiredSources: allowed}
 	material.Required += "\nsource_ids 的完整合法记录ID列表：" + marshalJSON(allowed) + "\n本次列表仅含保留状态的必要来源与新增记录，完整历史覆盖仍由存档维护。每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
 	material.System += memoryCorrectionRule
-	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v2")
+	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v3")
 	var result struct {
 		Content string            `json:"content"`
 		States  []SubjectiveState `json:"states"`
@@ -247,10 +247,10 @@ func withRecall(material contextMaterial, m memoryContext, query string) context
 		tail[s.ID] = true
 	}
 	groups := memoryGroups(m.Archive)
+	var selected []contextSection
 	// Lowest-ranked matches are removed first by the shared budgeter. A hit
 	// selects its entire committed group so attempts keep their outcomes.
-	for i := len(hits) - 1; i >= 0; i-- {
-		s := hits[i]
+	for _, s := range hits {
 		if tail[s.ID] || containsID(material.RecallSources, s.ID) {
 			continue
 		}
@@ -269,9 +269,12 @@ func withRecall(material contextMaterial, m memoryContext, query string) context
 				section.Sources = append(section.Sources, record.ID)
 				material.RecallSources = append(material.RecallSources, record.ID)
 			}
-			material.Optional = append(material.Optional, section)
+			selected = append(selected, section)
 			break
 		}
+	}
+	for i := len(selected) - 1; i >= 0; i-- {
+		material.Optional = append(material.Optional, selected[i])
 	}
 	return material
 }

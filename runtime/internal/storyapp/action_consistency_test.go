@@ -7,6 +7,7 @@ import (
 	"gameagent/runtime/internal/model"
 	"strings"
 	"testing"
+	"time"
 )
 
 type plotPresenceGenerator struct {
@@ -44,6 +45,9 @@ func TestPlotActionPresencePersistsAndControlsNextRound(t *testing.T) {
 	}
 	for i, present := range []bool{false, true} {
 		g.present = present
+		g.base.mu.Lock()
+		requestStart := len(g.base.requests)
+		g.base.mu.Unlock()
 		r, err := app.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: fmt.Sprint(i), Input: "等候"})
 		if err != nil {
 			t.Fatal(err)
@@ -59,12 +63,49 @@ func TestPlotActionPresencePersistsAndControlsNextRound(t *testing.T) {
 		}
 		if i == 1 {
 			g.base.mu.Lock()
-			defer g.base.mu.Unlock()
-			for _, req := range g.base.requests {
-				if strings.Contains(req.Input, r.RunID) && strings.Contains(req.System, "重要 NPC") && strings.Contains(req.Input, "阶段：1") && strings.Contains(req.Input, "铁杉") {
+			for _, req := range g.base.requests[requestStart:] {
+				if strings.Contains(req.System, "重要 NPC") && strings.Contains(req.Input, "阶段：1") && strings.Contains(req.Input, "你的身份：铁杉") {
+					g.base.mu.Unlock()
 					t.Fatal("departed NPC was scheduled at stage 1")
 				}
 			}
+			g.base.mu.Unlock()
+		}
+	}
+	status, _ := app.Status(ctx)
+	op, err := app.SaveAs(ctx, w.WorldID, "进出场分支", "presence-copy", status.ActiveRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(5 * time.Second); op.Status != "ready" && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+		op, err = app.CopyOperation(ctx, op.OperationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if op.Status != "ready" {
+		t.Fatal(op)
+	}
+	root := app.dataRoot
+	if err = app.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, Options{DataRoot: root, Generator: g})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	for _, id := range []string{w.WorldID, op.TargetWorldID} {
+		s := readContextSnapshot(t, reopened, id)
+		found := false
+		for _, c := range s.Characters {
+			if c.EntityID == "npc:mercenary" {
+				found = c.InScene
+			}
+		}
+		if !found {
+			t.Fatal("presence lost after copy/restart")
 		}
 	}
 }

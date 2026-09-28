@@ -15,9 +15,7 @@ func composeIntent(snapshot worldSnapshot, run Run) contextMaterial {
 	input := fmt.Sprintf("当前地点：%s\n当前时间：%s\n在场人物：\n%s玩家输入：%s\n显式目标（若有）：%s\n请判断玩家本轮是 speak、observe 还是 act；如果玩家明确向某个在场人物说话，只返回该人物的 entity_id；没有明确对象时 addressee_id 返回空字符串或 null。visibility 只能是 public 或 private。只输出 JSON：{\"intent_type\":\"speak\",\"addressee_id\":\"npc:...\",\"visibility\":\"public\"}。人物名出现在谈话内容里不等于玩家正在对该人物说话。", sceneFor(snapshot, "player"), snapshot.Summary.Clock, characters.String(), run.Input, cleanText(run.AddresseeID))
 	input = intentVisibilityRule + "\n" + input
 	input += "\n世界：" + snapshot.Summary.GameID + "\n公开世界背景：" + snapshot.Definition.Background
-	{
-		input += "\n另输出整数 wait_minutes：玩家明确选择等待时，解析其期望经过的分钟数，最多120；等待某事件但未指定时长时取120作为本轮等待上限。单纯沉默、观察或普通交谈取0。这里只解析意愿，实际经过时间由协调与剧情边界确定。玩家不参与也允许时间和世界事件继续发展。"
-	}
+	input += "\n另输出整数 wait_minutes：玩家明确选择等待时，解析其期望经过的分钟数，最多120；等待某事件但未指定时长时取120作为本轮等待上限。单纯沉默、观察或普通交谈取0。这里只解析意愿，实际经过时间由协调与剧情边界确定。玩家不参与也允许时间和世界事件继续发展。"
 
 	return contextMaterial{System: "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", RequiredSources: append([]string{run.RunID + ":input"}, sceneViewSources(snapshot, "player")...), Required: input, Optional: dialogueSections(snapshot)}
 }

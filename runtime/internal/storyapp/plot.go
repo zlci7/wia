@@ -433,7 +433,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
 		material.Required += plotActionSceneContract(*output, allowed)
 		material.Required += "\n当前实际在场人物：" + marshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
-		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v3")
+		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v4")
 		var resolved struct {
 			Outcomes     []plotActionResult `json:"outcomes"`
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`

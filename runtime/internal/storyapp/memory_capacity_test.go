@@ -48,3 +48,17 @@ func TestDigestPromptDoesNotGrowWithCoverageIDs(t *testing.T) {
 		t.Fatal("not incremental")
 	}
 }
+
+func TestDigestStateSourcesUseCurrentCatalog(t *testing.T) {
+	previous := MemoryDigest{Sources: []string{"covered", "retained"}, States: []SubjectiveState{{Kind: "belief", Content: "已保留判断", Sources: []string{"retained"}}}}
+	for _, tc := range []struct {
+		id    string
+		valid bool
+	}{{"covered", false}, {"retained", true}, {"new", true}} {
+		g := fixedJSONGenerator{text: fmt.Sprintf(`{"content":"有效回顾","states":[{"kind":"belief","content":"判断","source_ids":[%q]}]}`, tc.id)}
+		_, err := (&App{}).summarizeMemory(context.Background(), g, worldSnapshot{}, Run{}, "npc:a", previous, []MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
+		if (err == nil) != tc.valid {
+			t.Fatalf("source=%s err=%v", tc.id, err)
+		}
+	}
+}
