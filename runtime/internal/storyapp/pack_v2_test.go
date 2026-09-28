@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -94,6 +95,31 @@ func TestPackBystanderJSONRoundTrip(t *testing.T) {
 	}
 	if err := json.Unmarshal([]byte(`{"bystanders":[{"name":"甲","secret_field":"x"}]}`), &unknown); err == nil {
 		t.Fatal("unknown bystander field accepted")
+	}
+}
+
+// A package that declares schema v2 loads, and the bystander objects keep their
+// identity instead of being reduced to display names.
+func TestPackSchemaV2LoadsWithBystanderIdentity(t *testing.T) {
+	root := packFixture(t, "orbital-repair")
+	rewritePack(t, root, func(p map[string]any) {
+		p["schema_version"] = 2
+		p["bystanders"] = []any{
+			map[string]any{"bystander_id": "bystander:dockhand", "name": "搬运工", "description": "在栈桥上等活", "initial_location": "workshop"},
+		}
+	})
+	pack, err := loadPack(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pack.Definition.BystanderRefs) != 1 || pack.Definition.BystanderRefs[0].BystanderID != "bystander:dockhand" {
+		t.Fatalf("v2 identity lost: %+v", pack.Definition.BystanderRefs)
+	}
+	if len(pack.Definition.Bystanders) != 1 || pack.Definition.Bystanders[0] != "搬运工" {
+		t.Fatalf("display names: %+v", pack.Definition.Bystanders)
+	}
+	if body := marshalJSON(pack.Definition); !strings.Contains(body, "bystander:dockhand") {
+		t.Fatalf("snapshot dropped bystander identity: %s", body)
 	}
 }
 

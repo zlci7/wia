@@ -198,7 +198,7 @@ func loadPack(root string) (loadedPack, error) {
 	bad := func(field string) (loadedPack, error) {
 		return result, fmt.Errorf("story.json: invalid or missing %s", field)
 	}
-	if p.SchemaVersion != 1 {
+	if p.SchemaVersion != packSchemaV1 && p.SchemaVersion != packSchemaV2 {
 		return bad("schema_version")
 	}
 	if !packID.MatchString(p.GameID) {

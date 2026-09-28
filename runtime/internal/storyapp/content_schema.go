@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS content_drafts (
 );
 CREATE INDEX IF NOT EXISTS idx_content_drafts_project ON content_drafts(user_id, project_id, updated_at DESC);
 
+CREATE TABLE IF NOT EXISTS content_draft_assets (
+  user_id TEXT NOT NULL, draft_id TEXT NOT NULL, asset_id TEXT NOT NULL,
+  relative_name TEXT NOT NULL, media_type TEXT NOT NULL,
+  byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
+  digest TEXT NOT NULL, staged_path TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, draft_id, asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS content_revisions (
+  user_id TEXT NOT NULL, game_id TEXT NOT NULL, revision TEXT NOT NULL,
+  digest TEXT NOT NULL, path TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, game_id, revision)
+);
+CREATE INDEX IF NOT EXISTS idx_content_revisions_owner ON content_revisions(user_id, revision);
+
 CREATE TABLE IF NOT EXISTS content_operations (
   user_id TEXT NOT NULL, request_key TEXT NOT NULL, request_hash TEXT NOT NULL,
   operation_id TEXT NOT NULL, kind TEXT NOT NULL, target_id TEXT NOT NULL,

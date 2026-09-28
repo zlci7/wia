@@ -65,7 +65,7 @@ func TestPackValidation(t *testing.T) {
 		name   string
 		change func(map[string]any)
 	}{
-		{"schema", func(p map[string]any) { p["schema_version"] = 2 }},
+		{"schema", func(p map[string]any) { p["schema_version"] = 3 }},
 		{"mode", func(p map[string]any) { p["mode"] = "both" }},
 		{"unknown capability", func(p map[string]any) { p["event_generation"] = true }},
 		{"null", func(p map[string]any) { p["player"] = nil }},
