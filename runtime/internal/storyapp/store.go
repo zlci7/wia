@@ -75,6 +75,7 @@ func openAppDB(path string) (*sql.DB, error) {
 	for _, column := range []struct{ table, name, definition string }{
 		{"content_drafts", "confirmation_key", "TEXT NOT NULL DEFAULT ''"},
 		{"content_operations", "plan_json", "TEXT NOT NULL DEFAULT ''"},
+		{"pack_revisions", "digest_version", "INTEGER NOT NULL DEFAULT 1"},
 	} {
 		if err := ensureColumn(db, column.table, column.name, column.definition); err != nil {
 			db.Close()
@@ -171,7 +172,7 @@ func sqliteDSN(path string) string {
 }
 
 const appSchema = `
-CREATE TABLE IF NOT EXISTS pack_revisions (game_id TEXT NOT NULL, revision TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(game_id,revision));
+CREATE TABLE IF NOT EXISTS pack_revisions (game_id TEXT NOT NULL, revision TEXT NOT NULL, digest TEXT NOT NULL, digest_version INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(game_id,revision));
 CREATE TABLE IF NOT EXISTS creation_operations (user_id TEXT NOT NULL, request_key TEXT NOT NULL, request_hash TEXT NOT NULL, world_id TEXT NOT NULL, PRIMARY KEY(user_id,request_key));
 CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS worlds (

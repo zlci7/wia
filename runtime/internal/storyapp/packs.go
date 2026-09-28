@@ -83,6 +83,9 @@ type loadedPack struct {
 	Cover      []byte
 	CoverType  string
 	Digest     string
+	// LegacyDigest is the digest the previous algorithm produces for this same package.
+	// It exists only so an older database's record is recognised during migration.
+	LegacyDigest string
 	// CoverRelative is the package-relative cover reference, kept so a world can
 	// copy the image it started with.
 	CoverRelative string
@@ -373,23 +376,58 @@ func loadPack(root string) (loadedPack, error) {
 		assetNames = append(assetNames, name)
 	}
 	sort.Strings(assetNames)
-	type assetDigestEntry struct {
-		Name string
-		Body []byte
-	}
 	assetList := make([]assetDigestEntry, 0, len(assetNames))
 	for _, name := range assetNames {
 		assetList = append(assetList, assetDigestEntry{Name: name, Body: result.Assets[name]})
 	}
-	canonical, _ := json.Marshal(struct {
-		Story  StoryPack
-		NPCs   []json.RawMessage
-		Cover  []byte
-		Assets []assetDigestEntry
-	}{p, npcBodies, result.Cover, assetList})
-	digest := sha256.Sum256(canonical)
-	result.Digest = hex.EncodeToString(digest[:])
+	result.Digest = packDigest(packDigestCurrent, p, npcBodies, result.Cover, assetList)
+	// The previous algorithm is kept so a database written by an earlier release is
+	// still recognised instead of being reported as changed content.
+	result.LegacyDigest = packDigest(packDigestAssetsExcluded, p, npcBodies, result.Cover, assetList)
 	return result, nil
+}
+
+// The package digest has a version because its input changed once: the first algorithm
+// covered the story, the character files and the cover, and the current one also covers
+// every referenced image. A database written by the earlier release holds first-version
+// digests, so both are computed and an old record is migrated rather than reported as a
+// content change.
+const (
+	packDigestAssetsExcluded = 1
+	packDigestCurrent        = 2
+	// packDigestVersion marks the algorithm a freshly written digest belongs to.
+	packDigestVersion = packDigestCurrent
+)
+
+type assetDigestEntry struct {
+	Name string
+	Body []byte
+}
+
+func packDigest(version int, story StoryPack, npcs []json.RawMessage, cover []byte, assets []assetDigestEntry) string {
+	var canonical []byte
+	if version < packDigestCurrent {
+		canonical, _ = json.Marshal(struct {
+			Story StoryPack
+			NPCs  []json.RawMessage
+			Cover []byte
+		}{story, npcs, cover})
+	} else {
+		canonical, _ = json.Marshal(struct {
+			Story  StoryPack
+			NPCs   []json.RawMessage
+			Cover  []byte
+			Assets []assetDigestEntry
+		}{story, npcs, cover, assets})
+	}
+	sum := sha256.Sum256(canonical)
+	return hex.EncodeToString(sum[:])
+}
+
+// matchesLegacyDigest reports whether a stored digest was produced by the earlier
+// algorithm for exactly this package.
+func (p loadedPack) matchesLegacyDigest(stored string) bool {
+	return stored != "" && p.LegacyDigest != "" && stored == p.LegacyDigest
 }
 
 func (a *App) loadPacks(ctx context.Context, path string) error {
@@ -462,10 +500,18 @@ func (a *App) loadPacks(ctx context.Context, path string) error {
 			return err
 		}
 		if digest != pack.Digest {
-			a.packsMu.Lock()
-			a.packErrors = append(a.packErrors, PackIssue{id, "revision 内容已变化，请使用新的 revision"})
-			a.packsMu.Unlock()
-			continue
+			// A registered digest may come from an older digest algorithm. That is not a
+			// content change, so it is accepted under a controlled migration instead of
+			// making an unchanged story unplayable after an upgrade.
+			if !pack.matchesLegacyDigest(digest) {
+				a.packsMu.Lock()
+				a.packErrors = append(a.packErrors, PackIssue{id, "revision 内容已变化，请使用新的 revision"})
+				a.packsMu.Unlock()
+				continue
+			}
+			if _, err = a.appDB.ExecContext(ctx, `UPDATE pack_revisions SET digest=?,digest_version=? WHERE game_id=? AND revision=?`, pack.Digest, packDigestVersion, id, pack.Definition.Revision); err != nil {
+				return err
+			}
 		}
 		a.setPack(id, pack)
 	}
