@@ -106,9 +106,84 @@ func (s *Server) contentRoute(w http.ResponseWriter, r *http.Request, rest strin
 		s.publishContentDraft(w, r, parts[1])
 	case len(parts) == 2 && parts[0] == "operations":
 		s.contentOperation(w, r, parts[1])
+	case len(parts) == 2 && parts[0] == "imports":
+		s.contentImport(w, r, parts[1])
+	case len(parts) == 4 && parts[0] == "revisions" && parts[3] == "export":
+		s.exportContentRevision(w, r, parts[1], parts[2])
+	case len(parts) == 3 && parts[0] == "revisions":
+		s.exportContentRevision(w, r, parts[1], parts[2])
 	default:
 		writeError(w, 404, "not_found", "no such content route")
 	}
+}
+
+// Import previews and confirmations: the upload is bounded before the service sees
+// it, and the report comes back with the preview draft.
+func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action string) {
+	if r.Method != "POST" {
+		writeError(w, 405, "method_not_allowed", "imports use POST")
+		return
+	}
+	switch action {
+	case "preview":
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			writeError(w, 400, "invalid_request", "upload a file with an optional project_id field")
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			writeError(w, 400, "invalid_request", "upload a file with an optional project_id field")
+			return
+		}
+		defer file.Close()
+		body, err := storyapp.ReadUploadedAsset(file)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		name := header.Filename
+		if name == "" {
+			name = r.FormValue("name")
+		}
+		preview, err := s.app.PreviewContentImport(r.Context(), r.FormValue("project_id"), name, body)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 201, map[string]any{"import": preview})
+	case "confirm":
+		var request struct {
+			DraftID         string `json:"draft_id"`
+			ExpectedVersion int64  `json:"expected_version"`
+		}
+		if !decodeJSON(w, r, &request) {
+			return
+		}
+		draft, err := s.app.ConfirmContentImport(r.Context(), request.DraftID, request.ExpectedVersion)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"draft": draft})
+	default:
+		writeError(w, 404, "not_found", "no such import route")
+	}
+}
+
+func (s *Server) exportContentRevision(w http.ResponseWriter, r *http.Request, gameID, revision string) {
+	if r.Method != "GET" {
+		writeError(w, 405, "method_not_allowed", "exports are read with GET")
+		return
+	}
+	body, name, err := s.app.ExportContentRevision(r.Context(), gameID, revision)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
+	w.WriteHeader(200)
+	_, _ = w.Write(body)
 }
 
 func (s *Server) publishContentDraft(w http.ResponseWriter, r *http.Request, draftID string) {

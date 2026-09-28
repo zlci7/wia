@@ -435,6 +435,11 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 	if err != nil {
 		return ContentDraftPayload{}, err
 	}
+	return a.draftPayloadFromLoadedPack(pack, gameID)
+}
+
+// draftPayloadFromLoadedPack projects a loaded package into the editable draft shape.
+func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
 	definition := pack.Definition
 	payload := ContentDraftPayload{
 		SchemaVersion: packSchemaV2, GameID: gameID, Mode: definition.Summary.Mode, Title: definition.Summary.Title,

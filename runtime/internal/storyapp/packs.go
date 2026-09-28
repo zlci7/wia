@@ -88,6 +88,12 @@ type loadedPack struct {
 	CoverRelative string
 	// Root is the directory the package was read from; empty for in-memory packs.
 	Root string
+	// Story and NPCFiles keep the package's own JSON so an export can rebuild the
+	// same content without re-serialising a reduced view.
+	Story    StoryPack
+	NPCFiles map[string][]byte
+	// Assets maps package-relative asset paths to their bytes.
+	Assets map[string][]byte
 }
 
 type PackIssue struct {
@@ -190,6 +196,12 @@ func packFile(root, relative string, maxSize int64) ([]byte, error) {
 	return os.ReadFile(target)
 }
 
+// The default lead used by packages and imports that do not name one.
+const (
+	defaultPlayerName    = "旅人"
+	defaultPlayerProfile = "一个正在寻找答案的旅人。"
+)
+
 func loadPack(root string) (loadedPack, error) {
 	var result loadedPack
 	result.Root = root
@@ -197,7 +209,7 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
-	p := StoryPack{Player: PlayerDefaults{Name: "旅人", Profile: "一个正在寻找答案的旅人。", Editable: true}}
+	p := StoryPack{Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
 	if err := strictPackJSON(data, &p); err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
@@ -336,6 +348,21 @@ func loadPack(root string) (loadedPack, error) {
 	}
 	def.EventGeneration = p.EventGeneration
 	result.Definition = def
+	result.Story = p
+	result.NPCFiles = map[string][]byte{}
+	for index, file := range p.NPCs {
+		result.NPCFiles[file] = npcBodies[index]
+	}
+	result.Assets = map[string][]byte{}
+	for _, asset := range referencedAssets(ContentDraftPayload{
+		Cover:      p.Cover,
+		NPCs:       draftNPCRefs(def.Characters),
+		Bystanders: bystanders,
+	}) {
+		if body, err := packFile(root, asset, worldAssetLimit); err == nil {
+			result.Assets[asset] = body
+		}
+	}
 	// Include the complete effective package, including per-NPC revision and image bytes.
 	canonical, _ := json.Marshal(struct {
 		Story StoryPack

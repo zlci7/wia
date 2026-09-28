@@ -144,6 +144,21 @@ func TestContentRoutes(t *testing.T) {
 	if got := callAPI(t, s, "GET", "/api/v1/content/operations/publish_missing", "").Code; got != 404 {
 		t.Fatalf("unknown operation: %d", got)
 	}
+	if got := callAPI(t, s, "POST", "/api/v1/content/imports/preview", "not-form").Code; got != 400 {
+		t.Fatalf("bad import upload: %d", got)
+	}
+	if got := callAPI(t, s, "GET", "/api/v1/content/imports/preview", "").Code; got != 405 {
+		t.Fatalf("import method: %d", got)
+	}
+	if got := callAPI(t, s, "POST", "/api/v1/content/imports/confirm", `{"draft_id":"draft_missing"}`).Code; got != 404 {
+		t.Fatalf("unknown preview confirmation: %d", got)
+	}
+	if got := callAPI(t, s, "GET", "/api/v1/content/revisions/harbor/r-2026-09-28-abcd1234/export", "").Code; got != 404 {
+		t.Fatalf("unknown export: %d", got)
+	}
+	if got := callAPI(t, s, "POST", "/api/v1/content/revisions/harbor/r-2026-09-28-abcd1234/export", "").Code; got != 405 {
+		t.Fatalf("export method: %d", got)
+	}
 }
 
 // The lead profile route carries the world epoch and reports conflicts.
