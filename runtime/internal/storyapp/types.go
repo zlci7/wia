@@ -32,6 +32,10 @@ var (
 	ErrSaveFailed          = errors.New("save failed")
 	ErrInvalidRequest      = errors.New("invalid request")
 	ErrRunNotFound         = errors.New("run not found")
+	ErrPersonaNotFound     = errors.New("persona not found")
+	ErrContentNotFound     = errors.New("content not found")
+	ErrContentBusy         = errors.New("content is busy")
+	ErrContentInvalid      = errors.New("content is invalid")
 )
 
 type Options struct {

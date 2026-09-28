@@ -19,6 +19,7 @@ type CreateWorldRequest struct {
 	Name             string `json:"name"`
 	PlayerName       string `json:"player_name"`
 	PlayerProfile    string `json:"player_profile"`
+	PersonaID        string `json:"persona_id,omitempty"`
 	Activate         bool   `json:"activate"`
 }
 
@@ -85,6 +86,13 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	}
 	if playerProfile == "" {
 		playerProfile = def.Summary.Player.Profile
+	}
+	// A selected template is copied into the world; later template edits never
+	// reach a world that already exists.
+	if personaName, personaProfile, err := a.personaDefaults(ctx, request.PersonaID, def); err != nil {
+		return WorldSummary{}, err
+	} else if personaName != "" {
+		playerName, playerProfile = personaName, personaProfile
 	}
 	if len([]rune(name)) > 160 || len([]rune(playerName)) > 80 || len([]rune(playerProfile)) > 2000 {
 		return WorldSummary{}, ErrInvalidRequest

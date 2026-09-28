@@ -61,7 +61,7 @@ func openAppDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
-	if _, err := db.Exec(appSchema + usageSchema); err != nil {
+	if _, err := db.Exec(appSchema + usageSchema + contentSchema); err != nil {
 		db.Close()
 		return nil, err
 	}
