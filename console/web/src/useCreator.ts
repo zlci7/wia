@@ -269,8 +269,26 @@ export function useCreator() {
     saving.value = true;
     pending = (async () => {
       try {
+        // Remember what the save carried, so the identifiers the server derives can be
+        // written back without replacing anything the author changed meanwhile.
+        const sent = JSON.parse(JSON.stringify(form)) as ContentDraftPayload;
         const saved = await saveContentDraft(current.draft_id, form, current.version);
         if (ticket !== session) return;
+        // The server owns internal identifiers, so its normalised payload is written back
+        // into the form; a field the author touched during the save keeps their value.
+        const merged = mergeNormalizedPayload(sent, saved.payload);
+        for (let index = 0; index < form.locations.length && index < merged.locations.length; index++) {
+          if (!form.locations[index].id) form.locations[index].id = merged.locations[index].id;
+        }
+        for (let index = 0; index < form.npcs.length && index < merged.npcs.length; index++) {
+          if (!form.npcs[index].definition_id) form.npcs[index].definition_id = merged.npcs[index].definition_id;
+          if (!form.npcs[index].revision) form.npcs[index].revision = merged.npcs[index].revision;
+          if (!form.npcs[index].entity_id) form.npcs[index].entity_id = merged.npcs[index].entity_id;
+        }
+        for (let index = 0; index < form.bystanders.length && index < merged.bystanders.length; index++) {
+          if (!form.bystanders[index].bystander_id) form.bystanders[index].bystander_id = merged.bystanders[index].bystander_id;
+        }
+        if (!form.initial_location && merged.initial_location) form.initial_location = merged.initial_location;
         draft.value = { ...current, ...saved, payload: form };
         drafts.value = drafts.value.map(d => (d.draft_id === saved.draft_id ? { ...d, ...saved } : d));
         // Only the edit generation this save carried counts as confirmed; anything the
@@ -576,8 +594,34 @@ export function useCreator() {
   };
 }
 
-function stripUndefined<T extends object>(value: T | undefined | null): Partial<T> {
-  if (!value) return {};
+// mergeNormalizedPayload takes the identifiers the server derived and writes them into
+// the entries the save carried, matched by position. An entry the author added or edited
+// during the save is left alone.
+function mergeNormalizedPayload(sent: ContentDraftPayload, saved: ContentDraftPayload): Pick<ContentDraftPayload, "locations" | "npcs" | "bystanders" | "initial_location"> {
+  return {
+    locations: mergeByIndex(sent.locations ?? [], saved.locations ?? [], (item, normalized) => {
+      item.id = normalized.id;
+      return item;
+    }),
+    npcs: mergeByIndex(sent.npcs ?? [], saved.npcs ?? [], (item, normalized) => {
+      item.definition_id = normalized.definition_id;
+      item.revision = normalized.revision;
+      item.entity_id = normalized.entity_id;
+      return item;
+    }),
+    bystanders: mergeByIndex(sent.bystanders ?? [], saved.bystanders ?? [], (item, normalized) => {
+      item.bystander_id = normalized.bystander_id;
+      return item;
+    }),
+    initial_location: saved.initial_location,
+  };
+}
+
+function mergeByIndex<T, N>(sent: T[], saved: N[], apply: (item: T, normalized: N) => T): T[] {
+  return sent.map((item, index) => (index < saved.length ? apply(item, saved[index]) : item));
+}
+
+function stripUndefined<T extends object>(value: T | undefined | null): Partial<T> {  if (!value) return {};
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
     if (item !== undefined) out[key] = item;

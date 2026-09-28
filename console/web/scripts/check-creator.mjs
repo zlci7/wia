@@ -392,6 +392,41 @@ const tests = {
     assert.equal(c.operation.value.stage, "ready");
   },
 
+  async "identifiers the server derives are written back"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    let saved = 0;
+    hook = (method, url) => {
+      if (method === "PUT" && url.endsWith("/drafts/draft_1")) {
+        saved += 1;
+        // The service derives internal identifiers and returns the normalised payload.
+        return response({
+          draft: draft({
+            version: 4,
+            payload: {
+              ...draft().payload,
+              initial_location: "harbor",
+              locations: [{ id: "harbor", name: "港口", connections: [] }],
+              npcs: [{ definition_id: "keeper", revision: "v1", entity_id: "npc:keeper", name: "看灯人", role: "港口看灯人", profile: "资料", initial_location: "harbor" }],
+              bystanders: [{ bystander_id: "bystander:boatman", name: "船夫", description: "在栈桥等活" }],
+            },
+          }),
+        });
+      }
+    };
+    c.form.locations = [{ id: "", name: "港口", connections: [] }];
+    c.form.npcs = [{ definition_id: "", revision: "", entity_id: "", name: "看灯人", role: "港口看灯人", profile: "资料", initial_location: "" }];
+    c.form.bystanders = [{ bystander_id: "", name: "船夫", description: "在栈桥等活" }];
+    c.touch();
+    await c.flush();
+    hook = undefined;
+    assert.equal(saved, 1, "the save was sent");
+    assert.equal(c.form.locations[0].id, "harbor", "the derived place id reaches the form");
+    assert.equal(c.form.initial_location, "harbor", "the starting place reaches the form");
+    assert.equal(c.form.npcs[0].entity_id, "npc:keeper", "the derived character id reaches the form");
+    assert.equal(c.form.bystanders[0].bystander_id, "bystander:boatman", "the derived passer-by id reaches the form");
+  },
+
   async "a conflicting draft is not published"(c) {
     await c.openProject("project_1");
     await c.openDraft("draft_1");
