@@ -99,10 +99,10 @@ func TestNotExecutedStillRequiresEveryActionAndValidRecipients(t *testing.T) {
 	run := Run{RunID: "r"}
 	actor := lanternDefinition().Characters[0]
 	out := turnOutput{Events: []Event{{EventID: "action", ActorID: actor.EntityID, EventType: "npc_action_intent", RunID: "r", Stage: 1}}}
-	if _, err := appendHostOutcomes(&out, run, []Character{actor}, nil); err == nil {
+	if _, err := appendHostOutcomes(&out, run, []Character{actor}, nil, nil); err == nil {
 		t.Fatal("missing outcome accepted")
 	}
-	if _, err := appendHostOutcomes(&out, run, []Character{actor}, []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}); err == nil {
+	if _, err := appendHostOutcomes(&out, run, []Character{actor}, nil, []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}); err == nil {
 		t.Fatal("unknown recipient accepted")
 	}
 }

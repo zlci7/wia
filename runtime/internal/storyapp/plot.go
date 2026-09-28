@@ -503,7 +503,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 				}
 			}
 		}
-		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, outcomes)
+		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.Definition.BystanderRefs, outcomes)
 		if err != nil {
 			if a.logger != nil {
 				a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)

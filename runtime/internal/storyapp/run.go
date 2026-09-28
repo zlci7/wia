@@ -63,6 +63,9 @@ type hostActionResult struct {
 	Status     string   `json:"status"`
 	Content    string   `json:"content"`
 	Recipients []string `json:"recipients"`
+	// Bystanders names the defined passers-by this outcome actually involved, so
+	// their personal experience has a real attribution instead of a guess from prose.
+	Bystanders []string `json:"bystanders,omitempty"`
 }
 
 type narrativeResult struct {
@@ -391,6 +394,9 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
 	}
 	commitStarted := time.Now()
 	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress, output.GeneratedEvents); err != nil {
+		if a.logger != nil {
+			a.logger.Printf("story commit rejected: world_id=%q run_id=%q detail=%q", runtime.WorldID, run.RunID, err.Error())
+		}
 		err = atTurnStage(turnStageCommit, err)
 		status, reason, message := classifyTurnFailure(err)
 		if status == "failed" {
@@ -686,7 +692,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 			resultParticipants = append(resultParticipants, character)
 		}
 	}
-	visibleOutcomes, err := appendHostOutcomes(&output, run, resultParticipants, host.Outcomes)
+	visibleOutcomes, err := appendHostOutcomes(&output, run, resultParticipants, snapshot.Definition.BystanderRefs, host.Outcomes)
 	if err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story coordination validation failed: run_id=%q boundary=action_outcomes", run.RunID)
@@ -736,11 +742,57 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		}
 	}
 	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
+	// A character that joined the world after this scene's projection was written (a
+	// promoted passers-by, for example) still gets a view of this result instead of
+	// failing the commit.
+	if err := a.includeNewCharactersInSceneViews(ctx, store, &snapshot, &output); err != nil {
+		return turnOutput{}, atTurnStage(turnStageNarration, err)
+	}
 	for _, character := range participants {
 		kind, memory := playerExperienceMemory(intent.IntentType, private, character.EntityID, recipient, run.Input, def)
 		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
 	}
 	return output, nil
+}
+
+// includeNewCharactersInSceneViews gives every character present in the world a view
+// of the closing result when the scene projection predates them, so a roster change
+// does not invalidate the turn.
+func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *worldStore, snapshot *worldSnapshot, output *turnOutput) error {
+	current, err := loadCharacters(ctx, store.db)
+	if err != nil {
+		return err
+	}
+	settled := ""
+	for index := len(output.Events) - 1; index >= 0; index-- {
+		if output.Events[index].EventType == "turn_settled" {
+			settled = output.Events[index].Content
+			break
+		}
+	}
+	if settled == "" {
+		return nil
+	}
+	viewed := map[string]bool{}
+	for _, view := range output.SceneViews {
+		if view.Content != "" {
+			viewed[view.Recipient] = true
+		}
+	}
+	changed := false
+	for _, character := range current {
+		if viewed[character.EntityID] {
+			continue
+		}
+		output.SceneViews = append(output.SceneViews, SceneView{Recipient: character.EntityID, Content: settled, Version: output.SceneVersion + 1})
+		viewed[character.EntityID] = true
+		changed = true
+	}
+	if changed {
+		output.SceneVersion++
+		snapshot.SceneVersion = output.SceneVersion
+	}
+	return nil
 }
 
 func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, decision npcDecision, participants []Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
@@ -770,7 +822,7 @@ func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, d
 	return reply
 }
 
-func appendHostOutcomes(output *turnOutput, run Run, participants []Character, outcomes []hostActionResult) ([]Event, error) {
+func appendHostOutcomes(output *turnOutput, run Run, participants []Character, bystanders []PackBystander, outcomes []hostActionResult) ([]Event, error) {
 	actions := make(map[string]Event)
 	for _, event := range output.Events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
@@ -783,6 +835,10 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, o
 	participantIDs := make(map[string]bool, len(participants))
 	for _, character := range participants {
 		participantIDs[character.EntityID] = true
+	}
+	definedBystanders := make(map[string]bool, len(bystanders))
+	for _, bystander := range bystanders {
+		definedBystanders[bystander.BystanderID] = true
 	}
 	seen := make(map[string]bool, len(outcomes))
 	var visible []Event
@@ -818,6 +874,20 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, o
 		}
 		if recipients["player"] {
 			visible = append(visible, resultEvent)
+		}
+		// A passers-by who actually took part in the outcome keeps that as their own
+		// experience; being in the room still grants nothing.
+		involved := make(map[string]bool, len(outcome.Bystanders))
+		for _, id := range outcome.Bystanders {
+			id = cleanText(id)
+			if id == "" || involved[id] {
+				continue
+			}
+			if !definedBystanders[id] {
+				return nil, fmt.Errorf("%w: outcome %q attributes an undefined bystander %q", ErrGenerationFailed, outcome.ActionID, id)
+			}
+			involved[id] = true
+			output.Perceptions = append(output.Perceptions, Perception{RecipientID: id, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
 		}
 	}
 	return visible, nil
@@ -1192,11 +1262,24 @@ func publicCharacterContext(characters []Character, sceneCharacterIDs []string) 
 	return string(data)
 }
 
-func formatBystanders(bystanders []string) string {
+// formatBystanders lists passers-by with their stable identity so a coordinated
+// outcome can attribute experience to the one that actually took part.
+func formatBystanders(bystanders []PackBystander, names []string) string {
 	if len(bystanders) == 0 {
-		return "（无已记录背景人物）"
+		if len(names) == 0 {
+			return "（无已记录背景人物）"
+		}
+		return strings.Join(names, "、")
 	}
-	return strings.Join(bystanders, "、")
+	parts := make([]string, 0, len(bystanders))
+	for _, bystander := range bystanders {
+		if bystander.BystanderID != "" {
+			parts = append(parts, fmt.Sprintf("%s（%s）", bystander.Name, bystander.BystanderID))
+			continue
+		}
+		parts = append(parts, bystander.Name)
+	}
+	return strings.Join(parts, "、")
 }
 
 func generateNarrativeText(ctx context.Context, generator model.TextGenerator, system, input string, maxOutputTokens int) (string, int, error) {

@@ -482,6 +482,17 @@ func snapshotDefinition(ctx context.Context, store *worldStore, s worldSnapshot)
 		if json.Unmarshal([]byte(raw), &d) != nil || d.Summary.ID != s.Summary.GameID || d.Revision == "" {
 			return d, ErrStorageUnavailable
 		}
+		// Promotion removes a passer-by from the world, so the stored list is the
+		// authority once it exists. Legacy worlds keep display names only until the
+		// next world starts from the same content.
+		if stored, e := metaGet(ctx, store.db, "bystander_refs"); e == nil {
+			var refs []PackBystander
+			if json.Unmarshal([]byte(stored), &refs) == nil {
+				d.BystanderRefs = refs
+			}
+		} else if !errors.Is(e, sql.ErrNoRows) {
+			return d, e
+		}
 		return d, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {

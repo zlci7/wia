@@ -508,6 +508,13 @@ func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
 		} else if !errors.Is(e, sql.ErrNoRows) {
 			return nil, e
 		}
+		// A promoted or authored character can carry its own avatar; the world copy is
+		// recorded separately under the world's assets.
+		if value, e := metaGet(ctx, db, "avatar:"+result[i].EntityID); e == nil {
+			result[i].Avatar = value
+		} else if !errors.Is(e, sql.ErrNoRows) {
+			return nil, e
+		}
 	}
 	return result, nil
 }
