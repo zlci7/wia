@@ -121,6 +121,12 @@ func TestImportCharacterCard(t *testing.T) {
 	if !strings.Contains(draft.Payload.Opening, "雾里别走远") {
 		t.Fatalf("greeting did not become the opening candidate: %q", draft.Payload.Opening)
 	}
+	if draft.Payload.Gameplay == "" {
+		t.Fatal("card import left the goal line empty, so the draft cannot be published")
+	}
+	if strings.Contains(strings.Join(npc.SpeakingExamples, " "), "看灯人:") {
+		t.Fatalf("speaker prefixes must not survive the mapping: %+v", npc.SpeakingExamples)
+	}
 	// Behaviour instructions and extensions never become prompt text or settings.
 	body, err := json.Marshal(draft.Payload)
 	if err != nil {
@@ -226,6 +232,26 @@ func TestImportWIAPackageAndExportRoundTrip(t *testing.T) {
 	// Duplicate normalized paths are refused.
 	if _, err := a.PreviewContentImport(ctx, target.ProjectID, "dupe.zip", duplicateEntryZip(t)); !errors.Is(err, ErrContentInvalid) {
 		t.Fatalf("duplicate entries accepted: %v", err)
+	}
+}
+
+// A confirmed card import must be a draft the author can actually publish.
+func TestImportedCardDraftCanBePublished(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	project := importProject(t, a, "harbor-card-publish")
+	card := `{"spec":"chara_card_v2","spec_version":"2.0","data":{"name":"摆渡人阿汀","description":"{{char}}在雾里摆渡。","personality":"话少。","first_mes":"上船吧。","mes_example":"<START>\n{{char}}: 先坐稳。","creator_notes":"备注"}}`
+	preview, err := a.PreviewContentImport(ctx, project.ProjectID, "ferryman.json", []byte(card))
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, preview.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation, err := a.PublishContentDraft(ctx, PublishRequest{RequestKey: "card-publish", DraftID: confirmed.DraftID, ExpectedDraftVersion: confirmed.Version, ExpectedProjectVersion: project.Version})
+	if err != nil || operation.Status != "succeeded" {
+		t.Fatalf("an imported card could not be published: %+v %v", operation, err)
 	}
 }
 

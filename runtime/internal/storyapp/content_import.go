@@ -31,6 +31,7 @@ const (
 	defaultImportLocation     = "main"
 	defaultImportLocationName = "主要场景"
 	defaultImportClock        = "第 1 日 09:00"
+	defaultImportGameplay     = "按人物卡片的设定与这名人物互动，并决定关系走向。"
 )
 
 type ImportMapping struct {
@@ -321,14 +322,18 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	payload.NPCs = []ContentDraftNPC{npc}
 	payload.Title = project.Title
 	payload.Description = firstLine(profile, 400)
-	// A card has no world structure, so the draft starts with one usable place and the
-	// card's greeting as the opening candidate; the author edits both before publishing.
+	// A card has no world structure, so the draft starts with the minimum a package
+	// needs: one usable place, a starting time, the greeting as the opening candidate
+	// and a neutral goal line the author replaces.
 	payload.Locations = []PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
 	payload.InitialLocation = defaultImportLocation
 	npc.InitialLocation = defaultImportLocation
 	payload.NPCs = []ContentDraftNPC{npc}
 	if payload.Clock == "" {
 		payload.Clock = defaultImportClock
+	}
+	if payload.Gameplay == "" {
+		payload.Gameplay = defaultImportGameplay
 	}
 	if greeting := replaceCardMacros(strings.TrimSpace(card.Data.FirstMes), replacements); greeting != "" {
 		payload.Opening = truncateRunes(greeting, 8000)
@@ -508,22 +513,26 @@ func cardExamples(mesExample string, replacements map[string]string) []string {
 	out := []string{}
 	for _, block := range strings.Split(mesExample, "<START>") {
 		for _, line := range strings.Split(block, "\n") {
-			trimmed := strings.TrimSpace(replaceCardMacros(line, replacements))
-			if trimmed == "" || strings.HasPrefix(trimmed, "{{") {
+			trimmed := stripSpeakerPrefix(strings.TrimSpace(replaceCardMacros(line, replacements)))
+			if trimmed == "" {
 				continue
 			}
-			if index := strings.Index(trimmed, ":"); index > 0 && index < 12 {
-				trimmed = strings.TrimSpace(trimmed[index+1:])
-			}
-			if trimmed != "" {
-				out = append(out, truncateRunes(trimmed, 500))
-			}
+			out = append(out, truncateRunes(trimmed, 500))
 		}
 	}
 	if len(out) > 12 {
 		out = out[:12]
 	}
 	return out
+}
+
+// cardExamples and the greeting may carry the card's own `Name:` speaker prefix.
+func stripSpeakerPrefix(line string) string {
+	index := strings.Index(line, ":")
+	if index <= 0 || index > 24 {
+		return line
+	}
+	return strings.TrimSpace(line[index+1:])
 }
 
 func importDefinitionID(name string) string {
