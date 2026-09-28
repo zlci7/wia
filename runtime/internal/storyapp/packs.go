@@ -532,35 +532,18 @@ func (a *App) setPack(id string, pack loadedPack) {
 	a.packs[id] = pack
 }
 
-// attachSpeakingExamples copies each character's authored dialogue samples from the
-// loaded package onto the world's roster, so the NPC prompt can show how the person
-// sounds without treating the samples as things that happened.
-func (a *App) attachSpeakingExamples(definition *gameDefinition) {
-	if definition == nil || len(definition.Characters) == 0 {
-		return
-	}
-	pack, ok := a.pack(definition.Summary.ID)
-	if !ok || len(pack.NPCFiles) == 0 {
-		return
-	}
-	byDefinition := map[string][]string{}
-	for _, body := range pack.NPCFiles {
-		var file PackNPC
-		if json.Unmarshal(body, &file) != nil || file.DefinitionID == "" {
-			continue
+// characterSpeakingExamples reads the samples a frozen definition recorded for one
+// character, so the running turn uses the world's own version.
+func characterSpeakingExamples(characters []Character, entityID string) ([]string, bool) {
+	for _, character := range characters {
+		if character.EntityID == entityID {
+			if len(character.SpeakingExamples) == 0 {
+				return nil, false
+			}
+			return character.SpeakingExamples, true
 		}
-		byDefinition[file.DefinitionID] = file.SpeakingExamples
 	}
-	for index := range definition.Characters {
-		examples := byDefinition[definition.Characters[index].DefinitionID]
-		if len(examples) == 0 {
-			continue
-		}
-		if len(examples) > 8 {
-			examples = examples[:8]
-		}
-		definition.Characters[index].SpeakingExamples = examples
-	}
+	return nil, false
 }
 
 func (a *App) pack(id string) (loadedPack, bool) {

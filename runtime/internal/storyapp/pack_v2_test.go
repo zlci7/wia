@@ -157,8 +157,13 @@ func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	def := snapshot.Definition
+	frozen := def.Characters
 	def.Characters = snapshot.Characters
-	a.attachSpeakingExamples(&def)
+	for index := range def.Characters {
+		if samples, ok := characterSpeakingExamples(frozen, def.Characters[index].EntityID); ok {
+			def.Characters[index].SpeakingExamples = samples
+		}
+	}
 	if len(def.Characters) == 0 || len(def.Characters[0].SpeakingExamples) != 2 {
 		t.Fatalf("published samples did not reach the world roster: %+v", def.Characters)
 	}
@@ -170,6 +175,33 @@ func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "只作语气与用词参考") {
 		t.Fatal("the prompt must state that samples are style, not events")
+	}
+
+	// A later revision must not change how an existing world's characters speak.
+	reloaded, err := a.ReadContentDraft(ctx, saved.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := reloaded.Payload
+	edited.NPCs[0].SpeakingExamples = []string{"换过的示例，旧存档不该看到。"}
+	next, err := a.SaveContentDraft(ctx, saved.DraftID, edited, reloaded.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "examples-publish-2", DraftID: next.DraftID, ExpectedDraftVersion: next.Version, ExpectedProjectVersion: current.Version}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := a.ReadWorld(ctx, w.WorldID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	samples, ok := characterSpeakingExamples(after.Definition.Characters, after.Characters[0].EntityID)
+	if !ok || len(samples) != 2 || samples[0] != "灯要按时点。" {
+		t.Fatalf("a newer revision changed an existing world's samples: %+v", samples)
 	}
 }
 

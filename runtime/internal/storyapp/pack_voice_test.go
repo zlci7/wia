@@ -32,7 +32,8 @@ func TestBuiltInPacksAuthorACharacterVoice(t *testing.T) {
 				}
 			}
 		}
-		// The samples must also reach a world started from this story.
+		// The samples must also reach a world started from this story, through the
+		// definition that world froze.
 		world, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: gameID, ExpectedRevision: pack.Definition.Revision, RequestKey: "voice-" + gameID, Activate: true})
 		if err != nil {
 			t.Fatal(err)
@@ -41,11 +42,17 @@ func TestBuiltInPacksAuthorACharacterVoice(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		snapshot.Definition.Characters = snapshot.Characters
-		a.attachSpeakingExamples(&snapshot.Definition)
 		for _, character := range snapshot.Definition.Characters {
 			if len(character.SpeakingExamples) == 0 {
-				t.Errorf("%s: %s lost its samples in the world", gameID, character.Name)
+				t.Errorf("%s: %s lost its samples in the frozen definition", gameID, character.Name)
+			}
+		}
+		// The turn merges the live roster with the frozen samples, so what the prompt
+		// sees is the world's own version.
+		for _, character := range snapshot.Characters {
+			samples, ok := characterSpeakingExamples(snapshot.Definition.Characters, character.EntityID)
+			if !ok || len(samples) == 0 {
+				t.Errorf("%s: %s has no samples for the running turn", gameID, character.Name)
 			}
 		}
 	}

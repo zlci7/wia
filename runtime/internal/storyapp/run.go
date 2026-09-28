@@ -603,9 +603,17 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
 	def := snapshot.Definition
+	frozen := def.Characters
 	def.Characters = snapshot.Characters
-	// Authored dialogue samples live in the package, not in the world database.
-	a.attachSpeakingExamples(&def)
+	// Dialogue samples come from the definition this world froze when it started, never
+	// from the currently installed story: a later revision must not change how an
+	// existing save's characters speak. A world started before samples existed keeps none
+	// rather than silently adopting a newer template.
+	for index := range def.Characters {
+		if samples, ok := characterSpeakingExamples(frozen, def.Characters[index].EntityID); ok {
+			def.Characters[index].SpeakingExamples = samples
+		}
+	}
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
