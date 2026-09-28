@@ -53,6 +53,11 @@ export function useCreator() {
   let previewGeneration = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inflight = false;
+  // editGeneration counts local edits; confirmedGeneration counts the ones the server
+  // has acknowledged. Publishing requires them to be equal.
+  let editGeneration = 0;
+  let confirmedGeneration = 0;
+  let pending: Promise<void> = Promise.resolve();
 
   const draftID = computed(() => draft.value?.draft_id ?? "");
   const statusLine = computed(() => {
@@ -75,17 +80,27 @@ export function useCreator() {
 
   function applyPayload(payload: ContentDraftPayload) {
     const fallback = emptyPayload();
-    const merged = { ...fallback, ...payload };
+    // The form is replaced wholesale, not merged: a field the new draft does not carry
+    // must not keep the previous draft's value.
+    const merged = { ...fallback, ...stripUndefined(payload) };
     merged.player = {
       name: payload?.player?.name ?? fallback.player.name,
       profile: payload?.player?.profile ?? fallback.player.profile,
       editable: payload?.player?.editable ?? fallback.player.editable,
     };
-    merged.locations = Array.isArray(payload?.locations) ? payload.locations : [];
-    merged.npcs = Array.isArray(payload?.npcs) ? payload.npcs : [];
-    merged.bystanders = Array.isArray(payload?.bystanders) ? payload.bystanders : [];
+    for (const key of Object.keys(form) as (keyof typeof form)[]) {
+      if (!(key in merged)) {
+        delete (form as Record<string, unknown>)[key];
+      }
+    }
     Object.assign(form, merged);
+    form.npcs = (merged.npcs ?? []).map(npc => ({ ...npc, speaking_examples: npc.speaking_examples ?? [] }));
+    form.locations = (merged.locations ?? []).map(location => ({ ...location, connections: location.connections ?? [] }));
+    form.bystanders = (merged.bystanders ?? []).map(bystander => ({ ...bystander }));
     dirty.value = false;
+    // A new draft starts with a clean confirmation history.
+    editGeneration = 0;
+    confirmedGeneration = 0;
   }
 
   async function loadPersonas() {
@@ -190,12 +205,45 @@ export function useCreator() {
   function touch() {
     dirty.value = true;
     conflict.value = false;
+    // Every edit gets a generation, so a caller can wait until the server has
+    // confirmed exactly the content it is about to act on.
+    editGeneration += 1;
     schedule();
   }
 
   function schedule() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void flush(), AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  // savePending returns after the draft stored on the server matches the current
+  // form: it waits for an in-flight save, then saves again if edits arrived in the
+  // meantime. An unconfirmed save is reported, never silently treated as success.
+  async function savePending(): Promise<"saved" | "unsaved" | "conflict"> {
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (!draft.value) return "unsaved";
+    await pending;
+    while (confirmedGeneration < editGeneration && !conflict.value) {
+      if (inflight) {
+        await pending;
+        continue;
+      }
+      await flush();
+      if (saving.value) await pending;
+      if (conflict.value) return "conflict";
+      if (!dirty.value && confirmedGeneration >= editGeneration) break;
+      if (!inflight && confirmedGeneration < editGeneration) {
+        // The save failed and did not reschedule; do not pretend it succeeded.
+        if (error.value) return "unsaved";
+        break;
+      }
+    }
+    if (conflict.value) return "conflict";
+    if (confirmedGeneration < editGeneration) return "unsaved";
+    return "saved";
   }
 
   async function flush(): Promise<void> {
@@ -209,31 +257,38 @@ export function useCreator() {
       return;
     }
     const ticket = session;
+    const generation = editGeneration;
     inflight = true;
     saving.value = true;
-    try {
-      const saved = await saveContentDraft(current.draft_id, form, current.version);
-      if (ticket !== session) return;
-      draft.value = { ...current, ...saved, payload: form };
-      drafts.value = drafts.value.map(d => (d.draft_id === saved.draft_id ? { ...d, ...saved } : d));
-      dirty.value = false;
-      conflict.value = false;
-      error.value = "";
-    } catch (e) {
-      if (ticket !== session) return;
-      if (e instanceof ApiError && (e.code === "version_conflict" || e.code === "draft_version_conflict")) {
-        // The stored draft is untouched; keep the local edit and let the author choose.
-        conflict.value = true;
-      } else {
-        error.value = describe(e, "草稿保存失败，修改仍保留在本地。");
+    pending = (async () => {
+      try {
+        const saved = await saveContentDraft(current.draft_id, form, current.version);
+        if (ticket !== session) return;
+        draft.value = { ...current, ...saved, payload: form };
+        drafts.value = drafts.value.map(d => (d.draft_id === saved.draft_id ? { ...d, ...saved } : d));
+        // Only the edit generation this save carried counts as confirmed; anything the
+        // author typed while it was in flight is still pending.
+        confirmedGeneration = Math.max(confirmedGeneration, generation);
+        if (confirmedGeneration >= editGeneration) dirty.value = false;
+        conflict.value = false;
+        error.value = "";
+      } catch (e) {
+        if (ticket !== session) return;
+        if (e instanceof ApiError && (e.code === "version_conflict" || e.code === "draft_version_conflict")) {
+          // The stored draft is untouched; keep the local edit and let the author choose.
+          conflict.value = true;
+        } else {
+          error.value = describe(e, "草稿保存失败，修改仍保留在本地。");
+        }
+      } finally {
+        inflight = false;
+        if (ticket === session) saving.value = false;
+        // A conflicting or failed save waits for the author's decision instead of
+        // hammering the same stale version.
+        if (dirty.value && !conflict.value && ticket === session) schedule();
       }
-    } finally {
-      inflight = false;
-      if (ticket === session) saving.value = false;
-      // A conflicting or failed save waits for the author's decision instead of
-      // hammering the same stale version.
-      if (dirty.value && !conflict.value && ticket === session) schedule();
-    }
+    })();
+    return pending;
   }
 
   async function reloadDraft() {
@@ -389,8 +444,8 @@ export function useCreator() {
     }
   }
 
-  // Publishing always saves first, then acts on the version the server confirmed, so
-  // an accepted publication cannot contain a newer unsaved edit.
+  // Publishing only acts on content the server has confirmed, so an accepted
+  // publication can never contain a newer unsaved edit or an older stored version.
   async function publish() {
     const current = draft.value;
     if (!current || !project.value) return;
@@ -398,16 +453,21 @@ export function useCreator() {
     error.value = "";
     notice.value = "";
     try {
-      await flush();
-      if (conflict.value) {
+      const state = await savePending();
+      if (state === "conflict") {
         error.value = "草稿已过期，请先处理版本冲突再发布。";
+        return;
+      }
+      if (state === "unsaved") {
+        error.value = "还有修改没有保存成功，请先解决保存问题再发布。";
         return;
       }
       const fresh = await fetchContentDraft(current.draft_id);
       if (fresh.draft_id !== draft.value?.draft_id) return;
       draft.value = fresh;
       publishing.value = true;
-      const result = await publishContentDraft(fresh.draft_id, crypto.randomUUID(), fresh.version, project.value.version);
+      const requestKey = `${fresh.draft_id}:publish:${confirmedGeneration}`;
+      const result = await publishContentDraft(fresh.draft_id, requestKey, fresh.version, project.value.version);
       operation.value = result;
       if (result.status === "succeeded") {
         const revision = result.stage === "ready" ? "已发布不可变修订，新开局将使用它。" : "";
@@ -438,6 +498,15 @@ export function useCreator() {
     reloadDraft, copyAsNewDraft, removeDraft, loadPreview, loadAssets, uploadAsset, removeAsset, publish,
     addLocation, removeLocation, addNPC, removeNPC, addBystander, removeBystander, reset,
   };
+}
+
+function stripUndefined<T extends object>(value: T | undefined | null): Partial<T> {
+  if (!value) return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item !== undefined) out[key] = item;
+  }
+  return out as Partial<T>;
 }
 
 function describe(e: unknown, fallback: string): string {

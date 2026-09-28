@@ -191,6 +191,86 @@ const tests = {
     assert.match(c.notice.value, /已发布/);
   },
 
+  async "a failing save blocks publishing"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    let published = 0;
+    let saveAttempts = 0;
+    hook = (method, url) => {
+      if (method === "PUT" && url.endsWith("/drafts/draft_1")) {
+        saveAttempts += 1;
+        return response({ error: { code: "storage_unavailable", message: "外置存储不可用" } }, 503);
+      }
+      if (method === "POST" && url.endsWith("/publish")) {
+        published += 1;
+        return response({ operation: { operation_id: "publish_x", stage: "ready", status: "succeeded" } });
+      }
+    };
+    // Autosave will keep retrying; publishing must not accept the older stored version
+    // while the local edit has never been confirmed.
+    c.form.title = "保存失败也要拦";
+    c.touch();
+    await c.publish();
+    hook = undefined;
+    assert.equal(published, 0, "a draft whose save failed is never published");
+    assert.ok(saveAttempts >= 1, "the save was actually attempted");
+    assert.match(c.error.value, /保存/);
+  },
+
+  async "a save still running is awaited before publishing"(c) {    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    let published = 0;
+    let releaseSave;
+    const gate = new Promise((resolve) => {
+      releaseSave = resolve;
+    });
+    hook = (method, url, request) => {
+      if (method === "PUT" && url.endsWith("/drafts/draft_1")) {
+        return gate.then(() => response({ draft: draft({ version: 4 }) }));
+      }
+      if (method === "POST" && url.endsWith("/publish")) {
+        published += 1;
+        const body = JSON.parse(request.body);
+        return response({ operation: { operation_id: "publish_y", stage: "ready", status: "succeeded", expected: body.expected_draft_version } });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_1") return response({ draft: draft({ version: 4 }) });
+    };
+    c.form.title = "保存中也要等";
+    c.touch();
+    const publishing = c.publish();
+    // Let the in-flight save finish only after publishing has started waiting.
+    setTimeout(releaseSave, 30);
+    await publishing;
+    hook = undefined;
+    assert.equal(published, 1, "publishing waited for the running save");
+    assert.equal(c.operation.value.stage, "ready");
+  },
+
+  async "switching drafts does not carry optional fields over"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    // Draft A is configured with optional structure the other draft does not have.
+    c.form.cover = "assets/cover.png";
+    c.form.plot = { nodes: [{ id: "n1", title: "A 的剧情节点" }] };
+    c.form.event_generation = { enabled: true };
+    assert.equal(c.form.cover, "assets/cover.png");
+    hook = (method, url) => {
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_2") {
+        const withoutOptional = { ...draft().payload, title: "另一份内容" };
+        delete withoutOptional.cover;
+        delete withoutOptional.plot;
+        delete withoutOptional.event_generation;
+        return response({ draft: draft({ draft_id: "draft_2", version: 1, payload: withoutOptional }) });
+      }
+    };
+    await c.openDraft("draft_2");
+    hook = undefined;
+    assert.equal(c.form.title, "另一份内容");
+    assert.equal(c.form.cover, undefined, "the previous draft's cover must not follow");
+    assert.equal(c.form.plot, undefined, "the previous draft's plot must not follow");
+    assert.equal(c.form.event_generation, undefined, "the previous draft's event rules must not follow");
+  },
+
   async "a conflicting draft is not published"(c) {
     await c.openProject("project_1");
     await c.openDraft("draft_1");
