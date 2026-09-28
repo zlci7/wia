@@ -163,6 +163,10 @@ func ReadUploadedAsset(reader io.Reader) ([]byte, error) {
 	return ReadUploadedFile(reader, assetImageLimit)
 }
 
+// AssetUploadLimit is the largest request an image upload may be, including the form
+// wrapper, so the boundary can refuse it before parsing.
+func AssetUploadLimit() int64 { return assetImageLimit + (1 << 20) }
+
 // ReadUploadedFile reads one upload up to an explicit limit. Each import format has
 // its own ceiling, so the entry point must say which one applies instead of assuming
 // the image limit.

@@ -259,17 +259,20 @@ func TestImportedCardDraftCanBePublished(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
 	project := importProject(t, a, "harbor-card-publish")
 	card := `{"spec":"chara_card_v2","spec_version":"2.0","data":{"name":"摆渡人阿汀","description":"{{char}}在雾里摆渡。","personality":"话少。","first_mes":"上船吧。","mes_example":"<START>\n{{char}}: 先坐稳。","creator_notes":"备注"}}`
+	// A preview cannot be published before it is confirmed.
 	preview, err := a.PreviewContentImport(ctx, project.ProjectID, "ferryman.json", []byte(card))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "unconfirmed", DraftID: preview.DraftID, ExpectedDraftVersion: preview.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, ErrContentInvalid) {
+		t.Fatalf("an unconfirmed preview was published: %v", err)
 	}
 	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, "confirm-1", preview.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
-	operation, err := a.PublishContentDraft(ctx, PublishRequest{RequestKey: "card-publish", DraftID: confirmed.DraftID, ExpectedDraftVersion: confirmed.Version, ExpectedProjectVersion: project.Version})
-	if err != nil || operation.Status != "succeeded" {
-		t.Fatalf("an imported card could not be published: %+v %v", operation, err)
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "card-publish", DraftID: confirmed.DraftID, ExpectedDraftVersion: confirmed.Version, ExpectedProjectVersion: project.Version}); err != nil {
+		t.Fatalf("an imported card could not be published: %v", err)
 	}
 }
 

@@ -136,8 +136,8 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey stri
 			return ContentDraft{}, ErrIdempotencyConflict
 		}
 	}
-	result, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET status=?,version=version+1,updated_at=? WHERE user_id=? AND draft_id=? AND status=? AND version=?`,
-		draftStatusEditing, nowText(), a.userID, draft.DraftID, draftStatusPreview, draft.Version)
+	result, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET status=?,version=version+1,confirmation_key=?,updated_at=? WHERE user_id=? AND draft_id=? AND status=? AND version=?`,
+		draftStatusEditing, requestKey, nowText(), a.userID, draft.DraftID, draftStatusPreview, draft.Version)
 	if err != nil {
 		return ContentDraft{}, err
 	}
@@ -148,11 +148,6 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey stri
 	if affected == 0 {
 		// Someone else moved the draft between the read and the write.
 		return ContentDraft{}, ErrVersionConflict
-	}
-	if requestKey != "" {
-		if err = a.writeDraftConfirmation(ctx, draft.DraftID, requestKey); err != nil {
-			return ContentDraft{}, err
-		}
 	}
 	return a.ReadContentDraft(ctx, draft.DraftID)
 }

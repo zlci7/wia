@@ -233,6 +233,9 @@ func (s *Server) contentDraftAssets(w http.ResponseWriter, r *http.Request, draf
 		}
 		writeJSON(w, 200, map[string]any{"assets": assets})
 	case "POST":
+		// The request is bounded before the multipart parser can buffer it; the file's own
+		// ceiling is applied afterwards, so an oversized upload never reaches the service.
+		r.Body = http.MaxBytesReader(w, r.Body, storyapp.AssetUploadLimit())
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			writeError(w, 400, "invalid_request", "upload an image file with a name field")
 			return

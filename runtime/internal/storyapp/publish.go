@@ -72,6 +72,11 @@ func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (
 	if err != nil {
 		return ContentOperation{}, err
 	}
+	if draft.Status != draftStatusEditing {
+		// An import preview must be confirmed before it can be published, so a preview is
+		// never frozen into a world by accident.
+		return ContentOperation{}, fmt.Errorf("%w: this draft has not been confirmed for editing", ErrContentInvalid)
+	}
 	hash := hashJSON(request)
 	operation, priorHash, found, err := a.readContentOperation(ctx, request.RequestKey)
 	if err != nil {
