@@ -330,6 +330,68 @@ const tests = {
     assert.equal(c.draftID.value, "draft_import");
   },
 
+  async "publishing twice uses two request identities"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    const keys = [];
+    let version = 3;
+    hook = (method, url, request) => {
+      if (method === "POST" && url.endsWith("/publish")) {
+        const body = JSON.parse(request.body);
+        keys.push(body.request_key);
+        const published = { operation_id: "publish_" + keys.length, kind: "publish", target_id: "draft_1", stage: "ready", status: "succeeded" };
+        return response({ operation: published });
+      }
+      if (method === "GET" && url === "/api/v1/content/projects/project_1") {
+        return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "r-1", version: 2, created_at: "now", updated_at: "now" }, drafts: [draft({ version })] });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_1") return response({ draft: draft({ version }) });
+    };
+    c.form.title = "第一次发布";
+    c.touch();
+    await c.publish();
+    // Publishing reloads the draft, which used to reset the page counter and make the
+    // next publish reuse the same identity.
+    version = 4;
+    c.form.title = "第二次发布";
+    c.touch();
+    await c.publish();
+    hook = undefined;
+    assert.equal(keys.length, 2, "two publishes were sent");
+    assert.notEqual(keys[0], keys[1], "each publish intent must have its own request key");
+    assert.match(keys[0], /^draft_1:publish:/);
+    assert.match(keys[1], /^draft_1:publish:/);
+  },
+
+  async "an unknown publish outcome keeps its identity for a retry"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    const keys = [];
+    let attempt = 0;
+    hook = (method, url, request) => {
+      if (method === "POST" && url.endsWith("/publish")) {
+        attempt += 1;
+        const body = JSON.parse(request.body);
+        keys.push(body.request_key);
+        if (attempt === 1) return response({ error: { code: "storage_unavailable", message: "暂时无法完成" } }, 503);
+        return response({ operation: { operation_id: "publish_retry", stage: "ready", status: "succeeded" } });
+      }
+      if (method === "GET" && url === "/api/v1/content/projects/project_1") {
+        return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "r-1", version: 2, created_at: "now", updated_at: "now" }, drafts: [draft({ version: 3 })] });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_1") return response({ draft: draft({ version: 3 }) });
+    };
+    c.form.title = "重试同一次发布";
+    c.touch();
+    await c.publish();
+    assert.match(c.error.value, /发布失败|暂时/, "the first attempt reported a failure");
+    await c.publish();
+    hook = undefined;
+    assert.equal(keys.length, 2);
+    assert.equal(keys[0], keys[1], "a retry of the same intent keeps its request key");
+    assert.equal(c.operation.value.stage, "ready");
+  },
+
   async "a conflicting draft is not published"(c) {
     await c.openProject("project_1");
     await c.openDraft("draft_1");

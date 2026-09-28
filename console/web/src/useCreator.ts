@@ -62,6 +62,9 @@ export function useCreator() {
   let editGeneration = 0;
   let confirmedGeneration = 0;
   let pending: Promise<void> = Promise.resolve();
+  // The publication identity of an attempt whose result we could not observe. It is only
+  // reused for a retry of that same attempt.
+  let pendingPublish: { draftID: string; key: string; state: "unknown" } | null = null;
 
   const draftID = computed(() => draft.value?.draft_id ?? "");
   const statusLine = computed(() => {
@@ -529,8 +532,15 @@ export function useCreator() {
       if (fresh.draft_id !== draft.value?.draft_id) return;
       draft.value = fresh;
       publishing.value = true;
-      const requestKey = `${fresh.draft_id}:publish:${confirmedGeneration}`;
+      // Each publication intent gets its own request identity. Only an outcome we could
+      // not observe is retried under the same key and the same payload, so a second,
+      // deliberate publish is never mistaken for a repeat of the first.
+      const requestKey = pendingPublish?.draftID === fresh.draft_id && pendingPublish.state === "unknown"
+        ? pendingPublish.key
+        : `${fresh.draft_id}:publish:${crypto.randomUUID()}`;
+      pendingPublish = { draftID: fresh.draft_id, key: requestKey, state: "unknown" };
       const result = await publishContentDraft(fresh.draft_id, requestKey, fresh.version, project.value.version);
+      pendingPublish = null;
       operation.value = result;
       if (result.status === "succeeded") {
         const revision = result.stage === "ready" ? "已发布不可变修订，新开局将使用它。" : "";
@@ -542,9 +552,11 @@ export function useCreator() {
       }
     } catch (e) {
       if (e instanceof ApiError && e.code === "version_conflict") {
+        pendingPublish = null;
         conflict.value = true;
         error.value = "草稿或剧本版本已变化，请重新载入后再发布。";
       } else {
+        // The outcome is unknown, so the same key and payload stay available for a retry.
         error.value = describe(e, "发布失败。");
       }
     } finally {
