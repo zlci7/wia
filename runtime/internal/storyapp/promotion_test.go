@@ -83,13 +83,11 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if playerView.Experience != 2 || len(playerView.PlayerVisible) != 1 || playerView.PlayerVisible[0].SourceID != mine {
+	// The ordinary preview states how much the person lived through but does not claim to
+	// know what the player was told: a committed turn records no comparable player record,
+	// so listing content here would be a guess.
+	if playerView.Experience != 2 || len(playerView.PlayerVisible) != 0 {
 		t.Fatalf("player view: %+v", playerView)
-	}
-	for _, record := range playerView.PlayerVisible {
-		if record.SourceID == secret {
-			t.Fatal("the ordinary preview disclosed a result the player never learned")
-		}
 	}
 	// The ordinary preview always carries the public facts the player can act on.
 	if playerView.Location == "" || playerView.Name == "" || !playerView.InScene {
@@ -176,6 +174,19 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	}
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "promote-other", ExpectedContextEpoch: after.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: request.Draft}); !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("second promotion under a new key: %v", err)
+	}
+	// The early return must also refuse a changed payload under the same key: the same
+	// request key with a different draft is not a repeat.
+	changedDraft := request.Draft
+	changedDraft.Profile = "换过的资料。"
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: request.RequestKey, ExpectedContextEpoch: after.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: changedDraft}); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed payload under the same key: %v", err)
+	}
+	// A repeat that only differs by blanks is still the same request.
+	spaced := request
+	spaced.SourceIDs = append([]string{"  "}, request.SourceIDs...)
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, spaced); err != nil {
+		t.Fatalf("a whitespace-only difference was treated as a conflict: %v", err)
 	}
 	origins, err := readCharacterOrigins(ctx, openWorldForTest(t, a, w.WorldID).db, promoted.EntityID)
 	if err != nil || len(origins) != 3 {

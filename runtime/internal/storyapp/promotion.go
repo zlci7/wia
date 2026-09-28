@@ -95,15 +95,14 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 	if err != nil {
 		return PromotionPreview{}, err
 	}
-	preview.Experience = len(experiences)
-	// The ordinary preview shows what the player was actually told. The count still
-	// shows that the person lived through more than the player witnessed, without
-	// disclosing it.
-	for _, record := range experiences {
-		if author || record.PlayerVisible {
+	if author {
+		// The author view shows the records the person actually lived through, so the
+		// author can decide what to carry into their definition.
+		for _, record := range experiences {
 			preview.PlayerVisible = append(preview.PlayerVisible, record)
 		}
 	}
+	preview.Experience = len(experiences)
 	return preview, nil
 }
 
@@ -149,9 +148,11 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return Character{}, err
 	}
 	// A repeat request returns the character this world already created for that
-	// passer-by; a different key or payload for the same person is a conflict. The
-	// full comparison happens once the validated sources are known.
-	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey, ""); err != nil {
+	// passer-by. The comparison uses the normalized request, so blanks or spacing in the
+	// source list do not turn a repeat into a conflict, while a changed draft still does.
+	early := request
+	early.SourceIDs = normalizedSourceIDs(request.SourceIDs)
+	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey, promotionRequestHash(early, early.SourceIDs)); err != nil {
 		return Character{}, err
 	} else if found {
 		return existing, nil
@@ -168,17 +169,14 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	for _, record := range experiences {
 		authorized[record.SourceID] = true
 	}
-	selected := []string{}
-	for _, id := range request.SourceIDs {
-		id = cleanText(id)
-		if id == "" {
-			continue
-		}
+	selected := normalizedSourceIDs(request.SourceIDs)
+	for _, id := range selected {
 		if !authorized[id] {
 			return Character{}, fmt.Errorf("%w: %s is not an experience of this person", ErrContentInvalid, id)
 		}
-		selected = append(selected, id)
 	}
+	// The authoritative hash uses the validated selection, so a repeat whose source list
+	// only differs by blanks or order still matches the recorded promotion.
 	requestHash := promotionRequestHash(request, selected)
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -407,6 +405,18 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 		return character, true, nil
 	}
 	return Character{}, false, nil
+}
+
+// normalizedSourceIDs trims the chosen experiences and drops blanks, so the request hash
+// describes the selection rather than the caller's formatting.
+func normalizedSourceIDs(ids []string) []string {
+	out := []string{}
+	for _, id := range ids {
+		if trimmed := cleanText(id); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 // promotionRequestHash identifies one promotion request by its whole payload, so the
