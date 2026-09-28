@@ -30,6 +30,10 @@ type contextMaterial struct {
 	System          string
 	Required        string
 	Optional        []contextSection // oldest first; a section is an indivisible causal group
+	// Bounded rebuilds this material to fit an input budget. It reports changed=false
+	// when it is already as small as it can be, so a caller can tell "does not fit"
+	// from "was reduced".
+	Bounded func(inputLimit int) (contextMaterial, bool)
 }
 
 type ContextScope struct {
@@ -49,6 +53,9 @@ type ContextBuildReport struct {
 	Sources, Excluded, Duplicates, InputTokens, OutputTokens int
 	RequiredComplete                                         bool
 	WindowKnown                                              bool
+	// WindowShrunk records that the recent-experience window was reduced to fit the
+	// request budget rather than the request failing outright.
+	WindowShrunk                                             bool
 	ReasoningRequested, ReasoningReserved, TotalOutputTokens int
 }
 
@@ -88,6 +95,14 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 	if output <= 0 || limit <= 0 {
 		report.Failure = "invalid_capacity"
 		return model.TextRequest{}, report, ErrContextCapacity
+	}
+	// A material that knows the whole request's input budget can shrink its own recent
+	// window before the composer has to give up.
+	if material.Bounded != nil {
+		if bounded, changed := material.Bounded(limit); changed {
+			material = bounded
+			report.WindowShrunk = true
+		}
 	}
 	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
 	report.InputTokens = framedContextTokens(req)

@@ -21,22 +21,26 @@ type worldSnapshot struct {
 	Definition      gameDefinition
 	Summary         WorldSummary
 	SceneLocation   string
-	PlayerName      string
-	PlayerProfile   string
-	Narrative       NarrativeSettings
-	Bystanders      []string
-	SceneVersion    int64
-	Characters      []Character
-	Messages        []Message
-	Events          []Event
-	Dialogue        []Event
-	SceneViews      []SceneView
-	Sources         map[string]sourceMetadata
-	Perceptions     map[string][]Perception
-	Memories        map[string][]Memory
-	Plot            *PlotDefinition
-	PlotProgress    PlotProgress
-	LongMemory      map[string]memoryContext
+	// InputBudgetTokens is how many input tokens this world's requests may use; the long
+	// memory projection reads it so a small model window shrinks the recent window
+	// instead of failing the turn.
+	InputBudgetTokens int
+	PlayerName        string
+	PlayerProfile     string
+	Narrative         NarrativeSettings
+	Bystanders        []string
+	SceneVersion      int64
+	Characters        []Character
+	Messages          []Message
+	Events            []Event
+	Dialogue          []Event
+	SceneViews        []SceneView
+	Sources           map[string]sourceMetadata
+	Perceptions       map[string][]Perception
+	Memories          map[string][]Memory
+	Plot              *PlotDefinition
+	PlotProgress      PlotProgress
+	LongMemory        map[string]memoryContext
 }
 
 type worldStore struct {
