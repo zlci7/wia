@@ -968,7 +968,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 					break
 				}
 				material = withRecall(material, snapshot.LongMemory[character.EntityID], decision.RecallQuery)
-				material.Required += fmt.Sprintf("\n已完成第%d次只读检索；无新增结果表示没有命中。最多两次，随后根据已获准资料完成决定。", recall+1)
+				material.Required += fmt.Sprintf("\n已完成第%d次只读检索；命中材料按因果组纳入预算，已在近期经历或此前检索中的内容不重复添加。参考检索预算说明，缺少材料不等于事情未发生。最多两次，随后根据已获准资料完成决定。", recall+1)
 				callGenerator = a.contextGenerator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 				decision = npcDecision{}
 				var repairs int

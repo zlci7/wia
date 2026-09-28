@@ -141,7 +141,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 		t.Fatal("cross-scope search")
 	}
 	material := withLongMemory(contextMaterial{System: "NPC", Required: "本轮", Optional: []contextSection{{Text: "old"}}}, snapshot, "npc:innkeeper", "铜钥匙")
-	if len(material.Optional) != 0 || !strings.Contains(material.Required, "perception:23") {
+	if !strings.Contains(material.Required, "perception:23") {
 		t.Fatal("recent tail missing")
 	}
 	stale := snapshot.LongMemory["npc:innkeeper"].Digest

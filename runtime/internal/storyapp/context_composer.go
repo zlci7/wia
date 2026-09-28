@@ -36,6 +36,7 @@ type ContextScope struct {
 }
 
 type ContextBuildReport struct {
+	RecallIncluded, RecallExcluded                           int
 	SelectedSources                                          []string
 	ExcludedSources                                          int
 	Failure                                                  string
@@ -120,6 +121,22 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 			parts = append(parts, section.Text)
 		}
 		parts = append(parts, material.Required)
+		if len(material.RecallSources) > 0 {
+			selected := map[string]bool{}
+			for _, section := range sections {
+				for _, id := range section.Sources {
+					selected[id] = true
+				}
+			}
+			report.RecallIncluded = 0
+			for _, id := range material.RecallSources {
+				if selected[id] {
+					report.RecallIncluded++
+				}
+			}
+			report.RecallExcluded = len(material.RecallSources) - report.RecallIncluded
+			parts = append(parts, fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources), report.RecallIncluded, report.RecallExcluded))
+		}
 		req.Input = strings.Join(parts, "\n")
 		if _, err := model.ValidateTextRequest(req); err == nil {
 			break
@@ -183,6 +200,7 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	req, report, err := g.composer.Build(g.material, request.System, request.MaxOutputTokens)
 	if g.logger != nil {
 		s := report.Scope
+		g.logger.Printf("story context recall: world_id=%q run_id=%q purpose=%q recipient=%q included=%d excluded=%d", s.World, s.Run, s.Purpose, s.Recipient, report.RecallIncluded, report.RecallExcluded)
 		g.logger.Printf("story context output budget: world_id=%q run_id=%q purpose=%q recipient=%q visible_tokens=%d reasoning_requested=%d reasoning_reserved=%d total_output_tokens=%d", s.World, s.Run, s.Purpose, s.Recipient, report.OutputTokens, report.ReasoningRequested, report.ReasoningReserved, report.TotalOutputTokens)
 		g.logger.Printf("story context built: owner_id=%q game_id=%q world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d epoch=%d scene_version=%d template=%q policy_revision=%q sections=%q sources=%d excluded=%d duplicates=%d input_tokens=%d output_tokens=%d required_complete=%t window_known=%t success=%t failure=%q excluded_sources=%d selected_source_ids=%q", s.Owner, s.Game, s.World, s.Run, s.Attempt, s.Purpose, s.Recipient, s.Stage, s.Epoch, s.SceneVersion, s.Template, s.PolicyRevision, strings.Join(report.Sections, ","), report.Sources, report.Excluded, report.Duplicates, report.InputTokens, report.OutputTokens, report.RequiredComplete, report.WindowKnown, err == nil, report.Failure, report.ExcludedSources, strings.Join(report.SelectedSources, ","))
 	}
