@@ -83,6 +83,9 @@ type loadedPack struct {
 	Cover      []byte
 	CoverType  string
 	Digest     string
+	// CoverRelative is the package-relative cover reference, kept so a world can
+	// copy the image it started with.
+	CoverRelative string
 	// Root is the directory the package was read from; empty for in-memory packs.
 	Root string
 }
@@ -271,6 +274,7 @@ func loadPack(root string) (loadedPack, error) {
 		return bad("defaults")
 	}
 	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: bystanders}
+	result.CoverRelative = p.Cover
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
 	}
@@ -298,7 +302,7 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		seen[npc.EntityID], definitions[npc.DefinitionID] = true, true
 		def.InitialLocations[npc.EntityID] = npc.InitialLocation
-		def.Characters = append(def.Characters, Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, InScene: npc.InitialLocation == p.InitialLocation})
+		def.Characters = append(def.Characters, Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, InScene: npc.InitialLocation == p.InitialLocation})
 	}
 	if p.Plot != nil {
 		if err := validatePlot(*p.Plot, PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}); err != nil {

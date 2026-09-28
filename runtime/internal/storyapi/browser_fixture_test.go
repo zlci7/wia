@@ -43,7 +43,7 @@ func TestBrowserFixture(t *testing.T) {
 		t.Skip("interactive browser fixture")
 	}
 	root := t.TempDir()
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, Generator: browserGenerator{}})
+	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
 	if err != nil {
 		t.Fatal(err)
 	}

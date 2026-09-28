@@ -84,6 +84,9 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	if playerName == "" {
 		playerName = def.Summary.Player.Name
 	}
+	if playerName == "" {
+		playerName = a.worldPlayerName
+	}
 	if playerProfile == "" {
 		playerProfile = def.Summary.Player.Profile
 	}
@@ -115,6 +118,23 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 			return WorldSummary{}, err
 		}
 		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_type',?)`, pack.CoverType); err != nil {
+			return WorldSummary{}, err
+		}
+	}
+	// A world keeps the images it started with, so a later edit, republish or
+	// deletion of the template cannot change or remove them.
+	worldDir := filepath.Dir(path)
+	coverAsset, avatars, err := a.snapshotWorldAssets(pack, worldDir)
+	if err != nil {
+		return WorldSummary{}, err
+	}
+	if coverAsset != "" {
+		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_asset',?)`, coverAsset); err != nil {
+			return WorldSummary{}, err
+		}
+	}
+	for entityID, asset := range avatars {
+		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "avatar:"+entityID, asset); err != nil {
 			return WorldSummary{}, err
 		}
 	}

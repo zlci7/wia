@@ -276,6 +276,89 @@ func TestPublishCarriesReferencedAssets(t *testing.T) {
 	}
 }
 
+// A world copies the images it started with, so a later republish or a deleted
+// revision does not change what the world shows.
+func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	project, draft := publishableDraft(t, a, "harbor-snapshot")
+	payload := draft.Payload
+	payload.Cover = "assets/cover.png"
+	payload.NPCs[0].Avatar = "assets/keeper.png"
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cover := pngBytes(t, 12, 8)
+	avatar := pngBytes(t, 6, 6)
+	for id, asset := range map[string]struct {
+		name string
+		body []byte
+	}{"asset_cover": {"assets/cover.png", cover}, "asset_avatar": {"assets/keeper.png", avatar}} {
+		staged := filepath.Join(a.DataRoot(), id+".png")
+		if err = os.WriteFile(staged, asset.body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?)`, a.userID, saved.DraftID, id, asset.name, "image/png", len(asset.body), 1, 1, "digest", staged, nowText()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	operation, err := a.PublishContentDraft(ctx, PublishRequest{RequestKey: "snapshot", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version})
+	if err != nil || operation.Status != "succeeded" {
+		t.Fatalf("publish: %+v %v", operation, err)
+	}
+	var revision, revisionPath string
+	if err = a.appDB.QueryRowContext(ctx, `SELECT revision,path FROM content_revisions WHERE user_id=? AND game_id='harbor-snapshot'`, a.userID).Scan(&revision, &revisionPath); err != nil {
+		t.Fatal(err)
+	}
+	world, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "harbor-snapshot", ExpectedRevision: revision, RequestKey: "snapshot-world", Name: "港口镜像", Activate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worldPath, _, err := a.worldRecord(ctx, world.WorldID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"cover.png", "keeper.png"} {
+		if _, err = os.Stat(filepath.Join(filepath.Dir(worldPath), "assets", name)); err != nil {
+			t.Fatalf("world is missing its own copy of %s: %v", name, err)
+		}
+	}
+	store, err := openWorldDB(worldPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coverAsset, err := metaGet(ctx, store.db, "cover_asset")
+	if err != nil || coverAsset != "cover.png" {
+		t.Fatalf("cover record: %q %v", coverAsset, err)
+	}
+	keeperAvatar, err := metaGet(ctx, store.db, "avatar:npc:keeper")
+	if err != nil || keeperAvatar != "keeper.png" {
+		t.Fatalf("avatar record: %q %v", keeperAvatar, err)
+	}
+	store.db.Close()
+
+	// Removing the published revision does not affect the world's own copies.
+	if err = os.RemoveAll(revisionPath); err != nil {
+		t.Fatal(err)
+	}
+	body, err := a.worldAsset(worldPath, coverAsset)
+	if err != nil || len(body) != len(cover) {
+		t.Fatalf("world cover after revision removal: %d %v", len(body), err)
+	}
+	if body, err = a.worldAsset(worldPath, keeperAvatar); err != nil || len(body) != len(avatar) {
+		t.Fatalf("world avatar after revision removal: %d %v", len(body), err)
+	}
+	// The reader refuses names that could leave the world directory.
+	if _, err = a.worldAsset(worldPath, "../cover"); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("traversal accepted: %v", err)
+	}
+	if _, err = a.worldAsset(worldPath, "missing.png"); !errors.Is(err, ErrContentNotFound) {
+		t.Fatalf("missing asset: %v", err)
+	}
+}
+
 // The published identity is stable: the same content always derives the same
 // revision identity, and a changed field derives a different one.
 func TestPackageRevisionIdentity(t *testing.T) {

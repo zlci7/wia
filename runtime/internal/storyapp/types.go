@@ -46,6 +46,9 @@ type Options struct {
 	Generator       model.TextGenerator
 	AllowFake       bool
 	Logger          Logger
+	// WorldPlayerName overrides the lead character name of worlds created through
+	// this instance; the disposable browser fixture uses it.
+	WorldPlayerName string
 }
 
 type Logger interface {
@@ -58,7 +61,10 @@ type App struct {
 	packRoot   string
 	// contentDir holds this instance's published user content. Tests may point it
 	// at a temporary directory.
-	contentDir      string
+	contentDir string
+	// worldPlayerName overrides the lead character name of worlds created through
+	// this instance; the disposable browser fixture uses it.
+	worldPlayerName string
 	createMu        sync.Mutex
 	root            string
 	userID          string
@@ -149,14 +155,17 @@ type WorldSummary struct {
 type Character struct {
 	DefinitionRevision string `json:"definition_revision,omitempty"`
 	Appearance         string `json:"appearance,omitempty"`
-	EntityID           string `json:"entity_id"`
-	DefinitionID       string `json:"definition_id"`
-	Name               string `json:"name"`
-	Role               string `json:"role"`
-	Profile            string `json:"profile"`
-	Knowledge          string `json:"knowledge"`
-	InitialConcerns    string `json:"initial_concerns"`
-	InScene            bool   `json:"in_scene"`
+	// Avatar is a package-relative asset reference from the definition, not a world
+	// resource name; the world snapshot records its own copy separately.
+	Avatar          string `json:"avatar,omitempty"`
+	EntityID        string `json:"entity_id"`
+	DefinitionID    string `json:"definition_id"`
+	Name            string `json:"name"`
+	Role            string `json:"role"`
+	Profile         string `json:"profile"`
+	Knowledge       string `json:"knowledge"`
+	InitialConcerns string `json:"initial_concerns"`
+	InScene         bool   `json:"in_scene"`
 }
 
 // PublicCharacter is the player-facing character projection. Private role

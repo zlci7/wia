@@ -55,7 +55,7 @@ func Open(ctx context.Context, options Options) (*App, error) {
 		return nil, err
 	}
 	copyCtx, copyCancel := context.WithCancel(context.Background())
-	app := &App{root: appRoot, dataRoot: root, appDB: db, processLock: processLock, userID: userID, worlds: make(map[string]*worldRuntime), runs: make(map[string]*runRuntime), copyCtx: copyCtx, copyCancel: copyCancel, logger: options.Logger, closed: make(chan struct{})}
+	app := &App{root: appRoot, dataRoot: root, appDB: db, processLock: processLock, userID: userID, worlds: make(map[string]*worldRuntime), runs: make(map[string]*runRuntime), copyCtx: copyCtx, copyCancel: copyCancel, logger: options.Logger, closed: make(chan struct{}), worldPlayerName: cleanText(options.WorldPlayerName)}
 	if options.ModelConfigPath != "" {
 		app.modelPath = options.ModelConfigPath
 	} else if value := strings.TrimSpace(os.Getenv("WIA_MODEL_CONFIG")); value != "" {
