@@ -314,7 +314,9 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		seen[npc.EntityID], definitions[npc.DefinitionID] = true, true
 		def.InitialLocations[npc.EntityID] = npc.InitialLocation
-		def.Characters = append(def.Characters, Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, InScene: npc.InitialLocation == p.InitialLocation})
+		// The character's authored dialogue samples belong to its definition, so anything
+		// reading the loaded package sees them without a second lookup.
+		def.Characters = append(def.Characters, Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples, InScene: npc.InitialLocation == p.InitialLocation})
 	}
 	if p.Plot != nil {
 		if err := validatePlot(*p.Plot, PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}); err != nil {
