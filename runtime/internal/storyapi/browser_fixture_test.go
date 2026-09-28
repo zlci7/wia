@@ -29,6 +29,11 @@ func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRe
 		return model.TextResponse{}, ctx.Err()
 	case <-time.After(450 * time.Millisecond):
 	}
+	// The suggestion call has its own role and response contract; without this the
+	// generic stub would answer it with an NPC payload.
+	if strings.Contains(request.System, "玩家行动建议助手") {
+		return model.TextResponse{Text: `{"items":["我向沈岚问候。","我看看窗外的河面。","我在一旁稍作停留。"]}`, Diagnostic: model.TextDiagnostic{Provider: "fixture", Model: "controlled-fixture", InputKnown: true, OutputKnown: true, ReasoningKnown: true, CacheKnown: true, InputTokens: 100, OutputTokens: 30, ReasoningTokens: 10, CacheHitTokens: 60, CacheMissTokens: 40}}, nil
+	}
 	return g.apiGenerator.GenerateText(ctx, request)
 }
 
@@ -62,7 +67,13 @@ func TestBrowserFixture(t *testing.T) {
 				kind = "player"
 				content = fmt.Sprintf("第 %d 次：我向老板问起渡口的消息。", seq)
 			}
-			_, err = tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, seq, fmt.Sprintf("fixture-%d-%d", index, seq), kind, content, "", time.Now().UTC().Format(time.RFC3339Nano))
+			// One completed run per turn keeps the seeded history shaped like real
+			// play, so personal memory indexes it as per-turn groups.
+			run := fmt.Sprintf("fixture-run-%d-%d", index, seq/2)
+			if _, err = tx.Exec(`INSERT OR IGNORE INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed',?,?)`, run, run, run, time.Now().UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+				t.Fatal(err)
+			}
+			_, err = tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, seq, fmt.Sprintf("fixture-%d-%d", index, seq), kind, content, run, time.Now().UTC().Format(time.RFC3339Nano))
 			if err != nil {
 				t.Fatal(err)
 			}
