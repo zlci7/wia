@@ -49,6 +49,7 @@ type Dialog =
   | "copy"
   | "delete"
   | "scene"
+  | "usage"
   | "memory";
 export function useExperience() {
   const status = ref<Status | null>(null),
@@ -282,6 +283,7 @@ export function useExperience() {
         delete: "删除存档",
         scene: "场景与人物",
         memory: "回顾与纠正",
+        usage: "模型用量",
         "": "",
       })[dialog.value],
   );

@@ -9,6 +9,14 @@ import (
 
 // TextDiagnostic contains only bounded transport/validation metadata, never text.
 type TextDiagnostic struct {
+	Provider        string
+	Model           string
+	InputKnown      bool
+	OutputKnown     bool
+	ReasoningKnown  bool
+	CacheKnown      bool
+	CacheHitTokens  int
+	CacheMissTokens int
 	Code            string
 	HTTPStatus      int
 	RequestID       string
@@ -18,6 +26,22 @@ type TextDiagnostic struct {
 	ReasoningTokens int
 	ContentChars    int
 	ReasoningChars  int
+}
+
+// SetUsage keeps absent or inconsistent provider counters distinct from zero.
+func (d *TextDiagnostic) SetUsage(input, output, reasoning, hit, miss *int) {
+	if input != nil && *input >= 0 {
+		d.InputTokens, d.InputKnown = *input, true
+	}
+	if output != nil && *output >= 0 {
+		d.OutputTokens, d.OutputKnown = *output, true
+	}
+	if reasoning != nil && *reasoning >= 0 && d.OutputKnown && *reasoning <= d.OutputTokens {
+		d.ReasoningTokens, d.ReasoningKnown = *reasoning, true
+	}
+	if hit != nil && *hit >= 0 && d.InputKnown && *hit <= d.InputTokens && (miss == nil || *miss == d.InputTokens-*hit) {
+		d.CacheHitTokens, d.CacheMissTokens, d.CacheKnown = *hit, d.InputTokens-*hit, true
+	}
 }
 
 type TextCallError struct {

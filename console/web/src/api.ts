@@ -15,6 +15,13 @@ import {
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
+export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {
+  const query = new URLSearchParams();
+  if (world) query.set('world_id', world);
+  if (before) query.set('before_id', String(before));
+  return request(`/api/v1/usage?${query}`);
+}
+
 export function fetchMemory(world: string, author = false, scope = 'player', before = 0): Promise<MemoryView> {
   const query = new URLSearchParams({ scope }); if (before) query.set('before_seq', String(before));
   return request(`/api/v1/worlds/${encodeURIComponent(world)}/${author ? 'author-memory' : 'memory'}?${query}`)

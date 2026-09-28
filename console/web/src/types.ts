@@ -148,3 +148,19 @@ export interface MemoryView {
   has_more: boolean; next_before_seq?: number;
 }
 export interface CorrectionRequest { request_key: string; expected_context_epoch: number; kind: string; scope: string; target_id: string; replacement: string }
+export interface UsageCall {
+  id: number; world_id: string; run_id: string; attempt: number; purpose: string;
+  stage: number; started_at: string; status: string; elapsed_ms: number;
+  provider: string; model: string; input_tokens: number | null; output_tokens: number | null;
+  reasoning_tokens: number | null; cache_hit_tokens: number | null; cache_miss_tokens: number | null;
+  estimated_input_tokens: number; output_limit: number; error_code: string;
+}
+export interface UsagePage {
+  totals: {
+    calls: number; unconfirmed: number; failed: number;
+    input_known: number; output_known: number; reasoning_known: number; cache_known: number;
+    input_tokens: number; output_tokens: number; reasoning_tokens: number;
+    cache_hit_tokens: number; cache_miss_tokens: number; cache_hit_rate: number | null;
+  };
+  calls: UsageCall[]; next_before_id?: number;
+}

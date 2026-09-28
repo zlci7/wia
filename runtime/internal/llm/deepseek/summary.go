@@ -26,7 +26,7 @@ func (p *Provider) TextReasoningReserve() int {
 }
 
 func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (result model.TextResponse, callErr error) {
-	diagnostic := model.TextDiagnostic{}
+	diagnostic := model.TextDiagnostic{Provider: "deepseek", Model: p.model}
 	defer func() {
 		if callErr != nil {
 			if diagnostic.Code == "" {
@@ -115,10 +115,12 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 			} `json:"message"`
 		} `json:"choices"`
 		Usage struct {
-			Input   int `json:"prompt_tokens"`
-			Output  int `json:"completion_tokens"`
+			Input   *int `json:"prompt_tokens"`
+			Output  *int `json:"completion_tokens"`
+			Hit     *int `json:"prompt_cache_hit_tokens"`
+			Miss    *int `json:"prompt_cache_miss_tokens"`
 			Details struct {
-				Reasoning int `json:"reasoning_tokens"`
+				Reasoning *int `json:"reasoning_tokens"`
 			} `json:"completion_tokens_details"`
 		} `json:"usage"`
 		Status string `json:"status"`
@@ -130,9 +132,7 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		diagnostic.ContentChars = utf8.RuneCountInString(envelope.Choices[0].Message.Content)
 		diagnostic.ReasoningChars = utf8.RuneCountInString(envelope.Choices[0].Message.Reasoning)
 	}
-	diagnostic.InputTokens = max(0, envelope.Usage.Input)
-	diagnostic.OutputTokens = max(0, envelope.Usage.Output)
-	diagnostic.ReasoningTokens = max(0, envelope.Usage.Details.Reasoning)
+	diagnostic.SetUsage(envelope.Usage.Input, envelope.Usage.Output, envelope.Usage.Details.Reasoning, envelope.Usage.Hit, envelope.Usage.Miss)
 	diagnostic.FinishReason = model.SafeFinishReason(finish)
 	if finish == "length" || finish == "incomplete" {
 		diagnostic.Code = "output_incomplete"

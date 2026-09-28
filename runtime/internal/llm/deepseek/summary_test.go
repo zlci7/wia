@@ -19,6 +19,32 @@ import (
 
 const textSuccessBody = `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"Alice did not act.","reasoning_content":"private reasoning"}}]}`
 
+func TestTextCacheUsageIncludingInvalidOutput(t *testing.T) {
+	for _, finish := range []string{"stop", "length"} {
+		for _, usage := range []string{``, `,"usage":{"prompt_tokens":100,"completion_tokens":30,"completion_tokens_details":{"reasoning_tokens":20},"prompt_cache_hit_tokens":60,"prompt_cache_miss_tokens":40}`} {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.WriteString(w, strings.TrimSuffix(strings.Replace(textSuccessBody, `"stop"`, strconv.Quote(finish), 1), "}")+usage+"}")
+			}))
+			p := NewProvider("test", "test", WithBaseURL(server.URL))
+			response, err := p.GenerateText(context.Background(), model.TextRequest{Input: "facts"})
+			d := response.Diagnostic
+			if finish == "length" {
+				var failure *model.TextCallError
+				if !errors.As(err, &failure) {
+					t.Fatal(err)
+				}
+				d = failure.Diagnostic
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if d.CacheKnown != (usage != "") || (d.CacheKnown && (d.CacheHitTokens != 60 || d.CacheMissTokens != 40 || d.OutputTokens != 30 || d.ReasoningTokens != 20)) {
+				t.Fatalf("usage: %+v", d)
+			}
+			server.Close()
+		}
+	}
+}
+
 func TestTextReasoningReserveTransportAndVisibleCap(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

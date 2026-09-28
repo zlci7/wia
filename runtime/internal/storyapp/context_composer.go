@@ -177,6 +177,7 @@ func framedContextTokens(req model.TextRequest) int {
 }
 
 type contextGenerator struct {
+	app *App
 	model.TextGenerator
 	composer ContextComposer
 	material contextMaterial
@@ -193,7 +194,7 @@ func (a *App) contextGenerator(generator model.TextGenerator, material contextMa
 	if provider, ok := generator.(model.TextReasoningProvider); ok {
 		reasoning = provider.TextReasoningReserve()
 	}
-	return &contextGenerator{TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
+	return &contextGenerator{app: a, TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
 }
 
 func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
@@ -213,7 +214,13 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	if g.logger != nil {
 		g.logger.Printf("story model call started: world_id=%q run_id=%q attempt=%d purpose=%q recipient=%q stage=%d call=%d", scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Recipient, scope.Stage, g.calls)
 	}
-	response, callErr := g.TextGenerator.GenerateText(ctx, req)
+	var response model.TextResponse
+	var callErr error
+	if g.app != nil {
+		response, callErr = g.app.meteredText(ctx, g.TextGenerator, req, scope, report)
+	} else {
+		response, callErr = g.TextGenerator.GenerateText(ctx, req)
+	}
 	diagnostic := response.Diagnostic
 	var failure *model.TextCallError
 	if errors.As(callErr, &failure) {

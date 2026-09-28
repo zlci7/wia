@@ -381,6 +381,12 @@ TextRequest 的 MaxOutputTokens 约束可见回答，ReasoningReserveTokens 仅�
 
 ### 8.3 快照与来源完整性
 
+应用库 `model_usage` 持久保存每次实际文本调用，包括连接验证、正文、NPC、协调及记忆整理。调用前写入 unconfirmed 记录，返回后独立记录 returned/failed、模型、run/attempt/purpose/stage、耗时和可空的用量计数；回合失败不回滚计量。取消后的落盘使用独立五秒期限；进程中断或落盘失败保留未确认记录，不推断零费用。账本不保存正文、提示词、秘密或推理文本，不随世界复制。
+
+DeepSeek 读取 prompt_cache_hit_tokens/prompt_cache_miss_tokens；OpenAI Responses 读取 input_tokens_details.cached_tokens。输入、输出和推理分别标记是否已知，非法负数、超出总输入的命中量或不一致的缓存分项不作为有效缓存数据。命中率为已知命中量除以已知命中与未命中量之和，零分母返回 null。
+
+`GET /api/v1/usage?world_id=...&before_id=...` 沿用本地会话及 owner 范围；world_id 可省略以查询账户账本。显式世界须有读取权限且 ready。before_id 为正整数排他游标，每页最多100条倒序记录；返回 totals、calls、可选 next_before_id。汇总不受分页影响，并带输入、输出、推理及缓存各自的已知调用次数。历史日志不回填为新账本，不提供未经核实的金额估计。
+
 故事上下文由 storyapp 内的 ContextComposer 统一构建，覆盖 intent、npc、coordination、narration 四种用途。材料分为本轮必需内容与完整因果组的可选历史；模板和来源选择集中管理。构建器没有数据库、模型调用或跨请求可变状态。StoryService 冻结世界、run/attempt/stage、context epoch、场景版本和模型，负责读取及提交。
 
 个人感知与记忆的来源按引用批量补取事件元数据，窗口外来源仍可保留身份与顺序；该读取不向人物提供事件原文。真正缺失的引用使构建失败，不按空历史继续。

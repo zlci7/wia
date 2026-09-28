@@ -19,6 +19,22 @@ import (
 
 const textSuccessBody = `{"status":"completed","error":null,"incomplete_details":null,"output":[{"type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Alice did not act.","annotations":[]}]}]}`
 
+func TestResponsesUsageCache(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, strings.TrimSuffix(textSuccessBody, "}")+`,"usage":{"input_tokens":100,"output_tokens":30,"input_tokens_details":{"cached_tokens":60},"output_tokens_details":{"reasoning_tokens":20}}}`)
+	}))
+	defer server.Close()
+	p := NewProvider("test", "test", WithBaseURL(server.URL))
+	response, err := p.GenerateText(context.Background(), model.TextRequest{Input: "facts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := response.Diagnostic
+	if !d.CacheKnown || d.CacheMissTokens != 40 || !d.ReasoningKnown || d.ReasoningTokens != 20 {
+		t.Fatalf("usage: %+v", d)
+	}
+}
+
 func TestGenerateTextUsesConfiguredResponsesProviderWithoutTools(t *testing.T) {
 	for _, outputLimit := range []int{0, 32} {
 		t.Run(strconv.Itoa(outputLimit), func(t *testing.T) {

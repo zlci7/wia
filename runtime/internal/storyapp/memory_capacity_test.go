@@ -31,7 +31,7 @@ func TestDigestPromptDoesNotGrowWithCoverageIDs(t *testing.T) {
 	g := &digestGenerator{}
 	for i := 0; i < 2; i++ {
 		prefix := []MemorySource{{ID: fmt.Sprint("new:", i), Seq: int64(10001 + i), Content: "新进展"}}
-		d, err := (&App{}).summarizeMemory(context.Background(), g, worldSnapshot{}, Run{BaseContextEpoch: 1}, "npc:a", previous, prefix)
+		d, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, Run{BaseContextEpoch: 1}, "npc:a", previous, prefix)
 		if err != nil {
 			t.Fatalf("coverage IDs exhausted prompt: %v", err)
 		}
@@ -56,7 +56,7 @@ func TestDigestStateSourcesUseCurrentCatalog(t *testing.T) {
 		valid bool
 	}{{"covered", false}, {"retained", true}, {"new", true}} {
 		g := fixedJSONGenerator{text: fmt.Sprintf(`{"content":"有效回顾","states":[{"kind":"belief","content":"判断","source_ids":[%q]}]}`, tc.id)}
-		_, err := (&App{}).summarizeMemory(context.Background(), g, worldSnapshot{}, Run{}, "npc:a", previous, []MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
+		_, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, Run{}, "npc:a", previous, []MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
 		if (err == nil) != tc.valid {
 			t.Fatalf("source=%s err=%v", tc.id, err)
 		}

@@ -111,6 +111,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api/v1/status":
 		s.status(w, r)
+	case "/api/v1/usage":
+		s.usage(w, r)
 	case "/api/v1/games":
 		s.games(w, r)
 	case "/api/v1/model-profiles":

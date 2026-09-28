@@ -17,7 +17,7 @@ import (
 var _ model.TextGenerator = (*Provider)(nil)
 
 func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (result model.TextResponse, callErr error) {
-	diagnostic := model.TextDiagnostic{}
+	diagnostic := model.TextDiagnostic{Provider: "openai", Model: p.model}
 	defer func() {
 		if callErr != nil {
 			if diagnostic.Code == "" {
@@ -102,8 +102,19 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
 		Status string `json:"status"`
+		Usage  struct {
+			Input        *int `json:"input_tokens"`
+			Output       *int `json:"output_tokens"`
+			InputDetails struct {
+				Cached *int `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
+			OutputDetails struct {
+				Reasoning *int `json:"reasoning_tokens"`
+			} `json:"output_tokens_details"`
+		} `json:"usage"`
 	}
 	_ = json.Unmarshal(data, &envelope)
+	diagnostic.SetUsage(envelope.Usage.Input, envelope.Usage.Output, envelope.Usage.OutputDetails.Reasoning, envelope.Usage.InputDetails.Cached, nil)
 	finish := envelope.Status
 	if len(envelope.Choices) > 0 {
 		finish = envelope.Choices[0].FinishReason

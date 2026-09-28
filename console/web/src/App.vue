@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppDialog from "./components/AppDialog.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
+import UsagePanel from "./components/UsagePanel.vue";
 import { useExperience } from "./useExperience";
 import "./style.css";
 const {
@@ -137,6 +138,7 @@ const policyOptions = [
           <button class="quiet-button desktop-setting" @click="openModel()">
             模型设置
           </button>
+          <button class="quiet-button desktop-setting" @click="showDialog('usage')">模型用量</button>
           <button
             v-if="currentWorld && view === 'play'"
             class="quiet-button desktop-setting"
@@ -154,6 +156,7 @@ const policyOptions = [
               更多
             </button>
             <div v-if="moreOpen" class="menu-panel">
+              <button @click="showDialog('usage')">模型用量</button>
               <button
                 v-if="currentWorld && view === 'play'"
                 @click="showDialog('memory')"
@@ -556,6 +559,7 @@ const policyOptions = [
         @busy="dialogBusy = $event"
         @updated="freshRefresh"
       />
+      <UsagePanel v-if="dialog === 'usage'" :key="currentWorld?.world_id ?? ''" :world-id="currentWorld?.world_id" :world-name="currentWorld?.name" />
       <template v-if="dialog === 'model'">
         <p class="subtle">
           凭据仅保存在本机。{{

@@ -457,7 +457,8 @@ func (a *App) ConfigureModel(ctx context.Context, request ModelConfigRequest) (S
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	if _, err := generator.GenerateText(probeCtx, model.TextRequest{System: "Reply with one short word.", Input: "ready", MaxInputTokens: 1024, MaxOutputTokens: 64}); err != nil {
+	probe := model.TextRequest{System: "Reply with one short word.", Input: "ready", MaxInputTokens: 1024, MaxOutputTokens: 64}
+	if _, err := a.meteredText(probeCtx, generator, probe, ContextScope{Purpose: "connection"}, ContextBuildReport{InputTokens: framedContextTokens(probe), TotalOutputTokens: 64}); err != nil {
 		_ = os.Remove(tmpConfig)
 		_ = os.Remove(tmpKey)
 		return Status{}, fmt.Errorf("model_not_configured: provider verification failed")
