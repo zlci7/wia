@@ -138,7 +138,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	response, body = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{
 		"name":              "HTTP 冒险",
 		"game_id":           "lantern-dusk",
-		"expected_revision": "lantern-dusk.pack.v1",
+		"expected_revision": "lantern-dusk.pack.v2",
 		"request_key":       "http-create-world",
 		"player_name":       "旅人",
 		"player_profile":    "寻找信使",

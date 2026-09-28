@@ -37,6 +37,7 @@ func lanternPlotDefinition() *PlotDefinition {
 
 func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (WorldSummary, error) {
 	p := a.packs[GameID]
+	p.Definition.Plot = lanternPlotDefinition()
 	if mode == "" {
 		mode = p.Definition.Summary.Mode
 	}
