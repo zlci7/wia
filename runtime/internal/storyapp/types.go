@@ -135,21 +135,24 @@ type GameSummary struct {
 }
 
 type WorldSummary struct {
-	GameTitle    string    `json:"game_title"`
-	Revision     string    `json:"revision"`
-	GameID       string    `json:"game_id"`
-	WorldID      string    `json:"world_id"`
-	Name         string    `json:"name"`
-	Mode         string    `json:"mode"`
-	TurnSeq      int64     `json:"turn_seq"`
-	MessageHead  int64     `json:"message_head"`
-	EventHead    int64     `json:"event_head"`
-	ContextEpoch int64     `json:"context_epoch"`
-	Clock        string    `json:"clock"`
-	Scene        string    `json:"scene"`
-	Status       string    `json:"status"`
-	StoryEnded   bool      `json:"story_ended"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	GameTitle    string `json:"game_title"`
+	Revision     string `json:"revision"`
+	GameID       string `json:"game_id"`
+	WorldID      string `json:"world_id"`
+	Name         string `json:"name"`
+	Mode         string `json:"mode"`
+	TurnSeq      int64  `json:"turn_seq"`
+	MessageHead  int64  `json:"message_head"`
+	EventHead    int64  `json:"event_head"`
+	ContextEpoch int64  `json:"context_epoch"`
+	Clock        string `json:"clock"`
+	Scene        string `json:"scene"`
+	// SceneLocation is the current location's identifier. Presence is decided by
+	// identity, not by comparing human-readable scene text.
+	SceneLocation string    `json:"scene_location,omitempty"`
+	Status        string    `json:"status"`
+	StoryEnded    bool      `json:"story_ended"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type Character struct {

@@ -96,14 +96,11 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 		return PromotionPreview{}, err
 	}
 	preview.Experience = len(experiences)
+	// The ordinary preview shows what the player was actually told. The count still
+	// shows that the person lived through more than the player witnessed, without
+	// disclosing it.
 	for _, record := range experiences {
-		if author {
-			preview.PlayerVisible = append(preview.PlayerVisible, record)
-			continue
-		}
-		// The player only ever sees what they were told; the count still shows that
-		// the person lived through more than the player witnessed.
-		if record.PlayerVisible {
+		if author || record.PlayerVisible {
 			preview.PlayerVisible = append(preview.PlayerVisible, record)
 		}
 	}
@@ -152,8 +149,9 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return Character{}, err
 	}
 	// A repeat request returns the character this world already created for that
-	// passer-by; a different request key for the same person is a conflict.
-	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey); err != nil {
+	// passer-by; a different key or payload for the same person is a conflict. The
+	// full comparison happens once the validated sources are known.
+	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey, ""); err != nil {
 		return Character{}, err
 	} else if found {
 		return existing, nil
@@ -181,6 +179,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		}
 		selected = append(selected, id)
 	}
+	requestHash := promotionRequestHash(request, selected)
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Character{}, err
@@ -198,10 +197,6 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return Character{}, ErrVersionConflict
 	}
 	entityID, definitionID := promotionIdentity(bystander, snapshot.Definition)
-	requestHash := hashJSON(map[string]any{
-		"key": request.RequestKey, "bystander": request.BystanderID, "sources": selected,
-		"draft": draft, "epoch": request.ExpectedContextEpoch,
-	})
 	// A repeated request key with the same payload is idempotent; a different payload
 	// is a conflict rather than a second promotion.
 	rows, err := tx.QueryContext(ctx, `SELECT value FROM meta WHERE key LIKE 'promotion:%'`)
@@ -256,12 +251,42 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 			return Character{}, err
 		}
 	}
-	if entityID != bystander.BystanderID {
-		// The person keeps one identity: earlier authorized experience follows the
-		// promoted entity instead of being copied into unrelated records.
-		if _, err = tx.ExecContext(ctx, `UPDATE perceptions SET recipient_id=? WHERE recipient_id=?`, entityID, bystander.BystanderID); err != nil {
+	if entityID != bystander.BystanderID && len(selected) > 0 {
+		// The person keeps one identity: only the experiences the confirmation
+		// selected follow the promoted entity.
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(selected)), ",")
+		args := []any{entityID, bystander.BystanderID}
+		for _, id := range selected {
+			args = append(args, id)
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE perceptions SET recipient_id=? WHERE recipient_id=? AND source_event_id IN (`+placeholders+`)`, args...); err != nil {
 			return Character{}, err
 		}
+	}
+	// The promoted person needs a committed scene view of their own: the world's
+	// stored views are only valid when every character in the roster has one, so
+	// deferring this to the next turn would leave the save unreadable. The view holds
+	// what the player already knows plus the person's own authorized results, never
+	// another character's private material.
+	views := append([]SceneView{}, snapshot.SceneViews...)
+	nextSceneVersion := snapshot.SceneVersion
+	replaced := false
+	for index := range views {
+		if views[index].Recipient == entityID {
+			views[index].Content = promotionSceneContent(bystander, draft, snapshot)
+			views[index].SourceIDs = selected
+			replaced = true
+		}
+	}
+	if !replaced {
+		nextSceneVersion++
+		views = append(views, SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
+	}
+	if err = metaSetTx(ctx, tx, "scene_views", marshalJSON(views)); err != nil {
+		return Character{}, err
+	}
+	if err = metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(nextSceneVersion, 10)); err != nil {
+		return Character{}, err
 	}
 	remarks := marshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "promotion:"+entityID, remarks); err != nil {
@@ -330,9 +355,13 @@ func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
 }
 
 // readBystanderExperiences lists the committed results attributed to one person.
-// Only outcomes that named them grant experience; being present grants nothing.
+// Only outcomes that named them grant experience; being present grants nothing. An
+// experience is player-visible only when the player actually received that same
+// result, never because it happens to be an action outcome.
 func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID string) ([]PromotionSource, error) {
-	rows, err := db.QueryContext(ctx, `SELECT p.source_event_id, p.source_type, p.content FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE p.recipient_id=? ORDER BY e.seq`, bystanderID)
+	rows, err := db.QueryContext(ctx, `SELECT p.source_event_id, p.source_type, p.content,
+		EXISTS(SELECT 1 FROM perceptions v WHERE v.recipient_id='player' AND v.source_event_id=p.source_event_id) AS player_visible
+		FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE p.recipient_id=? ORDER BY e.seq`, bystanderID)
 	if err != nil {
 		return nil, err
 	}
@@ -341,11 +370,12 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 	for rows.Next() {
 		var record PromotionSource
 		var sourceType string
-		if err = rows.Scan(&record.SourceID, &sourceType, &record.Content); err != nil {
+		var visible int
+		if err = rows.Scan(&record.SourceID, &sourceType, &record.Content, &visible); err != nil {
 			return nil, err
 		}
 		record.Kind = sourceType
-		record.PlayerVisible = strings.HasPrefix(sourceType, "action_")
+		record.PlayerVisible = visible != 0
 		out = append(out, record)
 	}
 	return out, rows.Err()
@@ -354,7 +384,7 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 // promotedCharacter finds the character a previous promotion created for one
 // passer-by. The same request key returns that character; a different key for the
 // same person is a conflict instead of a second promotion.
-func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey string) (Character, bool, error) {
+func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (Character, bool, error) {
 	for _, character := range snapshot.Characters {
 		raw, err := metaGet(ctx, store.db, "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -366,11 +396,12 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 		var record struct {
 			BystanderID string `json:"bystander_id"`
 			RequestKey  string `json:"request_key"`
+			RequestHash string `json:"request_hash"`
 		}
 		if json.Unmarshal([]byte(raw), &record) != nil || record.BystanderID != bystanderID {
 			continue
 		}
-		if record.RequestKey != "" && record.RequestKey != requestKey {
+		if record.RequestKey != "" && (record.RequestKey != requestKey || (requestHash != "" && record.RequestHash != requestHash)) {
 			return Character{}, false, ErrIdempotencyConflict
 		}
 		return character, true, nil
@@ -378,7 +409,32 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 	return Character{}, false, nil
 }
 
-// readCharacterOrigins lists where a character in this world came from.
+// promotionRequestHash identifies one promotion request by its whole payload, so the
+// same key with a different payload is a conflict rather than a silent repeat.
+func promotionRequestHash(request PromotionRequest, selected []string) string {
+	return hashJSON(map[string]any{
+		"key": request.RequestKey, "bystander": request.BystanderID, "sources": selected, "draft": request.Draft,
+	})
+}
+
+// promotionSceneContent seeds the promoted person's own view. It states where they
+// are and what they themselves lived through, and never borrows another character's
+// private material to fill the gap.
+func promotionSceneContent(bystander PackBystander, draft PromotionDraft, snapshot worldSnapshot) string {
+	parts := []string{}
+	location := bystanderLocation(snapshot, bystander)
+	if location != "" {
+		parts = append(parts, fmt.Sprintf("%s 在%s。", bystander.Name, location))
+	} else {
+		parts = append(parts, fmt.Sprintf("%s 仍在原处。", bystander.Name))
+	}
+	if strings.TrimSpace(draft.InitialConcerns) != "" {
+		parts = append(parts, "眼下在意："+strings.TrimSpace(draft.InitialConcerns))
+	}
+	parts = append(parts, "本人获准的经历以已提交结果为准；未参与的部分不作为已知。")
+	return strings.Join(parts, "")
+}
+
 func readCharacterOrigins(ctx context.Context, db *sql.DB, entityID string) ([]PromotionSource, error) {
 	rows, err := db.QueryContext(ctx, `SELECT source_kind, source_id FROM character_origins WHERE entity_id=? ORDER BY seq`, entityID)
 	if err != nil {
@@ -412,21 +468,53 @@ func bystanderLocation(snapshot worldSnapshot, bystander PackBystander) string {
 	if bystanderInScene(snapshot, bystander) {
 		return snapshot.Summary.Scene
 	}
-	return snapshot.Definition.InitialLocations[bystander.BystanderID]
+	return bystanderStartingLocation(snapshot, bystander)
+}
+
+// bystanderStartingLocation is the place the person was defined to be in.
+func bystanderStartingLocation(snapshot worldSnapshot, bystander PackBystander) string {
+	if initial := snapshot.Definition.InitialLocations[bystander.BystanderID]; initial != "" {
+		return initial
+	}
+	return bystander.InitialLocation
 }
 
 func bystanderInScene(snapshot worldSnapshot, bystander PackBystander) bool {
-	initial := snapshot.Definition.InitialLocations[bystander.BystanderID]
+	initial := bystanderStartingLocation(snapshot, bystander)
 	if initial == "" {
-		// Passers-by defined with their own location are present where they live.
-		initial = bystander.InitialLocation
+		return true
 	}
-	return initial == "" || initial == sceneIDFor(snapshot)
+	current := snapshot.SceneLocation
+	if current == "" {
+		// A world written before locations were recorded falls back to comparing the
+		// first location whose name starts the scene text, which still tolerates a
+		// rewritten description.
+		current = sceneIDFor(snapshot)
+	}
+	return initial == current
 }
 
 func sceneIDFor(snapshot worldSnapshot) string {
-	for _, location := range snapshot.Definition.Locations {
-		if location.Name == snapshot.Summary.Scene {
+	if snapshot.SceneLocation != "" {
+		return snapshot.SceneLocation
+	}
+	return locationIDFor(snapshot.Definition, snapshot.Summary.Scene)
+}
+
+// locationIDFor finds the location a scene text belongs to. A scene description may
+// be rewritten with extra detail, so an exact match is not enough.
+func locationIDFor(definition gameDefinition, scene string) string {
+	scene = strings.TrimSpace(scene)
+	if scene == "" {
+		return ""
+	}
+	for _, location := range definition.Locations {
+		if location.Name == scene {
+			return location.ID
+		}
+	}
+	for _, location := range definition.Locations {
+		if location.Name != "" && strings.HasPrefix(scene, location.Name) {
 			return location.ID
 		}
 	}

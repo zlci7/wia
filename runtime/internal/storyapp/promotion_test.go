@@ -10,7 +10,7 @@ import (
 
 // seedBystanderExperience records one committed result attributed to a passer-by,
 // which is the only way a passer-by gains experience.
-func seedBystanderExperience(t *testing.T, a *App, worldID, bystanderID string, index int, content string) string {
+func seedBystanderExperience(t *testing.T, a *App, worldID, bystanderID string, index int, content string, playerWitnessed bool) string {
 	t.Helper()
 	ctx := context.Background()
 	path, _, err := a.worldRecord(ctx, worldID)
@@ -34,6 +34,13 @@ func seedBystanderExperience(t *testing.T, a *App, worldID, bystanderID string, 
 	if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'action_succeeded',?,3,1,?)`,
 		bystanderID, eventID, content, nowText()); err != nil {
 		t.Fatal(err)
+	}
+	// Only when the player received the same result is it player-visible.
+	if playerWitnessed {
+		if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('player',?,'action_succeeded',?,3,1,?)`,
+			eventID, content, nowText()); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// The world's event head follows the seeded result so later turns continue the
 	// sequence instead of colliding with it.
@@ -63,8 +70,11 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	}
 	target := snapshot.Definition.BystanderRefs[0]
 	other := snapshot.Definition.BystanderRefs[1]
-	mine := seedBystanderExperience(t, a, w.WorldID, target.BystanderID, 1, "船夫把缆绳递给了玩家。")
-	theirs := seedBystanderExperience(t, a, w.WorldID, other.BystanderID, 2, "另一个人接了话。")
+	mine := seedBystanderExperience(t, a, w.WorldID, target.BystanderID, 1, "船夫把缆绳递给了玩家。", true)
+	theirs := seedBystanderExperience(t, a, w.WorldID, other.BystanderID, 2, "另一个人接了话。", false)
+	// A result the person lived through but the player never learned stays out of the
+	// ordinary preview.
+	secret := seedBystanderExperience(t, a, w.WorldID, target.BystanderID, 3, "船夫在玩家没看见时收了别人的钱。", false)
 	// Being present without an attributed result grants nothing.
 	if _, err = a.PreviewCharacterPromotion(ctx, w.WorldID, "bystander:missing", false); !errors.Is(err, ErrContentNotFound) {
 		t.Fatalf("unknown passer-by previewed: %v", err)
@@ -73,8 +83,13 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if playerView.Experience != 1 || len(playerView.PlayerVisible) != 1 || playerView.PlayerVisible[0].SourceID != mine {
+	if playerView.Experience != 2 || len(playerView.PlayerVisible) != 1 || playerView.PlayerVisible[0].SourceID != mine {
 		t.Fatalf("player view: %+v", playerView)
+	}
+	for _, record := range playerView.PlayerVisible {
+		if record.SourceID == secret {
+			t.Fatal("the ordinary preview disclosed a result the player never learned")
+		}
 	}
 	// The ordinary preview always carries the public facts the player can act on.
 	if playerView.Location == "" || playerView.Name == "" || !playerView.InScene {
@@ -84,8 +99,18 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authorView.PlayerVisible) != 1 || authorView.PlayerVisible[0].Content != "船夫把缆绳递给了玩家。" {
+	// The author view carries the private record too, so the author can decide.
+	if len(authorView.PlayerVisible) != 2 {
 		t.Fatalf("author view: %+v", authorView.PlayerVisible)
+	}
+	foundSecret := false
+	for _, record := range authorView.PlayerVisible {
+		if record.SourceID == secret {
+			foundSecret = true
+		}
+	}
+	if !foundSecret {
+		t.Fatalf("author view hides the private record: %+v", authorView.PlayerVisible)
 	}
 
 	// Sources must belong to this person.
@@ -97,7 +122,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, request); !errors.Is(err, ErrContentInvalid) {
 		t.Fatalf("foreign experience accepted: %v", err)
 	}
-	request.SourceIDs = []string{mine}
+	request.SourceIDs = []string{mine, secret}
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "promote-2", ExpectedContextEpoch: snapshot.Summary.ContextEpoch + 5, BystanderID: target.BystanderID, Draft: request.Draft}); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("stale epoch accepted: %v", err)
 	}
@@ -136,7 +161,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(experiences) != 1 || experiences[0].SourceID != mine {
+	if len(experiences) != 2 || experiences[0].SourceID != mine || experiences[1].SourceID != secret {
 		t.Fatalf("promoted identity lost its experience: %+v", experiences)
 	}
 	remaining, err := readBystanderExperiences(ctx, openWorldForTest(t, a, w.WorldID).db, other.BystanderID)
@@ -153,7 +178,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 		t.Fatalf("second promotion under a new key: %v", err)
 	}
 	origins, err := readCharacterOrigins(ctx, openWorldForTest(t, a, w.WorldID).db, promoted.EntityID)
-	if err != nil || len(origins) != 2 || origins[0].Kind == "" {
+	if err != nil || len(origins) != 3 {
 		t.Fatalf("promotion origin record: %+v %v", origins, err)
 	}
 	// The promoted person joins later turns as an important character.
@@ -210,6 +235,49 @@ func TestPromotionGuardsAndEmptyExperience(t *testing.T) {
 	}
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "late", ExpectedContextEpoch: 1, BystanderID: target.BystanderID, Draft: PromotionDraft{Profile: "资料"}}); err == nil {
 		t.Fatal("a promotion revived a deleted world")
+	}
+}
+
+// A rewritten scene description must not move a person out of the room.
+func TestBystanderStaysInSceneWhenTheSceneTextIsRewritten(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	w, err := a.createFixtureWorld(ctx, "情境改写", "open", "旅人", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := a.ReadWorld(ctx, w.WorldID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := snapshot.Definition.BystanderRefs[0]
+	before, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !before.InScene {
+		t.Fatalf("fixture passer-by starts out of scene: %+v", before)
+	}
+	// The narrator may describe the same place in more detail.
+	path, _, err := a.worldRecord(ctx, w.WorldID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := openWorldDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`UPDATE meta SET value=value || '，灯光昏黄，玩家坐在门边。' WHERE key='scene'`); err != nil {
+		store.db.Close()
+		t.Fatal(err)
+	}
+	store.db.Close()
+	after, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.InScene {
+		t.Fatalf("a rewritten scene description moved the person out of the room: %+v", after)
 	}
 }
 

@@ -20,6 +20,7 @@ type worldSnapshot struct {
 	GeneratedEvents generatedEventState
 	Definition      gameDefinition
 	Summary         WorldSummary
+	SceneLocation   string
 	PlayerName      string
 	PlayerProfile   string
 	Narrative       NarrativeSettings
@@ -293,7 +294,7 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		"schema_version": strconv.Itoa(SchemaVersion), "user_id": userID, "game_id": def.Summary.ID,
 		"world_id": worldID, "game_revision": def.Revision, "mode": mode,
 		"turn_seq": "0", "message_head": "1", "event_head": "0", "context_epoch": "1",
-		"scene_version": "1", "scene": def.Scene, "clock": def.Clock,
+		"scene_version": "1", "scene": def.Scene, "scene_location": def.InitialLocation, "clock": def.Clock,
 		"player_name": playerName, "player_profile": playerProfile, "status": "ready",
 		"generation": "1", "plot_status": "active", "bystanders": marshalJSON(def.Bystanders),
 		"narrative_perspective": PerspectiveSecondPerson, "narrative_length": NarrativeLengthStandard,
@@ -378,6 +379,13 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	}
 	out.Summary.Scene, err = get("scene")
 	if err != nil {
+		return out, err
+	}
+	out.SceneLocation, err = get("scene_location")
+	if errors.Is(err, sql.ErrNoRows) {
+		// Worlds written before locations were recorded derive it from the definition.
+		out.SceneLocation, err = "", nil
+	} else if err != nil {
 		return out, err
 	}
 	out.Summary.Clock, err = get("clock")
@@ -661,7 +669,7 @@ func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
 	return count, err
 }
 
-func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -765,6 +773,11 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 	}
 	if err := metaSetTx(ctx, tx, "scene", scene); err != nil {
 		return 0, err
+	}
+	if sceneLocation != "" {
+		if err := metaSetTx(ctx, tx, "scene_location", sceneLocation); err != nil {
+			return 0, err
+		}
 	}
 	if err := metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(sceneVersion, 10)); err != nil {
 		return 0, err

@@ -13,9 +13,11 @@ type gameDefinition struct {
 	Summary          GameSummary
 	Opening          string
 	Scene            string
-	Clock            string
-	Characters       []Character
-	Bystanders       []string
+	// InitialLocation is the identifier of the scene the story starts in.
+	InitialLocation string
+	Clock           string
+	Characters      []Character
+	Bystanders      []string
 	// BystanderRefs carries the normalized v2 bystander definitions next to their
 	// display names so identity survives the pack boundary.
 	BystanderRefs   []PackBystander

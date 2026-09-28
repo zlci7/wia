@@ -188,6 +188,9 @@ type turnOutput struct {
 	Narrative       string
 	Clock           string
 	Scene           string
+	// SceneLocation is the identifier behind Scene, so presence can be decided
+	// without comparing human-readable text.
+	SceneLocation   string
 	SceneVersion    int64
 	SceneCharacters []string
 	SceneViews      []SceneView
@@ -393,7 +396,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
 		return
 	}
 	commitStarted := time.Now()
-	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress, output.GeneratedEvents); err != nil {
+	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneLocation, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress, output.GeneratedEvents); err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story commit rejected: world_id=%q run_id=%q detail=%q", runtime.WorldID, run.RunID, err.Error())
 		}
@@ -708,6 +711,9 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 	snapshot.SceneViews = output.SceneViews
 	output.Scene = sceneFor(snapshot, "player")
+	// The identifier behind the scene text, kept so presence is never decided by
+	// comparing prose.
+	output.SceneLocation = locationIDFor(snapshot.Definition, output.Scene)
 	snapshot.SceneVersion = output.SceneVersion
 	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
@@ -742,12 +748,6 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		}
 	}
 	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
-	// A character that joined the world after this scene's projection was written (a
-	// promoted passers-by, for example) still gets a view of this result instead of
-	// failing the commit.
-	if err := a.includeNewCharactersInSceneViews(ctx, store, &snapshot, &output); err != nil {
-		return turnOutput{}, atTurnStage(turnStageNarration, err)
-	}
 	for _, character := range participants {
 		kind, memory := playerExperienceMemory(intent.IntentType, private, character.EntityID, recipient, run.Input, def)
 		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
@@ -773,19 +773,24 @@ func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *world
 	if settled == "" {
 		return nil
 	}
-	viewed := map[string]bool{}
-	for _, view := range output.SceneViews {
-		if view.Content != "" {
-			viewed[view.Recipient] = true
-		}
+	existing := map[string]bool{}
+	for _, view := range snapshot.SceneViews {
+		existing[view.Recipient] = true
 	}
 	changed := false
 	for _, character := range current {
-		if viewed[character.EntityID] {
+		if existing[character.EntityID] {
 			continue
 		}
-		output.SceneViews = append(output.SceneViews, SceneView{Recipient: character.EntityID, Content: settled, Version: output.SceneVersion + 1})
-		viewed[character.EntityID] = true
+		// Only a character that genuinely appeared between the snapshot and the commit
+		// needs a view, and it must be that character's own starting state rather than
+		// the player's whole projection.
+		output.SceneViews = append(output.SceneViews, SceneView{
+			Recipient: character.EntityID,
+			Content:   fmt.Sprintf("%s 此刻在原地，尚未有属于本人的已提交结果。", character.Name),
+			Version:   output.SceneVersion + 1,
+		})
+		existing[character.EntityID] = true
 		changed = true
 	}
 	if changed {

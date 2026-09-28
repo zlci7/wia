@@ -285,7 +285,7 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return bad("defaults")
 	}
-	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: bystanders}
+	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: bystanders}
 	result.CoverRelative = p.Cover
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
