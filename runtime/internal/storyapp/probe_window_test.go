@@ -97,6 +97,31 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	if tight < 1 {
 		t.Fatal("a tight budget must still keep the newest group")
 	}
+	// Shrinking must render from the parts: the digest header appears once and the source
+	// list describes what was included.
+	shrunk := withLongMemory(contextMaterial{Required: "本轮", System: "规则"},
+		worldSnapshot{InputBudgetTokens: 20000, LongMemory: map[string]memoryContext{"player": {Tail: tail}}}, "player", "")
+	reduced, changed := shrunk.Bounded(recentWindowMinTokens + 200)
+	if !changed {
+		t.Fatal("the window did not shrink")
+	}
+	if count := strings.Count(reduced.Required, "已提交的连续个人回顾"); count != 1 {
+		t.Fatalf("the digest header appears %d times after shrinking", count)
+	}
+	included := 0
+	for _, id := range reduced.RequiredSources {
+		if strings.HasPrefix(id, "memory:") {
+			included++
+		}
+	}
+	if included >= generous || included < 1 {
+		t.Fatalf("the source list was not recomputed: %d", included)
+	}
+	for _, id := range reduced.RequiredSources {
+		if strings.HasPrefix(id, "memory:") && !strings.Contains(reduced.Required, id) {
+			t.Fatalf("a reported source is not in the text: %q", id)
+		}
+	}
 	long := strings.Repeat("唯一的一组", 4000)
 	single := withLongMemory(contextMaterial{Required: "本轮职责与刺激：玩家输入"},
 		worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")

@@ -248,10 +248,51 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 		budget = 12000
 	}
 	available := budget - baseTokens - budgetHeadroomTokens
-	block, backlog, supplied := selectRecentWindow(m.Tail, available)
-	label := fmt.Sprintf("最近的已发生经历（共%d组）", len(memoryGroups(block)))
-	if declined := len(m.Tail) - len(supplied); declined > 0 {
-		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(memoryGroups(block)), declined)
+	block, _, _ := selectRecentWindow(m.Tail, available)
+	base := material.Required
+	material = renderMemoryWindow(material, base, m, scope, block, query)
+	// The window is chosen against the known budget first; if the assembled request still
+	// does not fit, this material rebuilds itself from its parts with fewer complete
+	// groups rather than failing. The newest group always stays and the digest watermark
+	// is untouched either way.
+	full := material
+	material.Bounded = func(inputLimit int) (contextMaterial, bool) {
+		groups := memoryGroups(block)
+		if len(groups) <= 1 {
+			return full, false
+		}
+		// Reserve room for the system prompt and everything that is not the window.
+		baseTokens := framedContextTokens(model.TextRequest{System: full.System, Input: base})
+		budget := inputLimit - baseTokens - budgetHeadroomTokens
+		if budget < recentWindowMinTokens {
+			budget = recentWindowMinTokens
+		}
+		kept := groupsWithinBudget(groups, budget)
+		if len(kept) >= len(groups) {
+			return full, false
+		}
+		return renderMemoryWindow(full, base, m, scope, flattenGroups(kept), query), true
+	}
+	return material
+}
+
+// renderMemoryWindow builds the required block from the untouched base text and an
+// explicit set of groups. Rendering from the parts keeps the digest header, the source
+// list and the declined backlog consistent with what was actually included.
+func renderMemoryWindow(material contextMaterial, base string, m memoryContext, scope string, block []MemorySource, query string) contextMaterial {
+	material.Required = base
+	material.RequiredSources = nil
+	material.DeclinedSources = nil
+	material.Optional = nil
+	groups := memoryGroups(block)
+	included := map[string]bool{}
+	for _, record := range block {
+		included[record.ID] = true
+	}
+	label := fmt.Sprintf("最近的已发生经历（共%d组）", len(groups))
+	declinedCount := len(m.Tail) - len(block)
+	if declinedCount > 0 {
+		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(groups), declinedCount)
 	}
 	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + digestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memoryRecordsText(block) + "\n本轮职责与刺激：\n" + material.Required
 	material.RequiredSources = append(material.RequiredSources, retainedStateSources(m.Digest)...)
@@ -261,42 +302,27 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 	for _, record := range block {
 		material.RequiredSources = append(material.RequiredSources, record.ID)
 	}
-	// Groups that did not fit the recent window stay retrievable: they remain in the
-	// archive and are reported as declined rather than as already retrieved, so a
-	// later query can still bring them back.
+	// Groups that did not fit stay retrievable: they remain in the archive and are
+	// reported as declined rather than as already retrieved.
+	backlog := [][]MemorySource{}
+	for _, group := range memoryGroups(m.Tail) {
+		if len(group) > 0 && !included[group[0].ID] {
+			backlog = append(backlog, group)
+		}
+	}
 	for i := len(backlog) - 1; i >= 0; i-- {
-		group := backlog[i]
-		section := contextSection{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(group)}
-		for _, record := range group {
+		section := contextSection{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(backlog[i])}
+		for _, record := range backlog[i] {
 			section.Sources = append(section.Sources, record.ID)
 			material.DeclinedSources = append(material.DeclinedSources, record.ID)
 		}
 		material.Optional = append(material.Optional, section)
 	}
-	material = withRecall(material, memoryProjection{context: m, supplied: supplied}, query)
-	// The recent window is chosen by character count first; if the whole request still
-	// does not fit its budget, this material can rebuild itself with fewer complete
-	// groups instead of failing. The newest group always stays, and the digest
-	// watermark is untouched either way.
-	full := material
-	material.Bounded = func(inputLimit int) (contextMaterial, bool) {
-		groups := memoryGroups(block)
-		if len(groups) <= 1 {
-			return full, false
-		}
-		// Reserve room for the system prompt and everything that is not this block.
-		base := framedContextTokens(model.TextRequest{System: full.System, Input: strings.Replace(full.Required, memoryRecordsText(block), "", 1)})
-		budget := inputLimit - base
-		if budget < recentWindowMinTokens {
-			budget = recentWindowMinTokens
-		}
-		kept := groupsWithinBudget(groups, budget)
-		if len(kept) >= len(groups) {
-			return full, false
-		}
-		return withLongMemoryWindow(full, m, kept, query), true
+	supplied := map[string]bool{}
+	for _, record := range block {
+		supplied[record.ID] = true
 	}
-	return material
+	return withRecall(material, memoryProjection{context: m, supplied: supplied}, query)
 }
 
 // groupsWithinBudget keeps the newest complete groups that fit, and always keeps the
