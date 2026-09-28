@@ -206,6 +206,14 @@ func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation
 		return cleanup("published revision identity does not match")
 	}
 	digest := staged.Digest
+	// Record the digest the plan will verify before anything is renamed, so recovery
+	// checks the frozen content rather than only the revision name.
+	plan.Digest = digest
+	if body, marshalErr := json.Marshal(plan); marshalErr == nil {
+		if err = a.writeContentOperationPlanDigest(ctx, operation.OperationID, string(body)); err != nil {
+			return ContentOperation{}, err
+		}
+	}
 	operation.Stage = publishFilesWritten
 	if err = a.writeContentOperation(ctx, requestKey, hash, operation, ""); err != nil {
 		return ContentOperation{}, err
@@ -268,10 +276,17 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 	if err != nil {
 		return ContentOperation{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,created_at,updated_at)
-		VALUES(?,?,?,?,?,?,?,?,?,'',?,?) ON CONFLICT(user_id,request_key) DO UPDATE SET stage=excluded.stage,status=excluded.status,result_json=excluded.result_json,updated_at=excluded.updated_at`,
-		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, string(body), nowText(), nowText()); err != nil {
+	// The operation is addressed by its own id, so finishing an interrupted publication
+	// updates the row that recorded it. Inserting under an empty request key would leave
+	// the original key stuck in `running` and make a retry look like a conflict.
+	if _, err = tx.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,result_json=?,safe_error='',updated_at=? WHERE user_id=? AND operation_id=?`,
+		operation.Stage, operation.Status, string(body), nowText(), a.userID, operation.OperationID); err != nil {
 		return ContentOperation{}, err
+	}
+	if requestKey != "" {
+		if _, err = tx.ExecContext(ctx, `UPDATE content_operations SET request_hash=?,updated_at=? WHERE user_id=? AND request_key=?`, hash, nowText(), a.userID, requestKey); err != nil {
+			return ContentOperation{}, err
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return ContentOperation{}, err
@@ -311,24 +326,30 @@ func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (Co
 		_ = json.Unmarshal([]byte(raw), &plan)
 	}
 	staging := filepath.Join(a.contentRoot(), operation.OperationID+".staging")
+	// Recover the original request identity from the row that recorded this operation, so
+	// finishing it updates that row instead of creating an unrelated one.
+	requestKey, requestHash, err := a.operationRequestIdentity(ctx, operation.OperationID)
+	if err != nil {
+		return ContentOperation{}, err
+	}
 	if plan.Revision != "" {
 		if _, statErr := os.Stat(plan.FinalPath); statErr == nil {
 			// The directory is already in place; only registration may be missing.
 			pack, loadErr := loadPack(plan.FinalPath)
-			if loadErr == nil && pack.Definition.Revision == plan.Revision {
+			if loadErr == nil && pack.Definition.Revision == plan.Revision && (plan.Digest == "" || plan.Digest == pack.Digest) {
 				operation.Stage = publishRenamed
-				return a.completePublish(ctx, "", "", operation, plan, pack.Digest)
+				return a.completePublish(ctx, requestKey, requestHash, operation, plan, pack.Digest)
 			}
 		}
 		// The staging directory exists only for this operation, so it can be finished
 		// here instead of thrown away.
 		if _, statErr := os.Stat(staging); statErr == nil {
 			staged, loadErr := loadPack(staging)
-			if loadErr == nil && staged.Definition.Revision == plan.Revision {
+			if loadErr == nil && staged.Definition.Revision == plan.Revision && (plan.Digest == "" || plan.Digest == staged.Digest) {
 				if err = os.MkdirAll(filepath.Dir(plan.FinalPath), 0o755); err == nil {
 					if err = os.Rename(staging, plan.FinalPath); err == nil {
 						operation.Stage = publishRenamed
-						return a.completePublish(ctx, "", "", operation, plan, staged.Digest)
+						return a.completePublish(ctx, requestKey, requestHash, operation, plan, staged.Digest)
 					}
 				}
 			}
@@ -342,6 +363,27 @@ func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (Co
 	}
 	_ = os.RemoveAll(staging)
 	return operation, fmt.Errorf("%w: publication was interrupted; publish the draft again", ErrContentInvalid)
+}
+
+// writeContentOperationPlanDigest updates only the frozen plan, keeping the operation's
+// recorded request identity untouched.
+func (a *App) writeContentOperationPlanDigest(ctx context.Context, operationID, plan string) error {
+	_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET plan_json=?,updated_at=? WHERE user_id=? AND operation_id=?`, plan, nowText(), a.userID, operationID)
+	return err
+}
+
+// operationRequestIdentity finds the request key and hash that recorded an operation, so
+// finishing it updates that same row.
+func (a *App) operationRequestIdentity(ctx context.Context, operationID string) (string, string, error) {
+	var requestKey, requestHash string
+	err := a.appDB.QueryRowContext(ctx, `SELECT request_key,request_hash FROM content_operations WHERE user_id=? AND operation_id=? AND request_key<>''`, a.userID, operationID).Scan(&requestKey, &requestHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return requestKey, requestHash, nil
 }
 
 func (a *App) readContentOperationPlan(ctx context.Context, operationID string) (string, error) {
