@@ -14,10 +14,18 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	if projects, err := a.ListContentProjects(ctx); err != nil || len(projects) != 0 {
 		t.Fatalf("empty catalog: %+v %v", projects, err)
 	}
-	for _, bad := range []struct{ id, title string }{{"", "标题"}, {"bad id", "标题"}, {"ok-id", ""}, {"ok-id", strings.Repeat("长", 121)}} {
+	for _, bad := range []struct{ id, title string }{{"bad id", "标题"}, {"ok-id", ""}, {"ok-id", strings.Repeat("长", 121)}} {
 		if _, err := a.CreateContentProject(ctx, bad.id, bad.title); !errors.Is(err, ErrInvalidRequest) {
 			t.Fatalf("invalid project accepted: %+v %v", bad, err)
 		}
+	}
+	// A title alone is enough: the story identity is derived from it and then stays put.
+	derived, err := a.CreateContentProject(ctx, "", "雾港纪事")
+	if err != nil || derived.GameID == "" || !packID.MatchString(derived.GameID) {
+		t.Fatalf("a titled project without an identifier was rejected: %+v %v", derived, err)
+	}
+	if second, err := a.CreateContentProject(ctx, "", "雾港纪事"); err != nil || second.GameID == derived.GameID {
+		t.Fatalf("a derived identity must not collide: %+v %v", second, err)
 	}
 	// Official identities are not takeable.
 	if _, err := a.CreateContentProject(ctx, GameID, "冒充官方"); !errors.Is(err, ErrContentInvalid) {

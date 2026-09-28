@@ -182,11 +182,22 @@ func (a *App) PreviewContentDraft(ctx context.Context, draftID string, author bo
 	return preview, nil
 }
 
-// CreateContentProject reserves a stable game identity for one author project.
-// Official packages and other projects of the same account cannot be taken over.
+// CreateContentProject reserves a stable game identity for one author project. Official
+// packages and other projects of the same account cannot be taken over. An author who
+// only supplies a title gets an identifier derived from it, fixed at creation.
 func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (ContentProject, error) {
 	gameID, title = cleanText(gameID), cleanText(title)
-	if !packID.MatchString(gameID) || title == "" || len([]rune(title)) > 120 {
+	if title == "" || len([]rune(title)) > 120 {
+		return ContentProject{}, ErrInvalidRequest
+	}
+	if gameID == "" {
+		derived, err := a.availableGameID(ctx, title)
+		if err != nil {
+			return ContentProject{}, err
+		}
+		gameID = derived
+	}
+	if !packID.MatchString(gameID) {
 		return ContentProject{}, ErrInvalidRequest
 	}
 	if _, official := a.pack(gameID); official {
@@ -554,6 +565,38 @@ func generatedBystanderID(name string, index int, used map[string]bool) string {
 		candidate = fmt.Sprintf("bystander:%s-%d", base, suffix)
 	}
 	return candidate
+}
+
+// availableGameID derives an unused story identity from a title.
+func (a *App) availableGameID(ctx context.Context, title string) (string, error) {
+	base := identifierSlug(title)
+	if base == "" {
+		base = "story"
+	}
+	if len(base) > 40 {
+		base = base[:40]
+	}
+	candidate := base
+	for suffix := 2; ; suffix++ {
+		if !packID.MatchString(candidate) {
+			candidate = fmt.Sprintf("story-%d", suffix)
+		}
+		if _, official := a.pack(candidate); official {
+			candidate = fmt.Sprintf("%s-%d", base, suffix)
+			continue
+		}
+		var taken int
+		if err := a.appDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM content_projects WHERE user_id=? AND game_id=?`, a.userID, candidate).Scan(&taken); err != nil {
+			return "", err
+		}
+		if taken == 0 {
+			return candidate, nil
+		}
+		candidate = fmt.Sprintf("%s-%d", base, suffix)
+		if suffix > 200 {
+			return "", ErrContentBusy
+		}
+	}
 }
 
 // publishedPack resolves one immutable revision by identity. Official packages are
