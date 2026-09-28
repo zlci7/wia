@@ -213,10 +213,9 @@ func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 		name   string
 		mutate func(*ContentDraftPayload)
 	}{
-		{"unknown location", func(p *ContentDraftPayload) { p.NPCs[0].InitialLocation = "cellar" }},
 		{"external avatar", func(p *ContentDraftPayload) { p.NPCs[0].Avatar = "https://example.test/a.png" }},
-		{"invalid entity", func(p *ContentDraftPayload) { p.NPCs[0].EntityID = "keeper" }},
 		{"duplicate character", func(p *ContentDraftPayload) { p.NPCs = append(p.NPCs, p.NPCs[0]) }},
+		{"missing name", func(p *ContentDraftPayload) { p.NPCs[0].Name = "" }},
 	} {
 		invalid := saved.Payload
 		invalid.NPCs = append([]ContentDraftNPC{}, saved.Payload.NPCs...)
@@ -224,6 +223,40 @@ func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 		if _, err := a.SaveContentDraft(ctx, draft.DraftID, invalid, saved.Version); !errors.Is(err, ErrContentInvalid) {
 			t.Fatalf("%s accepted: %v", bad.name, err)
 		}
+	}
+	// Internal identifiers belong to the program: a name alone is enough, and a
+	// reference to a place that no longer exists is dropped instead of failing.
+	friendly := saved.Payload
+	friendly.Locations = []PackLocation{{Name: "栈桥", Connections: []string{}}}
+	friendly.InitialLocation = ""
+	friendly.NPCs = []ContentDraftNPC{{
+		Name: "看灯人", Role: "港口看灯人", Profile: "资料", InitialLocation: "不再存在的地点",
+	}}
+	friendly.Bystanders = []PackBystander{{Name: "船夫", Description: "在栈桥等活"}}
+	repaired, err := a.SaveContentDraft(ctx, draft.DraftID, friendly, saved.Version)
+	if err != nil {
+		t.Fatalf("a draft with only human names was rejected: %v", err)
+	}
+	if repaired.Payload.Locations[0].ID == "" || repaired.Payload.NPCs[0].DefinitionID == "" || !entityID.MatchString(repaired.Payload.NPCs[0].EntityID) {
+		t.Fatalf("identifiers were not generated: %+v", repaired.Payload)
+	}
+	if repaired.Payload.InitialLocation != repaired.Payload.Locations[0].ID {
+		t.Fatalf("an unspecified starting place must fall back to the first one: %+v", repaired.Payload)
+	}
+	if repaired.Payload.NPCs[0].InitialLocation != "" {
+		t.Fatalf("a reference to a missing place must be dropped: %q", repaired.Payload.NPCs[0].InitialLocation)
+	}
+	if !bystanderIDPattern.MatchString(repaired.Payload.Bystanders[0].BystanderID) {
+		t.Fatalf("passer-by identity: %+v", repaired.Payload.Bystanders[0])
+	}
+	// Generated identities stay stable across an edit, so published content keeps its
+	// identity when the author keeps editing it.
+	again, err := a.SaveContentDraft(ctx, draft.DraftID, repaired.Payload, repaired.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Payload.NPCs[0].DefinitionID != repaired.Payload.NPCs[0].DefinitionID || again.Payload.Locations[0].ID != repaired.Payload.Locations[0].ID {
+		t.Fatalf("generated identities changed on a plain resave: %+v", again.Payload)
 	}
 	if _, err := draftNPCFiles(ContentDraftPayload{NPCs: []ContentDraftNPC{{DefinitionID: "a", Revision: "v1", EntityID: "npc:a", Name: "甲", Role: "角色", Profile: "资料"}}}); err != nil {
 		t.Fatalf("minimal character rejected: %v", err)

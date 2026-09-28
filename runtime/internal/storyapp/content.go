@@ -323,6 +323,10 @@ func (a *App) SaveContentDraft(ctx context.Context, draftID string, payload Cont
 	if expectedVersion < 1 {
 		return ContentDraft{}, ErrInvalidRequest
 	}
+	// The author names things; the program owns the internal identifiers.
+	if err := normalizeDraftIdentities(&payload); err != nil {
+		return ContentDraft{}, err
+	}
 	if err := validateDraftPayload(payload); err != nil {
 		return ContentDraft{}, err
 	}
@@ -418,6 +422,138 @@ func validateDraftPayload(payload ContentDraftPayload) error {
 		}
 	}
 	return nil
+}
+
+// normalizeDraftIdentities fills in the internal identifiers the package format needs,
+// so an author names a place or a person and the program derives the rest. Anything the
+// author or a source package already set is kept, which is what makes published content
+// keep its identity across edits. A nameless entry is refused here rather than at
+// publication, because it is the one thing the author must supply.
+func normalizeDraftIdentities(payload *ContentDraftPayload) error {
+	if payload == nil {
+		return nil
+	}
+	usedLocations := map[string]bool{}
+	for index := range payload.Locations {
+		location := &payload.Locations[index]
+		location.Name = cleanText(location.Name)
+		if location.Name == "" {
+			return fmt.Errorf("%w: location %d has no name", ErrContentInvalid, index+1)
+		}
+		if location.ID == "" || !packID.MatchString(location.ID) {
+			location.ID = generatedIdentifier(location.Name, "place", usedLocations, len(payload.Locations), index)
+		}
+		usedLocations[location.ID] = true
+	}
+	seenLocations := map[string]bool{}
+	for _, location := range payload.Locations {
+		seenLocations[location.ID] = true
+	}
+	usedEntities := map[string]bool{}
+	for index := range payload.NPCs {
+		npc := &payload.NPCs[index]
+		npc.Name, npc.Role = cleanText(npc.Name), cleanText(npc.Role)
+		if npc.Name == "" {
+			return fmt.Errorf("%w: character %d has no name", ErrContentInvalid, index+1)
+		}
+		if npc.DefinitionID == "" || !packID.MatchString(npc.DefinitionID) {
+			npc.DefinitionID = generatedIdentifier(npc.Name, "npc", map[string]bool{}, len(payload.NPCs), index)
+		}
+		if npc.Revision == "" || !packID.MatchString(npc.Revision) {
+			npc.Revision = "v1"
+		}
+		if npc.EntityID == "" || !entityID.MatchString(npc.EntityID) {
+			npc.EntityID = generatedEntityID(npc.Name, npc.DefinitionID, usedEntities)
+		}
+		usedEntities[npc.EntityID] = true
+		if npc.InitialLocation != "" && !seenLocations[npc.InitialLocation] {
+			npc.InitialLocation = ""
+		}
+	}
+	for index := range payload.Bystanders {
+		bystander := &payload.Bystanders[index]
+		bystander.Name, bystander.Description = cleanText(bystander.Name), cleanText(bystander.Description)
+		if bystander.Name == "" {
+			return fmt.Errorf("%w: passer-by %d has no name", ErrContentInvalid, index+1)
+		}
+		if bystander.BystanderID == "" || !bystanderIDPattern.MatchString(bystander.BystanderID) {
+			bystander.BystanderID = generatedBystanderID(bystander.Name, index, usedEntities)
+		}
+		usedEntities[bystander.BystanderID] = true
+		if bystander.InitialLocation != "" && !seenLocations[bystander.InitialLocation] {
+			bystander.InitialLocation = ""
+		}
+	}
+	if payload.InitialLocation != "" && !seenLocations[payload.InitialLocation] {
+		payload.InitialLocation = ""
+	}
+	if payload.InitialLocation == "" && len(payload.Locations) > 0 {
+		payload.InitialLocation = payload.Locations[0].ID
+	}
+	return nil
+}
+
+// identifierSlug reduces a human name to the identifier alphabet.
+func identifierSlug(name string) string {
+	var builder strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r > 127:
+			builder.WriteString(fmt.Sprintf("%x", r))
+		}
+	}
+	slug := strings.Trim(builder.String(), "_")
+	if slug == "" {
+		return ""
+	}
+	if len(slug) > 48 {
+		slug = slug[:48]
+	}
+	if slug[0] < 'a' || slug[0] > 'z' {
+		slug = "x" + slug
+	}
+	return slug
+}
+
+func generatedIdentifier(name, fallback string, used map[string]bool, total, index int) string {
+	base := identifierSlug(name)
+	if base == "" {
+		base = fmt.Sprintf("%s%d", fallback, index+1)
+	}
+	candidate := base
+	for suffix := 2; used[candidate]; suffix++ {
+		candidate = fmt.Sprintf("%s-%d", base, suffix)
+	}
+	if !packID.MatchString(candidate) {
+		return fmt.Sprintf("%s%d", fallback, total+index+1)
+	}
+	return candidate
+}
+
+func generatedEntityID(name, definitionID string, used map[string]bool) string {
+	base := identifierSlug(name)
+	if base == "" {
+		base = definitionID
+	}
+	candidate := "npc:" + base
+	for suffix := 2; used[candidate] || !entityID.MatchString(candidate); suffix++ {
+		candidate = fmt.Sprintf("npc:%s-%d", base, suffix)
+	}
+	return candidate
+}
+
+func generatedBystanderID(name string, index int, used map[string]bool) string {
+	base := identifierSlug(name)
+	if base == "" {
+		base = fmt.Sprintf("person%d", index+1)
+	}
+	candidate := "bystander:" + base
+	for suffix := 2; used[candidate]; suffix++ {
+		candidate = fmt.Sprintf("bystander:%s-%d", base, suffix)
+	}
+	return candidate
 }
 
 // publishedPack resolves one immutable revision by identity. Official packages are
