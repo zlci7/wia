@@ -187,11 +187,15 @@ func ImportUploadLimit() int64 {
 
 // ImportContent validates the declared file name and bytes, keeping the size decision
 // in one place per format.
+// buildImportDraft picks the format from the bytes and the declared name together: a
+// card can arrive with a byte-order mark or an ambiguous first byte, and the extension
+// is what the author chose.
 func (a *App) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
+	lower := strings.ToLower(safeFileName(fileName))
 	switch {
-	case isZIP(body):
+	case isZIP(body) || strings.HasSuffix(lower, ".zip"):
 		return a.importWIAPackage(ctx, project, body)
-	case looksLikeJSON(body):
+	case looksLikeJSON(body) || strings.HasSuffix(lower, ".json"):
 		return a.importCharacterCard(project, fileName, body)
 	default:
 		return a.importPlainText(project, fileName, body)
@@ -364,7 +368,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 			Extensions         any      `json:"extensions"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(body, &card); err != nil {
+	if err := json.Unmarshal(bytes.TrimPrefix(bytes.TrimSpace(body), []byte{0xEF, 0xBB, 0xBF}), &card); err != nil {
 		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: the JSON could not be read", ErrContentInvalid)
 	}
 	if card.Spec != "chara_card_v2" || card.SpecVersion != "2.0" {
@@ -519,6 +523,8 @@ func isZIP(body []byte) bool {
 
 func looksLikeJSON(body []byte) bool {
 	trimmed := bytes.TrimSpace(body)
+	// A byte-order mark would otherwise hide the opening brace.
+	trimmed = bytes.TrimPrefix(trimmed, []byte{0xEF, 0xBB, 0xBF})
 	return len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[')
 }
 

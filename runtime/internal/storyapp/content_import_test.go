@@ -153,6 +153,15 @@ func TestImportCharacterCard(t *testing.T) {
 	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "broken.json", []byte(`{"spec":"chara_card_v2"`)); !errors.Is(err, ErrContentInvalid) {
 		t.Fatalf("broken JSON accepted: %v", err)
 	}
+	// A card whose bytes arrive with a byte-order mark is still a card, and so is one
+	// whose first byte is ambiguous but whose name says .json.
+	withBOM := append([]byte{0xEF, 0xBB, 0xBF}, []byte(card)...)
+	if preview, err := a.PreviewContentImport(ctx, project.ProjectID, "keeper.json", withBOM); err != nil || preview.Report.Format != "ccv2" {
+		t.Fatalf("a card with a byte-order mark was misread: %+v %v", preview.Report, err)
+	}
+	if preview, err := a.PreviewContentImport(ctx, project.ProjectID, "keeper.json", []byte("  "+card)); err != nil || preview.Report.Format != "ccv2" {
+		t.Fatalf("a named card was misread: %+v %v", preview.Report, err)
+	}
 }
 
 // A WIA package imports through the same validation as the runtime, keeps the
