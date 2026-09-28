@@ -1,5 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import {
+  confirmContentImport,
+  contentExportURL,
   createContentDraft,
   createContentProject,
   deleteContentDraft,
@@ -10,6 +12,7 @@ import {
   fetchContentProject,
   fetchContentProjects,
   fetchPersonas,
+  importContentPreview,
   publishContentDraft,
   saveContentDraft,
   uploadContentDraftAsset,
@@ -23,6 +26,7 @@ import {
   type ContentDraftSummary,
   type ContentOperation,
   type ContentProject,
+  type ImportPreview,
   type Persona,
 } from "./types";
 
@@ -291,6 +295,65 @@ export function useCreator() {
     return pending;
   }
 
+  // Importing is a two-step path in the interface too: the file produces a report the
+  // author reads, and only confirming turns the preview into an editable draft.
+  const importPreview = ref<ImportPreview | null>(null);
+  async function importContent(file: File) {
+    const current = project.value;
+    if (!current) {
+      error.value = "请先打开或新建一个内容项目，再导入。";
+      return;
+    }
+    busy.value = true;
+    error.value = "";
+    notice.value = "";
+    try {
+      const preview = await importContentPreview(current.project_id, file);
+      if (project.value?.project_id !== current.project_id) return;
+      importPreview.value = preview;
+      notice.value = "已生成导入预览，确认后才会成为草稿。";
+      await loadCatalog();
+    } catch (e) {
+      error.value = describe(e, "导入失败。");
+    } finally {
+      busy.value = false;
+    }
+  }
+  async function confirmImport() {
+    const preview = importPreview.value;
+    if (!preview) return;
+    busy.value = true;
+    error.value = "";
+    try {
+      await confirmContentImport(preview.draft_id, `import:${preview.draft_id}`, preview.version);
+      importPreview.value = null;
+      notice.value = "导入内容已变成可编辑草稿。";
+      await openProject(preview.project_id);
+      await openDraft(preview.draft_id);
+    } catch (e) {
+      error.value = describe(e, "确认导入失败。");
+    } finally {
+      busy.value = false;
+    }
+  }
+  function dismissImport() {
+    importPreview.value = null;
+    notice.value = "";
+  }
+
+  // Export hands the browser the archive the server rebuilt from the published revision.
+  function exportRevision() {
+    const current = project.value;
+    if (!current?.current_revision) return;
+    const link = document.createElement("a");
+    link.href = contentExportURL(current.game_id, current.current_revision);
+    link.download = `${current.game_id}-${current.current_revision}.wia-story.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    notice.value = "已开始下载导出的故事包。";
+  }
+
   async function reloadDraft() {
     const current = draft.value;
     if (current) await openDraft(current.draft_id);
@@ -497,6 +560,7 @@ export function useCreator() {
     loadCatalog, openProject, createProject, openDraft, startDraft, touch, flush,
     reloadDraft, copyAsNewDraft, removeDraft, loadPreview, loadAssets, uploadAsset, removeAsset, publish,
     addLocation, removeLocation, addNPC, removeNPC, addBystander, removeBystander, reset,
+    importPreview, importContent, confirmImport, dismissImport, exportRevision,
   };
 }
 

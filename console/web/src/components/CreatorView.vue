@@ -4,9 +4,10 @@ import { useCreator } from "../useCreator";
 const {
   personas, projects, project, drafts, draft, form, preview, previewView,
   error, notice, busy, saving, conflict, draftID, statusLine,
-  assets, operation, publishing,
+  assets, operation, publishing, importPreview,
   loadCatalog, openProject, createProject, openDraft, startDraft, touch, flush,
   reloadDraft, copyAsNewDraft, removeDraft, loadPreview, uploadAsset, removeAsset, publish,
+  importContent, confirmImport, dismissImport, exportRevision,
   addLocation, removeLocation, addNPC, removeNPC, addBystander, removeBystander,
 } = useCreator();
 
@@ -15,9 +16,15 @@ const assetName = ref("");
 onMounted(() => { void loadCatalog(); });
 
 function createProjectForm() {
-  if (!newGameID.value.trim() || !newTitle.value.trim()) return;
+  if (!newTitle.value.trim()) return;
   void createProject(newGameID.value.trim(), newTitle.value.trim());
   newGameID.value = ""; newTitle.value = "";
+}
+function onImportFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  void importContent(file).finally(() => { input.value = ""; });
 }
 function speaking(value: string, index: number) {
   form.npcs[index].speaking_examples = value.split("\n").map(line => line.trim()).filter(Boolean);
@@ -67,10 +74,47 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
         <p v-else class="subtle">还没有内容项目。用下面的表单新建一个。</p>
 
         <form class="new-project" @submit.prevent="createProjectForm">
-          <label>标识<input v-model="newGameID" placeholder="harbor-lights" autocomplete="off" /></label>
           <label>标题<input v-model="newTitle" placeholder="港口的灯" autocomplete="off" /></label>
+          <label class="optional">标识（可留空，自动生成）<input v-model="newGameID" placeholder="harbor-lights" autocomplete="off" /></label>
           <button type="submit" class="quiet-button" :disabled="busy">新建内容项目</button>
         </form>
+
+        <h2>导入内容</h2>
+        <p class="subtle">
+          支持 WIA 故事包（.zip）、Character Card V2 JSON、TXT 与 Markdown。导入先生成预览，确认后才成为可编辑草稿。
+        </p>
+        <label class="asset-upload import-upload">
+          <span>选择文件</span>
+          <input type="file" accept=".zip,.json,.txt,.md,.markdown" :disabled="busy || !project" @change="onImportFile" />
+        </label>
+        <p v-if="!project" class="subtle">先打开或新建一个内容项目，再导入。</p>
+        <div v-if="importPreview" class="import-report">
+          <h3>导入预览</h3>
+          <p class="subtle">{{ importPreview.report.summary }}</p>
+          <p class="subtle">识别格式：{{ importPreview.report.format }} · {{ importPreview.report.format_detail }}</p>
+          <ul>
+            <li v-for="mapping in importPreview.report.mappings" :key="mapping.field">
+              {{ mapping.source }} → {{ mapping.target }}（{{ mapping.confidence === 'high' ? '确定' : mapping.confidence === 'medium' ? '较确定' : '需确认' }}）
+              <span v-if="mapping.note" class="subtle"> · {{ mapping.note }}</span>
+            </li>
+          </ul>
+          <template v-if="importPreview.report.unsupported.length">
+            <h4>不会执行的内容</h4>
+            <ul>
+              <li v-for="item in importPreview.report.unsupported" :key="item">{{ item }}</li>
+            </ul>
+          </template>
+          <template v-if="importPreview.report.needs_confirmation.length">
+            <h4>需要你确认</h4>
+            <ul>
+              <li v-for="item in importPreview.report.needs_confirmation" :key="item">{{ item }}</li>
+            </ul>
+          </template>
+          <div class="import-actions">
+            <button type="button" class="quiet-button" :disabled="busy" @click="confirmImport()">确认导入为草稿</button>
+            <button type="button" class="quiet-button" @click="dismissImport()">放弃</button>
+          </div>
+        </div>
 
         <h2 v-if="personas.length">主角模板</h2>
         <ul v-if="personas.length" class="project-list">
@@ -161,9 +205,7 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
               <legend>人物</legend>
               <div v-for="(npc, index) in form.npcs" :key="index" class="npc-card">
                 <div class="row">
-                  <input v-model="npc.definition_id" placeholder="definition_id" @input="touch" />
-                  <input v-model="npc.revision" placeholder="版本" @input="touch" />
-                  <input v-model="npc.entity_id" placeholder="npc:xxx" @input="touch" />
+                  <span class="subtle">内部标识由程序生成<template v-if="npc.definition_id"> · {{ npc.definition_id }}</template></span>
                   <button type="button" class="quiet-button" @click="removeNPC(index)">移除</button>
                 </div>
                 <div class="pair">
@@ -194,7 +236,6 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
             <fieldset>
               <legend>路人</legend>
               <div v-for="(bystander, index) in form.bystanders" :key="index" class="row">
-                <input v-model="bystander.bystander_id" placeholder="bystander:xxx" @input="touch" />
                 <input v-model="bystander.name" placeholder="名称" @input="touch" />
                 <input v-model="bystander.description" placeholder="公开描述" @input="touch" />
                 <button type="button" class="quiet-button" @click="removeBystander(index)">移除</button>
@@ -225,6 +266,14 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
               <button type="button" class="quiet-button" @click="loadPreview('player')">玩家预览</button>
               <button type="button" class="quiet-button" @click="loadPreview('author')">作者预览（含剧透）</button>
               <button type="button" class="quiet-button primary" :disabled="publishing || busy" @click="publish()">发布修订</button>
+              <button
+                v-if="project?.current_revision"
+                type="button"
+                class="quiet-button"
+                @click="exportRevision()"
+              >
+                导出已发布修订
+              </button>
             </div>
             <p v-if="operation" class="subtle" role="status">
               发布操作 {{ operation.operation_id.slice(-6) }} · {{ operation.stage }} · {{ operation.status }}

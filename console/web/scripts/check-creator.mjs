@@ -271,6 +271,65 @@ const tests = {
     assert.equal(c.form.event_generation, undefined, "the previous draft's event rules must not follow");
   },
 
+  async "an import stays a preview until it is confirmed"(c) {
+    await c.openProject("project_1");
+    let confirmed = 0;
+    let previewed = 0;
+    hook = (method, url) => {
+      if (method === "POST" && url === "/api/v1/content/imports/preview") {
+        previewed += 1;
+        return response({
+          import: {
+            draft_id: "draft_import", version: 1, project_id: "project_1",
+            report: {
+              format: "ccv2", format_detail: "Character Card V2", summary: "已映射为一名人物",
+              mappings: [{ field: "data.name", source: "card.json", target: "人物姓名", confidence: "high" }],
+              unsupported: ["system_prompt 不会被执行"], needs_confirmation: ["情境只作候选"], source_bytes: 128,
+            },
+          },
+        }, 201);
+      }
+      if (method === "POST" && url === "/api/v1/content/imports/confirm") {
+        confirmed += 1;
+        const body = JSON.parse(request.body);
+        assert.equal(body.draft_id, "draft_import");
+        assert.ok(body.request_key, "confirmation carries a request key");
+        return response({ draft: draft({ draft_id: "draft_import", version: 2 }) });
+      }
+      if (method === "GET" && url === "/api/v1/content/projects/project_1") {
+        return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "", version: 1, created_at: "now", updated_at: "now" }, drafts: [draft({ version: 2 })] });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_import") {
+        return response({ draft: draft({ draft_id: "draft_import", version: 2 }) });
+      }
+    };
+    const file = new File([JSON.stringify({ spec: "chara_card_v2" })], "card.json", { type: "application/json" });
+    await c.importContent(file);
+    hook = undefined;
+    assert.equal(previewed, 1);
+    assert.equal(confirmed, 0, "importing alone must not confirm anything");
+    assert.ok(c.importPreview.value, "the report is shown before confirmation");
+    assert.equal(c.importPreview.value.report.unsupported.length, 1);
+
+    hook = (method, url) => {
+      if (method === "POST" && url === "/api/v1/content/imports/confirm") {
+        confirmed += 1;
+        return response({ draft: draft({ draft_id: "draft_import", version: 2 }) });
+      }
+      if (method === "GET" && url.startsWith("/api/v1/content/projects/project_1")) {
+        return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "", version: 1, created_at: "now", updated_at: "now" }, drafts: [draft({ version: 2 })] });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_import") {
+        return response({ draft: draft({ draft_id: "draft_import", version: 2 }) });
+      }
+    };
+    await c.confirmImport();
+    hook = undefined;
+    assert.equal(confirmed, 1, "confirming is what creates the editable draft");
+    assert.equal(c.importPreview.value, null);
+    assert.equal(c.draftID.value, "draft_import");
+  },
+
   async "a conflicting draft is not published"(c) {
     await c.openProject("project_1");
     await c.openDraft("draft_1");
