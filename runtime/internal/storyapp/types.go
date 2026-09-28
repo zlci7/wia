@@ -176,7 +176,10 @@ type Character struct {
 	Profile         string `json:"profile"`
 	Knowledge       string `json:"knowledge"`
 	InitialConcerns string `json:"initial_concerns"`
-	InScene         bool   `json:"in_scene"`
+	// SpeakingExamples are authored dialogue samples showing how this character
+	// sounds. They are style material, never events that happened.
+	SpeakingExamples []string `json:"speaking_examples,omitempty"`
+	InScene          bool     `json:"in_scene"`
 }
 
 // PublicCharacter is the player-facing character projection. Private role

@@ -111,6 +111,11 @@ func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character Charac
 	fmt.Fprintf(&builder, "世界：%s；地点：%s；时间：%s；阶段：%d；玩家意图类型：%s\n", snapshot.Summary.GameID, sceneFor(snapshot, character.EntityID), snapshot.Summary.Clock, stage, intentType)
 	fmt.Fprintf(&builder, "你的身份：%s（%s）\n角色资料：%s\n你知道的初始背景：%s\n", character.Name, character.Role, character.Profile, character.Knowledge)
 	fmt.Fprintf(&builder, "你的初始关切（故事开始时的动机，不是固定动作脚本）：%s\n", character.InitialConcerns)
+	if len(character.SpeakingExamples) > 0 {
+		// Style reference only: a sample shows how the person talks, it is not something
+		// that happened and must not be treated as memory.
+		fmt.Fprintf(&builder, "你的说话风格示例（只作语气与用词参考，不是已经发生的事，也不要照抄）：\n- %s\n", strings.Join(character.SpeakingExamples, "\n- "))
+	}
 	fmt.Fprintf(&builder, "本存档的 NPC 主动性：%s\n", npcInitiativeInstruction(snapshot.Narrative))
 	if recipient == "" {
 		builder.WriteString("玩家本轮没有明确指定具体对象。你获得了这次感知，请按照本存档的 NPC 主动性和自己的角色关切决定是否回应；可以沉默，也可以在规则允许时主动介入。\n")

@@ -1,6 +1,7 @@
 package storyapp
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -125,6 +126,53 @@ func TestPackSchemaV2LoadsWithBystanderIdentity(t *testing.T) {
 
 // Important characters carry their optional avatar and speaking examples, while
 // packs that omit them keep loading.
+// Authored dialogue samples must reach the NPC prompt as style material.
+func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	project, draft := publishableDraft(t, a, "harbor-examples")
+	payload := draft.Payload
+	payload.NPCs[0].SpeakingExamples = []string{"灯要按时点。", "潮水不会等人。"}
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "examples-publish", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: fresh.Version}); err != nil {
+		t.Fatal(err)
+	}
+	game, err := a.Game("harbor-examples")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "harbor-examples", ExpectedRevision: game.Revision, Name: "示例世界", RequestKey: "examples-world", Activate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := a.ReadWorld(ctx, w.WorldID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	def := snapshot.Definition
+	def.Characters = snapshot.Characters
+	a.attachSpeakingExamples(&def)
+	if len(def.Characters) == 0 || len(def.Characters[0].SpeakingExamples) != 2 {
+		t.Fatalf("published samples did not reach the world roster: %+v", def.Characters)
+	}
+	prompt := buildNPCPrompt(snapshot, def, def.Characters[0], "player", "speak", npcStageInput{PlayerPerception: "我问他灯的事。"}, "", 1)
+	for _, example := range def.Characters[0].SpeakingExamples {
+		if !strings.Contains(prompt, example) {
+			t.Fatalf("the prompt dropped a speaking example %q", example)
+		}
+	}
+	if !strings.Contains(prompt, "只作语气与用词参考") {
+		t.Fatal("the prompt must state that samples are style, not events")
+	}
+}
+
 func TestPackNPCAvatarAndSpeakingExamples(t *testing.T) {
 	var npc PackNPC
 	body := `{"definition_id":"innkeeper","revision":"v1","entity_id":"npc:innkeeper","name":"沈岚","role":"客栈老板","profile":"谨慎。","initial_location":"inn","avatar":"assets/innkeeper.png","speaking_examples":["先别惊动客人。","柜台上的东西别动。"]}`

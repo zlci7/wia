@@ -604,6 +604,8 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
 	def := snapshot.Definition
 	def.Characters = snapshot.Characters
+	// Authored dialogue samples live in the package, not in the world database.
+	a.attachSpeakingExamples(&def)
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
