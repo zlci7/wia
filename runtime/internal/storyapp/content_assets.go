@@ -73,7 +73,17 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return ContentDraftAsset{}, err
 	}
+	// Re-uploading a name replaces that asset instead of stacking duplicates: a draft
+	// refers to assets by their package-relative name.
+	var previousID, previousPath string
+	err = a.appDB.QueryRowContext(ctx, `SELECT asset_id,staged_path FROM content_draft_assets WHERE user_id=? AND draft_id=? AND relative_name=?`, a.userID, draft.DraftID, relativeName).Scan(&previousID, &previousPath)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return ContentDraftAsset{}, err
+	}
 	asset := ContentDraftAsset{AssetID: newID("asset"), RelativeName: relativeName, MediaType: mediaType, ByteSize: int64(len(body)), Width: config.Width, Height: config.Height}
+	if previousID != "" {
+		asset.AssetID = previousID
+	}
 	staged := filepath.Join(dir, asset.AssetID)
 	if err = os.WriteFile(staged, body, 0o644); err != nil {
 		return ContentDraftAsset{}, err
@@ -83,6 +93,9 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 		a.userID, draft.DraftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, nowText()); err != nil {
 		_ = os.Remove(staged)
 		return ContentDraftAsset{}, err
+	}
+	if previousPath != "" && previousPath != staged {
+		_ = os.Remove(previousPath)
 	}
 	return asset, nil
 }

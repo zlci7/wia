@@ -49,6 +49,14 @@ func TestDraftAssetUploadAndRemoval(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].AssetID != asset.AssetID {
 		t.Fatalf("asset list: %+v %v", list, err)
 	}
+	// Re-uploading the same name replaces that asset instead of stacking duplicates.
+	replaced, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/cover.png", pngBytes(t, 30, 12))
+	if err != nil || replaced.AssetID != asset.AssetID || replaced.Width != 30 {
+		t.Fatalf("replacement: %+v %v", replaced, err)
+	}
+	if list, err = a.ListContentDraftAssets(ctx, draft.DraftID); err != nil || len(list) != 1 || list[0].Width != 30 {
+		t.Fatalf("duplicate asset rows: %+v %v", list, err)
+	}
 	// The staged asset is exactly what publication copies.
 	payload := draft.Payload
 	payload.Cover = "assets/cover.png"
