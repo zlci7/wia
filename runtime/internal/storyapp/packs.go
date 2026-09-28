@@ -363,12 +363,28 @@ func loadPack(root string) (loadedPack, error) {
 			result.Assets[asset] = body
 		}
 	}
-	// Include the complete effective package, including per-NPC revision and image bytes.
+	// The identity covers the complete effective package: the story, every character
+	// file and every referenced image. Two publications must never share a revision
+	// identifier while differing in any byte a world can end up showing.
+	assetNames := make([]string, 0, len(result.Assets))
+	for name := range result.Assets {
+		assetNames = append(assetNames, name)
+	}
+	sort.Strings(assetNames)
+	type assetDigestEntry struct {
+		Name string
+		Body []byte
+	}
+	assetList := make([]assetDigestEntry, 0, len(assetNames))
+	for _, name := range assetNames {
+		assetList = append(assetList, assetDigestEntry{Name: name, Body: result.Assets[name]})
+	}
 	canonical, _ := json.Marshal(struct {
-		Story StoryPack
-		NPCs  []json.RawMessage
-		Cover []byte
-	}{p, npcBodies, result.Cover})
+		Story  StoryPack
+		NPCs   []json.RawMessage
+		Cover  []byte
+		Assets []assetDigestEntry
+	}{p, npcBodies, result.Cover, assetList})
 	digest := sha256.Sum256(canonical)
 	result.Digest = hex.EncodeToString(digest[:])
 	return result, nil

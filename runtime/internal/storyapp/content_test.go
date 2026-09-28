@@ -109,6 +109,63 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 
 // The editor receives full characters, edits stay valid, and the package mapping
 // writes them back one file per character.
+// Replacing a referenced image must change the package identity: a world that shows the
+// image would otherwise be indistinguishable from one showing the old bytes.
+func TestPublishedIdentityCoversEveryReferencedImage(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	project, draft := publishableDraft(t, a, "harbor-identity")
+	if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/cover.png", pngBytes(t, 12, 8)); err != nil {
+		t.Fatal(err)
+	}
+	payload := draft.Payload
+	payload.Cover = "assets/cover.png"
+	payload.NPCs[0].Avatar = "assets/keeper.png"
+	if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/keeper.png", pngBytes(t, 16, 16)); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "identity-1", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: first.Version}); err != nil {
+		t.Fatal(err)
+	}
+	afterFirst, err := a.Game("harbor-identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Same name, different bytes: the identity has to move.
+	if _, err = a.UploadContentDraftAsset(ctx, saved.DraftID, "assets/keeper.png", pngBytes(t, 24, 24)); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := a.ReadContentDraft(ctx, saved.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "identity-2", DraftID: reloaded.DraftID, ExpectedDraftVersion: reloaded.Version, ExpectedProjectVersion: second.Version}); err != nil {
+		t.Fatal(err)
+	}
+	afterSecond, err := a.Game("harbor-identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterFirst.Revision == afterSecond.Revision {
+		t.Fatalf("replacing an avatar kept the same revision identity: %s", afterFirst.Revision)
+	}
+	if afterSecond.Revision == "" {
+		t.Fatal("the second publication has no revision")
+	}
+}
+
 func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})

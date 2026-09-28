@@ -432,7 +432,7 @@ func (a *App) buildPackage(ctx context.Context, draft ContentDraft, project Cont
 		NPCs: names, Bystanders: payload.Bystanders, Plot: payload.Plot, EventGeneration: payload.EventGeneration,
 		Defaults: payload.Defaults,
 	}
-	revision, err := newContentRevision(story, npcFiles)
+	revision, err := newContentRevision(story, npcFiles, assets)
 	if err != nil {
 		return "", nil, "", err
 	}
@@ -456,9 +456,10 @@ func (a *App) buildPackage(ctx context.Context, draft ContentDraft, project Cont
 	return revision, files, "", nil
 }
 
-// newContentRevision derives an immutable revision identity from the frozen
-// content, excluding the revision field itself.
-func newContentRevision(story StoryPack, npcs map[string]PackNPC) (string, error) {
+// newContentRevision derives an immutable revision identity from the frozen content,
+// excluding the revision field itself but including every referenced image, so two
+// publications can never share an identifier while differing in a byte a world shows.
+func newContentRevision(story StoryPack, npcs map[string]PackNPC, assets map[string][]byte) (string, error) {
 	names := make([]string, 0, len(npcs))
 	for name := range npcs {
 		names = append(names, name)
@@ -472,10 +473,24 @@ func newContentRevision(story StoryPack, npcs map[string]PackNPC) (string, error
 		}
 		bodies = append(bodies, body)
 	}
+	assetNames := make([]string, 0, len(assets))
+	for name := range assets {
+		assetNames = append(assetNames, name)
+	}
+	sort.Strings(assetNames)
+	type assetEntry struct {
+		Name string
+		Body []byte
+	}
+	assetList := make([]assetEntry, 0, len(assetNames))
+	for _, name := range assetNames {
+		assetList = append(assetList, assetEntry{Name: name, Body: assets[name]})
+	}
 	canonical, err := json.Marshal(struct {
-		Story StoryPack
-		NPCs  []json.RawMessage
-	}{story, bodies})
+		Story  StoryPack
+		NPCs   []json.RawMessage
+		Assets []assetEntry
+	}{story, bodies, assetList})
 	if err != nil {
 		return "", err
 	}
