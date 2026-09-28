@@ -42,6 +42,23 @@ type ContentDraft struct {
 	Payload ContentDraftPayload `json:"payload"`
 }
 
+// ContentDraftNPC is one editable important character. Publication writes it back
+// into the package's npcs/<definition_id>.json file.
+type ContentDraftNPC struct {
+	DefinitionID     string   `json:"definition_id"`
+	Revision         string   `json:"revision"`
+	EntityID         string   `json:"entity_id"`
+	Name             string   `json:"name"`
+	Role             string   `json:"role"`
+	Appearance       string   `json:"appearance,omitempty"`
+	Profile          string   `json:"profile"`
+	Knowledge        string   `json:"knowledge,omitempty"`
+	InitialConcerns  string   `json:"initial_concerns,omitempty"`
+	InitialLocation  string   `json:"initial_location"`
+	Avatar           string   `json:"avatar,omitempty"`
+	SpeakingExamples []string `json:"speaking_examples,omitempty"`
+}
+
 // ContentDraftPayload is the editable draft shape. Every field is optional so the
 // editor can save partial work; publish validates the strict package schema.
 type ContentDraftPayload struct {
@@ -61,7 +78,7 @@ type ContentDraftPayload struct {
 	InitialLocation string                 `json:"initial_location"`
 	Clock           string                 `json:"clock"`
 	Locations       []PackLocation         `json:"locations"`
-	NPCs            []string               `json:"npcs"`
+	NPCs            []ContentDraftNPC      `json:"npcs"`
 	Bystanders      []PackBystander        `json:"bystanders"`
 	Plot            *PlotDefinition        `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy `json:"event_generation,omitempty"`
@@ -69,6 +86,96 @@ type ContentDraftPayload struct {
 }
 
 const payloadTooLarge = "payload is too large"
+
+// ContentDraftPreview is what a draft would look like. The player view can only
+// carry public projections; the author view is a separate explicit request and
+// never the same payload with fields hidden in the browser.
+type ContentDraftPreview struct {
+	View               string                  `json:"view"`
+	DraftID            string                  `json:"draft_id"`
+	Version            int64                   `json:"version"`
+	Title              string                  `json:"title"`
+	Mode               string                  `json:"mode"`
+	Description        string                  `json:"description"`
+	Gameplay           string                  `json:"gameplay"`
+	Background         string                  `json:"background"`
+	Opening            string                  `json:"opening"`
+	Clock              string                  `json:"clock"`
+	InitialLocation    string                  `json:"initial_location"`
+	Player             PlayerDefaults          `json:"player"`
+	Characters         []ContentPreviewNPC     `json:"characters"`
+	Bystanders         []PackBystander         `json:"bystanders"`
+	Locations          []PackLocation          `json:"locations"`
+	SpoilerWarning     string                  `json:"spoiler_warning,omitempty"`
+	AuthorRules        string                  `json:"author_rules,omitempty"`
+	AuthorFacts        string                  `json:"author_facts,omitempty"`
+	AuthorCharacters   []ContentPreviewAuthorNPC `json:"author_characters,omitempty"`
+	AuthorPlot         *PlotDefinition         `json:"author_plot,omitempty"`
+	AuthorEventPolicy  *EventGenerationPolicy  `json:"author_event_generation,omitempty"`
+}
+
+// ContentPreviewNPC is the public projection of an important character. Private
+// knowledge, profile and concerns stay out of this shape entirely.
+type ContentPreviewNPC struct {
+	EntityID        string `json:"entity_id"`
+	DefinitionID    string `json:"definition_id"`
+	Name            string `json:"name"`
+	Role            string `json:"role"`
+	Appearance      string `json:"appearance,omitempty"`
+	Avatar          string `json:"avatar,omitempty"`
+	InitialLocation string `json:"initial_location,omitempty"`
+}
+
+// ContentPreviewAuthorNPC is the author-only projection, requested explicitly.
+type ContentPreviewAuthorNPC struct {
+	ContentPreviewNPC
+	Revision         string   `json:"revision"`
+	Profile          string   `json:"profile"`
+	Knowledge        string   `json:"knowledge"`
+	InitialConcerns  string   `json:"initial_concerns"`
+	SpeakingExamples []string `json:"speaking_examples,omitempty"`
+}
+
+func (a *App) PreviewContentDraft(ctx context.Context, draftID string, author bool) (ContentDraftPreview, error) {
+	draft, err := a.ReadContentDraft(ctx, draftID)
+	if err != nil {
+		return ContentDraftPreview{}, err
+	}
+	payload := draft.Payload
+	preview := ContentDraftPreview{
+		View: "player", DraftID: draft.DraftID, Version: draft.Version, Title: payload.Title, Mode: payload.Mode,
+		Description: payload.Description, Gameplay: payload.Gameplay, Background: payload.Background,
+		Opening: payload.Opening, Clock: payload.Clock, InitialLocation: payload.InitialLocation, Player: payload.Player,
+		Locations: payload.Locations, Bystanders: payload.Bystanders, Characters: []ContentPreviewNPC{},
+	}
+	for _, npc := range payload.NPCs {
+		preview.Characters = append(preview.Characters, ContentPreviewNPC{
+			EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, Name: npc.Name, Role: npc.Role,
+			Appearance: npc.Appearance, Avatar: npc.Avatar, InitialLocation: npc.InitialLocation,
+		})
+	}
+	if !author {
+		return preview, nil
+	}
+	preview.View = "author"
+	preview.SpoilerWarning = "作者视图包含剧透与人物私密设定，仅用于创作检查。"
+	preview.AuthorRules = payload.Rules
+	preview.AuthorFacts = payload.AuthorFacts
+	preview.AuthorPlot = payload.Plot
+	preview.AuthorEventPolicy = payload.EventGeneration
+	preview.AuthorCharacters = []ContentPreviewAuthorNPC{}
+	for _, npc := range payload.NPCs {
+		preview.AuthorCharacters = append(preview.AuthorCharacters, ContentPreviewAuthorNPC{
+			ContentPreviewNPC: ContentPreviewNPC{
+				EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, Name: npc.Name, Role: npc.Role,
+				Appearance: npc.Appearance, Avatar: npc.Avatar, InitialLocation: npc.InitialLocation,
+			},
+			Revision: npc.Revision, Profile: npc.Profile, Knowledge: npc.Knowledge,
+			InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples,
+		})
+	}
+	return preview, nil
+}
 
 // CreateContentProject reserves a stable game identity for one author project.
 // Official packages and other projects of the same account cannot be taken over.
@@ -149,7 +256,7 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 		return ContentDraft{}, err
 	}
 	baseRevision = cleanText(baseRevision)
-	payload := ContentDraftPayload{SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "", NPCs: []string{}, Locations: []PackLocation{}, Bystanders: []PackBystander{}}
+	payload := ContentDraftPayload{SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "", NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{}}
 	status := draftStatusEditing
 	if baseRevision != "" {
 		copied, err := a.draftPayloadFromRevision(baseRevision, project.GameID)
@@ -271,6 +378,25 @@ func validateDraftPayload(payload ContentDraftPayload) error {
 			return fmt.Errorf("%w: defaults", ErrContentInvalid)
 		}
 	}
+	entityIDs := map[string]bool{}
+	for index, npc := range payload.NPCs {
+		if !packID.MatchString(npc.DefinitionID) || !packID.MatchString(npc.Revision) || !entityID.MatchString(npc.EntityID) {
+			return fmt.Errorf("%w: npc %d identity", ErrContentInvalid, index)
+		}
+		if entityIDs[npc.EntityID] {
+			return fmt.Errorf("%w: npc %d is duplicated", ErrContentInvalid, index)
+		}
+		entityIDs[npc.EntityID] = true
+		if npc.InitialLocation != "" && !seen[npc.InitialLocation] {
+			return fmt.Errorf("%w: npc %d location", ErrContentInvalid, index)
+		}
+		if npc.Avatar != "" && !strings.HasPrefix(npc.Avatar, "assets/") {
+			return fmt.Errorf("%w: npc %d avatar", ErrContentInvalid, index)
+		}
+		if len(npc.SpeakingExamples) > 12 {
+			return fmt.Errorf("%w: npc %d speaking examples", ErrContentInvalid, index)
+		}
+	}
 	return nil
 }
 
@@ -310,10 +436,28 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 		Description: definition.Summary.Description, Gameplay: definition.Summary.Gameplay, Background: definition.Background,
 		Rules: definition.Rules, AuthorFacts: definition.Secret, Player: definition.Summary.Player, Opening: definition.Opening,
 		Clock: definition.Clock, Locations: definition.Locations, Plot: definition.Plot, Bystanders: definition.BystanderRefs,
-		NPCs: []string{}, Defaults: &definition.Settings,
+		NPCs: []ContentDraftNPC{}, Defaults: &definition.Settings,
 	}
 	for _, character := range definition.Characters {
-		payload.NPCs = append(payload.NPCs, "npcs/"+character.DefinitionID+".json")
+		npc := ContentDraftNPC{
+			DefinitionID: character.DefinitionID, Revision: character.DefinitionRevision, EntityID: character.EntityID,
+			Name: character.Name, Role: character.Role, Appearance: character.Appearance, Profile: character.Profile,
+			Knowledge: character.Knowledge, InitialConcerns: character.InitialConcerns,
+			InitialLocation: definition.InitialLocations[character.EntityID],
+		}
+		if pack.Root != "" {
+			// The editor needs the full character, not only the published summary.
+			if body, err := packFile(pack.Root, "npcs/"+character.DefinitionID+".json", 64*1024); err == nil {
+				var file PackNPC
+				if json.Unmarshal(body, &file) == nil {
+					npc.Avatar, npc.SpeakingExamples = file.Avatar, file.SpeakingExamples
+					if file.InitialLocation != "" {
+						npc.InitialLocation = file.InitialLocation
+					}
+				}
+			}
+		}
+		payload.NPCs = append(payload.NPCs, npc)
 	}
 	for _, location := range definition.Locations {
 		if location.Name == definition.Scene {
@@ -321,4 +465,29 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 		}
 	}
 	return payload, nil
+}
+
+// draftNPCFiles renders the draft's characters back into package files. Publication
+// uses this mapping so the editor and the package agree on one shape.
+func draftNPCFiles(payload ContentDraftPayload) (map[string]PackNPC, error) {
+	files := map[string]PackNPC{}
+	for index, npc := range payload.NPCs {
+		if !packID.MatchString(npc.DefinitionID) || !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.Revision) {
+			return nil, fmt.Errorf("%w: npc identity", ErrContentInvalid)
+		}
+		if strings.TrimSpace(npc.Name) == "" || strings.TrimSpace(npc.Role) == "" || strings.TrimSpace(npc.Profile) == "" {
+			return nil, fmt.Errorf("%w: npc %d is incomplete", ErrContentInvalid, index)
+		}
+		name := "npcs/" + npc.DefinitionID + ".json"
+		if _, exists := files[name]; exists {
+			return nil, fmt.Errorf("%w: duplicate npc", ErrContentInvalid)
+		}
+		files[name] = PackNPC{
+			DefinitionID: npc.DefinitionID, Revision: npc.Revision, EntityID: npc.EntityID, Name: npc.Name,
+			Role: npc.Role, Appearance: npc.Appearance, Profile: npc.Profile, Knowledge: npc.Knowledge,
+			InitialConcerns: npc.InitialConcerns, InitialLocation: npc.InitialLocation,
+			Avatar: npc.Avatar, SpeakingExamples: npc.SpeakingExamples,
+		}
+	}
+	return files, nil
 }

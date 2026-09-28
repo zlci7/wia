@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -53,7 +54,13 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	payload.Description = "一处靠潮汐生活的港口。"
 	payload.Background = "港口在夜里退潮。"
 	payload.Opening = "潮水退去，灯还亮着。"
-	payload.NPCs = []string{"npcs/keeper.json"}
+	payload.NPCs = []ContentDraftNPC{{DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "港口看灯人", Profile: "守着潮汐表。", InitialLocation: "harbor"}}
+	if len(payload.Locations) == 0 {
+		payload.Locations = []PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
+	}
+	if payload.InitialLocation == "" {
+		payload.InitialLocation = payload.Locations[0].ID
+	}
 	saved, err := a.SaveContentDraft(ctx, blank.DraftID, payload, 1)
 	if err != nil || saved.Version != 2 || saved.Payload.Title != "港口的灯 · 修订" {
 		t.Fatalf("save draft: %+v %v", saved, err)
@@ -94,6 +101,126 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	}
 	if _, err := other.ReadContentDraft(ctx, blank.DraftID); !errors.Is(err, ErrContentNotFound) {
 		t.Fatalf("draft leaked to another owner: %v", err)
+	}
+}
+
+// The editor receives full characters, edits stay valid, and the package mapping
+// writes them back one file per character.
+func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	pack := a.packs[GameID]
+	project, err := a.CreateContentProject(ctx, "lantern-npc", "人物往返")
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft, err := a.CreateContentDraft(ctx, project.ProjectID, pack.Definition.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(draft.Payload.NPCs) != len(pack.Definition.Characters) {
+		t.Fatalf("characters missing from the draft: %+v", draft.Payload.NPCs)
+	}
+	for _, npc := range draft.Payload.NPCs {
+		location := pack.Definition.InitialLocations[npc.EntityID]
+		if npc.Profile == "" || npc.Role == "" || npc.Knowledge == "" || npc.InitialConcerns == "" || npc.InitialLocation != location || npc.Revision == "" {
+			t.Fatalf("draft character is incomplete: %+v", npc)
+		}
+	}
+	payload := draft.Payload
+	payload.NPCs[0].SpeakingExamples = []string{"灯要按时点。", "潮水不会等人。"}
+	payload.NPCs[0].Avatar = "assets/keeper.png"
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Payload.NPCs[0].SpeakingExamples) != 2 || saved.Payload.NPCs[0].Avatar != "assets/keeper.png" {
+		t.Fatalf("character extensions lost: %+v", saved.Payload.NPCs[0])
+	}
+	files, err := draftNPCFiles(saved.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != len(saved.Payload.NPCs) {
+		t.Fatalf("package mapping: %+v", files)
+	}
+	file, ok := files["npcs/"+saved.Payload.NPCs[0].DefinitionID+".json"]
+	if !ok || file.Avatar != "assets/keeper.png" || len(file.SpeakingExamples) != 2 || file.EntityID != saved.Payload.NPCs[0].EntityID {
+		t.Fatalf("character file: %+v", file)
+	}
+
+	for _, bad := range []struct {
+		name   string
+		mutate func(*ContentDraftPayload)
+	}{
+		{"unknown location", func(p *ContentDraftPayload) { p.NPCs[0].InitialLocation = "cellar" }},
+		{"external avatar", func(p *ContentDraftPayload) { p.NPCs[0].Avatar = "https://example.test/a.png" }},
+		{"invalid entity", func(p *ContentDraftPayload) { p.NPCs[0].EntityID = "keeper" }},
+		{"duplicate character", func(p *ContentDraftPayload) { p.NPCs = append(p.NPCs, p.NPCs[0]) }},
+	} {
+		invalid := saved.Payload
+		invalid.NPCs = append([]ContentDraftNPC{}, saved.Payload.NPCs...)
+		bad.mutate(&invalid)
+		if _, err := a.SaveContentDraft(ctx, draft.DraftID, invalid, saved.Version); !errors.Is(err, ErrContentInvalid) {
+			t.Fatalf("%s accepted: %v", bad.name, err)
+		}
+	}
+	if _, err := draftNPCFiles(ContentDraftPayload{NPCs: []ContentDraftNPC{{DefinitionID: "a", Revision: "v1", EntityID: "npc:a", Name: "甲", Role: "角色", Profile: "资料"}}}); err != nil {
+		t.Fatalf("minimal character rejected: %v", err)
+	}
+}
+
+// The player view is a separate projection: author facts, private character
+// knowledge and plot conditions never appear in it.
+func TestContentDraftPreviewViews(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	pack := a.packs[GameID]
+	project, err := a.CreateContentProject(ctx, "lantern-preview", "预览隔离")
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft, err := a.CreateContentDraft(ctx, project.ProjectID, pack.Definition.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	player, err := a.PreviewContentDraft(ctx, draft.DraftID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if player.View != "player" || player.AuthorFacts != "" || player.AuthorRules != "" || player.AuthorPlot != nil || player.AuthorEventPolicy != nil || len(player.AuthorCharacters) != 0 {
+		t.Fatalf("player view carries author material: %+v", player)
+	}
+	if player.Title == "" || len(player.Characters) == 0 || player.Opening == "" {
+		t.Fatalf("player view is too thin to be useful: %+v", player)
+	}
+	body, err := json.Marshal(player)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{pack.Definition.Secret, pack.Definition.Characters[0].Knowledge, pack.Definition.Characters[0].Profile, pack.Definition.Characters[0].InitialConcerns} {
+		if secret != "" && strings.Contains(string(body), secret) {
+			t.Fatalf("player view leaked %q", secret)
+		}
+	}
+
+	author, err := a.PreviewContentDraft(ctx, draft.DraftID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if author.View != "author" || author.AuthorFacts == "" || author.AuthorPlot == nil || len(author.AuthorCharacters) != len(draft.Payload.NPCs) || author.SpoilerWarning == "" {
+		t.Fatalf("author view is incomplete: %+v", author)
+	}
+	if author.AuthorCharacters[0].Knowledge == "" || author.AuthorCharacters[0].Profile == "" {
+		t.Fatalf("author view lost private fields: %+v", author.AuthorCharacters[0])
+	}
+	if _, err := a.PreviewContentDraft(ctx, "draft_missing", false); !errors.Is(err, ErrContentNotFound) {
+		t.Fatalf("missing draft previewed: %v", err)
+	}
+	// Preview is read-only: it neither bumps the draft version nor touches a world.
+	after, err := a.ReadContentDraft(ctx, draft.DraftID)
+	if err != nil || after.Version != draft.Version {
+		t.Fatalf("preview changed the draft: %+v %v", after.Version, err)
 	}
 }
 

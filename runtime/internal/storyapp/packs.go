@@ -83,6 +83,8 @@ type loadedPack struct {
 	Cover      []byte
 	CoverType  string
 	Digest     string
+	// Root is the directory the package was read from; empty for in-memory packs.
+	Root string
 }
 
 type PackIssue struct {
@@ -187,6 +189,7 @@ func packFile(root, relative string, maxSize int64) ([]byte, error) {
 
 func loadPack(root string) (loadedPack, error) {
 	var result loadedPack
+	result.Root = root
 	data, err := packFile(root, "story.json", 256*1024)
 	if err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
