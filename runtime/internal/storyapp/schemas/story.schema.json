@@ -4,7 +4,10 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "game_id": {
       "type": "string",
@@ -165,9 +168,51 @@
     "bystanders": {
       "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 200
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "bystander_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^bystander:[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "description": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 2000
+              },
+              "initial_location": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+              },
+              "avatar": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "pattern": "^assets/"
+              }
+            },
+            "required": [
+              "bystander_id",
+              "name"
+            ]
+          }
+        ]
       },
       "minItems": 0,
       "maxItems": 40

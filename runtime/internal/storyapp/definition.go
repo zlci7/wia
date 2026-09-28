@@ -16,9 +16,12 @@ type gameDefinition struct {
 	Clock            string
 	Characters       []Character
 	Bystanders       []string
-	Secret           string
-	Plot             *PlotDefinition
-	EventGeneration  *EventGenerationPolicy
+	// BystanderRefs carries the normalized v2 bystander definitions next to their
+	// display names so identity survives the pack boundary.
+	BystanderRefs   []PackBystander
+	Secret          string
+	Plot            *PlotDefinition
+	EventGeneration *EventGenerationPolicy
 }
 
 func characterByID(def gameDefinition, id string) (Character, bool) {

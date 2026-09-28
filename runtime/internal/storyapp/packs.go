@@ -57,23 +57,25 @@ type StoryPack struct {
 	Clock           string                 `json:"clock"`
 	Locations       []PackLocation         `json:"locations"`
 	NPCs            []string               `json:"npcs"`
-	Bystanders      []string               `json:"bystanders"`
+	Bystanders      []PackBystander        `json:"bystanders"`
 	Plot            *PlotDefinition        `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy `json:"event_generation,omitempty"`
 	Defaults        *NarrativeSettings     `json:"defaults,omitempty"`
 }
 
 type PackNPC struct {
-	DefinitionID    string `json:"definition_id"`
-	Revision        string `json:"revision"`
-	EntityID        string `json:"entity_id"`
-	Name            string `json:"name"`
-	Role            string `json:"role"`
-	Appearance      string `json:"appearance"`
-	Profile         string `json:"profile"`
-	Knowledge       string `json:"knowledge"`
-	InitialConcerns string `json:"initial_concerns"`
-	InitialLocation string `json:"initial_location"`
+	DefinitionID     string   `json:"definition_id"`
+	Revision         string   `json:"revision"`
+	EntityID         string   `json:"entity_id"`
+	Name             string   `json:"name"`
+	Role             string   `json:"role"`
+	Appearance       string   `json:"appearance"`
+	Profile          string   `json:"profile"`
+	Knowledge        string   `json:"knowledge"`
+	InitialConcerns  string   `json:"initial_concerns"`
+	InitialLocation  string   `json:"initial_location"`
+	Avatar           string   `json:"avatar,omitempty"`
+	SpeakingExamples []string `json:"speaking_examples,omitempty"`
 }
 
 type loadedPack struct {
@@ -242,6 +244,14 @@ func loadPack(root string) (loadedPack, error) {
 	if len(p.NPCs) == 0 || len(p.NPCs) > 16 || len(p.Bystanders) > 40 {
 		return bad("npcs/bystanders")
 	}
+	bystanders, err := normalizePackBystanders(p.Bystanders, p.Revision, locations)
+	if err != nil {
+		return bad("bystanders")
+	}
+	bystanderNames := make([]string, 0, len(bystanders))
+	for _, bystander := range bystanders {
+		bystanderNames = append(bystanderNames, bystander.Name)
+	}
 	settings := defaultNarrativeSettings()
 	if p.Defaults != nil {
 		// Decode again onto defaults so omitted values inherit the application defaults.
@@ -257,7 +267,7 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return bad("defaults")
 	}
-	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: p.Bystanders}
+	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: bystanders}
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
 	}

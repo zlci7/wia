@@ -20,7 +20,7 @@ type contextSection struct {
 }
 
 type contextMaterial struct {
-	RecallSources   []string
+	RecallSources []string
 	// DeclinedSources are authorized records this request deliberately left out of
 	// the recent window. They stay retrievable, so they are reported but not treated
 	// as already supplied or already retrieved.

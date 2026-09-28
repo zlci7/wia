@@ -56,6 +56,22 @@
       "minLength": 1,
       "maxLength": 80,
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+    },
+    "avatar": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^assets/"
+    },
+    "speaking_examples": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "minItems": 0,
+      "maxItems": 12
     }
   },
   "required": [
