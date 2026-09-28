@@ -18,7 +18,7 @@ async function load(more = false) {
   } catch { if (ticket === generation) error.value = '用量暂时无法读取，请重试。'; }
   finally { if (ticket === generation) loading.value = false; }
 }
-watch(scope, () => { data.value = undefined; void load(); });
+watch([scope, () => props.worldId], () => { data.value = undefined; void load(); });
 onMounted(() => void load());
 onUnmounted(() => { generation++; });
 </script>

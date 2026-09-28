@@ -4,7 +4,7 @@ World Is Agent 是一个本机运行的 AI 叙事游戏。玩家在浏览器中�
 
 The current local build includes Phase12 M1 and M2: reliable story saves, conditional world progression, scoped long-term memory, retrieval and recoverable corrections. The browser workspace connects directly to the local Runtime; no game adapter is required. This is an internal-playtest build, not a stable release.
 
-Repository story packs include a guided investigation with conditional endings and an open station with independent event lines and bounded, persistent AI-generated incidents. Existing saves keep their pinned definitions. Use the [authoring guide](docs/phase12/Story_Pack_Authoring.md) to select the current repository examples without replacing an existing catalog.
+Repository story packs include a guided investigation with conditional endings and an open station with independent event lines and bounded, persistent AI-generated incidents. Existing saves keep their pinned definitions. Use the [M2 story-pack reference](docs/phase12/stages/M2-世界剧情与长期记忆.md#10-本地剧本包参考) to select the current repository examples without replacing an existing catalog.
 
 ## 开始使用
 
@@ -36,7 +36,7 @@ go build -o wia-runtime.exe ./runtime/cmd/server
 
 ## 可体验内容
 
-- Local JSON packs: guided 《暮灯镇的失踪信使》 and open 《远星维修站》. The author owns each story's mode. See [pack authoring](docs/phase12/Story_Pack_Authoring.md).
+- Local JSON packs: guided 《暮灯镇的失踪信使》 and open 《远星维修站》. The author owns each story's mode. See [pack authoring](docs/phase12/stages/M2-世界剧情与长期记忆.md#10-本地剧本包参考).
 - 两名重要 NPC：客栈老板沈岚、佣兵铁杉；开场保留十名场景路人。
 - NPC 并行决策、公开回应后的下一阶段反应、按人物分开的感知和记忆。
 - 私下交谈的旁观隔离：授权人物看到原文，其他人物只看到交谈迹象。
@@ -51,7 +51,7 @@ go build -o wia-runtime.exe ./runtime/cmd/server
 
 ## 当前验证
 
-Verification evidence: [M1](docs/phase12/acceptance/M1.md), [M2](docs/phase12/acceptance/M2.md), and [phase status](docs/phase12/WIA_Phase12_开发状态.md). Deterministic tests, browser checks, real-model observations and user acceptance are recorded separately.
+Verification evidence: [M1](docs/phase12/records/M1-验收记录.md), [M2](docs/phase12/records/M2-验收记录.md), and [phase status](docs/phase12/开发状态.md). Deterministic tests, browser checks, real-model observations and user acceptance are recorded separately.
 
 Full Go regression, relevant race/vet checks, frontend mechanism tests, type checking and production builds pass. The executable starts with an isolated data root and serves both its homepage and bundled client assets. Real-model tests use disposable worlds; occasional generation failures, latency and semantic deviations remain documented limitations.
 
@@ -63,9 +63,10 @@ M3 covers action suggestions and the full content workspace. M4 covers server ac
 
 - [系统架构](ARCHITECTURE.md)
 - [公开状态](docs/STATUS.md)
-- [Phase12 产品说明](docs/phase12/WIA_产品说明_v1.0.md)
-- [Phase12 技术方案](docs/phase12/WIA_Phase12_技术方案_v1.0.md)
-- [Phase12 开发执行指南](docs/phase12/WIA_Phase12_开发执行指南.md)
+- [Phase12 文档入口](docs/phase12/README.md)
+- [Phase12 产品说明](docs/phase12/产品说明.md)
+- [Phase12 总体技术方案](docs/phase12/总体技术方案.md)
+- [Phase12 开发指南](docs/phase12/开发指南.md)
 
 ## 许可证
 

@@ -111,6 +111,35 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "suggestions fill only on selection and preserve an existing draft"(x) {
+    const w = x.currentWorld.value;
+    const basis = { world_id:w.world_id,message_head:w.message_head,event_head:w.event_head,context_epoch:w.context_epoch,revision:w.revision };
+    x.chooseSuggestion('我看看窗外。', basis);
+    assert.equal(x.session.value.draft,'我看看窗外。');
+    assert.deepEqual({...x.session.value.suggestionBasis},basis);
+    x.session.value.draft = '正在编辑';
+    x.chooseSuggestion('迟到建议',basis);
+    assert.equal(x.session.value.draft,'正在编辑');
+    assert.equal(sent,undefined);
+  },
+  async "stale suggestion cannot inherit a refreshed submission baseline"(x) {
+    const w = x.currentWorld.value;
+    x.chooseSuggestion('我看看窗外。',{world_id:w.world_id,message_head:w.message_head,event_head:w.event_head,context_epoch:w.context_epoch,revision:w.revision});
+    records.A.world = world('A',2); await x.freshRefresh();
+    let submitted = false;
+    networkHook = (url,init) => {if(url.endsWith('/runs') && init.method === 'POST'){submitted=true;return response({});}};
+    await x.sendInput();
+    assert.equal(submitted,false);
+    assert.match(x.session.value.sendError,/建议.*变化/);
+    assert.equal(x.session.value.draft,'我看看窗外。');
+  },
+  async "suggestion selection cannot cross world boundaries"(x) {
+    const w = x.currentWorld.value;
+    const basis = {world_id:w.world_id,message_head:w.message_head,event_head:w.event_head,context_epoch:w.context_epoch,revision:w.revision};
+    active='B'; await x.freshRefresh();
+    x.chooseSuggestion('来自A',basis);
+    assert.equal(x.session.value.draft,'');
+  },
   async "new story pins revision and preserves form on conflict"(x) {
     const game = x.storyEntries.value.find(g => g.id === 'demo');
     networkHook = (url, init) => {

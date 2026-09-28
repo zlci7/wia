@@ -338,6 +338,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 		return Run{}, err
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	world.cancelSuggestions()
 	runtime := &runRuntime{Cancel: cancel, Done: make(chan struct{}), WorldID: worldID, RunID: run.RunID, ActiveRevision: activeRevision, Generator: generator}
 	a.runsMu.Lock()
 	a.runs[run.RunID] = runtime

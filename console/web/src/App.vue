@@ -2,6 +2,7 @@
 import AppDialog from "./components/AppDialog.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
+import SuggestionPanel from "./components/SuggestionPanel.vue";
 import { useExperience } from "./useExperience";
 import "./style.css";
 const {
@@ -76,6 +77,7 @@ const {
   stopRun,
   inputKeys,
   chooseCharacter,
+  chooseSuggestion,
   resizeInput,
 } = useExperience();
 const policyOptions = [
@@ -419,6 +421,7 @@ const policyOptions = [
           </button>
         </div>
         <form class="composer" @submit.prevent="sendInput()">
+          <SuggestionPanel v-if="currentWorld" :world="currentWorld" :active-revision="status?.active_revision ?? 0" :ready="!!status?.ready" :busy="!!activeRun || session.sending || !!pendingSubmission" :has-draft="!!session.draft.trim()" @choose="chooseSuggestion" />
           <div class="composer-tools">
             <label
               >对谁说
@@ -465,6 +468,9 @@ const policyOptions = [
             @keydown="inputKeys"
             @input="resizeInput"
           ></textarea>
+          <p v-if="session.suggestionBasis" class="subtle suggestion-origin">来自行动建议，可修改后提交。
+            <button type="button" class="quiet-button" @click="session.suggestionBasis = undefined; session.sendError = ''">作为自由输入</button>
+          </p>
           <p
             v-if="session.sendError && !pendingSubmission"
             class="inline-error"

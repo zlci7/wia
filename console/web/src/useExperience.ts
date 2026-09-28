@@ -918,7 +918,7 @@ export function useExperience() {
     delete submissions[id];
     const state = reader.sessions[id];
     if (state) {
-      if (state.draft.trim() === pending.input.trim()) state.draft = "";
+      if (state.draft.trim() === pending.input.trim()) { state.draft = ""; state.suggestionBasis = undefined; }
       state.sendError = "";
     }
     if (
@@ -933,6 +933,14 @@ export function useExperience() {
       failed = failedRun.value;
     if (!world || state.sending || navigating.value) return;
     const id = world.world_id;
+    const chosen = state.suggestionBasis;
+    if (!retry && !submissions[id] && chosen && (
+      chosen.world_id !== id || chosen.message_head !== world.message_head ||
+      chosen.event_head !== world.event_head || chosen.context_epoch !== world.context_epoch || chosen.revision !== world.revision
+    )) {
+      state.sendError = '这条建议所依据的故事已变化。请检查输入，选择“作为自由输入”后再提交。';
+      return;
+    }
     if (
       !submissions[id] &&
       (activeRun.value || (!retry && !state.draft.trim()))
@@ -1033,7 +1041,17 @@ export function useExperience() {
     if (dialog.value === "scene") closeDialog();
     void nextTick(() => textarea.value?.focus());
   }
+  function chooseSuggestion(text: string, basis: import('./types').SuggestionBasis) {
+    const world = currentWorld.value;
+    if (!world || activeRun.value || session.value.sending || pendingSubmission.value || session.value.draft.trim() ||
+      basis.world_id !== world.world_id || basis.message_head !== world.message_head || basis.event_head !== world.event_head || basis.context_epoch !== world.context_epoch || basis.revision !== world.revision) return;
+    session.value.draft = text;
+    session.value.suggestionBasis = { ...basis };
+    session.value.addressee = '';
+    void nextTick(() => { resizeInput(); textarea.value?.focus(); });
+  }
   function resizeInput() {
+    if (!session.value.draft.trim()) session.value.suggestionBasis = undefined;
     if (textarea.value) {
       textarea.value.style.height = "auto";
       textarea.value.style.height = `${textarea.value.scrollHeight}px`;
@@ -1167,6 +1185,7 @@ export function useExperience() {
     stopRun,
     inputKeys,
     chooseCharacter,
+    chooseSuggestion,
     resizeInput,
   };
 }

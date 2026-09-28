@@ -123,6 +123,7 @@ func closeoutRealApp(t *testing.T) *App {
 	}
 	t.Logf("provider=%s model=%s", cfg.Provider, cfg.Model)
 	a := newTestApp(t, closeoutModelProbe{inner: g, t: t})
+	keepRealUsageReport(t, a)
 	a.logger = &recordingLogger{}
 	return a
 }

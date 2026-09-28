@@ -2,11 +2,11 @@
 
 更新时间：2026-09-28。
 
-Local story packs and multi-story saves are available. The runtime validates JSON schemas and references, pins author-selected modes and revisions, and stores independent definition/cover snapshots. The inn and orbital-station samples share the existing runtime. Evidence and remaining scope: [Story Packs](phase12/acceptance/Story_Packs.md).
+Local story packs and multi-story saves are available. The runtime validates JSON schemas and references, pins author-selected modes and revisions, and stores independent definition/cover snapshots. The inn and orbital-station samples share the existing runtime. Design and authoring reference: [M2 technical plan](phase12/stages/M2-世界剧情与长期记忆.md); evidence: [M2 record](phase12/records/M2-验收记录.md#剧本配置与多剧本运行专项).
 
 The local playtest build includes Phase12 M1 and M2. Players can run conditional story events, continue personal memories, inspect sources and correct records while keeping independent worlds and original prose. User experience acceptance remains separate from engineering verification.
 
-The v2 repository samples add a complete guided content route and an open station with independent inspection/freight lines. Optional generated incidents use confirmed actions, author-defined scopes, bounded admission and the same atomic event/memory pipeline. Generation state survives copying and restart; corrections invalidate affected continuations. Continuous-model observations and failures are recorded in [M2 closeout](phase12/acceptance/M2.md#m2-收口验证2026-09-28); M3 remains unstarted.
+The v2 repository samples add a complete guided content route and an open station with independent inspection/freight lines. Optional generated incidents use confirmed actions, author-defined scopes, bounded admission and the same atomic event/memory pipeline. Generation state survives copying and restart; corrections invalidate affected continuations. Continuous-model observations and failures are recorded in [M2 closeout](phase12/records/M2-验收记录.md#m2-收口验证2026-09-28).
 
 ## 已验证
 
@@ -48,11 +48,11 @@ The v2 repository samples add a complete guided content route and an open statio
 
 Action suggestions, full content editing/import, server accounts, cross-device access, attachment recovery and release packaging remain M3/M4 work. M2 memory/correction mechanisms are implemented. Real-model naturalness, latency and continuity are evaluated separately; short successful sequences do not establish a stable failure rate.
 
-详细阶段记录：[Phase12 M1 验收记录](phase12/acceptance/M1.md)。
+详细阶段记录：[Phase12 M1 验收记录](phase12/records/M1-验收记录.md)。
 
 ### NPC autonomy and behavior policies
 
-Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/acceptance/M1.md). M2 digests maintain scoped beliefs, relationships, concerns and commitments.
+Phase12 stores private initial concerns with newly created worlds; existing worlds keep their own character data. Story settings expose optional coordination, narration and shared NPC policies. Custom text replaces its default policy, explicit story options take precedence, and settings retain world/epoch isolation and copy semantics. Deterministic, browser and three-turn real-model evidence is recorded in [M1 acceptance](phase12/records/M1-验收记录.md). M2 digests maintain scoped beliefs, relationships, concerns and commitments.
 
 ### M2 world progression and memory
 
@@ -60,4 +60,4 @@ Conditional nodes, bounded waiting, resolved interventions and recipient-scoped 
 
 Each recipient has a continuous source index, a versioned digest and a complete recent tail. Search is scope-limited, and NPC-requested recall is bounded to two queries. Corrections preserve original records, advance the context epoch and use durable rebuild jobs. Required rebuilds block new generation and copying while preserving reading access; failed jobs can be retried.
 
-The browser “回顾与纠正” view supports paging, spoiler-gated author records, frozen editing versions and uncertain-request recovery. Frontend checks pass 24 settings/recovery cases and four memory-session cases. Real-model failures and quality limits remain in [M2 verification](phase12/acceptance/M2.md); M2 is not a stable-release claim.
+The browser “回顾与纠正” view supports paging, spoiler-gated author records, frozen editing versions and uncertain-request recovery. Frontend checks pass 24 settings/recovery cases and four memory-session cases. Real-model failures and quality limits remain in [M2 verification](phase12/records/M2-验收记录.md); M2 is not a stable-release claim.

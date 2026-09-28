@@ -164,3 +164,9 @@ export interface UsagePage {
   };
   calls: UsageCall[]; next_before_id?: number;
 }
+export interface SuggestionBasis {
+  world_id: string; message_head: number; event_head: number; context_epoch: number; revision: string;
+}
+export interface SuggestionSet {
+  id: string; basis: SuggestionBasis; enabled: boolean; status: string; items: string[];
+}

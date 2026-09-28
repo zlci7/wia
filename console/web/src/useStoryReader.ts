@@ -4,6 +4,7 @@ import { ApiError, type Message } from "./types";
 
 type Anchor = { id: string; offset: number };
 export type ReadingSession = {
+  suggestionBasis?: import('./types').SuggestionBasis;
   messages: Message[];
   draft: string;
   addressee: string;

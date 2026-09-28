@@ -184,6 +184,7 @@ func TestM2RealMemoryLifecycle(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, g)
 	logger := &recordingLogger{}
+	keepRealUsageReport(t, a)
 	a.logger = logger
 	w, err := a.createFixtureWorld(ctx, "长期约定验证", "open", "旅人", "谨慎礼貌，不替别人许诺", true)
 	if err != nil {

@@ -15,6 +15,16 @@ import {
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
+export function fetchSuggestions(world: string): Promise<import('./types').SuggestionSet> {
+  return request(`/api/v1/worlds/${encodeURIComponent(world)}/suggestions`);
+}
+export function requestSuggestions(world: string, basis: import('./types').SuggestionBasis, revision: number, enabled?: boolean): Promise<import('./types').SuggestionSet> {
+  return request(`/api/v1/worlds/${encodeURIComponent(world)}/suggestions`, {
+    method: enabled === undefined ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ basis, expected_active_revision: revision, enabled }),
+  });
+}
+
 export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {
   const query = new URLSearchParams();
   if (world) query.set('world_id', world);

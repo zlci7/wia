@@ -226,6 +226,10 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	worldID := parts[3]
+	if len(parts) == 5 && parts[4] == "suggestions" {
+		s.suggestions(w, r, worldID)
+		return
+	}
 	if len(parts) == 5 && parts[4] == "cover" {
 		if r.Method != "GET" {
 			writeError(w, 405, "method_not_allowed", "use GET")

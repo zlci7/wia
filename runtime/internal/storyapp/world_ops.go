@@ -91,6 +91,10 @@ func (a *App) activate(ctx context.Context, worldID string, expectedRevision int
 }
 
 func (a *App) cancelWorldRuns(ctx context.Context, worldID string) {
+	w := a.worldRuntimeFor(worldID)
+	w.mu.Lock()
+	w.cancelSuggestions()
+	w.mu.Unlock()
 	path, _, err := a.worldRecord(ctx, worldID)
 	if err == nil {
 		if store, e := openWorldDB(path); e == nil {
@@ -480,6 +484,7 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 		return err
 	}
 
+	world.cancelSuggestions()
 	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
 		_, _ = a.appDB.ExecContext(context.Background(), `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND world_id=? AND status='deleting'`, nowText(), a.userID, worldID)
 		return err

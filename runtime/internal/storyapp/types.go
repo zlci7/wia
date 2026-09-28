@@ -280,6 +280,8 @@ type runRuntime struct {
 }
 
 type worldRuntime struct {
+	suggestionID     string
+	suggestionCancel context.CancelFunc
 	mu               sync.Mutex
 	worldID          string
 	savePending      bool
