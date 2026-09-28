@@ -33,7 +33,7 @@ const draft = (overrides = {}) => ({
   updated_at: "now",
   payload: {
     schema_version: 2, game_id: "harbor", mode: "open", title: "港口", description: "", gameplay: "",
-    background: "", rules: "", author_facts: "", player: { name: "旅人", profile: "" },
+    background: "", rules: "", author_facts: "", player: { name: "旅人", profile: "", editable: true },
     opening: "", initial_location: "", clock: "第 1 日 19:00", locations: [], npcs: [], bystanders: [],
   },
   ...overrides,
@@ -154,6 +154,15 @@ const tests = {
     await c.loadPreview("author");
     assert.equal(c.preview.value.view, "author");
     assert.equal(c.preview.value.author_facts, "作者事实");
+  },
+
+  async "new content starts with an adjustable lead"(c) {
+    await c.loadCatalog();
+    assert.equal(c.form.player.editable, true, "a fresh session defaults to an adjustable lead");
+    await c.openProject("project_1");
+    assert.equal(c.form.player.editable, true, "opening a project must not lock the lead");
+    await c.openDraft("draft_1");
+    assert.equal(c.form.player.editable, true);
   },
 
   async "publishing saves first and reports the operation"(c) {

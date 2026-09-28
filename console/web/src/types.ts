@@ -192,8 +192,7 @@ export interface ContentDraftPayload {
   schema_version: number; game_id: string; mode: string; title: string; description: string; gameplay: string;
   background: string; rules: string; author_facts: string; cover?: string; cover_alt?: string;
   player: { name: string; profile: string; requirements?: string; editable?: boolean };
-  opening: string; initial_location: string; clock: string;
-  locations: { id: string; name: string; description?: string; connections: string[] }[];
+  opening: string; initial_location: string; clock: string;  locations: { id: string; name: string; description?: string; connections: string[] }[];
   npcs: ContentDraftNPC[]; bystanders: PackBystander[];
   plot?: unknown; event_generation?: unknown; defaults?: unknown;
 }

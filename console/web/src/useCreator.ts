@@ -66,14 +66,21 @@ export function useCreator() {
   function emptyPayload(): ContentDraftPayload {
     return {
       schema_version: 2, game_id: "", mode: "open", title: "", description: "", gameplay: "",
-      background: "", rules: "", author_facts: "", player: { name: "", profile: "" },
+      background: "", rules: "", author_facts: "",
+      // New content starts with a lead the player may adjust; the editor can lock it.
+      player: { name: "", profile: "", editable: true },
       opening: "", initial_location: "", clock: "", locations: [], npcs: [], bystanders: [],
     };
   }
 
   function applyPayload(payload: ContentDraftPayload) {
-    const merged = { ...emptyPayload(), ...payload };
-    merged.player = { name: payload?.player?.name ?? "", profile: payload?.player?.profile ?? "" };
+    const fallback = emptyPayload();
+    const merged = { ...fallback, ...payload };
+    merged.player = {
+      name: payload?.player?.name ?? fallback.player.name,
+      profile: payload?.player?.profile ?? fallback.player.profile,
+      editable: payload?.player?.editable ?? fallback.player.editable,
+    };
     merged.locations = Array.isArray(payload?.locations) ? payload.locations : [];
     merged.npcs = Array.isArray(payload?.npcs) ? payload.npcs : [];
     merged.bystanders = Array.isArray(payload?.bystanders) ? payload.bystanders : [];
