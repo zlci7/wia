@@ -191,7 +191,9 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 }
 
 // installPublishedRevision loads the finished package once and swaps the in-memory
-// catalog entry. A failed load keeps the database record; a later start rebuilds it.
+// catalog entry. Loading and verifying happen outside the directory lock; only the
+// entry swap is inside it. A failed load keeps the database record; a later start
+// rebuilds it.
 func (a *App) installPublishedRevision(gameID, revision, path string) {
 	pack, err := loadPack(path)
 	if err != nil {
@@ -200,7 +202,7 @@ func (a *App) installPublishedRevision(gameID, revision, path string) {
 		}
 		return
 	}
-	a.packs[gameID] = pack
+	a.setPack(gameID, pack)
 }
 
 // resumePublish finishes an operation interrupted between stages.
@@ -476,8 +478,14 @@ func (a *App) ReadContentOperation(ctx context.Context, operationID string) (Con
 }
 
 // loadPublishedRevisions restores user revisions into the in-memory catalog so a
-// restart keeps published content available without re-publishing it.
+// restart keeps published content available without re-publishing it. The project's
+// own current revision is the authority: revision identifiers order by their digest,
+// which says nothing about which publish came last, so the catalog must not guess.
 func (a *App) loadPublishedRevisions(ctx context.Context) error {
+	current, err := a.projectRevisions(ctx)
+	if err != nil {
+		return err
+	}
 	rows, err := a.appDB.QueryContext(ctx, `SELECT game_id,revision,path FROM content_revisions WHERE user_id=? AND status=?`, a.userID, publishReady)
 	if err != nil {
 		return err
@@ -496,19 +504,43 @@ func (a *App) loadPublishedRevisions(ctx context.Context) error {
 	for _, item := range list {
 		pack, err := loadPack(item.path)
 		if err != nil || pack.Definition.Revision != item.revision {
-			a.packErrors = append(a.packErrors, PackIssue{item.gameID, "已发布修订无法读取，请重新发布"})
+			a.addPackIssue(PackIssue{item.gameID, "已发布修订无法读取，请重新发布"})
 			continue
 		}
-		current, exists := a.packs[item.gameID]
-		if exists && current.Definition.Revision != "" {
-			// The newest published revision wins the catalog entry.
-			if current.Definition.Revision > item.revision {
-				continue
-			}
+		if wanted, known := current[item.gameID]; known && wanted != "" && wanted != item.revision {
+			// An older revision of the same story stays on disk and stays exportable,
+			// but the catalog serves what the project currently points at.
+			continue
 		}
-		a.packs[item.gameID] = pack
+		a.setPack(item.gameID, pack)
 	}
 	return nil
+}
+
+// projectRevisions maps each story to the revision its project currently publishes.
+func (a *App) projectRevisions(ctx context.Context) (map[string]string, error) {
+	rows, err := a.appDB.QueryContext(ctx, `SELECT game_id,current_revision FROM content_projects WHERE user_id=?`, a.userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var gameID, revision string
+		if err = rows.Scan(&gameID, &revision); err != nil {
+			return nil, err
+		}
+		if revision != "" {
+			out[gameID] = revision
+		}
+	}
+	return out, rows.Err()
+}
+
+func (a *App) addPackIssue(issue PackIssue) {
+	a.packsMu.Lock()
+	defer a.packsMu.Unlock()
+	a.packErrors = append(a.packErrors, issue)
 }
 
 func hashJSON(value any) string {

@@ -51,7 +51,7 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 	if !errors.Is(err, sql.ErrNoRows) {
 		return WorldSummary{}, err
 	}
-	pack, ok := a.packs[request.GameID]
+	pack, ok := a.pack(request.GameID)
 	if !ok {
 		return WorldSummary{}, ErrWorldNotFound
 	}
@@ -64,7 +64,7 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 // CreateWorld is a convenience for local callers; the public HTTP API requires
 // the selected game and revision. The author-owned mode cannot be overridden.
 func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (WorldSummary, error) {
-	p, ok := a.packs[GameID]
+	p, ok := a.pack(GameID)
 	if !ok {
 		return WorldSummary{}, ErrWorldNotFound
 	}

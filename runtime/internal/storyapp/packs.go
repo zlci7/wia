@@ -375,8 +375,10 @@ func loadPack(root string) (loadedPack, error) {
 }
 
 func (a *App) loadPacks(ctx context.Context, path string) error {
+	a.packsMu.Lock()
 	a.packs = map[string]loadedPack{}
 	a.packErrors = []PackIssue{}
+	a.packsMu.Unlock()
 	if path == "" {
 		path = strings.TrimSpace(os.Getenv("WIA_STORY_PACKS"))
 	}
@@ -442,33 +444,70 @@ func (a *App) loadPacks(ctx context.Context, path string) error {
 			return err
 		}
 		if digest != pack.Digest {
+			a.packsMu.Lock()
 			a.packErrors = append(a.packErrors, PackIssue{id, "revision 内容已变化，请使用新的 revision"})
+			a.packsMu.Unlock()
 			continue
 		}
-		a.packs[id] = pack
+		a.setPack(id, pack)
 	}
+	a.packsMu.Lock()
 	sort.Slice(a.packErrors, func(i, j int) bool { return a.packErrors[i].File < a.packErrors[j].File })
+	a.packsMu.Unlock()
 	return nil
 }
 
+// setPack swaps one directory entry inside a short critical section; loading and
+// validating a package always happens outside it.
+func (a *App) setPack(id string, pack loadedPack) {
+	a.packsMu.Lock()
+	defer a.packsMu.Unlock()
+	if a.packs == nil {
+		a.packs = map[string]loadedPack{}
+	}
+	a.packs[id] = pack
+}
+
+func (a *App) pack(id string) (loadedPack, bool) {
+	a.packsMu.RLock()
+	defer a.packsMu.RUnlock()
+	pack, ok := a.packs[id]
+	return pack, ok
+}
+
+func (a *App) packList() []loadedPack {
+	a.packsMu.RLock()
+	defer a.packsMu.RUnlock()
+	out := make([]loadedPack, 0, len(a.packs))
+	for _, pack := range a.packs {
+		out = append(out, pack)
+	}
+	return out
+}
+
 func (a *App) Games() []GameSummary {
-	result := make([]GameSummary, 0, len(a.packs))
-	for _, p := range a.packs {
+	packs := a.packList()
+	result := make([]GameSummary, 0, len(packs))
+	for _, p := range packs {
 		result = append(result, p.Definition.Summary)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
 }
-func (a *App) PackIssues() []PackIssue { return append([]PackIssue{}, a.packErrors...) }
+func (a *App) PackIssues() []PackIssue {
+	a.packsMu.RLock()
+	defer a.packsMu.RUnlock()
+	return append([]PackIssue{}, a.packErrors...)
+}
 func (a *App) Game(id string) (GameSummary, error) {
-	p, ok := a.packs[id]
+	p, ok := a.pack(id)
 	if !ok {
 		return GameSummary{}, ErrWorldNotFound
 	}
 	return p.Definition.Summary, nil
 }
 func (a *App) GameCover(id, revision string) ([]byte, string, error) {
-	p, ok := a.packs[id]
+	p, ok := a.pack(id)
 	if !ok || p.Definition.Revision != revision || len(p.Cover) == 0 {
 		return nil, "", ErrWorldNotFound
 	}

@@ -184,7 +184,7 @@ func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (C
 	if !packID.MatchString(gameID) || title == "" || len([]rune(title)) > 120 {
 		return ContentProject{}, ErrInvalidRequest
 	}
-	if _, official := a.packs[gameID]; official {
+	if _, official := a.pack(gameID); official {
 		return ContentProject{}, ErrContentInvalid
 	}
 	var existing int

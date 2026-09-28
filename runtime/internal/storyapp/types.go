@@ -59,6 +59,10 @@ type App struct {
 	packs      map[string]loadedPack
 	packErrors []PackIssue
 	packRoot   string
+	// packsMu guards the story directory. M3 publishes into a running process, so the
+	// map is no longer written only at startup; loading and validating a package stays
+	// outside the lock and only the directory entry swap is inside it.
+	packsMu sync.RWMutex
 	// contentDir holds this instance's published user content. Tests may point it
 	// at a temporary directory.
 	contentDir string
