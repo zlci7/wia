@@ -101,6 +101,10 @@ func openWorldDB(path string) (*worldStore, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := ensureEventDependencies(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &worldStore{path: path, db: db}, nil
 }
 
@@ -680,6 +684,11 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 		e.Seq = eventHead
 		if _, err := tx.ExecContext(ctx, `INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, e.Seq, e.EventID, e.EventType, e.ActorID, e.TargetID, e.Content, e.RunID, e.Stage, e.SceneVersion, e.SourceType, e.CreatedAt.Format(time.RFC3339Nano)); err != nil {
 			return 0, err
+		}
+		if e.ProjectionParentID != "" {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO event_dependencies(child_id,parent_id) VALUES(?,?)`, e.EventID, e.ProjectionParentID); err != nil {
+				return 0, err
+			}
 		}
 	}
 	for _, p := range perceptions {

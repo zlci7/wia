@@ -186,17 +186,18 @@ type Message struct {
 }
 
 type Event struct {
-	Seq          int64     `json:"seq"`
-	EventID      string    `json:"event_id"`
-	EventType    string    `json:"event_type"`
-	ActorID      string    `json:"actor_id,omitempty"`
-	TargetID     string    `json:"target_id,omitempty"`
-	Content      string    `json:"content"`
-	RunID        string    `json:"run_id"`
-	Stage        int       `json:"stage"`
-	SceneVersion int64     `json:"scene_version"`
-	SourceType   string    `json:"source_type"`
-	CreatedAt    time.Time `json:"created_at"`
+	ProjectionParentID string    `json:"-"`
+	Seq                int64     `json:"seq"`
+	EventID            string    `json:"event_id"`
+	EventType          string    `json:"event_type"`
+	ActorID            string    `json:"actor_id,omitempty"`
+	TargetID           string    `json:"target_id,omitempty"`
+	Content            string    `json:"content"`
+	RunID              string    `json:"run_id"`
+	Stage              int       `json:"stage"`
+	SceneVersion       int64     `json:"scene_version"`
+	SourceType         string    `json:"source_type"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type Perception struct {

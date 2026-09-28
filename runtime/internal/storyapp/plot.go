@@ -237,6 +237,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 			projection.EventID = fmt.Sprintf("%s:projection:%d", state.EventID, i)
 			projection.EventType, projection.TargetID, projection.Content = "plot_perceived", p.Recipient, p.Content
 			projection.SourceType = "plot_observed"
+			projection.ProjectionParentID = event.EventID
 			output.Events = append(output.Events, projection)
 			output.Perceptions = append(output.Perceptions, Perception{RecipientID: p.Recipient, SourceEventID: projection.EventID, SourceType: "plot_observed", Content: p.Content, Stage: 4, SceneVersion: output.SceneVersion, CreatedAt: event.CreatedAt})
 			if p.Recipient == "player" {

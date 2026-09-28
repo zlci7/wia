@@ -31,14 +31,15 @@ type CorrectionRequest struct {
 	Replacement   string `json:"replacement"`
 }
 type Correction struct {
-	SceneVersion int64  `json:"scene_version"`
-	Epoch        int64  `json:"epoch"`
-	Kind         string `json:"kind"`
-	Scope        string `json:"scope"`
-	TargetID     string `json:"target_id"`
-	Original     string `json:"original"`
-	Replacement  string `json:"replacement"`
-	CreatedAt    string `json:"created_at"`
+	Dependents   []string `json:"-"`
+	SceneVersion int64    `json:"scene_version"`
+	Epoch        int64    `json:"epoch"`
+	Kind         string   `json:"kind"`
+	Scope        string   `json:"scope"`
+	TargetID     string   `json:"target_id"`
+	Original     string   `json:"original"`
+	Replacement  string   `json:"replacement"`
+	CreatedAt    string   `json:"created_at"`
 }
 type MemoryJob struct {
 	Epoch     int64    `json:"epoch"`
@@ -62,7 +63,17 @@ func readCorrections(ctx context.Context, db *sql.DB) ([]Correction, error) {
 		}
 		result = append(result, c)
 	}
-	return result, rows.Err()
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for i := range result {
+		if err = expandCorrection(ctx, db, &result[i]); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func memoryReady(ctx context.Context, db *sql.DB) error {
@@ -153,6 +164,9 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	}
 	c := Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: cleanText(request.Replacement), CreatedAt: nowText()}
 	c.SceneVersion = snapshot.SceneVersion
+	if err = expandCorrection(ctx, store.db, &c); err != nil {
+		return c, err
+	}
 	var eventRun string
 	if c.Kind == "event" {
 		if err = store.db.QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&eventRun); err != nil {
@@ -204,7 +218,7 @@ func correctionNotices(snapshot worldSnapshot, c Correction, eventRun string) ma
 	}
 	for scope, m := range snapshot.LongMemory {
 		for _, s := range m.Archive {
-			if s.EventID != c.TargetID && !(scope == "player" && s.RunID != "" && s.RunID == eventRun) {
+			if !c.affects(s.EventID) && !(scope == "player" && s.RunID != "" && s.RunID == eventRun) {
 				continue
 			}
 			if s.Content == c.Original {
@@ -291,7 +305,7 @@ func correctedSource(s MemorySource, corrections []Correction, eventRuns map[str
 		if c.Kind != "event" {
 			continue
 		}
-		if s.EventID == c.TargetID {
+		if c.affects(s.EventID) {
 			if s.Content == c.Original {
 				s.Content = c.Replacement
 			} else {
@@ -347,6 +361,8 @@ func applySnapshotCorrections(ctx context.Context, store *worldStore, s *worldSn
 			for i := range s.Events {
 				if s.Events[i].EventID == c.TargetID {
 					s.Events[i].Content = c.Replacement
+				} else if c.affects(s.Events[i].EventID) {
+					s.Events[i].Content = correctedSource(MemorySource{EventID: s.Events[i].EventID, Content: s.Events[i].Content}, []Correction{c}, nil).Content
 				}
 			}
 			for i := range s.Dialogue {
@@ -356,7 +372,11 @@ func applySnapshotCorrections(ctx context.Context, store *worldStore, s *worldSn
 			}
 			for i := range s.SceneViews {
 				view := &s.SceneViews[i]
-				if view.Version <= c.SceneVersion && containsID(view.SourceIDs, c.TargetID) {
+				affected := false
+				for _, id := range view.SourceIDs {
+					affected = affected || c.affects(id)
+				}
+				if view.Version <= c.SceneVersion && affected {
 					view.Content = "当前位置沿用已提交经历；关联情境已纠正，应以本人有效经历重新确认细节。"
 				}
 			}

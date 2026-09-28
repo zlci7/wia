@@ -145,13 +145,8 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	d.Scope = scope
 	d.Epoch = job.Epoch
 	d.Revision = previous.Revision + 1
-	manualDigest := false
-	for _, c := range corrections {
-		if c.Epoch == job.Epoch && c.Kind == "digest" && c.Scope == scope {
-			manualDigest = true
-		}
-	}
-	if len(prefix) > 0 && !manualDigest {
+	manualDigest := pendingDigestEdit(previous, scope, job.Epoch, m.Archive, corrections, eventRuns)
+	if len(prefix) > 0 && manualDigest == nil {
 		a.modelMu.RLock()
 		generator := a.generator
 		a.modelMu.RUnlock()
@@ -162,15 +157,16 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 			d.Revision = previous.Revision + 1
 		}
 	}
-	for _, c := range corrections {
-		if c.Epoch == job.Epoch && c.Kind == "digest" && c.Scope == scope {
-			d = previous
-			d.Revision++
-			d.Epoch = job.Epoch
-			d.Content = c.Replacement
-			err = nil
-			prefix = nil
+	if manualDigest != nil {
+		d = previous
+		d.Revision++
+		d.Epoch = job.Epoch
+		d.Content = manualDigest.Replacement
+		if digestNeedsRebuild(previous, scope, m.Archive, corrections, eventRuns) {
+			d.States = []SubjectiveState{}
 		}
+		err = nil
+		prefix = nil
 	}
 	if len(m.Archive) > 0 {
 		d.Head = m.Archive[len(m.Archive)-1].Seq
@@ -226,6 +222,27 @@ func failMemoryJob(ctx context.Context, db *sql.DB, epoch int64, cause error) er
 	return err
 }
 
+// Job supersession cancels work, not accepted edits. The published digest epoch
+// is the watermark for edits already incorporated; later relevant corrections
+// invalidate a pending manual digest just as they invalidate a published one.
+func pendingDigestEdit(previous MemoryDigest, scope string, epoch int64, archive []MemorySource, corrections []Correction, eventRuns map[string]string) *Correction {
+	var edit *Correction
+	for _, c := range corrections {
+		if c.Kind == "digest" && c.Scope == scope && c.Epoch > previous.Epoch && c.Epoch <= epoch {
+			copy := c
+			edit = &copy
+		}
+	}
+	if edit != nil {
+		basis := previous
+		basis.Epoch = edit.Epoch
+		if digestNeedsRebuild(basis, scope, archive, corrections, eventRuns) {
+			return nil
+		}
+	}
+	return edit
+}
+
 // Unrelated corrections advance the world epoch without invalidating a person's
 // effective digest, including an explicit edit to that digest.
 func digestNeedsRebuild(d MemoryDigest, scope string, archive []MemorySource, corrections []Correction, eventRuns map[string]string) bool {
@@ -238,7 +255,7 @@ func digestNeedsRebuild(d MemoryDigest, scope string, archive []MemorySource, co
 		}
 		if c.Kind == "event" {
 			for _, s := range archive {
-				if s.Seq <= d.Through && (s.EventID == c.TargetID || (scope == "player" && s.RunID != "" && s.RunID == eventRuns[c.TargetID])) {
+				if s.Seq <= d.Through && (c.affects(s.EventID) || (scope == "player" && s.RunID != "" && s.RunID == eventRuns[c.TargetID])) {
 					return true
 				}
 			}
