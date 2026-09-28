@@ -98,6 +98,8 @@ func (s *Server) contentRoute(w http.ResponseWriter, r *http.Request, rest strin
 		s.createContentDraft(w, r, parts[1])
 	case len(parts) == 2 && parts[0] == "drafts":
 		s.contentDraft(w, r, parts[1])
+	case len(parts) == 3 && parts[0] == "drafts" && parts[2] == "assets":
+		s.contentDraftAssets(w, r, parts[1])
 	case len(parts) == 3 && parts[0] == "drafts" && parts[2] == "preview":
 		s.previewContentDraft(w, r, parts[1])
 	case len(parts) == 3 && parts[0] == "drafts" && parts[2] == "publish":
@@ -138,6 +140,54 @@ func (s *Server) contentOperation(w http.ResponseWriter, r *http.Request, operat
 		return
 	}
 	writeJSON(w, 200, map[string]any{"operation": operation})
+}
+
+// Image uploads and removals stay form-encoded: the name is a package-relative
+// assets/ path and the bytes decide the media type.
+func (s *Server) contentDraftAssets(w http.ResponseWriter, r *http.Request, draftID string) {
+	switch r.Method {
+	case "GET":
+		assets, err := s.app.ListContentDraftAssets(r.Context(), draftID)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"assets": assets})
+	case "POST":
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			writeError(w, 400, "invalid_request", "upload an image file with a name field")
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			writeError(w, 400, "invalid_request", "upload an image file with a name field")
+			return
+		}
+		defer file.Close()
+		body, err := storyapp.ReadUploadedAsset(file)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		name := r.FormValue("name")
+		if name == "" && header != nil {
+			name = "assets/" + header.Filename
+		}
+		asset, err := s.app.UploadContentDraftAsset(r.Context(), draftID, name, body)
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		writeJSON(w, 201, map[string]any{"asset": asset})
+	case "DELETE":
+		if err := s.app.RemoveContentDraftAsset(r.Context(), draftID, r.URL.Query().Get("asset_id")); err != nil {
+			writeAppError(w, err)
+			return
+		}
+		w.WriteHeader(204)
+	default:
+		writeError(w, 405, "method_not_allowed", "assets use GET, POST or DELETE")
+	}
 }
 
 func (s *Server) contentProjects(w http.ResponseWriter, r *http.Request) {
