@@ -82,7 +82,7 @@ export function useExperience() {
       }
     return entries;
   });
-  const view = ref<"home" | "story" | "play">("home"),
+  const view = ref<"home" | "story" | "play" | "creator">("home"),
     gameID = ref(""),
     loaded = ref(false);
   const connectionError = ref(""),
@@ -542,6 +542,14 @@ export function useExperience() {
     view.value = "home";
     moreOpen.value = false;
     if (!dialogBusy.value) showDialog("");
+  }
+  // Authoring is its own page: entering it never abandons a running turn, and it
+  // leaves the play session untouched so returning continues where it stopped.
+  function openCreator() {
+    reader.remember();
+    moreOpen.value = false;
+    if (!dialogBusy.value) showDialog("");
+    view.value = "creator";
   }
   async function openStory(item: GameSummary) {
     reader.remember();
@@ -1186,6 +1194,7 @@ export function useExperience() {
     inputKeys,
     chooseCharacter,
     chooseSuggestion,
+    openCreator,
     resizeInput,
   };
 }

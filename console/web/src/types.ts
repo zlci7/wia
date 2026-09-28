@@ -170,3 +170,44 @@ export interface SuggestionBasis {
 export interface SuggestionSet {
   id: string; basis: SuggestionBasis; enabled: boolean; status: string; items: string[];
 }
+export interface Persona {
+  persona_id: string; name: string; profile: string; version: number; created_at: string; updated_at: string;
+}
+export interface ContentProject {
+  project_id: string; game_id: string; title: string; current_revision: string; version: number;
+  created_at: string; updated_at: string;
+}
+export interface ContentDraftSummary {
+  draft_id: string; project_id: string; base_revision: string; version: number; status: string; updated_at: string;
+}
+export interface PackBystander {
+  bystander_id: string; name: string; description?: string; initial_location?: string; avatar?: string;
+}
+export interface ContentDraftNPC {
+  definition_id: string; revision: string; entity_id: string; name: string; role: string;
+  appearance?: string; profile: string; knowledge?: string; initial_concerns?: string;
+  initial_location: string; avatar?: string; speaking_examples?: string[];
+}
+export interface ContentDraftPayload {
+  schema_version: number; game_id: string; mode: string; title: string; description: string; gameplay: string;
+  background: string; rules: string; author_facts: string; cover?: string; cover_alt?: string;
+  player: { name: string; profile: string; requirements?: string; editable?: boolean };
+  opening: string; initial_location: string; clock: string;
+  locations: { id: string; name: string; description?: string; connections: string[] }[];
+  npcs: ContentDraftNPC[]; bystanders: PackBystander[];
+  plot?: unknown; event_generation?: unknown; defaults?: unknown;
+}
+export interface ContentDraft extends ContentDraftSummary { payload: ContentDraftPayload }
+export interface ContentPreviewNPC {
+  entity_id: string; definition_id: string; name: string; role: string; appearance?: string; avatar?: string; initial_location?: string;
+}
+export interface ContentPreviewAuthorNPC extends ContentPreviewNPC {
+  revision: string; profile: string; knowledge: string; initial_concerns: string; speaking_examples?: string[];
+}
+export interface ContentDraftPreview {
+  view: string; draft_id: string; version: number; title: string; mode: string; description: string;
+  gameplay: string; background: string; opening: string; clock: string; initial_location: string;
+  player: { name: string; profile: string }; characters: ContentPreviewNPC[]; bystanders: PackBystander[];
+  spoiler_warning?: string; author_rules?: string; author_facts?: string;
+  author_characters?: ContentPreviewAuthorNPC[]; author_plot?: unknown; author_event_generation?: unknown;
+}

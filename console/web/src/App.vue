@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppDialog from "./components/AppDialog.vue";
+import CreatorView from "./components/CreatorView.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
@@ -78,6 +79,7 @@ const {
   inputKeys,
   chooseCharacter,
   chooseSuggestion,
+  openCreator,
   resizeInput,
 } = useExperience();
 const policyOptions = [
@@ -142,6 +144,13 @@ const policyOptions = [
           </button>
           <button class="quiet-button desktop-setting" @click="showDialog('usage')">模型用量</button>
           <button
+            class="quiet-button desktop-setting"
+            :class="{ current: view === 'creator' }"
+            @click="openCreator"
+          >
+            创作
+          </button>
+          <button
             v-if="currentWorld && view === 'play'"
             class="quiet-button desktop-setting"
             @click="showDialog('memory')"
@@ -159,6 +168,7 @@ const policyOptions = [
             </button>
             <div v-if="moreOpen" class="menu-panel">
               <button @click="showDialog('usage')">模型用量</button>
+              <button @click="openCreator">创作</button>
               <button
                 v-if="currentWorld && view === 'play'"
                 @click="showDialog('memory')"
@@ -189,6 +199,10 @@ const policyOptions = [
       </div>
     </div>
     <div v-if="!loaded" class="loading-page">正在打开故事书…</div>
+
+    <section v-else-if="view === 'creator'" class="page-content">
+      <CreatorView />
+    </section>
 
     <section v-else-if="view === 'home'" class="page-content">
       <div class="page-heading">

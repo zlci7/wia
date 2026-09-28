@@ -25,8 +25,61 @@ export function requestSuggestions(world: string, basis: import('./types').Sugge
   });
 }
 
-export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {
-  const query = new URLSearchParams();
+export function fetchPersonas(): Promise<import('./types').Persona[]> {
+  return request<{ personas: import('./types').Persona[] }>('/api/v1/personas').then(r => r.personas ?? []);
+}
+export function createPersona(name: string, profile: string): Promise<import('./types').Persona> {
+  return request<{ persona: import('./types').Persona }>('/api/v1/personas', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, profile }),
+  }).then(r => r.persona);
+}
+export function updatePersona(personaID: string, name: string, profile: string, expectedVersion: number): Promise<import('./types').Persona> {
+  return request<{ persona: import('./types').Persona }>(`/api/v1/personas/${encodeURIComponent(personaID)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, profile, expected_version: expectedVersion }),
+  }).then(r => r.persona);
+}
+export function deletePersona(personaID: string): Promise<void> {
+  return request<void>(`/api/v1/personas/${encodeURIComponent(personaID)}`, { method: 'DELETE' });
+}
+export function savePlayerProfile(world: string, playerName: string, playerProfile: string, expectedContextEpoch: number): Promise<WorldSummary> {
+  return request<{ world: WorldSummary }>(`/api/v1/worlds/${encodeURIComponent(world)}/player-profile`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player_name: playerName, player_profile: playerProfile, expected_context_epoch: expectedContextEpoch }),
+  }).then(r => r.world);
+}
+
+export function fetchContentProjects(): Promise<import('./types').ContentProject[]> {
+  return request<{ projects: import('./types').ContentProject[] }>('/api/v1/content/projects').then(r => r.projects ?? []);
+}
+export function createContentProject(gameID: string, title: string): Promise<import('./types').ContentProject> {
+  return request<{ project: import('./types').ContentProject }>('/api/v1/content/projects', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game_id: gameID, title }),
+  }).then(r => r.project);
+}
+export function fetchContentProject(projectID: string): Promise<{ project: import('./types').ContentProject; drafts: import('./types').ContentDraftSummary[] }> {
+  return request(`/api/v1/content/projects/${encodeURIComponent(projectID)}`);
+}
+export function createContentDraft(projectID: string, baseRevision = ''): Promise<import('./types').ContentDraft> {
+  return request<{ draft: import('./types').ContentDraft }>(`/api/v1/content/projects/${encodeURIComponent(projectID)}/drafts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base_revision: baseRevision }),
+  }).then(r => r.draft);
+}
+export function fetchContentDraft(draftID: string): Promise<import('./types').ContentDraft> {
+  return request<{ draft: import('./types').ContentDraft }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}`).then(r => r.draft);
+}
+export function saveContentDraft(draftID: string, payload: import('./types').ContentDraftPayload, expectedVersion: number): Promise<import('./types').ContentDraft> {
+  return request<{ draft: import('./types').ContentDraft }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, expected_version: expectedVersion }),
+  }).then(r => r.draft);
+}
+export function deleteContentDraft(draftID: string): Promise<void> {
+  return request<void>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}`, { method: 'DELETE' });
+}
+export function fetchContentPreview(draftID: string, author = false): Promise<import('./types').ContentDraftPreview> {
+  return request<{ preview: import('./types').ContentDraftPreview }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/preview${author ? '?view=author' : ''}`).then(r => r.preview);
+}
+
+export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {  const query = new URLSearchParams();
   if (world) query.set('world_id', world);
   if (before) query.set('before_id', String(before));
   return request(`/api/v1/usage?${query}`);
