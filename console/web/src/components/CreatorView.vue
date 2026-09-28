@@ -4,12 +4,14 @@ import { useCreator } from "../useCreator";
 const {
   personas, projects, project, drafts, draft, form, preview, previewView,
   error, notice, busy, saving, conflict, draftID, statusLine,
+  assets, operation, publishing,
   loadCatalog, openProject, createProject, openDraft, startDraft, touch, flush,
-  reloadDraft, copyAsNewDraft, removeDraft, loadPreview,
+  reloadDraft, copyAsNewDraft, removeDraft, loadPreview, uploadAsset, removeAsset, publish,
   addLocation, removeLocation, addNPC, removeNPC, addBystander, removeBystander,
 } = useCreator();
 
 const newGameID = ref(""), newTitle = ref("");
+const assetName = ref("");
 onMounted(() => { void loadCatalog(); });
 
 function createProjectForm() {
@@ -19,6 +21,21 @@ function createProjectForm() {
 }
 function speaking(value: string, index: number) {
   form.npcs[index].speaking_examples = value.split("\n").map(line => line.trim()).filter(Boolean);
+  touch();
+}
+function pickAsset(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const name = assetName.value.trim() || `assets/${file.name}`;
+  void uploadAsset(name, file).then(() => { assetName.value = ""; input.value = ""; });
+}
+function useAsCover(asset: { relative_name: string }) {
+  form.cover = asset.relative_name;
+  touch();
+}
+function useAsAvatar(asset: { relative_name: string }, index: number) {
+  form.npcs[index].avatar = asset.relative_name;
   touch();
 }
 </script>
@@ -150,7 +167,12 @@ function speaking(value: string, index: number) {
                   <label>身份<input v-model="npc.role" @input="touch" /></label>
                 </div>
                 <label>公开外观<input v-model="npc.appearance" @input="touch" /></label>
-                <label>头像资源<input v-model="npc.avatar" placeholder="assets/keeper.png" @input="touch" /></label>
+                <label>头像资源
+                  <span class="row">
+                    <input v-model="npc.avatar" placeholder="assets/keeper.png" @input="touch" />
+                    <button v-if="assets.length" type="button" class="quiet-button" @click="useAsAvatar(assets[0], index)">用第一张</button>
+                  </span>
+                </label>
                 <label>人物资料<textarea v-model="npc.profile" rows="2" @input="touch"></textarea></label>
                 <label>初始知情（作者私有）<textarea v-model="npc.knowledge" rows="2" @input="touch"></textarea></label>
                 <label>初始关切<textarea v-model="npc.initial_concerns" rows="2" @input="touch"></textarea></label>
@@ -176,11 +198,34 @@ function speaking(value: string, index: number) {
               <button type="button" class="quiet-button" @click="addBystander()">添加路人</button>
             </fieldset>
 
+            <fieldset>
+              <legend>资源</legend>
+              <p class="subtle">封面与人物头像使用包内 assets/ 路径；上传后按内容校验类型与尺寸。</p>
+              <label>封面资源<input v-model="form.cover" placeholder="assets/cover.png" @input="touch" /></label>
+              <div class="row asset-upload">
+                <input v-model="assetName" placeholder="assets/cover.png（留空则用文件名）" />
+                <input type="file" accept="image/png,image/jpeg" @change="pickAsset" />
+              </div>
+              <ul v-if="assets.length" class="draft-list">
+                <li v-for="asset in assets" :key="asset.asset_id">
+                  <span class="subtle">{{ asset.relative_name }} · {{ asset.width }}×{{ asset.height }} · {{ Math.round(asset.byte_size / 1024) }}KB</span>
+                  <button type="button" class="quiet-button" @click="useAsCover(asset)">设为封面</button>
+                  <button type="button" class="quiet-button" @click="removeAsset(asset.asset_id)">移除</button>
+                </li>
+              </ul>
+              <p v-else class="subtle">还没有上传资源。</p>
+            </fieldset>
+
             <div class="editor-actions">
               <button type="submit" class="quiet-button" :disabled="saving">立即保存</button>
               <button type="button" class="quiet-button" @click="loadPreview('player')">玩家预览</button>
               <button type="button" class="quiet-button" @click="loadPreview('author')">作者预览（含剧透）</button>
+              <button type="button" class="quiet-button primary" :disabled="publishing || busy" @click="publish()">发布修订</button>
             </div>
+            <p v-if="operation" class="subtle" role="status">
+              发布操作 {{ operation.operation_id.slice(-6) }} · {{ operation.stage }} · {{ operation.status }}
+              <template v-if="operation.safe_error"> · {{ operation.safe_error }}</template>
+            </p>
           </form>
 
           <section v-if="preview" class="preview" aria-label="预览">
@@ -230,6 +275,9 @@ function speaking(value: string, index: number) {
 .npc-card { border: 1px dashed var(--border, #ddd2c4); border-radius: 8px; padding: .5rem; display: flex; flex-direction: column; gap: .35rem; }
 .npc-card .row { grid-template-columns: 1fr 1fr 1fr auto; }
 .editor-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.editor-actions .primary { border-color: var(--accent, #ae5440); color: var(--accent, #ae5440); }
+.asset-upload { grid-template-columns: 1fr 1fr; }
+.asset-upload input[type="file"] { padding: .2rem; }
 .conflict { border: 1px solid var(--accent, #ae5440); border-radius: 8px; padding: .6rem .75rem; margin-bottom: .75rem; display: flex; flex-direction: column; gap: .4rem; }
 .preview { border: 1px solid var(--border, #ddd2c4); border-radius: 8px; padding: .75rem; margin-top: 1rem; }
 .preview h3, .preview h4 { margin: .5rem 0 .25rem; }

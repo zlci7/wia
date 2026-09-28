@@ -198,6 +198,12 @@ export interface ContentDraftPayload {
   plot?: unknown; event_generation?: unknown; defaults?: unknown;
 }
 export interface ContentDraft extends ContentDraftSummary { payload: ContentDraftPayload }
+export interface ContentOperation {
+  operation_id: string; kind: string; target_id: string; stage: string; status: string; safe_error?: string;
+}
+export interface ContentDraftAsset {
+  asset_id: string; relative_name: string; media_type: string; byte_size: number; width: number; height: number;
+}
 export interface ContentPreviewNPC {
   entity_id: string; definition_id: string; name: string; role: string; appearance?: string; avatar?: string; initial_location?: string;
 }

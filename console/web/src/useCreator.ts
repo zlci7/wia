@@ -3,19 +3,25 @@ import {
   createContentDraft,
   createContentProject,
   deleteContentDraft,
+  deleteContentDraftAsset,
   fetchContentDraft,
+  fetchContentDraftAssets,
   fetchContentPreview,
   fetchContentProject,
   fetchContentProjects,
   fetchPersonas,
+  publishContentDraft,
   saveContentDraft,
+  uploadContentDraftAsset,
 } from "./api";
 import {
   ApiError,
   type ContentDraft,
+  type ContentDraftAsset,
   type ContentDraftPayload,
   type ContentDraftPreview,
   type ContentDraftSummary,
+  type ContentOperation,
   type ContentProject,
   type Persona,
 } from "./types";
@@ -40,6 +46,9 @@ export function useCreator() {
   const dirty = ref(false);
   const conflict = ref(false);
   const loaded = ref(false);
+  const assets = ref<ContentDraftAsset[]>([]);
+  const operation = ref<ContentOperation | null>(null);
+  const publishing = ref(false);
   let session = 0;
   let previewGeneration = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -143,6 +152,7 @@ export function useCreator() {
       conflict.value = false;
       applyPayload(opened.payload);
       preview.value = null;
+      await loadAssets();
     } catch (e) {
       if (ticket === session) error.value = describe(e, "暂时无法打开这份草稿。");
     } finally {
@@ -320,17 +330,105 @@ export function useCreator() {
     drafts.value = [];
     draft.value = null;
     preview.value = null;
+    assets.value = [];
+    publishing.value = false;
+    operation.value = null;
     conflict.value = false;
     dirty.value = false;
     notice.value = "";
     applyPayload(emptyPayload());
   }
 
+  async function loadAssets() {
+    const current = draft.value;
+    if (!current) return;
+    try {
+      assets.value = await fetchContentDraftAssets(current.draft_id);
+    } catch (e) {
+      error.value = describe(e, "暂时无法读取草稿资源。");
+    }
+  }
+
+  // Uploading needs a stable version: save first so the asset belongs to the version
+  // that will be published.
+  async function uploadAsset(name: string, file: File) {
+    const current = draft.value;
+    if (!current) return;
+    busy.value = true;
+    error.value = "";
+    try {
+      await flush();
+      const asset = await uploadContentDraftAsset(current.draft_id, name, file);
+      assets.value = [...assets.value.filter(a => a.relative_name !== asset.relative_name), asset];
+      notice.value = `已上传 ${asset.relative_name}`;
+    } catch (e) {
+      error.value = describe(e, "资源上传失败。");
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  async function removeAsset(assetID: string) {
+    const current = draft.value;
+    if (!current) return;
+    busy.value = true;
+    try {
+      await deleteContentDraftAsset(current.draft_id, assetID);
+      assets.value = assets.value.filter(a => a.asset_id !== assetID);
+    } catch (e) {
+      error.value = describe(e, "删除资源失败。");
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  // Publishing always saves first, then acts on the version the server confirmed, so
+  // an accepted publication cannot contain a newer unsaved edit.
+  async function publish() {
+    const current = draft.value;
+    if (!current || !project.value) return;
+    busy.value = true;
+    error.value = "";
+    notice.value = "";
+    try {
+      await flush();
+      if (conflict.value) {
+        error.value = "草稿已过期，请先处理版本冲突再发布。";
+        return;
+      }
+      const fresh = await fetchContentDraft(current.draft_id);
+      if (fresh.draft_id !== draft.value?.draft_id) return;
+      draft.value = fresh;
+      publishing.value = true;
+      const result = await publishContentDraft(fresh.draft_id, crypto.randomUUID(), fresh.version, project.value.version);
+      operation.value = result;
+      if (result.status === "succeeded") {
+        const revision = result.stage === "ready" ? "已发布不可变修订，新开局将使用它。" : "";
+        await openProject(fresh.project_id);
+        await openDraft(fresh.draft_id);
+        notice.value = revision;
+      } else {
+        error.value = result.safe_error || "发布未完成。";
+      }
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "version_conflict") {
+        conflict.value = true;
+        error.value = "草稿或剧本版本已变化，请重新载入后再发布。";
+      } else {
+        error.value = describe(e, "发布失败。");
+      }
+    } finally {
+      publishing.value = false;
+      busy.value = false;
+    }
+  }
+
   return {
     personas, projects, project, drafts, draft, form, preview, previewView,
     error, notice, busy, saving, dirty, conflict, loaded, draftID, statusLine,
+    assets, operation, publishing,
     loadCatalog, openProject, createProject, openDraft, startDraft, touch, flush,
-    reloadDraft, copyAsNewDraft, removeDraft, loadPreview,
+    reloadDraft, copyAsNewDraft, removeDraft, loadPreview, loadAssets, uploadAsset, removeAsset, publish,
     addLocation, removeLocation, addNPC, removeNPC, addBystander, removeBystander, reset,
   };
 }

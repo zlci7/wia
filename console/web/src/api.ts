@@ -78,6 +78,26 @@ export function deleteContentDraft(draftID: string): Promise<void> {
 export function fetchContentPreview(draftID: string, author = false): Promise<import('./types').ContentDraftPreview> {
   return request<{ preview: import('./types').ContentDraftPreview }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/preview${author ? '?view=author' : ''}`).then(r => r.preview);
 }
+export function publishContentDraft(draftID: string, requestKey: string, expectedDraftVersion: number, expectedProjectVersion: number): Promise<import('./types').ContentOperation> {
+  return request<{ operation: import('./types').ContentOperation }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/publish`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_key: requestKey, expected_draft_version: expectedDraftVersion, expected_project_version: expectedProjectVersion }),
+  }).then(r => r.operation);
+}
+export function fetchContentDraftAssets(draftID: string): Promise<import('./types').ContentDraftAsset[]> {
+  return request<{ assets: import('./types').ContentDraftAsset[] }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/assets`).then(r => r.assets ?? []);
+}
+export function uploadContentDraftAsset(draftID: string, name: string, file: File): Promise<import('./types').ContentDraftAsset> {
+  const form = new FormData();
+  form.append('name', name);
+  form.append('file', file);
+  return request<{ asset: import('./types').ContentDraftAsset }>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/assets`, {
+    method: 'POST', body: form,
+  }, 60000).then(r => r.asset);
+}
+export function deleteContentDraftAsset(draftID: string, assetID: string): Promise<void> {
+  return request<void>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/assets?asset_id=${encodeURIComponent(assetID)}`, { method: 'DELETE' });
+}
 
 export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {  const query = new URLSearchParams();
   if (world) query.set('world_id', world);

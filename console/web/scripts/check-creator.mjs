@@ -50,12 +50,12 @@ globalThis.fetch = async (url, init = {}) => {
   if (url === "/api/v1/personas") return response({ personas: [] });
   if (url === "/api/v1/content/projects/project_1") return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "", version: 1, created_at: "now", updated_at: "now" }, drafts: [draft()] });
   if (method === "GET" && url === "/api/v1/content/drafts/draft_1") return response({ draft: draft() });
+  if (method === "GET" && url === "/api/v1/content/drafts/draft_1/assets") return response({ assets: [] });
   if (method === "PUT" && url === "/api/v1/content/drafts/draft_1") {
     const body = JSON.parse(init.body);
     return response({ draft: draft({ version: body.expected_version + 1, payload: body.payload }) });
   }
-  if (url === "/api/v1/content/drafts/draft_1/preview" || url === "/api/v1/content/drafts/draft_1/preview?view=author") {
-    return response({ preview: { view: url.includes("author") ? "author" : "player", draft_id: "draft_1", version: 2, title: "港口", mode: "open", description: "", gameplay: "", background: "", opening: "", clock: "", initial_location: "", player: { name: "旅人", profile: "" }, characters: [], bystanders: [], author_facts: url.includes("author") ? "作者事实" : undefined } });
+  if (url === "/api/v1/content/drafts/draft_1/preview" || url === "/api/v1/content/drafts/draft_1/preview?view=author") {    return response({ preview: { view: url.includes("author") ? "author" : "player", draft_id: "draft_1", version: 2, title: "港口", mode: "open", description: "", gameplay: "", background: "", opening: "", clock: "", initial_location: "", player: { name: "旅人", profile: "" }, characters: [], bystanders: [], author_facts: url.includes("author") ? "作者事实" : undefined } });
   }
   return response({ error: { code: "not_found", message: `unexpected ${method} ${url}` } }, 404);
 };
@@ -156,7 +156,53 @@ const tests = {
     assert.equal(c.preview.value.author_facts, "作者事实");
   },
 
-  async "draft deletion clears the editing session"(c) {
+  async "publishing saves first and reports the operation"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    const savesBefore = calls.filter((line) => line.startsWith("PUT")).length;
+    let published = 0;
+    hook = (method, url, init) => {
+      if (method === "POST" && url.endsWith("/publish")) {
+        published += 1;
+        const body = JSON.parse(init.body);
+        return response({ operation: { operation_id: "publish_1", kind: "publish", target_id: "draft_1", stage: "ready", status: "succeeded", expected: body.expected_draft_version } });
+      }
+      if (method === "GET" && url === "/api/v1/content/projects/project_1") {
+        return response({ project: { project_id: "project_1", game_id: "harbor", title: "港口", current_revision: "r-1", version: 2, created_at: "now", updated_at: "now" }, drafts: [draft({ version: 3 })] });
+      }
+      if (method === "GET" && url === "/api/v1/content/drafts/draft_1") return response({ draft: draft({ version: 3 }) });
+    };
+    c.form.title = "发布前保存";
+    c.touch();
+    await c.publish();
+    hook = undefined;
+    assert.equal(published, 1, "publish runs once");
+    assert.ok(calls.filter((line) => line.startsWith("PUT")).length > savesBefore, "publish saved pending edits first");
+    assert.equal(c.operation.value.stage, "ready");
+    assert.match(c.notice.value, /已发布/);
+  },
+
+  async "a conflicting draft is not published"(c) {
+    await c.openProject("project_1");
+    await c.openDraft("draft_1");
+    hook = (method, url) => {
+      if (method === "PUT" && url.endsWith("/drafts/draft_1")) {
+        return response({ error: { code: "version_conflict", message: "version conflict" } }, 409);
+      }
+      if (method === "POST" && url.endsWith("/publish")) {
+        return response({ operation: { operation_id: "publish_2", stage: "ready", status: "succeeded" } });
+      }
+    };
+    c.form.title = "冲突中的编辑";
+    c.touch();
+    await c.publish();
+    hook = undefined;
+    assert.equal(calls.filter((line) => line.includes("/publish")).length, 0, "publish must not run with a conflicting draft");
+    assert.equal(c.conflict.value, true);
+    assert.match(c.error.value, /版本冲突|过期/);
+  },
+
+  async "deleting a draft clears the editing session"(c) {
     await c.openProject("project_1");
     await c.openDraft("draft_1");
     hook = (method, url) => {
