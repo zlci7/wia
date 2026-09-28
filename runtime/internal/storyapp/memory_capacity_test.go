@@ -9,7 +9,7 @@ import (
 
 func TestRecallBudgetPreservesRequiredAndCausalGroups(t *testing.T) {
 	archive := []MemorySource{{ID: "attempt", Seq: 1, RunID: "old", Content: "铜钥匙" + strings.Repeat("长篇旧经历", 15000)}, {ID: "result", Seq: 2, RunID: "old", Content: "尝试失败"}}
-	m := withRecall(contextMaterial{System: "NPC", Required: "本轮刺激与完整近期经历", RequiredSources: []string{"current"}}, memoryContext{Archive: archive}, "铜钥匙")
+	m := withRecall(contextMaterial{System: "NPC", Required: "本轮刺激与完整近期经历", RequiredSources: []string{"current"}}, memoryProjection{context: memoryContext{Archive: archive}}, "铜钥匙")
 	req, report, err := (ContextComposer{}).Build(m, m.System, 100)
 	if err != nil {
 		t.Fatalf("optional recall blocked current turn: %v", err)

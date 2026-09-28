@@ -217,16 +217,67 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 	}
 	material.Optional = nil
 	material.System += memoryCorrectionRule
-	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + digestContext(m.Digest) + "\n完整近期经历（均已发生，不重演）：\n" + memoryRecordsText(m.Tail) + "\n本轮职责与刺激：\n" + material.Required
+	block, backlog, supplied := projectRecentExperience(m.Tail)
+	label := fmt.Sprintf("最近的已发生经历（共%d组）", len(memoryGroups(block)))
+	if declined := len(m.Tail) - len(supplied); declined > 0 {
+		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(memoryGroups(block)), declined)
+	}
+	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + digestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memoryRecordsText(block) + "\n本轮职责与刺激：\n" + material.Required
 	material.RequiredSources = append(material.RequiredSources, retainedStateSources(m.Digest)...)
 	if m.Digest.Revision > 0 {
 		material.RequiredSources = append(material.RequiredSources, fmt.Sprintf("digest:%s:%d", scope, m.Digest.Revision))
 	}
-	for _, s := range m.Tail {
-		material.RequiredSources = append(material.RequiredSources, s.ID)
+	for _, record := range block {
+		material.RequiredSources = append(material.RequiredSources, record.ID)
 	}
-	material = withRecall(material, m, query)
+	// Groups that did not fit the recent window stay retrievable: they remain in the
+	// archive and are reported as declined rather than as already retrieved, so a
+	// later query can still bring them back.
+	for i := len(backlog) - 1; i >= 0; i-- {
+		group := backlog[i]
+		section := contextSection{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(group)}
+		for _, record := range group {
+			section.Sources = append(section.Sources, record.ID)
+			material.DeclinedSources = append(material.DeclinedSources, record.ID)
+		}
+		material.Optional = append(material.Optional, section)
+	}
+	material = withRecall(material, memoryProjection{context: m, supplied: supplied}, query)
 	return material
+}
+
+// projectRecentExperience splits the unsummarized tail into the groups supplied to
+// this request and the older backlog that stays recall-only. The digest watermark
+// is never advanced here: supplying fewer groups must not claim they were summarized.
+func projectRecentExperience(items []MemorySource) (block []MemorySource, backlog [][]MemorySource, supplied map[string]bool) {
+	supplied = map[string]bool{}
+	groups := memoryGroups(items)
+	if len(groups) == 0 {
+		return nil, nil, supplied
+	}
+	start := len(groups) - targetRecentGroups
+	if start < 0 {
+		start = 0
+	}
+	if len(groups)-start > 1 && len(memoryRecordsText(flattenGroups(groups[start:]))) > recentWindowChars {
+		for start < len(groups)-1 && len(memoryRecordsText(flattenGroups(groups[start:]))) > recentWindowChars {
+			start++
+		}
+	}
+	block = flattenGroups(groups[start:])
+	for _, record := range block {
+		supplied[record.ID] = true
+	}
+	backlog = groups[:start]
+	return block, backlog, supplied
+}
+
+func flattenGroups(groups [][]MemorySource) []MemorySource {
+	out := []MemorySource{}
+	for _, group := range groups {
+		out = append(out, group...)
+	}
+	return out
 }
 
 const memoryCorrectionRule = "\n记录类型 correction:* 是对本人资料已经生效的纠正，优先于此前关于同一内容的解释、回忆或自己的旧对白。保留曾经说过旧话这一历史，但后续判断使用纠正后的内容；纠正本身不是故事里新发生的对话，也不授予其他人物这些知识。"
@@ -240,18 +291,34 @@ func digestContext(d MemoryDigest) string {
 	}{d.Scope, d.Through, d.Content, d.States})
 }
 
-func withRecall(material contextMaterial, m memoryContext, query string) contextMaterial {
+// Recent requests carry a bounded window of committed groups. The newest group
+// stays required; older groups inside the window follow as optional material so the
+// composer can drop them whole when the complete request does not fit.
+const (
+	targetRecentGroups = 4
+	recentWindowChars  = 8000
+)
+
+type memoryProjection struct {
+	context memoryContext
+	// supplied marks the records this request already provides; anything else the
+	// receiver may lawfully recall stays eligible for retrieval.
+	supplied map[string]bool
+}
+
+func (p memoryProjection) alreadySupplied(id string) bool {
+	return p.supplied[id]
+}
+
+func withRecall(material contextMaterial, projection memoryProjection, query string) contextMaterial {
+	m := projection.context
 	hits := searchMemory(m.Archive, query, 5)
-	tail := map[string]bool{}
-	for _, s := range m.Tail {
-		tail[s.ID] = true
-	}
 	groups := memoryGroups(m.Archive)
 	var selected []contextSection
 	// Lowest-ranked matches are removed first by the shared budgeter. A hit
 	// selects its entire committed group so attempts keep their outcomes.
 	for _, s := range hits {
-		if tail[s.ID] || containsID(material.RecallSources, s.ID) {
+		if projection.alreadySupplied(s.ID) || containsID(material.RecallSources, s.ID) {
 			continue
 		}
 		for _, group := range groups {
@@ -259,7 +326,7 @@ func withRecall(material contextMaterial, m memoryContext, query string) context
 			overlap := false
 			for _, record := range group {
 				contains = contains || record.ID == s.ID
-				overlap = overlap || tail[record.ID] || containsID(material.RecallSources, record.ID)
+				overlap = overlap || projection.alreadySupplied(record.ID) || containsID(material.RecallSources, record.ID)
 			}
 			if !contains || overlap {
 				continue

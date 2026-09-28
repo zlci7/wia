@@ -21,6 +21,10 @@ type contextSection struct {
 
 type contextMaterial struct {
 	RecallSources   []string
+	// DeclinedSources are authorized records this request deliberately left out of
+	// the recent window. They stay retrievable, so they are reported but not treated
+	// as already supplied or already retrieved.
+	DeclinedSources []string
 	PolicyRevision  string
 	RequiredSources []string
 	System          string
@@ -121,7 +125,7 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 			parts = append(parts, section.Text)
 		}
 		parts = append(parts, material.Required)
-		if len(material.RecallSources) > 0 {
+		if len(material.RecallSources) > 0 || len(material.DeclinedSources) > 0 {
 			selected := map[string]bool{}
 			for _, section := range sections {
 				for _, id := range section.Sources {
@@ -134,8 +138,8 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 					report.RecallIncluded++
 				}
 			}
-			report.RecallExcluded = len(material.RecallSources) - report.RecallIncluded
-			parts = append(parts, fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources), report.RecallIncluded, report.RecallExcluded))
+			report.RecallExcluded = len(material.RecallSources) - report.RecallIncluded + len(material.DeclinedSources)
+			parts = append(parts, fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources)+len(material.DeclinedSources), report.RecallIncluded, report.RecallExcluded))
 		}
 		req.Input = strings.Join(parts, "\n")
 		if _, err := model.ValidateTextRequest(req); err == nil {
