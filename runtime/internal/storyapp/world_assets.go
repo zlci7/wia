@@ -1,6 +1,9 @@
 package storyapp
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -81,4 +84,37 @@ func (a *App) worldAsset(worldPath, name string) ([]byte, error) {
 		return nil, ErrStorageUnavailable
 	}
 	return os.ReadFile(target)
+}
+
+// WorldCharacterAsset serves one character's world copy. Only a file the world's own
+// snapshot recorded is reachable, never a client-supplied path.
+func (a *App) WorldCharacterAsset(ctx context.Context, worldID, entityID string) ([]byte, string, error) {
+	path, status, err := a.worldRecord(ctx, worldID)
+	if err != nil {
+		return nil, "", err
+	}
+	if status != "ready" {
+		return nil, "", ErrWorldNotReady
+	}
+	store, err := openWorldDB(path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer store.db.Close()
+	name, err := metaGet(ctx, store.db, "avatar:"+cleanText(entityID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, "", ErrContentNotFound
+		}
+		return nil, "", err
+	}
+	body, err := a.worldAsset(path, name)
+	if err != nil {
+		return nil, "", err
+	}
+	mime := "image/png"
+	if len(body) > 2 && body[0] == 0xFF && body[1] == 0xD8 {
+		mime = "image/jpeg"
+	}
+	return body, mime, nil
 }

@@ -80,6 +80,13 @@ const {
   chooseCharacter,
   chooseSuggestion,
   openCreator,
+  bystanders,
+  promotion,
+  promotionDraft,
+  promotionError,
+  promotionBusy,
+  openPromotion,
+  confirmPromotion,
   resizeInput,
 } = useExperience();
 const policyOptions = [
@@ -993,7 +1000,51 @@ const policyOptions = [
         </button>
         <p v-if="!characters.length" class="subtle">
           眼前暂时没有可交谈的人物。
-        </p></template
+        </p>
+        <template v-if="bystanders.length">
+          <h3>场景里的路人</h3>
+          <p class="subtle">
+            路人只在他们真正参与过的结果里有经历；提升为重要人物会让他们按自己的经历继续参与。
+          </p>
+          <div v-for="bystander in bystanders" :key="bystander.bystander_id" class="bystander-row">
+            <span
+              ><strong>{{ bystander.name }}</strong
+              ><small>{{ bystander.description }}</small></span
+            >
+            <button
+              type="button"
+              class="quiet-button"
+              :disabled="!bystander.bystander_id || promotionBusy"
+              @click="openPromotion(bystander)"
+            >
+              提升为重要人物
+            </button>
+          </div>
+        </template>
+        <div v-if="promotion" class="promotion-panel">
+          <h3>{{ promotion.name }} · 提升预览</h3>
+          <p class="subtle">
+            当前位置：{{ promotion.location }} · 已归属经历 {{ promotion.experience_count }} 条
+            <template v-if="promotion.in_scene">（此刻在场）</template>
+          </p>
+          <ul v-if="promotion.player_visible_experiences.length">
+            <li v-for="item in promotion.player_visible_experiences" :key="item.source_id">
+              {{ item.content }}
+            </li>
+          </ul>
+          <p v-else class="subtle">玩家可见的经历暂时没有；提升后只继承明确归属此人的结果。</p>
+          <label>身份<input v-model="promotionDraft.role" /></label>
+          <label>人物资料<textarea v-model="promotionDraft.profile" rows="3"></textarea></label>
+          <label>初始知情（作者补充）<textarea v-model="promotionDraft.knowledge" rows="2"></textarea></label>
+          <label>初始关切<textarea v-model="promotionDraft.initial_concerns" rows="2"></textarea></label>
+          <p v-if="promotionError" class="inline-error" role="alert">{{ promotionError }}</p>
+          <div class="promotion-actions">
+            <button type="button" class="quiet-button" :disabled="promotionBusy" @click="confirmPromotion()">
+              确认提升
+            </button>
+            <button type="button" class="quiet-button" @click="promotion = null">取消</button>
+          </div>
+        </div></template
       >
     </AppDialog>
   </main>

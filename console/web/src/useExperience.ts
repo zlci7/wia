@@ -18,10 +18,12 @@ import {
   fetchGame,
   fetchWorldGame,
   fetchModel,
+  fetchPromotion,
   fetchRuns,
   fetchStatus,
   fetchWorld,
   fetchWorlds,
+  promoteCharacter,
   retryRun,
   saveAgentSettings,
   saveAs,
@@ -34,6 +36,9 @@ import {
   type BehaviorPolicyCatalog,
   type GameSummary,
   type NarrativeSettings,
+  type PackBystander,
+  type PromotionDraft,
+  type PromotionPreview,
   type Run,
   type Status,
   type WorldSummary,
@@ -530,6 +535,7 @@ export function useExperience() {
     if (refreshing) return refreshing;
     refreshing = refreshNow().finally(() => {
       refreshing = undefined;
+      void loadBystanders();
     });
     return refreshing;
   }
@@ -537,12 +543,82 @@ export function useExperience() {
     await refreshing;
     await refresh();
   }
+  // Promotion is a world mutation like any other: it needs the current epoch and a
+  // stable request key, and the preview stays separate from the confirmation.
+  const bystanders = ref<PackBystander[]>([]);
+  const promotion = ref<PromotionPreview | null>(null);
+  const promotionDraft = reactive<PromotionDraft>({ role: "", appearance: "", profile: "", knowledge: "", initial_concerns: "" });
+  const promotionError = ref("");
+  const promotionBusy = ref(false);
+  async function loadBystanders() {
+    const id = currentWorld.value?.world_id;
+    if (!id) {
+      bystanders.value = [];
+      return;
+    }
+    try {
+      const view = await fetchWorld(id);
+      if (currentWorld.value?.world_id !== id) return;
+      bystanders.value = (view as { bystander_refs?: PackBystander[] }).bystander_refs ?? [];
+    } catch {
+      bystanders.value = [];
+    }
+  }
+  async function openPromotion(bystander: PackBystander) {
+    const id = currentWorld.value?.world_id;
+    if (!id || !bystander.bystander_id) return;
+    promotionBusy.value = true;
+    promotionError.value = "";
+    try {
+      const preview = await fetchPromotion(id, bystander.bystander_id);
+      if (currentWorld.value?.world_id !== id) return;
+      promotion.value = preview;
+      Object.assign(promotionDraft, {
+        role: preview.draft.role || "背景人物",
+        appearance: preview.draft.appearance || "",
+        profile: preview.draft.profile || "",
+        knowledge: preview.draft.knowledge || "",
+        initial_concerns: preview.draft.initial_concerns || "",
+      });
+    } catch (error) {
+      promotionError.value = describe(error);
+    } finally {
+      promotionBusy.value = false;
+    }
+  }
+  async function confirmPromotion() {
+    const id = currentWorld.value?.world_id;
+    const preview = promotion.value;
+    if (!id || !preview || !currentWorld.value) return;
+    promotionBusy.value = true;
+    promotionError.value = "";
+    try {
+      await promoteCharacter(id, {
+        request_key: `${id}:promotion:${preview.bystander_id}:${Date.now()}`,
+        expected_context_epoch: currentWorld.value.context_epoch,
+        bystander_id: preview.bystander_id,
+        source_ids: preview.player_visible_experiences.map((item) => item.source_id),
+        draft: { ...promotionDraft },
+      });
+      promotion.value = null;
+      notice.value = `${preview.name} 已成为重要人物。`;
+      await refresh();
+      await loadBystanders();
+      await freshRefresh();
+    } catch (error) {
+      promotionError.value = describe(error);
+    } finally {
+      promotionBusy.value = false;
+    }
+  }
+
   function returnHome() {
     reader.remember();
     view.value = "home";
     moreOpen.value = false;
     if (!dialogBusy.value) showDialog("");
   }
+
   // Authoring is its own page: entering it never abandons a running turn, and it
   // leaves the play session untouched so returning continues where it stopped.
   function openCreator() {
@@ -1195,6 +1271,14 @@ export function useExperience() {
     chooseCharacter,
     chooseSuggestion,
     openCreator,
+    bystanders,
+    promotion,
+    promotionDraft,
+    promotionError,
+    promotionBusy,
+    openPromotion,
+    confirmPromotion,
+    loadBystanders,
     resizeInput,
   };
 }

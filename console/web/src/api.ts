@@ -99,6 +99,31 @@ export function deleteContentDraftAsset(draftID: string, assetID: string): Promi
   return request<void>(`/api/v1/content/drafts/${encodeURIComponent(draftID)}/assets?asset_id=${encodeURIComponent(assetID)}`, { method: 'DELETE' });
 }
 
+export function fetchPromotion(world: string, bystanderID: string, author = false): Promise<import('./types').PromotionPreview> {
+  const query = new URLSearchParams({ bystander_id: bystanderID });
+  if (author) query.set('view', 'author');
+  return request<{ promotion: import('./types').PromotionPreview }>(`/api/v1/worlds/${encodeURIComponent(world)}/character-promotions?${query}`).then(r => r.promotion);
+}
+export function promoteCharacter(world: string, payload: import('./types').PromotionRequest): Promise<import('./types').Character> {
+  return request<{ character: import('./types').Character }>(`/api/v1/worlds/${encodeURIComponent(world)}/character-promotions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }).then(r => r.character);
+}
+export function importContentPreview(projectID: string, file: File): Promise<import('./types').ImportPreview> {
+  const form = new FormData();
+  form.append('project_id', projectID);
+  form.append('file', file);
+  return request<{ import: import('./types').ImportPreview }>('/api/v1/content/imports/preview', { method: 'POST', body: form }, 60000).then(r => r.import);
+}
+export function confirmContentImport(draftID: string, expectedVersion: number): Promise<import('./types').ContentDraft> {
+  return request<{ draft: import('./types').ContentDraft }>('/api/v1/content/imports/confirm', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft_id: draftID, expected_version: expectedVersion }),
+  }).then(r => r.draft);
+}
+export function contentExportURL(gameID: string, revision: string): string {
+  return `/api/v1/content/revisions/${encodeURIComponent(gameID)}/${encodeURIComponent(revision)}/export`;
+}
+
 export function fetchUsage(world = '', before = 0): Promise<import('./types').UsagePage> {  const query = new URLSearchParams();
   if (world) query.set('world_id', world);
   if (before) query.set('before_id', String(before));

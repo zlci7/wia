@@ -244,6 +244,14 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		s.playerProfile(w, r, worldID)
 		return
 	}
+	if len(parts) == 5 && parts[4] == "character-promotions" {
+		s.characterPromotions(w, r, worldID)
+		return
+	}
+	if len(parts) == 6 && parts[4] == "entities" && parts[5] != "" {
+		s.worldAssetRoute(w, r, worldID, parts[5])
+		return
+	}
 	if len(parts) == 5 && parts[4] == "cover" {
 		if r.Method != "GET" {
 			writeError(w, 405, "method_not_allowed", "use GET")
@@ -342,7 +350,7 @@ func (s *Server) world(w http.ResponseWriter, r *http.Request, id string) {
 			writeAppError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": storyapp.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": storyapp.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders})
+		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": storyapp.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": storyapp.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders, "bystander_refs": snapshot.Definition.BystanderRefs})
 	case "DELETE":
 		raw := strings.TrimSpace(r.URL.Query().Get("expected_active_revision"))
 		expectedRevision, err := strconv.ParseInt(raw, 10, 64)

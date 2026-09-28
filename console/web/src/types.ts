@@ -216,3 +216,29 @@ export interface ContentDraftPreview {
   spoiler_warning?: string; author_rules?: string; author_facts?: string;
   author_characters?: ContentPreviewAuthorNPC[]; author_plot?: unknown; author_event_generation?: unknown;
 }
+export interface ImportMapping {
+  field: string; source: string; target: string; confidence: string; note?: string;
+}
+export interface ImportReport {
+  format: string; format_detail: string; summary: string; mappings: ImportMapping[];
+  unsupported: string[]; needs_confirmation: string[]; source_bytes: number;
+}
+export interface ImportPreview {
+  draft_id: string; version: number; project_id: string; report: ImportReport;
+}
+export interface PromotionSource {
+  source_id: string; kind: string; content: string; player_visible: boolean;
+}
+export interface PromotionDraft {
+  role: string; appearance: string; profile: string; knowledge: string;
+  initial_concerns: string; speaking_examples?: string[];
+}
+export interface PromotionPreview {
+  bystander_id: string; name: string; description?: string; avatar?: string;
+  location: string; in_scene: boolean; experience_count: number;
+  player_visible_experiences: PromotionSource[]; draft: PromotionDraft;
+}
+export interface PromotionRequest {
+  request_key: string; expected_context_epoch: number; bystander_id: string;
+  source_ids: string[]; draft: PromotionDraft;
+}
