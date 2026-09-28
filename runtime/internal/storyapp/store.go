@@ -66,7 +66,49 @@ func openAppDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	// Columns added after a release are applied to existing databases here, so an
+	// author's workspace keeps working without a migration step.
+	for _, column := range []struct{ table, name, definition string }{
+		{"content_drafts", "confirmation_key", "TEXT NOT NULL DEFAULT ''"},
+		{"content_operations", "plan_json", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := ensureColumn(db, column.table, column.name, column.definition); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	return db, nil
+}
+
+// ensureColumn adds a column when an older database does not have it yet.
+func ensureColumn(db *sql.DB, table, column, definition string) error {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	exists := false
+	for rows.Next() {
+		var cid int
+		var name, kind string
+		var notNull, primaryKey int
+		var fallback any
+		if err = rows.Scan(&cid, &name, &kind, &notNull, &fallback, &primaryKey); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == column {
+			exists = true
+		}
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	_, err = db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)
+	return err
 }
 
 func openWorldDB(path string) (*worldStore, error) {

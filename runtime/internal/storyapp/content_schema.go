@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS content_drafts (
   base_revision TEXT NOT NULL DEFAULT '',
   version INTEGER NOT NULL, status TEXT NOT NULL,
   payload_json TEXT NOT NULL, source_json TEXT NOT NULL DEFAULT '',
+  confirmation_key TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (user_id, draft_id)
 );

@@ -1,8 +1,10 @@
 package storyapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -149,6 +151,21 @@ func TestContentRoutes(t *testing.T) {
 	}
 	if got := callAPI(t, s, "GET", "/api/v1/content/imports/preview", "").Code; got != 405 {
 		t.Fatalf("import method: %d", got)
+	}
+	// An upload past the import ceiling is refused at the boundary, before the service
+	// ever parses it into a draft.
+	var oversized bytes.Buffer
+	writer := multipart.NewWriter(&oversized)
+	_ = writer.WriteField("project_id", "project_missing")
+	part, _ := writer.CreateFormFile("file", "big.zip")
+	_, _ = part.Write(bytes.Repeat([]byte("x"), int(storyapp.ImportUploadLimit())+4096))
+	_ = writer.Close()
+	request := httptest.NewRequest("POST", "/api/v1/content/imports/preview", &oversized)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	s.handleAPI(recorder, request)
+	if recorder.Code != 400 {
+		t.Fatalf("oversized import upload: %d", recorder.Code)
 	}
 	if got := callAPI(t, s, "POST", "/api/v1/content/imports/confirm", `{"draft_id":"draft_missing"}`).Code; got != 404 {
 		t.Fatalf("unknown preview confirmation: %d", got)

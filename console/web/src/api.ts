@@ -115,9 +115,9 @@ export function importContentPreview(projectID: string, file: File): Promise<imp
   form.append('file', file);
   return request<{ import: import('./types').ImportPreview }>('/api/v1/content/imports/preview', { method: 'POST', body: form }, 60000).then(r => r.import);
 }
-export function confirmContentImport(draftID: string, expectedVersion: number): Promise<import('./types').ContentDraft> {
+export function confirmContentImport(draftID: string, requestKey: string, expectedVersion: number): Promise<import('./types').ContentDraft> {
   return request<{ draft: import('./types').ContentDraft }>('/api/v1/content/imports/confirm', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft_id: draftID, expected_version: expectedVersion }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft_id: draftID, request_key: requestKey, expected_version: expectedVersion }),
   }).then(r => r.draft);
 }
 export function contentExportURL(gameID: string, revision: string): string {

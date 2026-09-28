@@ -158,14 +158,21 @@ func (a *App) ReadContentDraftAsset(ctx context.Context, draftID, relativeName s
 	return os.ReadFile(staged)
 }
 
-// ReadUploadedAsset enforces the upload limit before the service sees the bytes.
+// ReadUploadedAsset enforces the image limit before the service sees the bytes.
 func ReadUploadedAsset(reader io.Reader) ([]byte, error) {
-	body, err := io.ReadAll(io.LimitReader(reader, assetImageLimit+1))
+	return ReadUploadedFile(reader, assetImageLimit)
+}
+
+// ReadUploadedFile reads one upload up to an explicit limit. Each import format has
+// its own ceiling, so the entry point must say which one applies instead of assuming
+// the image limit.
+func ReadUploadedFile(reader io.Reader, limit int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(reader, limit+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(body) > assetImageLimit {
-		return nil, fmt.Errorf("%w: asset size", ErrContentInvalid)
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%w: upload exceeds the size limit", ErrContentInvalid)
 	}
 	return body, nil
 }

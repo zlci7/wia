@@ -101,12 +101,27 @@ func (a *App) PreviewContentImport(ctx context.Context, projectID, fileName stri
 	return ImportPreview{DraftID: draft.DraftID, Version: 1, Project: project.ProjectID, Report: report}, nil
 }
 
-// ConfirmContentImport turns a preview into an editable draft. The confirmation is
-// versioned so a stale preview cannot silently adopt newer content.
-func (a *App) ConfirmContentImport(ctx context.Context, draftID string, expectedVersion int64) (ContentDraft, error) {
+// ConfirmContentImport turns a preview into an editable draft. Confirmation is a
+// versioned, idempotent transition: the same confirmation returns the same result
+// instead of failing, a stale one conflicts, and anything already past the preview
+// state is refused.
+func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey string, expectedVersion int64) (ContentDraft, error) {
 	draft, err := a.ReadContentDraft(ctx, draftID)
 	if err != nil {
 		return ContentDraft{}, err
+	}
+	if draft.Status == draftStatusEditing {
+		// Already confirmed. The same confirmation is satisfied; a different request key
+		// is not a second confirmation of a different preview.
+		if confirmation, found, err := a.readDraftConfirmation(ctx, draft.DraftID); err != nil {
+			return ContentDraft{}, err
+		} else if found {
+			if requestKey != "" && confirmation != requestKey {
+				return ContentDraft{}, ErrIdempotencyConflict
+			}
+			return draft, nil
+		}
+		return draft, nil
 	}
 	if draft.Status != draftStatusPreview {
 		return ContentDraft{}, fmt.Errorf("%w: this draft is not an import preview", ErrContentInvalid)
@@ -114,13 +129,64 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID string, expected
 	if expectedVersion > 0 && draft.Version != expectedVersion {
 		return ContentDraft{}, ErrVersionConflict
 	}
-	if _, err = a.appDB.ExecContext(ctx, `UPDATE content_drafts SET status=?,version=version+1,updated_at=? WHERE user_id=? AND draft_id=? AND status=?`,
-		draftStatusEditing, nowText(), a.userID, draft.DraftID, draftStatusPreview); err != nil {
+	if requestKey != "" {
+		if prior, found, err := a.readDraftConfirmation(ctx, draft.DraftID); err != nil {
+			return ContentDraft{}, err
+		} else if found && prior != requestKey {
+			return ContentDraft{}, ErrIdempotencyConflict
+		}
+	}
+	result, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET status=?,version=version+1,updated_at=? WHERE user_id=? AND draft_id=? AND status=? AND version=?`,
+		draftStatusEditing, nowText(), a.userID, draft.DraftID, draftStatusPreview, draft.Version)
+	if err != nil {
 		return ContentDraft{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return ContentDraft{}, err
+	}
+	if affected == 0 {
+		// Someone else moved the draft between the read and the write.
+		return ContentDraft{}, ErrVersionConflict
+	}
+	if requestKey != "" {
+		if err = a.writeDraftConfirmation(ctx, draft.DraftID, requestKey); err != nil {
+			return ContentDraft{}, err
+		}
 	}
 	return a.ReadContentDraft(ctx, draft.DraftID)
 }
 
+// A draft records which confirmation request produced it, so a repeat is answered
+// instead of applied twice.
+func (a *App) readDraftConfirmation(ctx context.Context, draftID string) (string, bool, error) {
+	var key string
+	err := a.appDB.QueryRowContext(ctx, `SELECT confirmation_key FROM content_drafts WHERE user_id=? AND draft_id=?`, a.userID, draftID).Scan(&key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return key, key != "", nil
+}
+
+func (a *App) writeDraftConfirmation(ctx context.Context, draftID, requestKey string) error {
+	_, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET confirmation_key=? WHERE user_id=? AND draft_id=?`, requestKey, a.userID, draftID)
+	return err
+}
+
+// ImportUploadLimit is the largest upload the import entry point accepts. Each format
+// still applies its own smaller limit inside the service.
+func ImportUploadLimit() int64 {
+	if importZIPLimit > importTextLimit {
+		return importZIPLimit
+	}
+	return importTextLimit
+}
+
+// ImportContent validates the declared file name and bytes, keeping the size decision
+// in one place per format.
 func (a *App) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	switch {
 	case isZIP(body):

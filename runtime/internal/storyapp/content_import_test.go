@@ -53,18 +53,27 @@ func TestImportPlainTextPreviewAndConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("preview draft must accept edits: %v", err)
 	}
-	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, draft.Version); !errors.Is(err, ErrVersionConflict) {
+	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", draft.Version); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("stale confirmation accepted: %v", err)
 	}
-	confirmed, err := a.ConfirmContentImport(ctx, draft.DraftID, saved.Version)
+	confirmed, err := a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", saved.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if confirmed.Status != draftStatusEditing {
 		t.Fatalf("confirmation status: %+v", confirmed)
 	}
-	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, confirmed.Version); !errors.Is(err, ErrContentInvalid) {
-		t.Fatalf("double confirmation accepted: %v", err)
+	// Repeating the same confirmation is satisfied rather than applied twice, and a
+	// different request key against an already confirmed draft conflicts.
+	repeated, err := a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", confirmed.Version)
+	if err != nil {
+		t.Fatalf("a repeated confirmation must be satisfied: %v", err)
+	}
+	if repeated.Version != confirmed.Version || repeated.Status != draftStatusEditing {
+		t.Fatalf("a repeated confirmation changed the draft: %+v", repeated)
+	}
+	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-other", confirmed.Version); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("a second confirmation key was accepted: %v", err)
 	}
 	// The original bytes stay as a non-executed attachment on disk.
 	source, err := os.ReadFile(a.importSourcePath(draft.DraftID, "harbor.md"))
@@ -199,7 +208,7 @@ func TestImportWIAPackageAndExportRoundTrip(t *testing.T) {
 	if imported.Payload.Background != "港口在夜里退潮。" || len(imported.Payload.Bystanders) != 1 {
 		t.Fatalf("round trip lost background or bystanders: %+v", imported.Payload)
 	}
-	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, preview.Version)
+	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, "confirm-1", preview.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +254,7 @@ func TestImportedCardDraftCanBePublished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, preview.Version)
+	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, "confirm-1", preview.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +342,7 @@ func TestImportPackageRoundTripKeepsFieldsAndAssets(t *testing.T) {
 		t.Fatalf("imported asset bytes: %d %v", len(staged), err)
 	}
 	// Confirming and publishing the imported draft works without the source revision.
-	if _, err = a.ConfirmContentImport(ctx, preview.DraftID, preview.Version); err != nil {
+	if _, err = a.ConfirmContentImport(ctx, preview.DraftID, "confirm-1", preview.Version); err != nil {
 		t.Fatal(err)
 	}
 	reloaded, err := a.ReadContentDraft(ctx, preview.DraftID)

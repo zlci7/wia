@@ -126,6 +126,9 @@ func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action st
 	}
 	switch action {
 	case "preview":
+		// The request is bounded before the multipart parser can buffer it, and the
+		// import's own ceiling is applied to the file rather than the image limit.
+		r.Body = http.MaxBytesReader(w, r.Body, storyapp.ImportUploadLimit())
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			writeError(w, 400, "invalid_request", "upload a file with an optional project_id field")
 			return
@@ -136,7 +139,7 @@ func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action st
 			return
 		}
 		defer file.Close()
-		body, err := storyapp.ReadUploadedAsset(file)
+		body, err := storyapp.ReadUploadedFile(file, storyapp.ImportUploadLimit())
 		if err != nil {
 			writeAppError(w, err)
 			return
@@ -154,12 +157,13 @@ func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action st
 	case "confirm":
 		var request struct {
 			DraftID         string `json:"draft_id"`
+			RequestKey      string `json:"request_key"`
 			ExpectedVersion int64  `json:"expected_version"`
 		}
 		if !decodeJSON(w, r, &request) {
 			return
 		}
-		draft, err := s.app.ConfirmContentImport(r.Context(), request.DraftID, request.ExpectedVersion)
+		draft, err := s.app.ConfirmContentImport(r.Context(), request.DraftID, request.RequestKey, request.ExpectedVersion)
 		if err != nil {
 			writeAppError(w, err)
 			return
