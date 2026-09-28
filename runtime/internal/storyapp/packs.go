@@ -39,27 +39,28 @@ type PackLocation struct {
 }
 
 type StoryPack struct {
-	SchemaVersion   int                `json:"schema_version"`
-	GameID          string             `json:"game_id"`
-	Revision        string             `json:"revision"`
-	Mode            string             `json:"mode"`
-	Title           string             `json:"title"`
-	Description     string             `json:"description"`
-	Gameplay        string             `json:"gameplay"`
-	Background      string             `json:"background"`
-	Rules           string             `json:"rules"`
-	AuthorFacts     string             `json:"author_facts"`
-	Cover           string             `json:"cover,omitempty"`
-	CoverAlt        string             `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults     `json:"player"`
-	Opening         string             `json:"opening"`
-	InitialLocation string             `json:"initial_location"`
-	Clock           string             `json:"clock"`
-	Locations       []PackLocation     `json:"locations"`
-	NPCs            []string           `json:"npcs"`
-	Bystanders      []string           `json:"bystanders"`
-	Plot            *PlotDefinition    `json:"plot,omitempty"`
-	Defaults        *NarrativeSettings `json:"defaults,omitempty"`
+	SchemaVersion   int                    `json:"schema_version"`
+	GameID          string                 `json:"game_id"`
+	Revision        string                 `json:"revision"`
+	Mode            string                 `json:"mode"`
+	Title           string                 `json:"title"`
+	Description     string                 `json:"description"`
+	Gameplay        string                 `json:"gameplay"`
+	Background      string                 `json:"background"`
+	Rules           string                 `json:"rules"`
+	AuthorFacts     string                 `json:"author_facts"`
+	Cover           string                 `json:"cover,omitempty"`
+	CoverAlt        string                 `json:"cover_alt,omitempty"`
+	Player          PlayerDefaults         `json:"player"`
+	Opening         string                 `json:"opening"`
+	InitialLocation string                 `json:"initial_location"`
+	Clock           string                 `json:"clock"`
+	Locations       []PackLocation         `json:"locations"`
+	NPCs            []string               `json:"npcs"`
+	Bystanders      []string               `json:"bystanders"`
+	Plot            *PlotDefinition        `json:"plot,omitempty"`
+	EventGeneration *EventGenerationPolicy `json:"event_generation,omitempty"`
+	Defaults        *NarrativeSettings     `json:"defaults,omitempty"`
 }
 
 type PackNPC struct {
@@ -313,6 +314,10 @@ func loadPack(root string) (loadedPack, error) {
 		result.CoverType = "image/" + format
 		def.Summary.CoverURL = "/api/v1/games/" + p.GameID + "/cover?revision=" + p.Revision
 	}
+	if err := validateEventPolicy(p.EventGeneration, def); err != nil {
+		return result, err
+	}
+	def.EventGeneration = p.EventGeneration
 	result.Definition = def
 	// Include the complete effective package, including per-NPC revision and image bytes.
 	canonical, _ := json.Marshal(struct {

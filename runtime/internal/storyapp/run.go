@@ -29,7 +29,27 @@ type turnIntent struct {
 	Visibility  string `json:"visibility"`
 }
 
+func (intent *turnIntent) validateGeneratedFields() error {
+	intent.IntentType = strings.ToLower(cleanText(intent.IntentType))
+	intent.Visibility = strings.ToLower(cleanText(intent.Visibility))
+	intent.AddresseeID = cleanText(intent.AddresseeID)
+	field, expected := "", ""
+	switch {
+	case intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act":
+		field, expected = "intent_type", "speak|observe|act"
+	case intent.Visibility != "public" && intent.Visibility != "private":
+		field, expected = "visibility", "public|private"
+	case intent.WaitMinutes < 0 || intent.WaitMinutes > 120:
+		field, expected = "wait_minutes", "integer:0..120"
+	}
+	if field != "" {
+		return &generationJSONError{Code: "json_field_value", Field: field, Expected: expected, Cause: ErrGenerationFailed}
+	}
+	return nil
+}
+
 type hostResult struct {
+	EventOpportunity *eventOpportunity  `json:"event_opportunity,omitempty"`
 	InterruptSources []string           `json:"interrupt_source_ids,omitempty"`
 	TimeMinutes      int                `json:"time_minutes"`
 	Scene            string             `json:"scene"`
@@ -80,9 +100,9 @@ const (
 
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion       = "story.intent.v6"
+	intentPromptVersion       = "story.intent.v7"
 	npcPromptVersion          = "story.npc.v13"
-	coordinationPromptVersion = "story.coordination.v14"
+	coordinationPromptVersion = "story.coordination.v15"
 	narrationPromptVersion    = "story.narration.v11"
 )
 
@@ -161,6 +181,7 @@ func classifyTurnFailure(err error) (status, reason, message string) {
 }
 
 type turnOutput struct {
+	GeneratedEvents *generatedEventState
 	Narrative       string
 	Clock           string
 	Scene           string
@@ -368,7 +389,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
 		return
 	}
 	commitStarted := time.Now()
-	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress); err != nil {
+	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PlotProgress, output.GeneratedEvents); err != nil {
 		err = atTurnStage(turnStageCommit, err)
 		status, reason, message := classifyTurnFailure(err)
 		if status == "failed" {
@@ -537,35 +558,23 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 	var intent turnIntent
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, "intent_type", "addressee_id", "visibility")
+	checkRecipient := func() error {
+		if explicitRecipient != "" {
+			intent.AddresseeID = explicitRecipient
+		}
+		if intent.AddresseeID != "" {
+			if _, ok := findSceneCharacter(participants, intent.AddresseeID); !ok {
+				return &generationJSONError{Code: "json_field_value", Field: "addressee_id", Expected: "listed-in-scene-important-character-or-empty", Cause: ErrGenerationFailed}
+			}
+		}
+		if intent.Visibility == "private" && intent.AddresseeID == "" {
+			return &generationJSONError{Code: "json_field_value", Field: "visibility", Expected: "public-when-addressee-is-empty", Cause: ErrGenerationFailed}
+		}
+		return nil
+	}
+	repairCount, err := generateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
 	if err != nil {
 		return turnIntent{}, repairCount, err
-	}
-	intent.IntentType = strings.ToLower(cleanText(intent.IntentType))
-	if intent.WaitMinutes < 0 || intent.WaitMinutes > 120 {
-		return turnIntent{}, repairCount, ErrGenerationFailed
-	}
-	intent.Visibility = strings.ToLower(cleanText(intent.Visibility))
-	intent.AddresseeID = cleanText(intent.AddresseeID)
-	if explicitRecipient != "" {
-		intent.AddresseeID = explicitRecipient
-	}
-	if intent.IntentType == "" {
-		return turnIntent{}, repairCount, fmt.Errorf("%w: intent_type is empty", ErrGenerationFailed)
-	}
-	if intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act" {
-		return turnIntent{}, repairCount, fmt.Errorf("%w: invalid intent_type %q", ErrGenerationFailed, intent.IntentType)
-	}
-	if intent.AddresseeID != "" {
-		if _, ok := findSceneCharacter(participants, intent.AddresseeID); !ok {
-			return turnIntent{}, repairCount, ErrInvalidRequest
-		}
-	}
-	if intent.Visibility != "public" && intent.Visibility != "private" {
-		return turnIntent{}, repairCount, fmt.Errorf("%w: invalid visibility %q", ErrGenerationFailed, intent.Visibility)
-	}
-	if intent.Visibility == "private" && intent.AddresseeID == "" {
-		return turnIntent{}, repairCount, fmt.Errorf("%w: private intent has no addressee", ErrGenerationFailed)
 	}
 	return intent, repairCount, nil
 }
@@ -654,7 +663,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 
 	publicReplies := strings.Join(publicReplyLog, "\n")
-	if intent.IntentType != "speak" {
+	if intent.IntentType != "speak" || recipient == "" {
 		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: snapshot.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
 	}
 	coordinationStarted := time.Now()
@@ -668,7 +677,15 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || sceneFor(snapshot, "player") != snapshot.Summary.Scene {
 		output.SceneVersion = snapshot.SceneVersion + 1
 	}
-	visibleOutcomes, err := appendHostOutcomes(&output, run, participants, host.Outcomes)
+	// Stage 3 outcomes may be witnessed on arrival. Earlier expressions retain
+	// their original recipients and are never replayed to the final roster.
+	resultParticipants := []Character{}
+	for _, character := range snapshot.Characters {
+		if character.InScene || containsID(host.SceneCharacters, character.EntityID) {
+			resultParticipants = append(resultParticipants, character)
+		}
+	}
+	visibleOutcomes, err := appendHostOutcomes(&output, run, resultParticipants, host.Outcomes)
 	if err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story coordination validation failed: run_id=%q boundary=action_outcomes", run.RunID)
@@ -687,7 +704,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	snapshot.SceneVersion = output.SceneVersion
 	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
-	if snapshot.Plot != nil {
+	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		elapsed := Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
 		visibleEvents = append(visibleEvents, elapsed)
@@ -697,6 +714,11 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		return turnOutput{}, atTurnStage(turnStageCoordination, err)
 	}
 	visibleEvents = append(visibleEvents, plotEvents...)
+	generatedVisible, err := a.advanceGeneratedEvents(ctx, generator, snapshot, run, host.EventOpportunity, &output)
+	if err != nil {
+		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+	}
+	visibleEvents = append(visibleEvents, generatedVisible...)
 	snapshot.SceneViews, snapshot.SceneVersion = output.SceneViews, output.SceneVersion
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
@@ -1108,7 +1130,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 		return narrativeResult{}, 0, err
 	}
 	stage := 3
-	if snapshot.Plot != nil {
+	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		stage = 7
 	}
 	generator = a.contextGenerator(generator, material, snapshot, run, "narration", "player", stage, narrationPromptVersion)
@@ -1316,6 +1338,10 @@ func generateJSONMetrics(ctx context.Context, generator model.TextGenerator, sys
 }
 
 func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields []string, requiredFields ...string) (int, error) {
+	return generateJSONCheckedMetrics(ctx, generator, system, input, target, maxOutput, nullableFields, requiredFields, nil)
+}
+
+func generateJSONCheckedMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields, requiredFields []string, check func() error) (int, error) {
 	if t := reflect.TypeOf(target); t != nil && t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
 		system += "\n机器可读字段合同（对象只使用以下字段；string表示字符串，[]表示数组，boolean表示布尔值，integer表示整数）：" + generatedFieldContract(t)
 	}
@@ -1337,6 +1363,9 @@ func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.
 			return attempt, err
 		}
 		lastValidation = decodeGeneratedJSON(response.Text, target, nullableFields, requiredFields)
+		if lastValidation == nil && check != nil {
+			lastValidation = check()
+		}
 		if recorder, ok := generator.(interface{ recordJSONValidation(error) }); ok {
 			recorder.recordJSONValidation(lastValidation)
 		}
@@ -1409,6 +1438,9 @@ func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return generatedDecodeError(err, target)
+	}
+	if validator, ok := target.(interface{ validateGeneratedFields() error }); ok {
+		return validator.validateGeneratedFields()
 	}
 	return nil
 }

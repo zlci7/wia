@@ -21,6 +21,24 @@ type plotTestGenerator struct {
 	intervene     bool
 }
 
+func TestPlotReferencesRetainedViewsOutsideEventWindow(t *testing.T) {
+	s := worldSnapshot{Plot: lanternPlotDefinition(), Sources: map[string]sourceMetadata{"old-result": {ID: "old-result", Kind: "player_action_result"}, "old-plot": {ID: "old-plot", Kind: "plot_result"}}, PlotProgress: PlotProgress{Nodes: map[string]PlotNodeState{"dock_warning": {Status: "occurred", EventID: "old-plot", Content: "铃已响"}}}}
+	out := turnOutput{SceneViews: []SceneView{{Recipient: "player", Content: "信使已安全上船", SourceIDs: []string{"old-result"}, Version: 1}}}
+	r := plotResolution{Status: "occurred", Content: "机会结束", SourceIDs: []string{"old-result", "old-plot"}, Projections: []plotProjection{}, DecisionRequests: []string{}}
+	if err := validatePlotResolution(s, s.Plot.Nodes[2], out, r); err != nil {
+		t.Fatal("retained sourced material rejected", err)
+	}
+	r.SourceIDs = []string{"unprovided-other-world"}
+	if !errors.Is(validatePlotResolution(s, s.Plot.Nodes[2], out, r), ErrContextSourceMissing) {
+		t.Fatal("unknown reference accepted")
+	}
+	delete(s.Sources, "old-result")
+	r.SourceIDs = []string{"old-result"}
+	if !errors.Is(validatePlotResolution(s, s.Plot.Nodes[2], out, r), ErrContextSourceMissing) {
+		t.Fatal("view ID grants nonexistent source")
+	}
+}
+
 func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
 	g.mu.Lock()
 	g.requests = append(g.requests, req)
@@ -69,7 +87,8 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		if err := json.Unmarshal([]byte(raw), &node); err != nil {
 			return model.TextResponse{}, err
 		}
-		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:" + lanternPlotDefinition().Revision + ":" + node.ID}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
+		definitionRef := strings.SplitN(strings.SplitN(req.Input, "或 definition:", 2)[1], "；", 2)[0]
+		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:" + definitionRef}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
 		result.Projections[0].Scene = "你仍在客栈，刚听见码头铃声。"
 		if g.intervene && node.ID == "courier_window" {
 			var events []Event

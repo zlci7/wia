@@ -358,6 +358,13 @@ func applySnapshotCorrections(ctx context.Context, store *worldStore, s *worldSn
 			}
 		}
 		if c.Kind == "event" {
+			active := make([]generatedEvent, 0, len(s.GeneratedEvents.Active))
+			for _, e := range s.GeneratedEvents.Active {
+				if !c.affects(e.StartID) && !c.affects(e.TriggerID) {
+					active = append(active, e)
+				}
+			}
+			s.GeneratedEvents.Active = active
 			for i := range s.Events {
 				if s.Events[i].EventID == c.TargetID {
 					s.Events[i].Content = c.Replacement

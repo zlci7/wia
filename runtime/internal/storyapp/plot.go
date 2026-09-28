@@ -175,6 +175,9 @@ func nextPlotNode(snapshot worldSnapshot) (PlotNode, int, bool) {
 
 func plotTimeLimit(snapshot worldSnapshot) int {
 	_, due, ok := nextPlotNode(snapshot)
+	if _, eventDue, found := nextGeneratedEvent(snapshot); found && (!ok || eventDue < due) {
+		due, ok = eventDue, true
+	}
 	if !ok {
 		return 120
 	}
@@ -186,8 +189,11 @@ func plotTimeLimit(snapshot worldSnapshot) int {
 }
 
 func plotContext(snapshot worldSnapshot) string {
-	if snapshot.Plot == nil {
+	if snapshot.Plot == nil && len(snapshot.GeneratedEvents.Active) == 0 {
 		return ""
+	}
+	if snapshot.Plot == nil {
+		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", plotTimeLimit(snapshot), marshalJSON(snapshot.GeneratedEvents.Active))
 	}
 	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", plotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, marshalJSON(snapshot.PlotProgress))
 }
@@ -211,7 +217,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 		return nil, nil
 	}
 	material := composePlot(snapshot, run, node, output)
-	call := a.contextGenerator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v2")
+	call := a.contextGenerator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v3")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
@@ -225,16 +231,31 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 		return nil, err
 	}
 	state := PlotNodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
-	var visible []Event
 	if result.Status != "deferred" {
 		state.EventID = "plot:" + snapshot.Plot.Revision + ":" + node.ID
-		event := Event{EventID: state.EventID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
+	}
+	visible, err := a.publishPlotResolution(ctx, generator, snapshot, run, state.EventID, result, output)
+	if err != nil {
+		return nil, err
+	}
+	output.PlotProgress.Nodes[node.ID] = state
+	output.PlotProgress.Version++
+	if snapshot.Summary.Mode == "guided" && result.Ending != "" {
+		output.PlotProgress.Ending = result.Ending
+	}
+	return visible, nil
+}
+
+func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, rootID string, result plotResolution, output *turnOutput) ([]Event, error) {
+	var visible []Event
+	if result.Status != "deferred" {
+		event := Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, event)
 		for i, p := range result.Projections {
 			// Projection IDs have their own text. Possessing their ID never grants the
 			// receiving character access to the author's complete plot result.
 			projection := event
-			projection.EventID = fmt.Sprintf("%s:projection:%d", state.EventID, i)
+			projection.EventID = fmt.Sprintf("%s:projection:%d", rootID, i)
 			projection.EventType, projection.TargetID, projection.Content = "plot_perceived", p.Recipient, p.Content
 			projection.SourceType = "plot_observed"
 			projection.ProjectionParentID = event.EventID
@@ -248,24 +269,19 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	sources := plotSceneSources(*output, visible)
 	updates := []sceneUpdate{}
 	for i, p := range result.Projections {
-		id := fmt.Sprintf("%s:projection:%d", state.EventID, i)
+		id := fmt.Sprintf("%s:projection:%d", rootID, i)
 		if cleanText(p.Scene) != "" {
 			updates = append(updates, sceneUpdate{Content: p.Scene, SourceIDs: []string{"view:" + p.Recipient, id}, Recipients: []string{p.Recipient}})
 		}
 	}
-	if err = applyPlotSceneUpdates(output, sources, updates); err != nil {
+	if err := applyPlotSceneUpdates(output, sources, updates); err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story plot scene rejected: world_id=%q run_id=%q constraint=%q", snapshot.Summary.WorldID, run.RunID, err.Error())
 		}
 		return nil, err
 	}
-	output.PlotProgress.Nodes[node.ID] = state
-	output.PlotProgress.Version++
-	if snapshot.Summary.Mode == "guided" && result.Ending != "" {
-		output.PlotProgress.Ending = result.Ending
-	}
 	if len(result.DecisionRequests) > 0 {
-		npcVisible, err := a.respondToPlot(ctx, generator, snapshot, run, node, result, output)
+		npcVisible, err := a.respondToPlot(ctx, generator, snapshot, run, rootID, result, output)
 		if err != nil {
 			return nil, err
 		}
@@ -287,6 +303,13 @@ func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOut
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
 	material.Required += "\n接收与唤醒合同：每个 recipient 最多出现一次，只选当前节点 audience 中的ID。decision_requests 只选本次 projections 已提供刺激的重要NPC ID，最多一次；player、背景人物、信使等没有独立Agent的角色不放入 decision_requests。没有符合条件的人物时返回[]。"
+	material.Required += "\n保留场景与已提交节点的来源ID也可以引用，但仅用于这些已提供状态，不据ID猜测未提供的原文。definition引用仅限本次当前节点；其他节点的发生依据使用其event_id，不使用其未来计划。"
+	material.RequiredSources = append(material.RequiredSources, sceneViewSources(snapshot, "")...)
+	for _, state := range snapshot.PlotProgress.Nodes {
+		if state.EventID != "" {
+			material.RequiredSources = append(material.RequiredSources, state.EventID)
+		}
+	}
 	return material
 }
 
@@ -324,6 +347,17 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	for _, e := range append(append([]Event{}, snapshot.Events...), output.Events...) {
 		known[e.EventID] = true
 	}
+	// Retained views and node results are provided even when their originating
+	// event body falls outside the optional history window. Metadata is world-local.
+	provided := sceneViewSources(worldSnapshot{SceneViews: output.SceneViews}, "")
+	for _, state := range snapshot.PlotProgress.Nodes {
+		provided = append(provided, state.EventID)
+	}
+	for _, id := range provided {
+		if source, ok := snapshot.Sources[id]; ok && source.ID == id {
+			known[id] = true
+		}
+	}
 	for _, id := range result.SourceIDs {
 		if !known[id] {
 			return ErrContextSourceMissing
@@ -351,7 +385,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	return nil
 }
 
-func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, node PlotNode, resolution plotResolution, output *turnOutput) ([]Event, error) {
+func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, rootID string, resolution plotResolution, output *turnOutput) ([]Event, error) {
 	base := snapshot
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
@@ -378,7 +412,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	inputs := map[string]npcStageInput{}
 	for i, p := range resolution.Projections {
 		if slices.Contains(resolution.DecisionRequests, p.Recipient) {
-			inputs[p.Recipient] = npcStageInput{NewStimulus: p.Content, SourceEventIDs: []string{fmt.Sprintf("plot:%s:%s:projection:%d", snapshot.Plot.Revision, node.ID, i)}}
+			inputs[p.Recipient] = npcStageInput{NewStimulus: p.Content, SourceEventIDs: []string{fmt.Sprintf("%s:projection:%d", rootID, i)}}
 		}
 	}
 	// Inputs, not global presence, select this bounded response round. Characters

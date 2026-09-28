@@ -24,10 +24,11 @@ func TestM2ReviewRealActionAndWait(t *testing.T) {
 		t.Fatal("text generator unavailable")
 	}
 	a := newTestApp(t, g)
+	withoutWorldEvents(a)
 	ctx := context.Background()
 	logger := &recordingLogger{}
 	a.logger = logger
-	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "orbital-repair.pack.v1", RequestKey: "review", Activate: true})
+	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: a.packs["orbital-repair"].Definition.Revision, RequestKey: "review", Activate: true})
 	if err != nil {
 		t.Fatal(err)
 	}

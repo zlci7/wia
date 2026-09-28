@@ -122,6 +122,37 @@ func TestPlotPresenceRejectsUnresolvedMovement(t *testing.T) {
 
 type actionConsistencyGenerator struct{ status string }
 
+func TestArrivalSharesOnlyNewOutcomeWithEnteringNPC(t *testing.T) {
+	a := newTestApp(t, actionConsistencyGenerator{"succeeded"})
+	withoutWorldEvents(a)
+	p := a.packs["orbital-repair"]
+	for i := range p.Definition.Characters {
+		p.Definition.Characters[i].InScene = false
+	}
+	a.packs["orbital-repair"] = p
+	w := createPackWorld(t, a, "orbital-repair")
+	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: "arrival", Input: "走回值班室"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r = waitRun(t, a, w.WorldID, r.RunID); r.Status != "completed" {
+		t.Fatal(r)
+	}
+	s := readContextSnapshot(t, a, w.WorldID)
+	found := false
+	for _, p := range s.Perceptions["npc:innkeeper"] {
+		if strings.HasPrefix(p.SourceEventID, r.RunID) {
+			if p.Stage != 3 || !strings.Contains(p.SourceEventID, ":result:") {
+				t.Fatal("arrival backfilled an earlier expression", p)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("newly present NPC missed arrival outcome")
+	}
+}
+
 func (g actionConsistencyGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
 	switch {
 	case strings.Contains(req.System, "结构化回合意图"):
@@ -149,7 +180,8 @@ func TestPackWithoutPlotResolvesPlayerActions(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			ctx := context.Background()
 			app := newTestApp(t, actionConsistencyGenerator{status})
-			w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "orbital-repair.pack.v1", RequestKey: "action", Activate: true})
+			withoutWorldEvents(app)
+			w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "action", Activate: true})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -31,13 +31,14 @@ func (g *overlappingActionGenerator) GenerateText(ctx context.Context, req model
 		start := strings.Index(req.Input, "待裁定行动(JSON)：") + len("待裁定行动(JSON)：")
 		end := strings.Index(req.Input, "\n所有可用重要人物：")
 		var actions []Event
-		if start < 0 || end < start || json.Unmarshal([]byte(req.Input[start:end]), &actions) != nil || len(actions) != 2 {
+		if start < 0 || end < start || json.Unmarshal([]byte(req.Input[start:end]), &actions) != nil || len(actions) != 3 {
 			return model.TextResponse{}, errors.New("missing action sources")
 		}
 		out := hostResult{Scene: "客栈", SceneCharacters: []string{"npc:innkeeper", "npc:mercenary"}, SceneUpdates: []sceneUpdate{}, Outcomes: []hostActionResult{
 			{ActionID: actions[0].EventID, Status: "succeeded", Content: "沈岚把一碗热水放在桌上。", Recipients: []string{"player", "npc:mercenary"}},
 			{ActionID: actions[1].EventID, Status: "not_executed", Content: "热水刚放下，没有消耗，无须另行续水。", Recipients: []string{"player"}},
 		}}
+		out.Outcomes = append(out.Outcomes, hostActionResult{ActionID: actions[2].EventID, Status: "succeeded", Content: "你向堂内问起近来的怪事。", Recipients: []string{"player", "npc:innkeeper", "npc:mercenary"}})
 		data, _ := json.Marshal(out)
 		return model.TextResponse{Text: string(data)}, nil
 	}

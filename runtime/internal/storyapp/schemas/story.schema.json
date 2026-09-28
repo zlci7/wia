@@ -248,13 +248,25 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 64
+          "maxItems": 32
         }
       },
       "required": [
         "revision",
         "nodes"
       ]
+    },
+    "event_generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "locations", "participants", "max_active", "cooldown_turns"],
+      "properties": {
+        "scope": {"type":"string", "minLength":1, "maxLength":4000},
+        "locations": {"type":"array", "minItems":1, "maxItems":32, "items":{"type":"string", "minLength":1, "maxLength":80}},
+        "participants": {"type":"array", "minItems":0, "maxItems":16, "items":{"type":"string", "minLength":1, "maxLength":84}},
+        "max_active": {"type":"integer", "minimum":1, "maximum":3},
+        "cooldown_turns": {"type":"integer", "minimum":2, "maximum":20}
+      }
     },
     "defaults": {
       "type": "object",

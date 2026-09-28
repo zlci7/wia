@@ -39,7 +39,8 @@ func (g overflowingWaitGenerator) GenerateText(ctx context.Context, req model.Te
 func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, overflowingWaitGenerator{})
-	w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "orbital-repair.pack.v1", RequestKey: "wait", Activate: true})
+	withoutWorldEvents(app)
+	w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "wait", Activate: true})
 	if err != nil {
 		t.Fatal(err)
 	}

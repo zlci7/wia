@@ -30,6 +30,14 @@ func loadCoordinationEvidence(ctx context.Context, store *worldStore, snapshot *
 		selected[runs[i]] = true
 	}
 	queries := []string{input}
+	for _, e := range snapshot.GeneratedEvents.Active {
+		queries = append(queries, e.Node.Condition)
+		for _, source := range events {
+			if source.EventID == e.StartID || source.EventID == e.TriggerID {
+				selected[source.RunID] = true
+			}
+		}
+	}
 	if snapshot.Plot != nil {
 		for _, node := range snapshot.Plot.Nodes {
 			queries = append(queries, node.Condition)

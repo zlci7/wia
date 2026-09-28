@@ -111,7 +111,7 @@ func TestPackDigestAndIsolation(t *testing.T) {
 	if _, e = app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "wrong", RequestKey: "wrong"}); !errors.Is(e, ErrVersionConflict) {
 		t.Fatal(e)
 	}
-	req := CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "orbital-repair.pack.v1", RequestKey: "unique"}
+	req := CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "unique"}
 	w, e := app.CreateStoryWorld(ctx, req)
 	if e != nil {
 		t.Fatal(e)

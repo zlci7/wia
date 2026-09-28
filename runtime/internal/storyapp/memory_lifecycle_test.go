@@ -31,21 +31,25 @@ func seedMemoryHistory(t *testing.T, a *App, id string) {
 	for i := 1; i <= 10; i++ {
 		run := fmt.Sprintf("fixture-history-%02d", i)
 		content := "我安静地看雨，没有新的约定。"
+		kind, actor, source := "player_attempt", "player", "player_private"
 		if i == 1 {
-			content = "我私下答应沈岚，明早在旧码头归还借来的铜钥匙。"
+			content = "沈岚已将铜钥匙借给旅人；双方私下约定，旅人明早在旧码头归还。"
+			kind, actor, source = "npc_action_result", "npc:innkeeper", "action_succeeded"
 		}
 		if _, err = tx.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,?,'npc:innkeeper',1,'completed','now','now')`, run, run, run, content); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = tx.Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+1, run+":input", "player_attempt", "player", "npc:innkeeper", content, run, 1, 1, "player_private", "now"); err != nil {
+		if _, err = tx.Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+1, run+":input", kind, actor, "npc:innkeeper", content, run, 1, 1, source, "now"); err != nil {
 			t.Fatal(err)
 		}
 		for _, scope := range []string{"npc:innkeeper", "npc:mercenary"} {
 			projection := content
+			perceptionType := source
 			if scope == "npc:mercenary" {
 				projection = "旅人与老板低声交谈，听不见内容。"
+				perceptionType = "witnessed_interaction"
 			}
-			if _, err = tx.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, scope, run+":input", projection); err != nil {
+			if _, err = tx.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,?,?,1,1,'now')`, scope, run+":input", perceptionType, projection); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -17,24 +17,25 @@ import (
 )
 
 type worldSnapshot struct {
-	Definition    gameDefinition
-	Summary       WorldSummary
-	PlayerName    string
-	PlayerProfile string
-	Narrative     NarrativeSettings
-	Bystanders    []string
-	SceneVersion  int64
-	Characters    []Character
-	Messages      []Message
-	Events        []Event
-	Dialogue      []Event
-	SceneViews    []SceneView
-	Sources       map[string]sourceMetadata
-	Perceptions   map[string][]Perception
-	Memories      map[string][]Memory
-	Plot          *PlotDefinition
-	PlotProgress  PlotProgress
-	LongMemory    map[string]memoryContext
+	GeneratedEvents generatedEventState
+	Definition      gameDefinition
+	Summary         WorldSummary
+	PlayerName      string
+	PlayerProfile   string
+	Narrative       NarrativeSettings
+	Bystanders      []string
+	SceneVersion    int64
+	Characters      []Character
+	Messages        []Message
+	Events          []Event
+	Dialogue        []Event
+	SceneViews      []SceneView
+	Sources         map[string]sourceMetadata
+	Perceptions     map[string][]Perception
+	Memories        map[string][]Memory
+	Plot            *PlotDefinition
+	PlotProgress    PlotProgress
+	LongMemory      map[string]memoryContext
 }
 
 type worldStore struct {
@@ -463,6 +464,10 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 			return out, err
 		}
 	}
+	out.GeneratedEvents, err = readGeneratedEvents(ctx, store.db, out.Definition)
+	if err != nil {
+		return out, err
+	}
 	if err = applySnapshotCorrections(ctx, store, &out); err != nil {
 		return out, err
 	}
@@ -642,7 +647,7 @@ func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
 	return count, err
 }
 
-func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress) (int64, error) {
+func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -726,6 +731,11 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 	}
 	if plotState != nil {
 		if err := metaSetTx(ctx, tx, "plot_progress", marshalJSON(plotState)); err != nil {
+			return 0, err
+		}
+	}
+	if len(generated) > 0 && generated[0] != nil {
+		if err := metaSetTx(ctx, tx, "generated_events", marshalJSON(generated[0])); err != nil {
 			return 0, err
 		}
 	}

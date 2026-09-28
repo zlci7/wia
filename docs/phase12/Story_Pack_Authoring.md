@@ -31,13 +31,20 @@ The embedded [story schema](../../runtime/internal/storyapp/schemas/story.schema
 | `bystanders` | Public background people; no independent NPC agents |
 | `cover`, `cover_alt` | Optional local image reference under `assets/` and alternative text |
 | `plot` | Existing conditional plot: revision, facts and ordered nodes |
+| `event_generation` | Optional open-world event scope, allowed location/participant IDs, active limit and successful-turn cooldown |
 | `defaults` | Partial narrative settings and shared behavior policies |
 
 Omitted player values use the application defaults (旅人, the standard profile, editable). Omitted narrative options inherit the application settings; declared options override them. Effective settings and their origin are saved with the world. Empty shared behavior policies follow the application default; explicit policies remain world-owned.
 
-Plot nodes contain `id`, `after`, optional non-negative `at_minute`, `condition`, `development`, `audience`, and optional `terminal`. Dependencies refer to earlier nodes. Conditions and developments use the existing M2 coordinator; schema validity does not prove that a story is playable or has a reachable ending. Dynamic event-generation settings are not accepted in this format.
+Plot nodes contain `id`, `after`, optional non-negative `at_minute`, `condition`, `development`, `audience`, and optional `terminal`. Dependencies refer to earlier nodes. Independent lines use independent dependencies; an unresolved inspection does not block a freight notification. Conditions and developments use the M2 coordinator; schema validity does not prove that a story is playable or has a reachable ending.
 
-Limits include 32 locations, 16 important NPCs, 40 bystanders and 64 plot nodes. `story.json` is at most 256 KiB, each NPC file 64 KiB. Covers support PNG/JPEG, at most 4 MiB and 4096 × 4096 pixels. References must resolve inside the pack; remote URLs, traversal and external links are rejected. The server exposes only the selected cover, never the whole directory.
+Open packs may declare `event_generation` with `scope` (author constraints), `locations` (existing location IDs), `participants` (existing important NPC IDs), `max_active` (1–3), and `cooldown_turns` (2–20). Orbital Repair uses two active events and a three-successful-turn cooldown. Omission disables generated events. Guided packs do not accept this policy.
+
+Confirmed arrival or a significant scene change can offer one generation opportunity. A matching successful/partial action result is required; reads, refreshes, prose and rejected actions do not create opportunities. The coordinator can return no event. Due authored events take priority, then due active generated events, then a new opportunity. Each turn has at most one world-event round. Generated events have an observed start, a future condition/development, a time boundary, scoped projections and a settled result. Important NPC choices still require their own decisions; background interactions use the scene coordinator's resolved interaction record.
+
+World-local generated plans, their progress, scoped observations and prose commit together. Failure leaves them unpublished. Copies inherit them; refresh/restart does not generate additional events. Correcting an event's start or trigger invalidates its pending development without rewriting history. Plans are author material, not accomplished facts or shared NPC knowledge.
+
+Limits include 32 locations, 16 important NPCs, 40 bystanders and 32 plot nodes. `story.json` is at most 256 KiB, each NPC file 64 KiB. Covers support PNG/JPEG, at most 4 MiB and 4096 × 4096 pixels. References must resolve inside the pack; remote URLs, traversal and external links are rejected. The server exposes only the selected cover, never the whole directory.
 
 ## NPC definition
 
@@ -72,4 +79,6 @@ Creation returns `{ world }` with HTTP 201. The same owner/key/payload returns t
 
 ## Current examples
 
-Lantern Dusk is a guided investigation using the existing plot nodes. Orbital Repair is a different-theme open interaction sample with two NPCs and two locations. A complete guided ending package and persistent AI-generated open-world events are separate subsequent deliveries.
+Lantern Dusk (`lantern-dusk.pack.v2`) is a guided rain-night investigation with three connected locations and a 20:00 ending boundary. Helping, declining, partial success and missed opportunities are settled from actual results. Orbital Repair (`orbital-repair.pack.v2`) has two locations, independent inspection/freight lines, and bounded generated daily events; settled events leave the world playable.
+
+To use the repository examples without replacing an existing local catalog, start with `./scripts/start-phase12.ps1 -StoryPacks ./runtime/internal/storyapp/packs` and create a new world. Existing saves retain their frozen revision. Verification and model-quality limits are recorded in [M2 acceptance](acceptance/M2.md).

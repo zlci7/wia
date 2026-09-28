@@ -18,6 +18,7 @@ type gameDefinition struct {
 	Bystanders       []string
 	Secret           string
 	Plot             *PlotDefinition
+	EventGeneration  *EventGenerationPolicy
 }
 
 func characterByID(def gameDefinition, id string) (Character, bool) {
