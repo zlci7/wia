@@ -143,10 +143,18 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if err != nil || len(remaining) != 1 {
 		t.Fatalf("other passer-by experience moved: %+v %v", remaining, err)
 	}
-	// Promoting twice returns the same character instead of creating a second one.
-	again, err := a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "promote-3", ExpectedContextEpoch: after.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: request.Draft})
+	// Repeating the same request returns the same character, while a different request
+	// key for the same person is a conflict instead of a second promotion.
+	again, err := a.PromoteCharacter(ctx, w.WorldID, request)
 	if err != nil || again.EntityID != promoted.EntityID {
 		t.Fatalf("repeat promotion: %+v %v", again, err)
+	}
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "promote-other", ExpectedContextEpoch: after.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: request.Draft}); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("second promotion under a new key: %v", err)
+	}
+	origins, err := readCharacterOrigins(ctx, openWorldForTest(t, a, w.WorldID).db, promoted.EntityID)
+	if err != nil || len(origins) != 2 || origins[0].Kind == "" {
+		t.Fatalf("promotion origin record: %+v %v", origins, err)
 	}
 	// The promoted person joins later turns as an important character.
 	run, err := a.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: "after-promotion", Input: "我向船夫点头。"})
@@ -187,10 +195,21 @@ func TestPromotionGuardsAndEmptyExperience(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := openWorldForTest(t, a, w.WorldID)
-	defer store.db.Close()
 	experiences, err := readBystanderExperiences(ctx, store.db, promoted.EntityID)
 	if err != nil || len(experiences) != 0 {
 		t.Fatalf("promotion invented experience: %+v %v", experiences, err)
+	}
+	store.db.Close()
+	// Deleting the world means a late promotion cannot revive anything.
+	status, err := a.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = a.DeleteWorld(ctx, w.WorldID, status.ActiveRevision); err != nil {
+		t.Fatalf("delete world: %v", err)
+	}
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "late", ExpectedContextEpoch: 1, BystanderID: target.BystanderID, Draft: PromotionDraft{Profile: "资料"}}); err == nil {
+		t.Fatal("a promotion revived a deleted world")
 	}
 }
 

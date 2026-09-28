@@ -178,6 +178,13 @@ CREATE TABLE IF NOT EXISTS memories (
   kind TEXT NOT NULL, content TEXT NOT NULL, source_event_id TEXT NOT NULL,
   created_at TEXT NOT NULL, UNIQUE(recipient_id, kind, content, source_event_id)
 );
+-- Where a character in this world came from, and which of that person's own
+-- experiences were carried over when they were promoted.
+CREATE TABLE IF NOT EXISTS character_origins (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, entity_id TEXT NOT NULL,
+  source_kind TEXT NOT NULL, source_id TEXT NOT NULL, created_at TEXT NOT NULL,
+  UNIQUE(entity_id, source_kind, source_id)
+);
 CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, request_key TEXT NOT NULL UNIQUE, request_hash TEXT NOT NULL,
   input TEXT NOT NULL, addressee_id TEXT NOT NULL, attempt INTEGER NOT NULL,

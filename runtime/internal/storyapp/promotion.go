@@ -152,8 +152,8 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return Character{}, err
 	}
 	// A repeat request returns the character this world already created for that
-	// passer-by instead of reporting them missing.
-	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID); err != nil {
+	// passer-by; a different request key for the same person is a conflict.
+	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey); err != nil {
 		return Character{}, err
 	} else if found {
 		return existing, nil
@@ -198,8 +198,52 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return Character{}, ErrVersionConflict
 	}
 	entityID, definitionID := promotionIdentity(bystander, snapshot.Definition)
+	requestHash := hashJSON(map[string]any{
+		"key": request.RequestKey, "bystander": request.BystanderID, "sources": selected,
+		"draft": draft, "epoch": request.ExpectedContextEpoch,
+	})
+	// A repeated request key with the same payload is idempotent; a different payload
+	// is a conflict rather than a second promotion.
+	rows, err := tx.QueryContext(ctx, `SELECT value FROM meta WHERE key LIKE 'promotion:%'`)
+	if err != nil {
+		return Character{}, err
+	}
+	records := []string{}
+	for rows.Next() {
+		var value string
+		if err = rows.Scan(&value); err != nil {
+			rows.Close()
+			return Character{}, err
+		}
+		records = append(records, value)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return Character{}, err
+	}
+	for _, value := range records {
+		var record struct {
+			RequestKey  string `json:"request_key"`
+			RequestHash string `json:"request_hash"`
+		}
+		if json.Unmarshal([]byte(value), &record) == nil && record.RequestKey == request.RequestKey && record.RequestHash != requestHash {
+			return Character{}, ErrIdempotencyConflict
+		}
+	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`,
 		entityID, definitionID, bystander.Name, draft.Role, draft.Profile, draft.Knowledge, boolInt(bystanderInScene(snapshot, bystander))); err != nil {
+		return Character{}, err
+	}
+	// The origin record states what the character came from and which of the person's
+	// own experiences were carried over.
+	for _, origin := range selected {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
+			entityID, "bystander_experience", origin, nowText()); err != nil {
+			return Character{}, err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
+		entityID, "bystander", bystander.BystanderID, nowText()); err != nil {
 		return Character{}, err
 	}
 	for key, value := range map[string]string{
@@ -219,7 +263,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 			return Character{}, err
 		}
 	}
-	remarks := marshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role})
+	remarks := marshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "promotion:"+entityID, remarks); err != nil {
 		return Character{}, err
 	}
@@ -308,8 +352,9 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 }
 
 // promotedCharacter finds the character a previous promotion created for one
-// passer-by, so a repeat request is idempotent instead of a second person.
-func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID string) (Character, bool, error) {
+// passer-by. The same request key returns that character; a different key for the
+// same person is a conflict instead of a second promotion.
+func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey string) (Character, bool, error) {
 	for _, character := range snapshot.Characters {
 		raw, err := metaGet(ctx, store.db, "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -320,12 +365,35 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 		}
 		var record struct {
 			BystanderID string `json:"bystander_id"`
+			RequestKey  string `json:"request_key"`
 		}
-		if json.Unmarshal([]byte(raw), &record) == nil && record.BystanderID == bystanderID {
-			return character, true, nil
+		if json.Unmarshal([]byte(raw), &record) != nil || record.BystanderID != bystanderID {
+			continue
 		}
+		if record.RequestKey != "" && record.RequestKey != requestKey {
+			return Character{}, false, ErrIdempotencyConflict
+		}
+		return character, true, nil
 	}
 	return Character{}, false, nil
+}
+
+// readCharacterOrigins lists where a character in this world came from.
+func readCharacterOrigins(ctx context.Context, db *sql.DB, entityID string) ([]PromotionSource, error) {
+	rows, err := db.QueryContext(ctx, `SELECT source_kind, source_id FROM character_origins WHERE entity_id=? ORDER BY seq`, entityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PromotionSource{}
+	for rows.Next() {
+		var record PromotionSource
+		if err = rows.Scan(&record.Kind, &record.SourceID); err != nil {
+			return nil, err
+		}
+		out = append(out, record)
+	}
+	return out, rows.Err()
 }
 
 func bystanderByID(items []PackBystander, id string) (PackBystander, bool) {
