@@ -4,6 +4,8 @@ World Is Agent 是一个本机运行的 AI 叙事游戏。玩家在浏览器中�
 
 The current local build includes Phase12 M1 and M2: reliable story saves, conditional world progression, scoped long-term memory, retrieval and recoverable corrections. The browser workspace connects directly to the local Runtime; no game adapter is required. This is an internal-playtest build, not a stable release.
 
+Repository story packs include a guided investigation with conditional endings and an open station with independent event lines and bounded, persistent AI-generated incidents. Existing saves keep their pinned definitions. Use the [authoring guide](docs/phase12/Story_Pack_Authoring.md) to select the current repository examples without replacing an existing catalog.
+
 ## 开始使用
 
 运行环境：Windows、Go 1.25+；首次从源码构建工作台还需要 Node.js 20+。

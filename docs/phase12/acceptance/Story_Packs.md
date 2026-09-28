@@ -46,4 +46,4 @@ All four turns completed. The station retained its characters and earlier events
 
 Start the rebuilt runtime, choose either story, inspect its public introduction and create a world using defaults. Return home to switch stories. Save-as from the play bar and confirm that the copy is independent. File authors can follow [the authoring guide](../Story_Pack_Authoring.md) to edit a pack, increment its revision and restart.
 
-Unit ② complete guided routes/endings, unit ③ persistent generated events and unit ④ expanded long-memory/recovery evaluation remain subsequent work. The open station sample is an interaction baseline, not a claim of completed generated-event gameplay. M3 and M4 remain unstarted.
+The evidence above covers the original configuration unit. The current v2 samples add guided routes, independent open event lines and persistent generated events; their implementation, regression and real-model results are recorded in [M2 closeout](M2.md#m2-收口验证2026-09-28). M3 and M4 remain unstarted. Existing catalogs and saved revisions are preserved; use the repository pack directory explicitly to start a new v2 world.

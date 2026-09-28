@@ -6,6 +6,8 @@ Local story packs and multi-story saves are available. The runtime validates JSO
 
 The local playtest build includes Phase12 M1 and M2. Players can run conditional story events, continue personal memories, inspect sources and correct records while keeping independent worlds and original prose. User experience acceptance remains separate from engineering verification.
 
+The v2 repository samples add a complete guided content route and an open station with independent inspection/freight lines. Optional generated incidents use confirmed actions, author-defined scopes, bounded admission and the same atomic event/memory pipeline. Generation state survives copying and restart; corrections invalidate affected continuations. Continuous-model observations and failures are recorded in [M2 closeout](phase12/acceptance/M2.md#m2-收口验证2026-09-28); M3 remains unstarted.
+
 ## 已验证
 
 | 范围 | 状态 |

@@ -1,6 +1,6 @@
 # Phase12 剧本配置与事件生成设计
 
-状态：第一单元“剧本配置化与多剧本运行”已实现；第二至四单元待实施。文件格式与接口见 [Story Pack Authoring](Story_Pack_Authoring.md)，专项证据见[配置化验收记录](acceptance/Story_Packs.md)。当前实现事实见[开发状态](WIA_Phase12_开发状态.md)；M2 基线证据见[验收记录](acceptance/M2.md)。
+状态：剧本配置化、流程型内容收束、独立开放事件与受限生成已经接入。综合验证区分确定性测试、浏览器检查、真实模型连续游玩和用户体验验收；实际结果与限制见 [M2 验收记录](acceptance/M2.md)。文件格式与接口见 [Story Pack Authoring](Story_Pack_Authoring.md)，配置化基线证据见[配置化验收记录](acceptance/Story_Packs.md)。M3、M4 未开始。
 
 ## 1. 目标与范围
 
