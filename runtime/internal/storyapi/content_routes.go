@@ -100,9 +100,44 @@ func (s *Server) contentRoute(w http.ResponseWriter, r *http.Request, rest strin
 		s.contentDraft(w, r, parts[1])
 	case len(parts) == 3 && parts[0] == "drafts" && parts[2] == "preview":
 		s.previewContentDraft(w, r, parts[1])
+	case len(parts) == 3 && parts[0] == "drafts" && parts[2] == "publish":
+		s.publishContentDraft(w, r, parts[1])
+	case len(parts) == 2 && parts[0] == "operations":
+		s.contentOperation(w, r, parts[1])
 	default:
 		writeError(w, 404, "not_found", "no such content route")
 	}
+}
+
+func (s *Server) publishContentDraft(w http.ResponseWriter, r *http.Request, draftID string) {
+	if r.Method != "POST" {
+		writeError(w, 405, "method_not_allowed", "publication uses POST")
+		return
+	}
+	var request storyapp.PublishRequest
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	request.DraftID = draftID
+	operation, err := s.app.PublishContentDraft(r.Context(), request)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"operation": operation})
+}
+
+func (s *Server) contentOperation(w http.ResponseWriter, r *http.Request, operationID string) {
+	if r.Method != "GET" {
+		writeError(w, 405, "method_not_allowed", "operations are read with GET")
+		return
+	}
+	operation, err := s.app.ReadContentOperation(r.Context(), operationID)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"operation": operation})
 }
 
 func (s *Server) contentProjects(w http.ResponseWriter, r *http.Request) {

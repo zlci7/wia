@@ -53,9 +53,12 @@ type Logger interface {
 }
 
 type App struct {
-	packs           map[string]loadedPack
-	packErrors      []PackIssue
-	packRoot        string
+	packs      map[string]loadedPack
+	packErrors []PackIssue
+	packRoot   string
+	// contentDir holds this instance's published user content. Tests may point it
+	// at a temporary directory.
+	contentDir      string
 	createMu        sync.Mutex
 	root            string
 	userID          string

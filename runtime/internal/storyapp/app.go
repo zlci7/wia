@@ -73,6 +73,14 @@ func Open(ctx context.Context, options Options) (*App, error) {
 		app.Close()
 		return nil, err
 	}
+	if err := app.recoverContentOperations(ctx); err != nil {
+		app.Close()
+		return nil, err
+	}
+	if err := app.loadPublishedRevisions(ctx); err != nil {
+		app.Close()
+		return nil, err
+	}
 	if err := app.markInterrupted(ctx); err != nil {
 		db.Close()
 		_ = processLock.Release()

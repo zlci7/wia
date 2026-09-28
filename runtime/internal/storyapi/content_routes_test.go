@@ -127,6 +127,23 @@ func TestContentRoutes(t *testing.T) {
 	if strings.Contains(preview.Body.String(), "author_facts") || strings.Contains(preview.Body.String(), "author_characters") {
 		t.Fatalf("player preview carries author fields: %s", preview.Body.String())
 	}
+
+	// Publication reports its operation, and an incomplete draft fails as a content
+	// error instead of publishing something unusable.
+	publishPath := "/api/v1/content/drafts/" + draftPayload.Draft.DraftID + "/publish"
+	if got := callAPI(t, s, "GET", publishPath, "").Code; got != 405 {
+		t.Fatalf("publish method: %d", got)
+	}
+	publishBody, err := json.Marshal(map[string]any{"request_key": "publish-route", "expected_draft_version": draftPayload.Draft.Version, "expected_project_version": projectPayload.Project.Version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := callAPI(t, s, "POST", publishPath, string(publishBody)).Code; got != 400 {
+		t.Fatalf("incomplete draft published: %d", got)
+	}
+	if got := callAPI(t, s, "GET", "/api/v1/content/operations/publish_missing", "").Code; got != 404 {
+		t.Fatalf("unknown operation: %d", got)
+	}
 }
 
 // The lead profile route carries the world epoch and reports conflicts.
