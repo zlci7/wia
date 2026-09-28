@@ -50,6 +50,35 @@ type plotProjection struct {
 	Scene     string `json:"scene,omitempty"`
 }
 
+// Presence is an effect of this actor's resolved action, not of being selected
+// for a decision round. Earlier speech retains its event-time audience.
+type plotActionResult struct {
+	hostActionResult
+	ActorInScene *bool `json:"actor_in_scene,omitempty"`
+}
+
+func plotActionPresence(current []string, events []Event, outcomes []plotActionResult) ([]string, error) {
+	ids := append([]string{}, current...)
+	seen := map[string]bool{}
+	for _, o := range outcomes {
+		if o.ActorInScene == nil {
+			continue
+		}
+		e, ok := eventByID(events, o.ActionID)
+		if !ok || e.EventType != "npc_action_intent" || seen[e.ActorID] || (o.Status != "succeeded" && o.Status != "partial") {
+			return nil, fmt.Errorf("%w: invalid plot action presence", ErrGenerationFailed)
+		}
+		seen[e.ActorID] = true
+		if *o.ActorInScene && !slices.Contains(ids, e.ActorID) {
+			ids = append(ids, e.ActorID)
+		}
+		if !*o.ActorInScene {
+			ids = slices.DeleteFunc(ids, func(id string) bool { return id == e.ActorID })
+		}
+	}
+	return ids, nil
+}
+
 type plotResolution struct {
 	Status           string           `json:"status"` // occurred, deferred, skipped
 	Content          string           `json:"content"`
@@ -402,9 +431,10 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		material := contextMaterial{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
 		material.Required += plotActionSceneContract(*output, allowed)
+		material.Required += "\n当前实际在场人物：" + marshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v3")
 		var resolved struct {
-			Outcomes     []hostActionResult `json:"outcomes"`
+			Outcomes     []plotActionResult `json:"outcomes"`
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -412,6 +442,21 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		cancel()
 		if err != nil {
 			return nil, err
+		}
+		finalCharacters, err := plotActionPresence(output.SceneCharacters, extra.Events, resolved.Outcomes)
+		if err != nil {
+			return nil, err
+		}
+		if err = validateSceneCharacters(finalCharacters, snapshot.Characters); err != nil {
+			return nil, err
+		}
+		outcomes := make([]hostActionResult, 0, len(resolved.Outcomes))
+		for _, o := range resolved.Outcomes {
+			outcomes = append(outcomes, o.hostActionResult)
+			// Only the arrival result may reach the destination audience.
+			if o.ActorInScene != nil && *o.ActorInScene {
+				allowed[o.ActionID] = append(append(allowed[o.ActionID], "player"), finalCharacters...)
+			}
 		}
 		for _, outcome := range resolved.Outcomes {
 			for _, id := range outcome.Recipients {
@@ -423,7 +468,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 				}
 			}
 		}
-		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, resolved.Outcomes)
+		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, outcomes)
 		if err != nil {
 			if a.logger != nil {
 				a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)
@@ -449,12 +494,17 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			action, _ := eventByID(extra.Events, outcome.ActionID)
 			sources[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
 		}
+		version := output.SceneVersion
 		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {
 			if a.logger != nil {
 				a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=scene_sources detail=%q", run.RunID, err.Error())
 			}
 			return nil, err
 		}
+		if !slices.Equal(output.SceneCharacters, finalCharacters) && output.SceneVersion == version {
+			output.SceneVersion++
+		}
+		output.SceneCharacters = finalCharacters
 	}
 	output.Events = append(output.Events, extra.Events...)
 	output.Perceptions = append(output.Perceptions, extra.Perceptions...)

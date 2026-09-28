@@ -654,7 +654,7 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	}
 
 	publicReplies := strings.Join(publicReplyLog, "\n")
-	if snapshot.Plot != nil && intent.IntentType != "speak" {
+	if intent.IntentType != "speak" {
 		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: snapshot.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
 	}
 	coordinationStarted := time.Now()
@@ -1061,7 +1061,10 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 		return hostResult{}, repairCount, err
 	}
 	result.Scene = cleanText(result.Scene)
-	if snapshot.Plot != nil && intent.WaitMinutes > 0 {
+	if intent.WaitMinutes > 0 {
+		if result.TimeMinutes > min(intent.WaitMinutes, plotTimeLimit(snapshot)) {
+			return hostResult{}, repairCount, fmt.Errorf("%w: waiting exceeds requested duration", ErrGenerationFailed)
+		}
 		for _, id := range result.InterruptSources {
 			e, ok := eventByID(events, id)
 			current := ok && e.RunID == run.RunID && e.Stage >= 1 && e.Stage <= 2

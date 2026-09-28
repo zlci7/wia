@@ -35,3 +35,16 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestedWaitIsAnUpperBound(t *testing.T) {
+	for _, plot := range []*PlotDefinition{nil, lanternPlotDefinition()} {
+		s := worldSnapshot{Summary: WorldSummary{Clock: "第 1 日 19:00"}, Plot: plot, PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
+		for _, minutes := range []int{5, 30} {
+			g := waitResultGenerator{hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}}
+			_, _, err := (&App{}).coordinateTurn(context.Background(), g, s, Run{RunID: "wait"}, turnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
+			if (err == nil) != (minutes == 5) {
+				t.Fatalf("plot=%t minutes=%d err=%v", plot != nil, minutes, err)
+			}
+		}
+	}
+}

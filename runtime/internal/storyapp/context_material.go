@@ -15,7 +15,7 @@ func composeIntent(snapshot worldSnapshot, run Run) contextMaterial {
 	input := fmt.Sprintf("当前地点：%s\n当前时间：%s\n在场人物：\n%s玩家输入：%s\n显式目标（若有）：%s\n请判断玩家本轮是 speak、observe 还是 act；如果玩家明确向某个在场人物说话，只返回该人物的 entity_id；没有明确对象时 addressee_id 返回空字符串或 null。visibility 只能是 public 或 private。只输出 JSON：{\"intent_type\":\"speak\",\"addressee_id\":\"npc:...\",\"visibility\":\"public\"}。人物名出现在谈话内容里不等于玩家正在对该人物说话。", sceneFor(snapshot, "player"), snapshot.Summary.Clock, characters.String(), run.Input, cleanText(run.AddresseeID))
 	input = intentVisibilityRule + "\n" + input
 	input += "\n世界：" + snapshot.Summary.GameID + "\n公开世界背景：" + snapshot.Definition.Background
-	if snapshot.Plot != nil {
+	{
 		input += "\n另输出整数 wait_minutes：玩家明确选择等待时，解析其期望经过的分钟数，最多120；等待某事件但未指定时长时取120作为本轮等待上限。单纯沉默、观察或普通交谈取0。这里只解析意愿，实际经过时间由协调与剧情边界确定。玩家不参与也允许时间和世界事件继续发展。"
 	}
 
@@ -39,7 +39,7 @@ func composeCoordination(snapshot worldSnapshot, run Run, intent turnIntent, dec
 	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。对白仅取 NPC 已确定的公开对白，不从行动提案中补造问话、承诺或他人的回应。\n"
 	input += sceneSourcePrompt(snapshot, run, intent, events)
 	input += plotContext(snapshot)
-	if snapshot.Plot != nil && intent.WaitMinutes > 0 {
+	if intent.WaitMinutes > 0 {
 		input += fmt.Sprintf("\n本轮已表达的等待目标：%d分钟；当前允许执行到%d分钟。通常令 time_minutes 等于后者，日常添水、闲聊、保持观察等可在等待期间发生，不独立缩短玩家的等待。只有需要玩家即时作关键选择、直接危险或玩家明确指定的中止事件才提前停下。另输出 interrupt_source_ids 数组：提前停止时引用本轮确实造成中止的事件ID，否则为[]。输出实际等候后的情境，不提前解决未来节点。", intent.WaitMinutes, min(intent.WaitMinutes, plotTimeLimit(snapshot)))
 		input += "\n中断依据也可引用提供的已提交历史事件，但只有其影响仍在当前情境中成立时才用于中断；事件发生过不等于危险一直持续。引用真实 event_id，不使用人物ID、view别名或未来 definition 节点作为已经发生的证据。"
 	}
