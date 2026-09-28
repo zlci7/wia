@@ -63,6 +63,10 @@ type App struct {
 	// map is no longer written only at startup; loading and validating a package stays
 	// outside the lock and only the directory entry swap is inside it.
 	packsMu sync.RWMutex
+	// liveOps holds the publications running in this process, keyed by request key, so
+	// a repeated request returns the live operation instead of recovering it.
+	liveMu  sync.Mutex
+	liveOps map[string]ContentOperation
 	// contentDir holds this instance's published user content. Tests may point it
 	// at a temporary directory.
 	contentDir string

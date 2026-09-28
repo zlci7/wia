@@ -71,8 +71,13 @@ func (a *App) PreviewContentImport(ctx context.Context, projectID, fileName stri
 	if len(body) == 0 {
 		return ImportPreview{}, fmt.Errorf("%w: empty upload", ErrContentInvalid)
 	}
-	draft, report, err := a.buildImportDraft(ctx, project, fileName, body)
+	draft, report, assets, err := a.buildImportDraft(ctx, project, fileName, body)
 	if err != nil {
+		return ImportPreview{}, err
+	}
+	// A preview draft owns the images its source used, so confirming and publishing it
+	// has everything it references.
+	if err = a.copyPackAssets(ctx, draft.DraftID, assets); err != nil {
 		return ImportPreview{}, err
 	}
 	staged := a.importSourcePath(draft.DraftID, fileName)
@@ -116,7 +121,7 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID string, expected
 	return a.ReadContentDraft(ctx, draft.DraftID)
 }
 
-func (a *App) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, error) {
+func (a *App) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	switch {
 	case isZIP(body):
 		return a.importWIAPackage(ctx, project, body)
@@ -129,13 +134,13 @@ func (a *App) buildImportDraft(ctx context.Context, project ContentProject, file
 
 // ---- plain text and Markdown -------------------------------------------------
 
-func (a *App) importPlainText(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, error) {
+func (a *App) importPlainText(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importTextLimit {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: text import exceeds the size limit", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: text import exceeds the size limit", ErrContentInvalid)
 	}
 	text := strings.ToValidUTF8(string(body), "")
 	if strings.TrimSpace(text) == "" {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: the file has no readable text", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: the file has no readable text", ErrContentInvalid)
 	}
 	name := safeFileName(fileName)
 	format, detail := "text", "plain text"
@@ -156,44 +161,44 @@ func (a *App) importPlainText(project ContentProject, fileName string, body []by
 		Unsupported:  []string{"HTML、脚本、远程图片与链接命令不会被执行"},
 		NeedsConfirm: []string{"背景之外的内容只作候选，需要作者确认"},
 	}
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil, nil
 }
 
 // ---- WIA package -------------------------------------------------------------
 
-func (a *App) importWIAPackage(ctx context.Context, project ContentProject, body []byte) (ContentDraft, ImportReport, error) {
+func (a *App) importWIAPackage(ctx context.Context, project ContentProject, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importZIPLimit {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: package exceeds the size limit", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: package exceeds the size limit", ErrContentInvalid)
 	}
 	files, err := readPackageZip(body)
 	if err != nil {
-		return ContentDraft{}, ImportReport{}, err
+		return ContentDraft{}, ImportReport{}, nil, err
 	}
 	if _, ok := files["story.json"]; !ok {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: story.json is missing", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: story.json is missing", ErrContentInvalid)
 	}
 	staging, err := os.MkdirTemp(a.contentRoot(), "import-")
 	if err != nil {
-		return ContentDraft{}, ImportReport{}, err
+		return ContentDraft{}, ImportReport{}, nil, err
 	}
 	defer os.RemoveAll(staging)
 	for name, content := range files {
 		target := filepath.Join(staging, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return ContentDraft{}, ImportReport{}, err
+			return ContentDraft{}, ImportReport{}, nil, err
 		}
 		if err := os.WriteFile(target, content, 0o644); err != nil {
-			return ContentDraft{}, ImportReport{}, err
+			return ContentDraft{}, ImportReport{}, nil, err
 		}
 	}
 	pack, err := loadPack(staging)
 	if err != nil {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: %s", ErrContentInvalid, err.Error())
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: %s", ErrContentInvalid, err.Error())
 	}
 	payload := newDraftPayload(project)
 	copied, err := a.draftPayloadFromLoadedPack(pack, project.GameID)
 	if err != nil {
-		return ContentDraft{}, ImportReport{}, err
+		return ContentDraft{}, ImportReport{}, nil, err
 	}
 	// The imported identity is never taken over: the project keeps its own game_id.
 	payload = copied
@@ -214,7 +219,7 @@ func (a *App) importWIAPackage(ctx context.Context, project ContentProject, body
 		report.Mappings = append(report.Mappings, ImportMapping{Field: "bystanders", Source: "story.json", Target: "路人稳定身份", Confidence: "high"})
 	}
 	_ = ctx
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, pack.Assets, nil
 }
 
 // readPackageZip reads a package archive with hard limits and no path escapes.
@@ -268,9 +273,9 @@ func readPackageZip(body []byte) (map[string][]byte, error) {
 
 // ---- Character Card V2 -------------------------------------------------------
 
-func (a *App) importCharacterCard(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, error) {
+func (a *App) importCharacterCard(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importTextLimit {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: card exceeds the size limit", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: card exceeds the size limit", ErrContentInvalid)
 	}
 	var card struct {
 		Spec        string `json:"spec"`
@@ -294,13 +299,13 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &card); err != nil {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: the JSON could not be read", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: the JSON could not be read", ErrContentInvalid)
 	}
 	if card.Spec != "chara_card_v2" || card.SpecVersion != "2.0" {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: only chara_card_v2 version 2.0 text cards are supported", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: only chara_card_v2 version 2.0 text cards are supported", ErrContentInvalid)
 	}
 	if strings.TrimSpace(card.Data.Name) == "" {
-		return ContentDraft{}, ImportReport{}, fmt.Errorf("%w: the card has no character name", ErrContentInvalid)
+		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: the card has no character name", ErrContentInvalid)
 	}
 	payload := newDraftPayload(project)
 	replacements := map[string]string{"{{char}}": card.Data.Name, "{{user}}": payload.Player.Name}
@@ -368,7 +373,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	if unsupported := unsupportedMacros(map[string]string{"{{char}}": card.Data.Name, "{{user}}": payload.Player.Name}, []byte(strings.Join(append([]string{profile, npc.Knowledge}, npc.SpeakingExamples...), "\n"))); len(unsupported) > 0 {
 		report.Unsupported = append(report.Unsupported, "未支持的宏保持原文："+strings.Join(unsupported, ", "))
 	}
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil, nil
 }
 
 // ---- export ------------------------------------------------------------------

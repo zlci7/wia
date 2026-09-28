@@ -1,11 +1,16 @@
 package storyapp
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -263,12 +268,17 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 		Player: PlayerDefaults{Editable: true},
 	}
 	status := draftStatusEditing
+	draftID := newID("draft")
+	var inherited map[string][]byte
 	if baseRevision != "" {
 		copied, err := a.draftPayloadFromRevision(baseRevision, project.GameID)
 		if err != nil {
 			return ContentDraft{}, err
 		}
 		payload = copied
+		if pack, packErr := a.publishedPack(baseRevision); packErr == nil {
+			inherited = pack.Assets
+		}
 	}
 	if err = validateDraftPayload(payload); err != nil {
 		return ContentDraft{}, err
@@ -277,9 +287,14 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 	if err != nil {
 		return ContentDraft{}, err
 	}
-	draft := ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, BaseRevision: baseRevision, Version: 1, Status: status, UpdatedAt: nowText()}, Payload: payload}
+	draft := ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: draftID, ProjectID: project.ProjectID, BaseRevision: baseRevision, Version: 1, Status: status, UpdatedAt: nowText()}, Payload: payload}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_drafts(user_id,draft_id,project_id,base_revision,version,status,payload_json,source_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'',?,?)`,
 		a.userID, draft.DraftID, draft.ProjectID, draft.BaseRevision, draft.Version, draft.Status, string(body), draft.UpdatedAt, draft.UpdatedAt); err != nil {
+		return ContentDraft{}, err
+	}
+	// The new draft owns its own copies of the images its source used, so editing and
+	// publishing it does not depend on files belonging to another revision.
+	if err = a.copyPackAssets(ctx, draft.DraftID, inherited); err != nil {
 		return ContentDraft{}, err
 	}
 	return draft, nil
@@ -439,14 +454,33 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 }
 
 // draftPayloadFromLoadedPack projects a loaded package into the editable draft shape.
+// It reads the package's own files instead of guessing paths, and carries the fields
+// the editor can change, so a round trip through a draft is lossless for the content
+// the product supports.
 func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
 	definition := pack.Definition
 	payload := ContentDraftPayload{
 		SchemaVersion: packSchemaV2, GameID: gameID, Mode: definition.Summary.Mode, Title: definition.Summary.Title,
 		Description: definition.Summary.Description, Gameplay: definition.Summary.Gameplay, Background: definition.Background,
 		Rules: definition.Rules, AuthorFacts: definition.Secret, Player: definition.Summary.Player, Opening: definition.Opening,
-		Clock: definition.Clock, Locations: definition.Locations, Plot: definition.Plot, Bystanders: definition.BystanderRefs,
+		Cover: pack.Story.Cover, CoverAlt: pack.Story.CoverAlt, EventGeneration: pack.Story.EventGeneration,
+		InitialLocation: definition.InitialLocation,
+		Clock:           definition.Clock, Locations: definition.Locations, Plot: definition.Plot, Bystanders: definition.BystanderRefs,
 		NPCs: []ContentDraftNPC{}, Defaults: &definition.Settings,
+	}
+	// Each character's own file travels with the package under its recorded path, so
+	// the editor gets the real avatar and examples whatever the file is called.
+	byDefinition := map[string]PackNPC{}
+	for name, body := range pack.NPCFiles {
+		var file PackNPC
+		if json.Unmarshal(body, &file) != nil {
+			continue
+		}
+		key := file.DefinitionID
+		if key == "" {
+			key = strings.TrimSuffix(strings.TrimPrefix(name, "npcs/"), ".json")
+		}
+		byDefinition[key] = file
 	}
 	for _, character := range definition.Characters {
 		npc := ContentDraftNPC{
@@ -455,26 +489,60 @@ func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (Conten
 			Knowledge: character.Knowledge, InitialConcerns: character.InitialConcerns,
 			InitialLocation: definition.InitialLocations[character.EntityID],
 		}
-		if pack.Root != "" {
-			// The editor needs the full character, not only the published summary.
-			if body, err := packFile(pack.Root, "npcs/"+character.DefinitionID+".json", 64*1024); err == nil {
-				var file PackNPC
-				if json.Unmarshal(body, &file) == nil {
-					npc.Avatar, npc.SpeakingExamples = file.Avatar, file.SpeakingExamples
-					if file.InitialLocation != "" {
-						npc.InitialLocation = file.InitialLocation
-					}
-				}
+		if file, ok := byDefinition[character.DefinitionID]; ok {
+			npc.Avatar, npc.SpeakingExamples = file.Avatar, file.SpeakingExamples
+			if file.InitialLocation != "" {
+				npc.InitialLocation = file.InitialLocation
 			}
 		}
 		payload.NPCs = append(payload.NPCs, npc)
 	}
-	for _, location := range definition.Locations {
-		if location.Name == definition.Scene {
-			payload.InitialLocation = location.ID
+	return payload, nil
+}
+
+// copyPackAssets gives a draft its own copy of the images a source package uses, so
+// publishing the draft does not depend on files it does not own.
+func (a *App) copyPackAssets(ctx context.Context, draftID string, assets map[string][]byte) error {
+	if len(assets) == 0 {
+		return nil
+	}
+	dir := filepath.Join(a.contentRoot(), "drafts", draftID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	names := make([]string, 0, len(assets))
+	for name := range assets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		body := assets[name]
+		config, format, err := image.DecodeConfig(bytes.NewReader(body))
+		if err != nil || config.Width <= 0 || config.Height <= 0 || config.Width > assetMaxPixels || config.Height > assetMaxPixels {
+			// Only images the product can serve are carried over; a package referencing
+			// anything else already failed its own validation.
+			continue
+		}
+		mediaType := "image/png"
+		if format == "jpeg" {
+			mediaType = "image/jpeg"
+		}
+		asset := ContentDraftAsset{
+			AssetID: newID("asset"), RelativeName: name, MediaType: mediaType,
+			ByteSize: int64(len(body)), Width: config.Width, Height: config.Height,
+		}
+		staged := filepath.Join(dir, asset.AssetID)
+		if err = os.WriteFile(staged, body, 0o644); err != nil {
+			return err
+		}
+		if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,draft_id,asset_id) DO UPDATE SET relative_name=excluded.relative_name,digest=excluded.digest,staged_path=excluded.staged_path`,
+			a.userID, draftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, nowText()); err != nil {
+			_ = os.Remove(staged)
+			return err
 		}
 	}
-	return payload, nil
+	return nil
 }
 
 // draftNPCFiles renders the draft's characters back into package files. Publication

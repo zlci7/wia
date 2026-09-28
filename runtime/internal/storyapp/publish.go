@@ -43,13 +43,30 @@ type ContentOperation struct {
 	SafeError   string `json:"safe_error,omitempty"`
 }
 
+// publishPlan is the frozen decision a publication follows: the identity it will
+// create and the digest it must match. It is persisted before any file is written so
+// an interruption after the rename can still be finished instead of discarded.
+type publishPlan struct {
+	GameID         string `json:"game_id"`
+	ProjectID      string `json:"project_id"`
+	ProjectVersion int64  `json:"project_version"`
+	Revision       string `json:"revision"`
+	Digest         string `json:"digest"`
+	FinalPath      string `json:"final_path"`
+	// Digest before the rename is unknown, so validation re-derives it from staging.
+}
+
 // PublishContentDraft validates the draft, writes a complete package into a staging
 // directory, renames it to its immutable revision directory and only then registers
 // it. A repeated request key returns the original result; a different payload
-// conflicts.
+// conflicts; the same key while the original request is still running returns that
+// live operation instead of treating it as a crash to recover.
 func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (ContentOperation, error) {
 	if cleanText(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedDraftVersion < 1 {
 		return ContentOperation{}, ErrInvalidRequest
+	}
+	if live, ok := a.liveOperation(request.RequestKey); ok {
+		return live, nil
 	}
 	draft, err := a.ReadContentDraft(ctx, request.DraftID)
 	if err != nil {
@@ -83,25 +100,84 @@ func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (
 	if request.ExpectedProjectVersion > 0 && project.Version != request.ExpectedProjectVersion {
 		return ContentOperation{}, ErrVersionConflict
 	}
-	if _, exists := a.packs[project.GameID]; exists && project.CurrentRevision == "" {
+	if _, exists := a.pack(project.GameID); exists && project.CurrentRevision == "" {
 		// An official package owns this identity; user content cannot take it over.
 		return ContentOperation{}, ErrContentInvalid
 	}
+	return a.startPublish(ctx, request, draft, project, hash)
+}
+
+// existingRevision reports a publication of this exact content, including one that a
+// previous interruption registered but did not point the project at.
+func (a *App) existingRevision(ctx context.Context, revision string) (ContentRevisionRef, bool, error) {
+	var ref ContentRevisionRef
+	ref.Revision = revision
+	err := a.appDB.QueryRowContext(ctx, `SELECT path,digest FROM content_revisions WHERE user_id=? AND revision=? AND status=?`, a.userID, revision, publishReady).Scan(&ref.Path, &ref.Digest)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ContentRevisionRef{}, false, nil
+	}
+	if err != nil {
+		return ContentRevisionRef{}, false, err
+	}
+	return ref, true, nil
+}
+
+// ContentRevisionRef identifies one already registered publication.
+type ContentRevisionRef struct {
+	Revision string
+	Digest   string
+	Path     string
+}
+
+// registerRevision points the project at an already published revision.
+func (a *App) registerRevision(ctx context.Context, requestKey, hash string, operation ContentOperation, project ContentProject, revision, digest, path string) error {
+	_, err := a.completePublish(ctx, requestKey, hash, operation, publishPlan{
+		GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version,
+		Revision: revision, Digest: digest, FinalPath: path,
+	}, digest)
+	return err
+}
+
+func (a *App) startPublish(ctx context.Context, request PublishRequest, draft ContentDraft, project ContentProject, hash string) (ContentOperation, error) {
 	revision, files, _, err := a.buildPackage(ctx, draft, project)
 	if err != nil {
 		return ContentOperation{}, err
 	}
-	operation = ContentOperation{OperationID: newID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishPrepared, Status: "running"}
-	if err = a.writeContentOperation(ctx, request.RequestKey, hash, operation, ""); err != nil {
+	// A revision is content-addressed, so publishing the same content again names the
+	// same immutable directory. That is the same publication, not a conflict: point the
+	// project at it and report success.
+	if existing, found, err := a.existingRevision(ctx, revision); err != nil {
+		return ContentOperation{}, err
+	} else if found {
+		operation := ContentOperation{OperationID: newID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishReady, Status: "succeeded"}
+		if err = a.registerRevision(ctx, request.RequestKey, hash, operation, project, existing.Revision, existing.Digest, existing.Path); err != nil {
+			return ContentOperation{}, err
+		}
+		return operation, nil
+	}
+	operation := ContentOperation{OperationID: newID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishPrepared, Status: "running"}
+	plan := publishPlan{
+		GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version,
+		Revision: revision, FinalPath: filepath.Join(a.contentRoot(), project.GameID, revision),
+	}
+	body, err := json.Marshal(plan)
+	if err != nil {
 		return ContentOperation{}, err
 	}
-	return a.runPublish(ctx, request.RequestKey, hash, operation, project, revision, files)
+	// The plan is durably recorded before any file is written, so an interruption after
+	// the rename is recoverable instead of leaving an unclaimed directory behind.
+	if err = a.writeContentOperationPlan(ctx, request.RequestKey, hash, operation, string(body)); err != nil {
+		return ContentOperation{}, err
+	}
+	a.beginLiveOperation(request.RequestKey, operation)
+	defer a.endLiveOperation(request.RequestKey)
+	return a.runPublish(ctx, request.RequestKey, hash, operation, plan, files)
 }
 
-func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation ContentOperation, project ContentProject, revision string, files map[string][]byte) (ContentOperation, error) {
+func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, files map[string][]byte) (ContentOperation, error) {
 	root := a.contentRoot()
 	staging := filepath.Join(root, operation.OperationID+".staging")
-	final := filepath.Join(root, project.GameID, revision)
+	final := plan.FinalPath
 	cleanup := func(reason string) (ContentOperation, error) {
 		_ = os.RemoveAll(staging)
 		operation.Stage, operation.Status = publishFailed, "failed"
@@ -126,7 +202,7 @@ func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation
 	if err != nil {
 		return cleanup("package validation failed: " + err.Error())
 	}
-	if staged.Definition.Revision != revision {
+	if staged.Definition.Revision != plan.Revision {
 		return cleanup("published revision identity does not match")
 	}
 	digest := staged.Digest
@@ -138,7 +214,18 @@ func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation
 		return cleanup("revision directory unavailable")
 	}
 	if _, statErr := os.Stat(final); statErr == nil {
-		return cleanup("revision already exists")
+		// The directory already exists. It is only acceptable when it is this exact
+		// package, which makes an interrupted rename idempotent instead of a dead end.
+		existing, loadErr := loadPack(final)
+		if loadErr != nil || existing.Digest != digest {
+			return cleanup("revision already exists")
+		}
+		_ = os.RemoveAll(staging)
+		operation.Stage = publishRenamed
+		if err = a.writeContentOperation(ctx, requestKey, hash, operation, ""); err != nil {
+			return ContentOperation{}, err
+		}
+		return a.completePublish(ctx, requestKey, hash, operation, plan, digest)
 	}
 	if err := os.Rename(staging, final); err != nil {
 		return cleanup("revision could not be published")
@@ -147,12 +234,14 @@ func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation
 	if err = a.writeContentOperation(ctx, requestKey, hash, operation, ""); err != nil {
 		return ContentOperation{}, err
 	}
-	return a.completePublish(ctx, requestKey, hash, operation, project, revision, digest, final)
+	return a.completePublish(ctx, requestKey, hash, operation, plan, digest)
 }
 
 // completePublish registers the revision and moves the project forward in one
 // application transaction; the directory is already in place.
-func (a *App) completePublish(ctx context.Context, requestKey, hash string, operation ContentOperation, project ContentProject, revision, digest, path string) (ContentOperation, error) {
+func (a *App) completePublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, digest string) (ContentOperation, error) {
+	revision, project := plan.Revision, ContentProject{ProjectID: plan.ProjectID, GameID: plan.GameID, Version: plan.ProjectVersion}
+	path := plan.FinalPath
 	tx, err := a.appDB.BeginTx(ctx, nil)
 	if err != nil {
 		return ContentOperation{}, err
@@ -165,7 +254,8 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 	if currentVersion != project.Version {
 		return ContentOperation{}, ErrVersionConflict
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO content_revisions(user_id,game_id,revision,digest,path,status,created_at) VALUES(?,?,?,?,?,?,?)`,
+	if _, err = tx.ExecContext(ctx, `INSERT INTO content_revisions(user_id,game_id,revision,digest,path,status,created_at) VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(user_id,game_id,revision) DO UPDATE SET digest=excluded.digest,path=excluded.path,status=excluded.status`,
 		a.userID, project.GameID, revision, digest, path, publishReady, nowText()); err != nil {
 		return ContentOperation{}, err
 	}
@@ -205,30 +295,43 @@ func (a *App) installPublishedRevision(gameID, revision, path string) {
 	a.setPack(gameID, pack)
 }
 
-// resumePublish finishes an operation interrupted between stages.
+// resumePublish finishes an operation interrupted between stages. The frozen plan
+// says which directory and digest the publication was creating, so a rename that
+// completed before the interruption is finished rather than discarded.
 func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (ContentOperation, error) {
-	staging := filepath.Join(a.contentRoot(), operation.OperationID+".staging")
-	var published struct {
-		Revision string `json:"revision"`
-		GameID   string `json:"game_id"`
+	if live, ok := a.liveOperation(operation.OperationID); ok {
+		return live, nil
 	}
-	if _, result, found, err := a.readContentOperationByID(ctx, operation.OperationID); err != nil {
+	raw, err := a.readContentOperationPlan(ctx, operation.OperationID)
+	if err != nil {
 		return ContentOperation{}, err
-	} else if found && result != "" {
-		_ = json.Unmarshal([]byte(result), &published)
 	}
-	if published.Revision != "" {
-		var path, digest string
-		if err := a.appDB.QueryRowContext(ctx, `SELECT path,digest FROM content_revisions WHERE user_id=? AND revision=?`, a.userID, published.Revision).Scan(&path, &digest); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return ContentOperation{}, err
-		} else if err == nil {
-			// The revision is already registered; finish the bookkeeping.
-			operation.Stage, operation.Status = publishReady, "succeeded"
-			if writeErr := a.writeContentOperation(ctx, "", "", operation, ""); writeErr != nil {
-				return ContentOperation{}, writeErr
+	plan := publishPlan{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &plan)
+	}
+	staging := filepath.Join(a.contentRoot(), operation.OperationID+".staging")
+	if plan.Revision != "" {
+		if _, statErr := os.Stat(plan.FinalPath); statErr == nil {
+			// The directory is already in place; only registration may be missing.
+			pack, loadErr := loadPack(plan.FinalPath)
+			if loadErr == nil && pack.Definition.Revision == plan.Revision {
+				operation.Stage = publishRenamed
+				return a.completePublish(ctx, "", "", operation, plan, pack.Digest)
 			}
-			a.installPublishedRevision(published.GameID, published.Revision, path)
-			return operation, nil
+		}
+		// The staging directory exists only for this operation, so it can be finished
+		// here instead of thrown away.
+		if _, statErr := os.Stat(staging); statErr == nil {
+			staged, loadErr := loadPack(staging)
+			if loadErr == nil && staged.Definition.Revision == plan.Revision {
+				if err = os.MkdirAll(filepath.Dir(plan.FinalPath), 0o755); err == nil {
+					if err = os.Rename(staging, plan.FinalPath); err == nil {
+						operation.Stage = publishRenamed
+						return a.completePublish(ctx, "", "", operation, plan, staged.Digest)
+					}
+				}
+			}
 		}
 	}
 	// The staging directory belongs to this operation, so an interrupted write is
@@ -239,6 +342,15 @@ func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (Co
 	}
 	_ = os.RemoveAll(staging)
 	return operation, fmt.Errorf("%w: publication was interrupted; publish the draft again", ErrContentInvalid)
+}
+
+func (a *App) readContentOperationPlan(ctx context.Context, operationID string) (string, error) {
+	var plan string
+	err := a.appDB.QueryRowContext(ctx, `SELECT plan_json FROM content_operations WHERE user_id=? AND operation_id=?`, a.userID, operationID).Scan(&plan)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return plan, err
 }
 
 func (a *App) readContentOperationByID(ctx context.Context, operationID string) (ContentOperation, string, bool, error) {
@@ -461,6 +573,44 @@ func (a *App) writeContentOperation(ctx context.Context, requestKey, hash string
 	_, err = a.appDB.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,safe_error=?,updated_at=? WHERE user_id=? AND operation_id=?`,
 		operation.Stage, operation.Status, safeError, nowText(), a.userID, operation.OperationID)
 	return err
+}
+
+// writeContentOperationPlan records the frozen plan together with the operation, so
+// recovery knows exactly which directory and digest it is finishing.
+func (a *App) writeContentOperationPlan(ctx context.Context, requestKey, hash string, operation ContentOperation, plan string) error {
+	_, err := a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,plan_json,created_at,updated_at)
+		VALUES(?,?,?,?,?,?,?,?,'','',?,?,?) ON CONFLICT(user_id,request_key) DO UPDATE SET stage=excluded.stage,status=excluded.status,plan_json=excluded.plan_json,updated_at=excluded.updated_at`,
+		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, plan, nowText(), nowText())
+	return err
+}
+
+// liveOperations tracks publications running in this process. A repeated request for
+// one of them returns that operation; it is never treated as an interruption to
+// recover, because the original writer is still working.
+type liveOperation struct {
+	operation ContentOperation
+}
+
+func (a *App) beginLiveOperation(requestKey string, operation ContentOperation) {
+	a.liveMu.Lock()
+	defer a.liveMu.Unlock()
+	if a.liveOps == nil {
+		a.liveOps = map[string]ContentOperation{}
+	}
+	a.liveOps[requestKey] = operation
+}
+
+func (a *App) endLiveOperation(requestKey string) {
+	a.liveMu.Lock()
+	defer a.liveMu.Unlock()
+	delete(a.liveOps, requestKey)
+}
+
+func (a *App) liveOperation(requestKey string) (ContentOperation, bool) {
+	a.liveMu.Lock()
+	defer a.liveMu.Unlock()
+	operation, ok := a.liveOps[requestKey]
+	return operation, ok
 }
 
 func (a *App) ReadContentOperation(ctx context.Context, operationID string) (ContentOperation, error) {

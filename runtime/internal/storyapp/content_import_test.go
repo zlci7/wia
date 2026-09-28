@@ -255,6 +255,142 @@ func TestImportedCardDraftCanBePublished(t *testing.T) {
 	}
 }
 
+// A package with images, event rules and a character file that does not follow the
+// naming convention must survive a draft round trip: field by field and byte by byte.
+func TestImportPackageRoundTripKeepsFieldsAndAssets(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	cover := pngBytes(t, 12, 8)
+	avatar := pngBytes(t, 20, 20)
+
+	project, draft := publishableDraft(t, a, "harbor-rich")
+	// Stage real images and a cover, then publish, so the source package is a rich one.
+	if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/cover.png", cover); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/keeper.png", avatar); err != nil {
+		t.Fatal(err)
+	}
+	payload := draft.Payload
+	payload.Cover = "assets/cover.png"
+	payload.CoverAlt = "港口的封面"
+	payload.NPCs[0].Avatar = "assets/keeper.png"
+	payload.EventGeneration = &EventGenerationPolicy{Scope: "harbor", Locations: []string{"harbor"}, Participants: []string{"npc:keeper"}, MaxActive: 2, CooldownTurns: 3}
+	payload.NPCs[0].SpeakingExamples = []string{"灯要按时点。"}
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "rich-publish", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: fresh.Version}); err != nil {
+		t.Fatal(err)
+	}
+	var revision string
+	if err = a.appDB.QueryRowContext(ctx, `SELECT revision FROM content_revisions WHERE user_id=? AND game_id='harbor-rich'`, a.userID).Scan(&revision); err != nil {
+		t.Fatal(err)
+	}
+
+	// Round trip through the export archive into a new project.
+	archive, _, err := a.ExportContentRevision(ctx, "harbor-rich", revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := importProject(t, a, "harbor-rich-target")
+	preview, err := a.PreviewContentImport(ctx, target.ProjectID, "rich.wia-story.zip", archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imported, err := a.ReadContentDraft(ctx, preview.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if imported.Payload.Cover != "assets/cover.png" || imported.Payload.CoverAlt != "港口的封面" {
+		t.Fatalf("cover lost in the round trip: %+v", imported.Payload)
+	}
+	if imported.Payload.EventGeneration == nil {
+		t.Fatal("event generation rules were dropped")
+	}
+	if len(imported.Payload.NPCs) != 1 {
+		t.Fatalf("characters: %+v", imported.Payload.NPCs)
+	}
+	npc := imported.Payload.NPCs[0]
+	if npc.Avatar != "assets/keeper.png" || len(npc.SpeakingExamples) == 0 {
+		t.Fatalf("character fields lost: %+v", npc)
+	}
+	// The draft owns the image bytes, not a reference into the other revision.
+	assets, err := a.ListContentDraftAssets(ctx, imported.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(assets) != 2 {
+		t.Fatalf("imported draft did not take its own asset copies: %+v", assets)
+	}
+	staged, err := a.ReadContentDraftAsset(ctx, imported.DraftID, "assets/keeper.png")
+	if err != nil || len(staged) != len(avatar) {
+		t.Fatalf("imported asset bytes: %d %v", len(staged), err)
+	}
+	// Confirming and publishing the imported draft works without the source revision.
+	if _, err = a.ConfirmContentImport(ctx, preview.DraftID, preview.Version); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := a.ReadContentDraft(ctx, preview.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetVersion, _, err := a.ReadContentProject(ctx, target.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "rich-import-publish", DraftID: reloaded.DraftID, ExpectedDraftVersion: reloaded.Version, ExpectedProjectVersion: targetVersion.Version}); err != nil {
+		t.Fatalf("an imported rich package could not be published: %v", err)
+	}
+}
+
+// A draft started from a published revision inherits that revision's images.
+func TestDraftFromRevisionOwnsItsAssets(t *testing.T) {
+	ctx := context.Background()
+	a := newTestApp(t, &scriptedGenerator{})
+	project, draft := publishableDraft(t, a, "harbor-inherit")
+	if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, "assets/cover.png", pngBytes(t, 12, 8)); err != nil {
+		t.Fatal(err)
+	}
+	payload := draft.Payload
+	payload.Cover = "assets/cover.png"
+	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, _, err := a.ReadContentProject(ctx, project.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "inherit-publish", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: fresh.Version}); err != nil {
+		t.Fatal(err)
+	}
+	var revision string
+	if err = a.appDB.QueryRowContext(ctx, `SELECT revision FROM content_revisions WHERE user_id=? AND game_id='harbor-inherit'`, a.userID).Scan(&revision); err != nil {
+		t.Fatal(err)
+	}
+	copied, err := a.CreateContentDraft(ctx, project.ProjectID, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if copied.Payload.Cover != "assets/cover.png" {
+		t.Fatalf("copied draft lost the cover: %+v", copied.Payload)
+	}
+	assets, err := a.ListContentDraftAssets(ctx, copied.DraftID)
+	if err != nil || len(assets) != 1 {
+		t.Fatalf("copied draft has no asset of its own: %+v %v", assets, err)
+	}
+	body, err := a.ReadContentDraftAsset(ctx, copied.DraftID, "assets/cover.png")
+	if err != nil || len(body) == 0 {
+		t.Fatalf("copied draft asset is unreadable: %v", err)
+	}
+}
+
 func keysOf(files map[string][]byte) []string {
 	out := make([]string, 0, len(files))
 	for name := range files {

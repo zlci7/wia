@@ -141,6 +141,23 @@ func (a *App) RemoveContentDraftAsset(ctx context.Context, draftID, assetID stri
 	return nil
 }
 
+// ReadContentDraftAsset returns one staged asset's bytes, which is what publication
+// copies into the package.
+func (a *App) ReadContentDraftAsset(ctx context.Context, draftID, relativeName string) ([]byte, error) {
+	if _, err := a.ReadContentDraft(ctx, draftID); err != nil {
+		return nil, err
+	}
+	var staged string
+	err := a.appDB.QueryRowContext(ctx, `SELECT staged_path FROM content_draft_assets WHERE user_id=? AND draft_id=? AND relative_name=?`, a.userID, draftID, relativeName).Scan(&staged)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrContentNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(staged)
+}
+
 // ReadUploadedAsset enforces the upload limit before the service sees the bytes.
 func ReadUploadedAsset(reader io.Reader) ([]byte, error) {
 	body, err := io.ReadAll(io.LimitReader(reader, assetImageLimit+1))

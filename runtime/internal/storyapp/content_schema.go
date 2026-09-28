@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS content_operations (
   operation_id TEXT NOT NULL, kind TEXT NOT NULL, target_id TEXT NOT NULL,
   stage TEXT NOT NULL, status TEXT NOT NULL,
   result_json TEXT NOT NULL DEFAULT '', safe_error TEXT NOT NULL DEFAULT '',
+  plan_json TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (user_id, request_key)
 );
