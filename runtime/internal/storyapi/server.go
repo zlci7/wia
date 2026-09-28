@@ -121,6 +121,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		s.worlds(w, r)
 	case "/api/v1/active-world":
 		s.activeWorld(w, r)
+	case "/api/v1/personas":
+		s.personas(w, r)
 	default:
 		if strings.HasPrefix(r.URL.Path, "/api/v1/games/") {
 			s.gameRoute(w, r)
@@ -128,6 +130,14 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/v1/world-copy-operations/") {
 			s.copyOperation(w, r, strings.TrimPrefix(r.URL.Path, "/api/v1/world-copy-operations/"))
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/personas/") {
+			s.personaRoute(w, r, strings.TrimPrefix(r.URL.Path, "/api/v1/personas/"))
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/content/") {
+			s.contentRoute(w, r, strings.TrimPrefix(r.URL.Path, "/api/v1/content/"))
 			return
 		}
 		s.handleWorldRoute(w, r)
@@ -228,6 +238,10 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 	worldID := parts[3]
 	if len(parts) == 5 && parts[4] == "suggestions" {
 		s.suggestions(w, r, worldID)
+		return
+	}
+	if len(parts) == 5 && parts[4] == "player-profile" {
+		s.playerProfile(w, r, worldID)
 		return
 	}
 	if len(parts) == 5 && parts[4] == "cover" {
@@ -723,6 +737,18 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrSaveFailed):
 		status = 409
 		code = "save_failed"
+	case errors.Is(err, storyapp.ErrPersonaNotFound):
+		status = 404
+		code = "persona_not_found"
+	case errors.Is(err, storyapp.ErrContentNotFound):
+		status = 404
+		code = "content_not_found"
+	case errors.Is(err, storyapp.ErrContentBusy):
+		status = 409
+		code = "content_busy"
+	case errors.Is(err, storyapp.ErrContentInvalid):
+		status = 400
+		code = "content_invalid"
 	}
 	writeError(w, status, code, err.Error())
 }
