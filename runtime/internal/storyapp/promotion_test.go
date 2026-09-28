@@ -290,6 +290,23 @@ func TestBystanderStaysInSceneWhenTheSceneTextIsRewritten(t *testing.T) {
 	if !after.InScene {
 		t.Fatalf("a rewritten scene description moved the person out of the room: %+v", after)
 	}
+	// A description that names no known place must not clear the recorded location.
+	store, err = openWorldDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`UPDATE meta SET value='光线昏暗，看不清哪里。' WHERE key='scene'`); err != nil {
+		store.db.Close()
+		t.Fatal(err)
+	}
+	store.db.Close()
+	unknown, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !unknown.InScene {
+		t.Fatalf("an unrecognized description moved the person out of the room: %+v", unknown)
+	}
 }
 
 func openWorldForTest(t *testing.T, a *App, worldID string) *worldStore {

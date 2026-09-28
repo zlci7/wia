@@ -722,8 +722,12 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	snapshot.SceneViews = output.SceneViews
 	output.Scene = sceneFor(snapshot, "player")
 	// The identifier behind the scene text, kept so presence is never decided by
-	// comparing prose.
+	// comparing prose. A description that names no known place leaves the location
+	// unchanged rather than clearing it.
 	output.SceneLocation = locationIDFor(snapshot.Definition, output.Scene)
+	if output.SceneLocation == "" {
+		output.SceneLocation = snapshot.SceneLocation
+	}
 	snapshot.SceneVersion = output.SceneVersion
 	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
