@@ -256,7 +256,12 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 		return ContentDraft{}, err
 	}
 	baseRevision = cleanText(baseRevision)
-	payload := ContentDraftPayload{SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "", NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{}}
+	payload := ContentDraftPayload{
+		SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
+		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
+		// New content starts with a lead the player may adjust; the editor can lock it.
+		Player: PlayerDefaults{Editable: true},
+	}
 	status := draftStatusEditing
 	if baseRevision != "" {
 		copied, err := a.draftPayloadFromRevision(baseRevision, project.GameID)

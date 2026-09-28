@@ -127,6 +127,10 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
                 <label>主角姓名<input v-model="form.player.name" @input="touch" /></label>
                 <label>主角简介<textarea v-model="form.player.profile" rows="2" @input="touch"></textarea></label>
               </div>
+              <label class="check">
+                <input type="checkbox" :checked="form.player.editable !== false" @change="form.player.editable = !($event.target as HTMLInputElement).checked ? false : true; touch()" />
+                允许玩家修改主角资料（取消后主角固定为上面填写的内容）
+              </label>
             </fieldset>
 
             <fieldset>
@@ -276,6 +280,8 @@ function useAsAvatar(asset: { relative_name: string }, index: number) {
 .npc-card .row { grid-template-columns: 1fr 1fr 1fr auto; }
 .editor-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .editor-actions .primary { border-color: var(--accent, #ae5440); color: var(--accent, #ae5440); }
+.editor label.check { flex-direction: row; align-items: center; gap: .4rem; }
+.editor label.check input { width: auto; }
 .asset-upload { grid-template-columns: 1fr 1fr; }
 .asset-upload input[type="file"] { padding: .2rem; }
 .conflict { border: 1px solid var(--accent, #ae5440); border-radius: 8px; padding: .6rem .75rem; margin-bottom: .75rem; display: flex; flex-direction: column; gap: .4rem; }

@@ -63,7 +63,6 @@ func publishableDraft(t *testing.T, a *App, gameID string) (ContentProject, Cont
 	}
 	return project, saved
 }
-
 func TestPublishContentDraftIsImmutableAndResumable(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
@@ -108,6 +107,13 @@ func TestPublishContentDraftIsImmutableAndResumable(t *testing.T) {
 	}
 	if len(snapshot.Definition.Characters) != 1 || snapshot.Definition.Characters[0].Name != "看灯人" {
 		t.Fatalf("world characters: %+v", snapshot.Definition.Characters)
+	}
+	// Author-created content keeps the lead adjustable in the worlds it starts.
+	if !snapshot.Definition.Summary.Player.Editable {
+		t.Fatal("published content locked the lead character")
+	}
+	if _, err = a.UpdatePlayerProfile(ctx, world.WorldID, UpdatePlayerProfileRequest{PlayerName: "陆舟", PlayerProfile: "夜行客", ExpectedContextEpoch: snapshot.Summary.ContextEpoch}); err != nil {
+		t.Fatalf("lead profile is not editable in published content: %v", err)
 	}
 
 	// A repeated key returns the original result instead of publishing again.

@@ -41,6 +41,9 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	if blank.Version != 1 || blank.Status != draftStatusEditing || blank.Payload.GameID != "harbor-lights" || blank.Payload.Mode != "open" {
 		t.Fatalf("blank draft: %+v", blank)
 	}
+	if !blank.Payload.Player.Editable {
+		t.Fatal("new content must start with a lead the player may adjust")
+	}
 	if draft, err := a.ReadContentDraft(ctx, blank.DraftID); err != nil || draft.Version != 1 || draft.Payload.Title != "港口的灯" {
 		t.Fatalf("read draft: %+v %v", draft, err)
 	}
