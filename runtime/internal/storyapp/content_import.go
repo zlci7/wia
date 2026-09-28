@@ -26,6 +26,11 @@ const (
 	importZipEntries = 128
 	importZipDepth   = 8
 	importSourceName = "import-source"
+	// Imported cards carry no world structure, so a draft starts with one usable place
+	// and time that the author can rename.
+	defaultImportLocation     = "main"
+	defaultImportLocationName = "主要场景"
+	defaultImportClock        = "第 1 日 09:00"
 )
 
 type ImportMapping struct {
@@ -316,6 +321,18 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	payload.NPCs = []ContentDraftNPC{npc}
 	payload.Title = project.Title
 	payload.Description = firstLine(profile, 400)
+	// A card has no world structure, so the draft starts with one usable place and the
+	// card's greeting as the opening candidate; the author edits both before publishing.
+	payload.Locations = []PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
+	payload.InitialLocation = defaultImportLocation
+	npc.InitialLocation = defaultImportLocation
+	payload.NPCs = []ContentDraftNPC{npc}
+	if payload.Clock == "" {
+		payload.Clock = defaultImportClock
+	}
+	if greeting := replaceCardMacros(strings.TrimSpace(card.Data.FirstMes), replacements); greeting != "" {
+		payload.Opening = truncateRunes(greeting, 8000)
+	}
 	report := ImportReport{
 		Format: "ccv2", FormatDetail: "Character Card V2 text card", SourceBytes: len(body),
 		Summary: "卡片已映射为一名重要人物候选；情境与开场需要确认后才能作为世界背景或开场。",

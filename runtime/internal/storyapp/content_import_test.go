@@ -113,6 +113,14 @@ func TestImportCharacterCard(t *testing.T) {
 	if len(npc.SpeakingExamples) == 0 || !strings.Contains(strings.Join(npc.SpeakingExamples, " "), "灯要按时点") {
 		t.Fatalf("speaking examples: %+v", npc.SpeakingExamples)
 	}
+	// A card has no world structure, so the draft must still be publishable after the
+	// author confirms it: one place, a starting time and the greeting as the opening.
+	if draft.Payload.InitialLocation == "" || len(draft.Payload.Locations) == 0 || draft.Payload.Clock == "" || draft.Payload.Opening == "" {
+		t.Fatalf("card import is not a usable draft: %+v", draft.Payload)
+	}
+	if !strings.Contains(draft.Payload.Opening, "雾里别走远") {
+		t.Fatalf("greeting did not become the opening candidate: %q", draft.Payload.Opening)
+	}
 	// Behaviour instructions and extensions never become prompt text or settings.
 	body, err := json.Marshal(draft.Payload)
 	if err != nil {
