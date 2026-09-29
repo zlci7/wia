@@ -80,7 +80,7 @@ func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T)
 	s := contextFixture()
 	s.Memories["npc:innkeeper"] = []wiaworld.Memory{{SourceEventID: "secret", Content: "SECRET_MEMORY"}}
 	s.SceneViews[1].Content = "PRIVATE_SCENE"
-	material := composeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", turn.StageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
+	material := turn.ComposeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", turn.StageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
 	req, _, err := (turn.ContextComposer{}).Build(material, material.System, 1024)
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ func (g sceneUpdateGenerator) GenerateText(ctx context.Context, req model.TextRe
 		}
 		start := strings.Index(req.Input, "场景来源(JSON)：") + len("场景来源(JSON)：")
 		end := strings.Index(req.Input[start:], "\n")
-		var sources []sceneSource
+		var sources []turn.SceneSource
 		_ = json.Unmarshal([]byte(req.Input[start:start+end]), &sources)
 		for _, source := range sources {
 			if strings.HasSuffix(source.ID, ":input") {
@@ -242,7 +242,7 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 }
 
 func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
-	events := narrativeEvents([]wiaworld.Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", wiaworld.NarrativeSettings{})
+	events := turn.NarrativeEvents([]wiaworld.Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", wiaworld.NarrativeSettings{})
 	if len(events) != 1 || events[0].SpeechScope != "public_current_scene" {
 		t.Fatalf("%+v", events)
 	}
@@ -250,7 +250,7 @@ func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
 
 func TestNarrativeEventsPreservePlayerAudibility(t *testing.T) {
 	for _, test := range []struct{ source, scope string }{{"player_public", "public_current_scene"}, {"player_private", "private_recipient"}} {
-		events := narrativeEvents([]wiaworld.Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", wiaworld.NarrativeSettings{})
+		events := turn.NarrativeEvents([]wiaworld.Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", wiaworld.NarrativeSettings{})
 		if len(events) != 1 || events[0].SpeechScope != test.scope {
 			t.Fatalf("%+v", events)
 		}
@@ -264,7 +264,7 @@ func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
 		{EventID: "foreign", RunID: "foreign", Stage: 1, EventType: "player_attempt"},
 		{EventID: "future", RunID: "current", Stage: 9, EventType: "npc_dialogue"},
 	}
-	sources := sceneSources(s, wiaworld.Run{RunID: "current"}, turn.TurnIntent{Visibility: "public"}, events)
+	sources := turn.SceneSources(s, wiaworld.Run{RunID: "current"}, turn.TurnIntent{Visibility: "public"}, events)
 	var valid bool
 	for _, source := range sources {
 		if source.ID == "foreign" || source.ID == "future" {

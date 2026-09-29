@@ -45,11 +45,11 @@ func (h *turnHost) ResolveIntent(ctx context.Context, generator model.TextGenera
 }
 
 func (h *turnHost) RunCharacters(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	return h.app.runCharacterStages(ctx, generator, snapshot, run, intent, sceneCharacters(snapshot.Characters), output.PerceptText, output.StageOneInputs, output)
+	return h.app.runCharacterStages(ctx, generator, snapshot, run, intent, turn.InScene(snapshot.Characters), output.PerceptText, output.StageOneInputs, output)
 }
 
 func (h *turnHost) Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	participants := sceneCharacters(snapshot.Characters)
+	participants := turn.InScene(snapshot.Characters)
 	host, visibleEvents, err := h.app.coordinateStage(ctx, generator, snapshot, run, intent, participants, intent.AddresseeID, intent.Private(), output)
 	if err != nil {
 		return err

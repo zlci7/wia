@@ -124,7 +124,7 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		}
 		updates := []sceneUpdate{}
 		if g.scene != "" {
-			var sources []sceneSource
+			var sources []turn.SceneSource
 			start := strings.Index(req.Input, "场景来源(JSON)：") + len("场景来源(JSON)：")
 			end := strings.Index(req.Input[start:], "\n")
 			if end >= 0 && json.Unmarshal([]byte(req.Input[start:start+end]), &sources) == nil {
@@ -410,7 +410,7 @@ func TestPublicAddressKeepsNPCAttribution(t *testing.T) {
 
 func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *testing.T) {
 	def := lanternDefinition()
-	character, ok := characterByID(def, "npc:mercenary")
+	character, ok := turn.CharacterByID(def, "npc:mercenary")
 	if !ok {
 		t.Fatal("mercenary definition missing")
 	}
@@ -422,7 +422,7 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 		Memories:     map[string][]wiaworld.Memory{},
 		SceneVersion: 1,
 	}
-	prompt := buildNPCPrompt(snapshot, def, character, "", "act", turn.StageInput{PlayerPerception: "走进大门看看"}, "", 1)
+	prompt := turn.ComposeNPC(snapshot, def, character, "", "act", turn.StageInput{PlayerPerception: "走进大门看看"}, "", 1).Required
 	for _, want := range []string{
 		"按情境主动",
 		"可以沉默，也可以在规则允许时主动介入",

@@ -50,7 +50,7 @@ func validateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) er
 	}
 	seen = map[string]bool{}
 	for _, id := range p.Participants {
-		if _, ok := characterByID(def, id); !ok || seen[id] {
+		if _, ok := turn.CharacterByID(def, id); !ok || seen[id] {
 			return fmt.Errorf("story.json: invalid event_generation participant")
 		}
 		seen[id] = true

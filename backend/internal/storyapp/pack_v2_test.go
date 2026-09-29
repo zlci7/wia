@@ -171,7 +171,8 @@ func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
 	if len(def.Characters) == 0 || len(def.Characters[0].SpeakingExamples) != 2 {
 		t.Fatalf("published samples did not reach the world roster: %+v", def.Characters)
 	}
-	prompt := buildNPCPrompt(snapshot, def, def.Characters[0], "player", "speak", turn.StageInput{PlayerPerception: "我问他灯的事。"}, "", 1)
+	material := turn.ComposeNPC(snapshot, def, def.Characters[0], "player", "speak", turn.StageInput{PlayerPerception: "我问他灯的事。"}, "", 1)
+	prompt := material.Required
 	for _, example := range def.Characters[0].SpeakingExamples {
 		if !strings.Contains(prompt, example) {
 			t.Fatalf("the prompt dropped a speaking example %q", example)

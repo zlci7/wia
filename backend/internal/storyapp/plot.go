@@ -291,7 +291,7 @@ func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.
 			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
-			if _, ok := characterByID(story.Definition{Characters: snapshot.Characters}, p.Recipient); !ok {
+			if _, ok := turn.CharacterByID(story.Definition{Characters: snapshot.Characters}, p.Recipient); !ok {
 				return fmt.Errorf("%w: plot_unknown_character", ErrGenerationFailed)
 			}
 		}
@@ -449,7 +449,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		sources := plotSceneSources(*output, nil)
 		for i, outcome := range resolved.Outcomes {
 			action, _ := turn.EventByID(extra.Events, outcome.ActionID)
-			sources[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
+			sources[outcome.ActionID] = turn.SceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
 		}
 		version := output.SceneVersion
 		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {
@@ -470,10 +470,10 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 }
 
 func plotActionSceneContract(output turn.Output, allowed map[string][]string) string {
-	sources := map[string]sceneSource{}
+	sources := map[string]turn.SceneSource{}
 	for _, v := range output.SceneViews {
 		id := "view:" + v.Recipient
-		sources[id] = sceneSource{ID: id, Content: v.Content, Recipients: []string{v.Recipient}}
+		sources[id] = turn.SceneSource{ID: id, Content: v.Content, Recipients: []string{v.Recipient}}
 	}
 	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + wire.MarshalJSON(sources) + "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）：" + wire.MarshalJSON(allowed)
 }

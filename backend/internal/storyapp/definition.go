@@ -31,25 +31,6 @@ func storyBystanders(items []content.PackBystander) []story.Bystander {
 	return out
 }
 
-func characterByID(def story.Definition, id string) (wiaworld.Character, bool) {
-	for _, c := range def.Characters {
-		if c.EntityID == strings.TrimSpace(id) {
-			return c, true
-		}
-	}
-	return wiaworld.Character{}, false
-}
-
-func sceneCharacters(characters []wiaworld.Character) []wiaworld.Character {
-	result := make([]wiaworld.Character, 0, len(characters))
-	for _, character := range characters {
-		if character.InScene {
-			result = append(result, character)
-		}
-	}
-	return result
-}
-
 func findSceneCharacter(characters []wiaworld.Character, id string) (wiaworld.Character, bool) {
 	for _, character := range characters {
 		if character.InScene && character.EntityID == strings.TrimSpace(id) {

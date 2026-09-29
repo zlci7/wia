@@ -20,7 +20,7 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 	}
 	s := readContextSnapshot(t, a, w.WorldID)
 	for _, c := range s.Characters {
-		initial, _ := characterByID(lanternDefinition(), c.EntityID)
+		initial, _ := turn.CharacterByID(lanternDefinition(), c.EntityID)
 		if c.InitialConcerns == "" || c.InitialConcerns != initial.InitialConcerns {
 			t.Fatal("initial concern not copied")
 		}
@@ -32,8 +32,8 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 		}
 	}
 	s.Characters[0].InitialConcerns = "ONLY_FIRST_CHARACTER_CONCERN"
-	own := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
-	other := composeNPC(s, lanternDefinition(), s.Characters[1], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
+	own := turn.ComposeNPC(s, lanternDefinition(), s.Characters[0], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
+	other := turn.ComposeNPC(s, lanternDefinition(), s.Characters[1], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
 	if !strings.Contains(own.Required, "ONLY_FIRST_CHARACTER_CONCERN") || strings.Contains(other.Required, "ONLY_FIRST_CHARACTER_CONCERN") {
 		t.Fatal("concern scope")
 	}
@@ -72,7 +72,7 @@ func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
 		t.Fatalf("actions=%d", actions)
 	}
 	s := contextFixture()
-	m := composeNPC(s, lanternDefinition(), actor, "", "act", turn.StageInput{PlayerPerception: "我沉默片刻，不回复"}, "", 1)
+	m := turn.ComposeNPC(s, lanternDefinition(), actor, "", "act", turn.StageInput{PlayerPerception: "我沉默片刻，不回复"}, "", 1)
 	if strings.Contains(m.Required, "基于玩家本轮输入作出一次自然决定") || !strings.Contains(m.Required, "处理自己的事务") {
 		t.Fatal("reactive-only task")
 	}

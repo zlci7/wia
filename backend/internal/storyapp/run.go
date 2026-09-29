@@ -159,19 +159,6 @@ type narrativeResult struct {
 	Narrative string `json:"narrative"`
 }
 
-type narrativeEvent struct {
-	OutcomeStatus      string `json:"outcome_status,omitempty"`
-	EventID            string `json:"event_id"`
-	EventType          string `json:"event_type"`
-	ActorID            string `json:"actor_id"`
-	ActorName          string `json:"actor_name"`
-	ActorRole          string `json:"actor_role,omitempty"`
-	NarrativeReference string `json:"narrative_reference"`
-	Stage              int    `json:"stage"`
-	SpeechScope        string `json:"speech_scope,omitempty"`
-	Content            string `json:"content"`
-}
-
 const (
 	turnStageLoad         turn.Stage = "load_world"
 	turnStageIntent       turn.Stage = "intent"
@@ -559,14 +546,14 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 }
 
 func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turn.TurnIntent, int, error) {
-	participants := sceneCharacters(snapshot.Characters)
+	participants := turn.InScene(snapshot.Characters)
 	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
 		if _, ok := findSceneCharacter(participants, explicitRecipient); !ok {
 			return turn.TurnIntent{}, 0, ErrInvalidRequest
 		}
 	}
-	material := composeIntent(snapshot, run)
+	material := turn.ComposeIntent(snapshot, run)
 	generator = a.contextGenerator(generator, material, snapshot, run, "intent", "player", 0, intentPromptVersion)
 	input := material.Required
 	var intent turn.TurnIntent
@@ -938,7 +925,7 @@ func appendHostOutcomes(output *turn.Output, run wiaworld.Run, participants []wi
 
 func playerExperienceMemory(intentType string, private bool, characterID, recipient, input string, def story.Definition) (string, string) {
 	if private && characterID != recipient {
-		return "observed", "我看见玩家和" + describeRecipient(def, recipient) + "低声交谈，但没有听清内容。"
+		return "observed", "我看见玩家和" + turn.DescribeRecipient(def, recipient) + "低声交谈，但没有听清内容。"
 	}
 	switch intentType {
 	case "observe":
@@ -953,16 +940,6 @@ func playerExperienceMemory(intentType string, private bool, characterID, recipi
 	}
 }
 
-func describeRecipient(def story.Definition, recipient string) string {
-	if recipient == "" {
-		return "未明确指定具体人物"
-	}
-	if character, ok := characterByID(def, recipient); ok {
-		return fmt.Sprintf("%s（%s）", character.Name, character.Role)
-	}
-	return "未明确指定具体人物"
-}
-
 func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]turn.StageInput, priorTurn map[string]string, decisions map[string]turn.NPCDecision, stage int) error {
 	if generator == nil {
 		return ErrModelNotConfigured
@@ -973,7 +950,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 	var firstErr error
 	var errMu sync.Mutex
 	var decisionMu sync.Mutex
-	for _, character := range sceneCharacters(snapshot.Characters) {
+	for _, character := range turn.InScene(snapshot.Characters) {
 		character := character
 		stageInput, present := inputs[character.EntityID]
 		if !present {
@@ -982,7 +959,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			material := composeNPC(snapshot, def, character, recipient, intentType, stageInput, priorTurn[character.EntityID], stage)
+			material := turn.ComposeNPC(snapshot, def, character, recipient, intentType, stageInput, priorTurn[character.EntityID], stage)
 			callGenerator := a.contextGenerator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 			input := material.Required
 			var decision turn.NPCDecision
@@ -1035,7 +1012,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	if generator == nil {
 		return hostResult{}, 0, ErrModelNotConfigured
 	}
-	material := composeCoordination(snapshot, run, intent, decisions, events, publicReplies)
+	material := turn.ComposeCoordination(snapshot, run, intent, decisions, events, publicReplies)
 	generator = a.contextGenerator(generator, material, snapshot, run, "coordination", "coordinator", 3, coordinationPromptVersion)
 	input := material.Required
 	var result hostResult
@@ -1088,7 +1065,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}
-	material, maxOutputTokens, err := composeNarration(snapshot, run, def, recipient, intentType, visibleEvents, clock, sceneCharacters)
+	material, maxOutputTokens, err := turn.ComposeNarration(snapshot, run, def, recipient, intentType, visibleEvents, clock, sceneCharacters)
 	if err != nil {
 		return narrativeResult{}, 0, err
 	}
@@ -1105,34 +1082,6 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 		return narrativeResult{}, repairCount, err
 	}
 	return narrativeResult{Narrative: narrative}, repairCount, nil
-}
-
-func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, playerName string, settings wiaworld.NarrativeSettings) []narrativeEvent {
-	result := make([]narrativeEvent, 0, len(events))
-	for _, event := range events {
-		name, role, reference := event.ActorID, "", event.ActorID
-		if event.ActorID == "player" {
-			name, role, reference = playerName, "player_character", turn.NarrativeReference(settings, playerName)
-		}
-		for _, character := range characters {
-			if character.EntityID == event.ActorID {
-				name, role, reference = character.Name, character.Role, character.Name
-				break
-			}
-		}
-		speechScope := ""
-		if event.EventType == "npc_dialogue" || event.SourceType == "player_public" {
-			speechScope = "public_current_scene"
-		} else if event.SourceType == "player_private" {
-			speechScope = "private_recipient"
-		}
-		outcomeStatus := ""
-		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
-			outcomeStatus = strings.TrimPrefix(event.SourceType, "action_")
-		}
-		result = append(result, narrativeEvent{OutcomeStatus: outcomeStatus, SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
-	}
-	return result
 }
 
 // formatBystanders lists passers-by with their stable identity so a coordinated
