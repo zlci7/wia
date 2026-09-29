@@ -26,7 +26,7 @@ if ($AgentConfig) {
 }
 if (-not $DataRoot) {
     $DataRoot = $env:WIA_DATA_ROOT
-    if (-not $DataRoot) { $DataRoot = Join-Path $root 'runtime/.local/runtime-data' }
+    if (-not $DataRoot) { $DataRoot = Join-Path $root 'backend/.local/runtime-data' }
 }
 if (-not [System.IO.Path]::IsPathRooted($DataRoot)) { $DataRoot = Join-Path $root $DataRoot }
 $DataRoot = [System.IO.Path]::GetFullPath($DataRoot)
@@ -39,7 +39,7 @@ Push-Location $root
 try {
     if ($configPath) { $env:GAMEAGENT_AGENT_CONFIG = $configPath }
     $env:WIA_DATA_ROOT = $DataRoot
-    & go run ./runtime/cmd/server
+    & go run ./backend/cmd/wia
     if ($LASTEXITCODE -ne 0) { throw "Runtime exited with code $LASTEXITCODE" }
 }
 finally {

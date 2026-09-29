@@ -58,7 +58,7 @@ $exeName = 'wia-runtime.exe'
 # The client is embedded with //go:embed, so it has to exist before the Go build
 # reads it. Building it here keeps the package from shipping a stale bundle.
 Write-Host 'Building the local client...'
-Push-Location (Join-Path $root 'console\web')
+Push-Location (Join-Path $root 'frontend')
 try {
     # Always npm ci, not only when node_modules is absent: a release has to be
     # reproducible from the lock file rather than from whatever is installed.
@@ -79,7 +79,7 @@ try {
     # nothing here is meant to be debugged from a release binary.
     # CGO_ENABLED=0 keeps the binary free of a C runtime dependency.
     $env:CGO_ENABLED = '0'
-    & go build -trimpath -ldflags "-s -w -X main.version=$Version" -o (Join-Path $stage $exeName) ./runtime/cmd/server
+    & go build -trimpath -ldflags "-s -w -X main.version=$Version" -o (Join-Path $stage $exeName) ./backend/cmd/wia
     if ($LASTEXITCODE -ne 0) { throw "Go build failed with exit code $LASTEXITCODE" }
 }
 finally {

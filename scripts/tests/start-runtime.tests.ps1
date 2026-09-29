@@ -29,19 +29,19 @@ try {
     & $launcher
     Assert (-not $launchTest.Invocation.Config) 'Default launcher must use the selected profile'
     $env:GAMEAGENT_AGENT_CONFIG = 'existing-config'
-    foreach ($config in @('runtime/config/games/stardew-valley/agent.json', 'runtime/config/agent.json')) {
+    foreach ($config in @('backend/config/games/stardew-valley/agent.json', 'backend/config/agent.json')) {
         $launchTest.Invocation = $null
         & $launcher -AgentConfig $config
         Assert ($launchTest.Invocation.Config -eq (Join-Path $root $config)) 'Wrong configuration supplied to Runtime'
         Assert ($launchTest.Invocation.Directory -eq $root) 'Runtime must start at repository root'
-        Assert (($launchTest.Invocation.Arguments -join ' ') -eq 'run ./runtime/cmd/server') 'Wrong Go command'
+        Assert (($launchTest.Invocation.Arguments -join ' ') -eq 'run ./backend/cmd/wia') 'Wrong Go command'
         Assert ($env:GAMEAGENT_AGENT_CONFIG -eq 'existing-config') 'Caller environment was changed'
         Assert ((Get-Location).Path -eq $callerDirectory) 'Caller directory was changed'
     }
-    & $launcher -AgentConfig (Join-Path $root 'runtime/config/agent.json')
-    Assert ($launchTest.Invocation.Config -eq (Join-Path $root 'runtime/config/agent.json')) 'Absolute path was not accepted'
+    & $launcher -AgentConfig (Join-Path $root 'backend/config/agent.json')
+    Assert ($launchTest.Invocation.Config -eq (Join-Path $root 'backend/config/agent.json')) 'Absolute path was not accepted'
 
-    foreach ($invalid in @('runtime/config/nonexistent-launcher-test.json', 'AGENTS.md', 'runtime/config')) {
+    foreach ($invalid in @('backend/config/nonexistent-launcher-test.json', 'AGENTS.md', 'backend/config')) {
         $launchTest.Invocation = $null
         $failed = $false
         try { & $launcher -AgentConfig $invalid } catch { $failed = $true }

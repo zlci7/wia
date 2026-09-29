@@ -27,8 +27,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$webRoot = Join-Path $root 'console\web'
-$embeddedIndex = Join-Path $root 'console\dist\index.html'
+$webRoot = Join-Path $root 'frontend'
+$embeddedIndex = Join-Path $root 'backend\internal\webdist\dist\index.html'
 
 Get-Command go -ErrorAction Stop | Out-Null
 
@@ -79,7 +79,7 @@ if ($resolvedModelConfig) {
 Write-Host 'Starting Phase12 Runtime. Press Ctrl+C to stop.'
 Push-Location $root
 try {
-    & go run ./runtime/cmd/server @runtimeArgs
+    & go run ./backend/cmd/wia @runtimeArgs
     if ($LASTEXITCODE -ne 0) { throw "Runtime exited with code $LASTEXITCODE" }
 }
 finally {

@@ -28,7 +28,7 @@ cd D:\data\project\game-agent\wia
 也可以先构建可执行文件：
 
 ```powershell
-go build -o wia-runtime.exe ./runtime/cmd/server
+go build -o wia-runtime.exe ./backend/cmd/wia
 .\wia-runtime.exe
 ```
 通过 `-data-root` 指定数据目录，或使用 `WIA_DATA_ROOT`。默认数据目录是 `%LOCALAPPDATA%\WorldIsAgent`。每个世界位于独立的 SQLite 数据库中；另存会创建新的 world_id，读取后继续写入所选世界。

@@ -1,0 +1,385 @@
+package storyapi
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"strings"
+	"testing"
+	"testing/fstest"
+	"time"
+
+	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storyapp"
+)
+
+type apiGenerator struct{}
+
+func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return model.TextResponse{}, err
+	}
+	if strings.Contains(request.System, "结构化回合意图") {
+		return model.TextResponse{Text: `{"intent_type":"speak","addressee_id":"npc:innkeeper","visibility":"private"}`}, nil
+	}
+	if strings.Contains(request.System, "场景协调 Agent") {
+		var candidates []storyapp.Event
+		start := strings.Index(request.Input, "待裁定行动(JSON)：")
+		end := strings.Index(request.Input, "\n所有可用重要人物：")
+		if start < 0 || end < start || json.Unmarshal([]byte(request.Input[start+len("待裁定行动(JSON)："):end]), &candidates) != nil {
+			return model.TextResponse{Text: `{}`}, nil
+		}
+		outcomes := make([]map[string]any, 0, len(candidates))
+		for _, candidate := range candidates {
+			outcomes = append(outcomes, map[string]any{"action_id": candidate.EventID, "status": "succeeded", "content": "行动已经完成。", "recipients": []string{"player", "npc:innkeeper", "npc:mercenary"}})
+		}
+		data, _ := json.Marshal(map[string]any{"time_minutes": 0, "scene": "旧渡口客栈", "scene_characters": []string{"npc:innkeeper", "npc:mercenary"}, "outcomes": outcomes, "scene_updates": []any{}})
+		return model.TextResponse{Text: string(data)}, nil
+	}
+	if strings.Contains(request.System, "玩家正文 Agent") {
+		return model.TextResponse{Text: `{"narrative":"雨声沿着窗棂滑下，客栈里的人都听见了这句话。"}`}, nil
+	}
+	return model.TextResponse{Text: `{"speech":"我听见了。","action_intent":"继续观察","silent":false,"memory":"我记住了这次交谈。"}`}, nil
+}
+
+func TestLocalSessionAndStoryRoutes(t *testing.T) {
+	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+
+	server, err := New(Options{
+		Addr:    "127.0.0.1:0",
+		App:     app,
+		Assets:  fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<html>story</html>")}},
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Shutdown()
+	go func() { _ = server.Serve() }()
+
+	plainClient := &http.Client{}
+	response, body := requestJSON(t, plainClient, http.MethodGet, server.URL()+"/api/v1/status", nil)
+	if response.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "unauthorized") {
+		t.Fatalf("unauthorized status = %d, body = %s", response.StatusCode, body)
+	}
+
+	parsed, err := url.Parse(server.BrowserURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := strings.TrimPrefix(parsed.Fragment, "token=")
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	response, _ = requestJSON(t, client, http.MethodPost, server.URL()+"/api/session", map[string]string{"token": token})
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("session status = %d", response.StatusCode)
+	}
+	originRequest, err := http.NewRequest(http.MethodGet, server.URL()+"/api/v1/status", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originRequest.Header.Set("Origin", "http://attacker.invalid")
+	originResponse, err := client.Do(originRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = originResponse.Body.Close()
+	if originResponse.StatusCode != http.StatusForbidden {
+		t.Fatalf("unexpected origin status = %d", originResponse.StatusCode)
+	}
+
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/", nil)
+	if response.StatusCode != http.StatusOK || string(body) != "<html>story</html>" {
+		t.Fatalf("asset response = %d/%q", response.StatusCode, body)
+	}
+
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/status", nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.StatusCode, body)
+	}
+	var statusEnvelope struct {
+		Status storyapp.Status `json:"status"`
+	}
+	decodeJSONBody(t, body, &statusEnvelope)
+	if !statusEnvelope.Status.Ready || statusEnvelope.Status.ActiveWorld != nil {
+		t.Fatalf("initial status = %+v", statusEnvelope.Status)
+	}
+	for _, route := range []string{"/api/v1/games", "/api/v1/games/orbital-repair", "/api/v1/games/lantern-dusk"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+route, nil)
+		if response.StatusCode != 200 {
+			t.Fatalf("catalog %s: %d", route, response.StatusCode)
+		}
+		for _, private := range []string{"author_facts", "initial_concerns", "knowledge", "漏签", "信蜡", "plot"} {
+			if strings.Contains(string(body), private) {
+				t.Fatalf("catalog exposes %s", private)
+			}
+		}
+	}
+	response, _ = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{"game_id": "orbital-repair", "expected_revision": "old", "request_key": "stale"})
+	if response.StatusCode != 409 {
+		t.Fatalf("version conflict: %d", response.StatusCode)
+	}
+	response, _ = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{"game_id": "orbital-repair", "expected_revision": "orbital-repair.pack.v1", "request_key": "mode", "mode": "guided"})
+	if response.StatusCode != 400 {
+		t.Fatalf("player mode override: %d", response.StatusCode)
+	}
+
+	response, body = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds", map[string]any{
+		"name":              "HTTP 冒险",
+		"game_id":           "lantern-dusk",
+		"expected_revision": "lantern-dusk.pack.v2",
+		"request_key":       "http-create-world",
+		"player_name":       "旅人",
+		"player_profile":    "寻找信使",
+		"activate":          true,
+	})
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create world = %d, body = %s", response.StatusCode, body)
+	}
+	var worldEnvelope struct {
+		World storyapp.WorldSummary `json:"world"`
+	}
+	decodeJSONBody(t, body, &worldEnvelope)
+	world := worldEnvelope.World
+	for _, query := range []string{"limit=0", "limit=201", "limit=no", "limit=", "before_seq=0", "before_seq=-1", "before_seq=bad", "after_seq=-1", "after_seq=", "after_seq=9223372036854775808", "before_seq=2&after_seq=0"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages?"+query, nil)
+		if response.StatusCode != http.StatusBadRequest {
+			t.Fatalf("invalid cursor %s: %d %s", query, response.StatusCode, body)
+		}
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages?after_seq=0&limit=1", nil)
+	var messagePage storyapp.MessagePage
+	decodeJSONBody(t, body, &messagePage)
+	if response.StatusCode != http.StatusOK || len(messagePage.Messages) != 1 || messagePage.Messages[0].Seq != 1 || messagePage.HasMore {
+		t.Fatalf("message page: %d %s", response.StatusCode, body)
+	}
+	if world.WorldID == "" || world.MessageHead != 1 || world.EventHead != 1 {
+		t.Fatalf("created world = %+v", world)
+	}
+	response, body = requestJSON(t, client, http.MethodPut, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/agent-settings", map[string]any{
+		"perspective":            "omniscient",
+		"length":                 "standard",
+		"detail":                 "balanced",
+		"player_elaboration":     "natural",
+		"npc_initiative":         "contextual",
+		"expected_context_epoch": world.ContextEpoch,
+	})
+	if response.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "invalid_request") {
+		t.Fatalf("invalid agent settings = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodPut, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/agent-settings", map[string]any{
+		"perspective":            "third_person",
+		"length":                 "concise",
+		"detail":                 "restrained",
+		"player_elaboration":     "expressive",
+		"npc_initiative":         "proactive",
+		"custom_instruction":     "对白留白。",
+		"expected_context_epoch": world.ContextEpoch,
+	})
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("agent settings = %d, body = %s", response.StatusCode, body)
+	}
+	var settingsEnvelope struct {
+		Settings storyapp.NarrativeSettings `json:"settings"`
+		World    storyapp.WorldSummary      `json:"world"`
+	}
+	decodeJSONBody(t, body, &settingsEnvelope)
+	if settingsEnvelope.Settings.Perspective != storyapp.PerspectiveThirdPerson || settingsEnvelope.Settings.PlayerElaboration != storyapp.PlayerElaborationExpressive || settingsEnvelope.Settings.NPCInitiative != storyapp.NPCInitiativeProactive || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
+		t.Fatalf("agent settings response = %+v", settingsEnvelope)
+	}
+	world = settingsEnvelope.World
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs", nil)
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"runs":[]`) {
+		t.Fatalf("empty run list = %d, body = %s", response.StatusCode, body)
+	}
+
+	response, body = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs", map[string]any{
+		"request_key":              "http-run-1",
+		"input":                    "我私下对老板说：有人来过。",
+		"expected_active_revision": 1,
+		"expected_message_head":    1,
+		"expected_event_head":      1,
+		"expected_context_epoch":   world.ContextEpoch,
+	})
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("submit run = %d, body = %s", response.StatusCode, body)
+	}
+	var runEnvelope struct {
+		Run storyapp.Run `json:"run"`
+	}
+	decodeJSONBody(t, body, &runEnvelope)
+	run := runEnvelope.Run
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs/"+url.PathEscape(run.RunID), nil)
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("read run = %d, body = %s", response.StatusCode, body)
+		}
+		decodeJSONBody(t, body, &runEnvelope)
+		run = runEnvelope.Run
+		if run.Status != "accepted" && run.Status != "running" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if run.Status != "completed" {
+		t.Fatalf("run = %+v", run)
+	}
+
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs", nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("list runs = %d, body = %s", response.StatusCode, body)
+	}
+	var runsEnvelope struct {
+		Runs []storyapp.Run `json:"runs"`
+	}
+	decodeJSONBody(t, body, &runsEnvelope)
+	if len(runsEnvelope.Runs) != 1 || runsEnvelope.Runs[0].RunID != run.RunID {
+		t.Fatalf("runs = %+v", runsEnvelope.Runs)
+	}
+
+	for _, key := range []string{"http-run-1", "missing-key"} {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/runs?request_key="+url.QueryEscape(key), nil)
+		decodeJSONBody(t, body, &runsEnvelope)
+		want := 0
+		if key == "http-run-1" {
+			want = 1
+		}
+		if response.StatusCode != http.StatusOK || len(runsEnvelope.Runs) != want {
+			t.Fatalf("request lookup: %d %s", response.StatusCode, body)
+		}
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID), nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("read world = %d, body = %s", response.StatusCode, body)
+	}
+	var readEnvelope struct {
+		Messages          []storyapp.Message         `json:"messages"`
+		Bystanders        []string                   `json:"bystanders"`
+		Characters        []storyapp.PublicCharacter `json:"characters"`
+		NarrativeSettings storyapp.NarrativeSettings `json:"narrative_settings"`
+	}
+	decodeJSONBody(t, body, &readEnvelope)
+	if len(readEnvelope.Messages) != 3 || readEnvelope.Messages[1].Kind != "player" || readEnvelope.Messages[2].Kind != "narrative" {
+		t.Fatalf("messages = %+v", readEnvelope.Messages)
+	}
+	if len(readEnvelope.Bystanders) != 10 || len(readEnvelope.Characters) != 2 || strings.Contains(string(body), "染血的信蜡") || strings.Contains(string(body), "知道失踪信使曾在今晚来过") {
+		t.Fatalf("player projection leaked or is incomplete: %s", body)
+	}
+	if readEnvelope.NarrativeSettings != settingsEnvelope.Settings {
+		t.Fatalf("narrative settings = %+v, want %+v", readEnvelope.NarrativeSettings, settingsEnvelope.Settings)
+	}
+
+	response, body = requestJSON(t, client, http.MethodPost, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/save-as", map[string]any{
+		"name":                     "HTTP 分支",
+		"request_key":              "http-copy-1",
+		"expected_active_revision": 1,
+	})
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("save as = %d, body = %s", response.StatusCode, body)
+	}
+	var operationEnvelope struct {
+		Operation storyapp.SaveOperation `json:"operation"`
+	}
+	decodeJSONBody(t, body, &operationEnvelope)
+	operation := operationEnvelope.Operation
+	for time.Now().Before(deadline) {
+		response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/world-copy-operations/"+url.PathEscape(operation.OperationID), nil)
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("read copy = %d, body = %s", response.StatusCode, body)
+		}
+		decodeJSONBody(t, body, &operationEnvelope)
+		operation = operationEnvelope.Operation
+		if operation.Status != "copying" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if operation.Status != "ready" {
+		t.Fatalf("copy operation = %+v", operation)
+	}
+
+	response, body = requestJSON(t, client, http.MethodDelete, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID), nil)
+	if response.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "invalid_request") {
+		t.Fatalf("delete without active revision = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodDelete, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"?expected_active_revision=999", nil)
+	if response.StatusCode != http.StatusConflict || !strings.Contains(string(body), "version_conflict") {
+		t.Fatalf("stale active-world delete = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodDelete, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"?expected_active_revision=1", nil)
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete active world = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/status", nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status after active delete = %d, body = %s", response.StatusCode, body)
+	}
+	decodeJSONBody(t, body, &statusEnvelope)
+	if statusEnvelope.Status.ActiveWorld != nil || statusEnvelope.Status.ActiveRevision != 2 {
+		t.Fatalf("status after active delete = %+v", statusEnvelope.Status)
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID), nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("deleted active world remains readable = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages", nil)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("deleted messages remain readable = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodDelete, server.URL()+"/api/v1/worlds/"+url.PathEscape(operation.TargetWorldID)+"?expected_active_revision=2", nil)
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete inactive world = %d, body = %s", response.StatusCode, body)
+	}
+	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds", nil)
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"worlds":[]`) {
+		t.Fatalf("world list after deletes = %d, body = %s", response.StatusCode, body)
+	}
+}
+
+func requestJSON(t *testing.T, client *http.Client, method, endpoint string, value any) (*http.Response, []byte) {
+	t.Helper()
+	var body io.Reader
+	if value != nil {
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body = bytes.NewReader(data)
+	}
+	request, err := http.NewRequest(method, endpoint, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return response, data
+}
+
+func decodeJSONBody(t *testing.T, body []byte, target any) {
+	t.Helper()
+	if err := json.Unmarshal(body, target); err != nil {
+		t.Fatalf("decode %s: %v", body, err)
+	}
+}

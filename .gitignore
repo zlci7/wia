@@ -1,18 +1,19 @@
 # Build outputs
 bin/
 obj/
-runtime/server.exe
+backend/server.exe
 
 # Release archives produced by scripts/release-runtime.ps1. A package is built
 # from a tag, so a checked-in archive could only be stale.
 dist/
 
-# The client build. dist/ is produced from console/web/ and embedded into the
-# Runtime binary; only the placeholder that keeps the embed pattern valid is
-# tracked, so a checked-in bundle can never drift from its source.
-console/dist/*
-!console/dist/.gitkeep
-console/web/node_modules/
+# The client build. dist/ is produced from frontend/ and copied into the embed
+# package; only the placeholder that keeps the embed pattern valid is tracked, so
+# a checked-in bundle can never drift from its source.
+frontend/dist/
+backend/internal/webdist/dist/*
+!backend/internal/webdist/dist/.gitkeep
+frontend/node_modules/
 
 # IDE/editor state
 .vs/
@@ -30,8 +31,8 @@ Thumbs.db
 *.tmp
 *.temp
 *.stackdump
-runtime/.local/
-runtime/data/
+backend/.local/
+backend/data/
 
 # Go local artifacts
 *.test
@@ -39,11 +40,11 @@ coverage.out
 .gocache/
 
 # Local private config overrides
-runtime/config/*.local.json
+backend/config/*.local.json
 
 # Credentials. The development data root is inside the repository, so a secret
 # written to <root>/secrets/ during local testing must never be committable.
-runtime/secrets/
+backend/secrets/
 
 # AGENTS.md is tracked: it is the repository's standing agent instructions.
 
