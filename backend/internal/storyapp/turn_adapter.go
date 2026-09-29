@@ -10,27 +10,20 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-// turnHost adapts the application to what a turn asks for.
+// turnHost adapts the application to what a turn still asks it for.
 //
 // It exists so the pipeline can live in the turn package without the application
 // exporting its internals: every method calls the same private stage function the
-// in-package pipeline used, in the same order, so moving the pipeline changes where the
+// in-package pipeline used, in the same order, so moving the pipeline changed where the
 // order is written down and nothing else.
 //
-// The carried fields hold what one stage decides for the next — the roster and the
-// per-character stage inputs — because those are stage handoff rather than results, and
-// the turn package deliberately does not thread them through its host signature. A host
-// serves exactly one turn.
+// It holds no state. Everything one stage decides for the next travels in the turn's own
+// output, which is why a host can serve a turn without remembering anything about it.
 type turnHost struct {
 	app *App
-
-	participants   []wiaworld.Character
-	perceptText    map[string]string
-	stageOneInputs map[string]turn.StageInput
 }
 
-// turnService is the application's turn runner, built per turn so a stale host cannot
-// outlive the turn it belongs to.
+// turnService is the application's turn runner.
 func (a *App) turnService() *turn.Service {
 	return turn.New(&turnHost{app: a})
 }
@@ -48,23 +41,21 @@ func (h *turnHost) ResolveIntent(ctx context.Context, generator model.TextGenera
 	if err != nil {
 		return turn.TurnIntent{}, turn.Output{}, err
 	}
-	h.participants = sceneCharacters(snapshot.Characters)
-	output, perceptText, stageOneInputs, _ := newTurnOutput(snapshot, intent, run, intent.AddresseeID, intent.Private(), h.participants)
-	h.perceptText, h.stageOneInputs = perceptText, stageOneInputs
-	return intent, output, nil
+	return intent, turn.OpenOutput(snapshot, intent, run), nil
 }
 
 func (h *turnHost) RunCharacters(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	return h.app.runCharacterStages(ctx, generator, snapshot, run, intent, h.participants, h.perceptText, h.stageOneInputs, output)
+	return h.app.runCharacterStages(ctx, generator, snapshot, run, intent, sceneCharacters(snapshot.Characters), output.PerceptText, output.StageOneInputs, output)
 }
 
 func (h *turnHost) Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	host, visibleEvents, err := h.app.coordinateStage(ctx, generator, snapshot, run, intent, h.participants, intent.AddresseeID, intent.Private(), output)
+	participants := sceneCharacters(snapshot.Characters)
+	host, visibleEvents, err := h.app.coordinateStage(ctx, generator, snapshot, run, intent, participants, intent.AddresseeID, intent.Private(), output)
 	if err != nil {
 		return err
 	}
 	output.VisibleEvents = append(output.VisibleEvents, visibleEvents...)
-	return h.app.resolveSceneResult(ctx, generator, snapshot, run, intent, host, h.participants, output)
+	return h.app.resolveSceneResult(ctx, generator, snapshot, run, intent, host, participants, output)
 }
 
 func (h *turnHost) Narrate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {

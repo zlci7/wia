@@ -100,7 +100,7 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err := s.host.Narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNarration, err)
 	}
-	recordPlayerExperience(&snapshot, &output, intent, SceneCharacters(snapshot.Characters), run.RunID+":input")
+	recordPlayerExperience(&snapshot, &output, intent, output.SceneCharacters, output.PlayerEventID)
 	return output, nil
 }
 
