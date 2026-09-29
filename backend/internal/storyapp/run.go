@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
@@ -136,32 +135,6 @@ func parseNarrativeText(text string) (string, error) {
 	return text, nil
 }
 
-type turnIntent struct {
-	WaitMinutes int    `json:"wait_minutes,omitempty"`
-	IntentType  string `json:"intent_type"`
-	AddresseeID string `json:"addressee_id"`
-	Visibility  string `json:"visibility"`
-}
-
-func (intent *turnIntent) validateGeneratedFields() error {
-	intent.IntentType = strings.ToLower(wire.Clean(intent.IntentType))
-	intent.Visibility = strings.ToLower(wire.Clean(intent.Visibility))
-	intent.AddresseeID = wire.Clean(intent.AddresseeID)
-	field, expected := "", ""
-	switch {
-	case intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act":
-		field, expected = "intent_type", "speak|observe|act"
-	case intent.Visibility != "public" && intent.Visibility != "private":
-		field, expected = "visibility", "public|private"
-	case intent.WaitMinutes < 0 || intent.WaitMinutes > 120:
-		field, expected = "wait_minutes", "integer:0..120"
-	}
-	if field != "" {
-		return &generationJSONError{Code: "json_field_value", Field: field, Expected: expected, Cause: ErrGenerationFailed}
-	}
-	return nil
-}
-
 type hostResult struct {
 	EventOpportunity *eventOpportunity  `json:"event_opportunity,omitempty"`
 	InterruptSources []string           `json:"interrupt_source_ids,omitempty"`
@@ -214,29 +187,6 @@ const (
 	coordinationPromptVersion = "story.coordination.v15"
 	narrationPromptVersion    = "story.narration.v11"
 )
-
-type turnOutput struct {
-	GeneratedEvents *turn.GeneratedEventState
-	Narrative       string
-	Clock           string
-	Scene           string
-	// SceneLocation is the identifier behind Scene, so presence can be decided
-	// without comparing human-readable text.
-	SceneLocation   string
-	SceneVersion    int64
-	SceneCharacters []string
-	SceneViews      []turn.SceneView
-	PlotProgress    *plot.Progress
-	Events          []wiaworld.Event
-	Perceptions     []wiaworld.Perception
-	Memories        []wiaworld.
-		// publicReplies and decisions carry stage state from the character stages to
-		// the coordination stage; they stay internal to the turn.
-		Memory
-
-	publicReplies []string                    `json:"-"`
-	decisions     map[string]turn.NPCDecision `json:"-"`
-}
 
 func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest) (wiaworld.Run, error) {
 	request.Input = wire.Clean(request.Input)
@@ -608,18 +558,18 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 	})
 }
 
-func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turnIntent, int, error) {
+func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turn.TurnIntent, int, error) {
 	participants := sceneCharacters(snapshot.Characters)
 	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
 		if _, ok := findSceneCharacter(participants, explicitRecipient); !ok {
-			return turnIntent{}, 0, ErrInvalidRequest
+			return turn.TurnIntent{}, 0, ErrInvalidRequest
 		}
 	}
 	material := composeIntent(snapshot, run)
 	generator = a.contextGenerator(generator, material, snapshot, run, "intent", "player", 0, intentPromptVersion)
 	input := material.Required
-	var intent turnIntent
+	var intent turn.TurnIntent
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	checkRecipient := func() error {
@@ -638,7 +588,7 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 	}
 	repairCount, err := generateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
 	if err != nil {
-		return turnIntent{}, repairCount, err
+		return turn.TurnIntent{}, repairCount, err
 	}
 	return intent, repairCount, nil
 }
@@ -646,33 +596,33 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 // executeTurn runs one story turn. Every step below is a named stage, so the
 // pipeline can be read in order; the implementation of each stage lives in its
 // own function.
-func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turnOutput, error) {
+func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turn.Output, error) {
 	snapshot, err := a.loadTurn(ctx, store, run, generator)
 	if err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	intent, err := a.resolveIntentStage(ctx, generator, snapshot, run)
 	if err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	recipient := intent.AddresseeID
 	private := intent.Visibility == "private"
 	participants := sceneCharacters(snapshot.Characters)
 	output, perceptText, stageOneInputs, playerEventID := newTurnOutput(&snapshot, intent, run, recipient, private, participants)
 	if err = a.runCharacterStages(ctx, generator, &snapshot, run, intent, participants, perceptText, stageOneInputs, &output); err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	a.notePlayerAction(&output, run, intent, recipient)
 	host, visibleEvents, err := a.coordinateStage(ctx, generator, &snapshot, run, intent, participants, recipient, private, &output)
 	if err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	visibleEvents, err = a.resolveSceneResult(ctx, generator, &snapshot, run, intent, host, participants, visibleEvents, &output)
 	if err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	if err = a.narrateStage(ctx, generator, &snapshot, run, intent, recipient, private, visibleEvents, &output); err != nil {
-		return turnOutput{}, err
+		return turn.Output{}, err
 	}
 	a.recordPlayerExperience(&snapshot, &output, run, intent, playerEventID, characterIDs(participants), recipient, private)
 	return output, nil
@@ -714,11 +664,11 @@ func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiawo
 }
 
 // resolveIntentStage decides what the player is trying to do and who it addresses.
-func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turnIntent, error) {
+func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turn.TurnIntent, error) {
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
-		return turnIntent{}, turn.AtStage(turn.StageIntent, err)
+		return turn.TurnIntent{}, turn.AtStage(turn.StageIntent, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turn.StageIntent, "resolve_intent", "", 0, intentPromptVersion, nil, intent.AddresseeID, intentRepairs, time.Since(intentStarted))
 	return intent, nil
@@ -727,12 +677,12 @@ func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenera
 // newTurnOutput builds the turn output skeleton: it freezes the definition this
 // turn speaks through, records the player's own attempt and derives the
 // stage-one perception inputs.
-func newTurnOutput(snapshot *turn.Snapshot, intent turnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turnOutput, map[string]string, map[string]turn.StageInput, string) {
+func newTurnOutput(snapshot *turn.Snapshot, intent turn.TurnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turn.Output, map[string]string, map[string]turn.StageInput, string) {
 	def := turnDefinition(snapshot)
 
 	now := time.Now().UTC()
 	playerEventID := run.RunID + ":input"
-	output := turnOutput{
+	output := turn.Output{
 		Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
 		SceneCharacters: characterIDs(participants),
 		Events:          []wiaworld.Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
@@ -754,7 +704,7 @@ func newTurnOutput(snapshot *turn.Snapshot, intent turnIntent, run wiaworld.Run,
 
 // runCharacterStages runs the two character decision stages and keeps the public
 // reply log and the merged decisions on the output for the coordination stage.
-func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]turn.StageInput, output *turnOutput) error {
+func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]turn.StageInput, output *turn.Output) error {
 	def := turnDefinition(snapshot)
 
 	playerEventID := run.RunID + ":input"
@@ -797,14 +747,14 @@ func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenera
 			decisions[character.EntityID] = turn.MergeNPCDecision(decisions[character.EntityID], decision)
 		}
 	}
-	output.publicReplies = publicReplyLog
-	output.decisions = decisions
+	output.PublicReplies = publicReplyLog
+	output.Decisions = decisions
 	return nil
 }
 
 // notePlayerAction records the player's own attempt as an action the coordinator
 // has to resolve when the turn can produce an outcome for it.
-func (a *App) notePlayerAction(output *turnOutput, run wiaworld.Run, intent turnIntent, recipient string) {
+func (a *App) notePlayerAction(output *turn.Output, run wiaworld.Run, intent turn.TurnIntent, recipient string) {
 	if intent.IntentType != "speak" || recipient == "" {
 		output.Events = append(output.Events, wiaworld.Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
 	}
@@ -812,10 +762,10 @@ func (a *App) notePlayerAction(output *turnOutput, run wiaworld.Run, intent turn
 
 // coordinateStage resolves the scene: time, roster, action outcomes and the
 // scene views, and returns the events the player can perceive so far.
-func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, recipient string, private bool, output *turnOutput) (hostResult, []wiaworld.Event, error) {
-	publicReplies := strings.Join(output.publicReplies, "\n")
+func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, participants []wiaworld.Character, recipient string, private bool, output *turn.Output) (hostResult, []wiaworld.Event, error) {
+	publicReplies := strings.Join(output.PublicReplies, "\n")
 	coordinationStarted := time.Now()
-	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, *snapshot, run, intent, output.decisions, output.Events, publicReplies)
+	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, *snapshot, run, intent, output.Decisions, output.Events, publicReplies)
 	if err != nil {
 		return hostResult{}, nil, turn.AtStage(turn.StageCoordination, err)
 	}
@@ -864,7 +814,7 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 
 // resolveSceneResult advances the plot and the generated events and folds their
 // player-visible results into the events the narration stage renders.
-func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turn.Output) ([]wiaworld.Event, error) {
 	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		elapsed := wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
@@ -886,7 +836,7 @@ func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenera
 
 // narrateStage renders the player-facing prose and closes the turn with the
 // settled scene projection.
-func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turnOutput) error {
+func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turn.Output) error {
 	def := turnDefinition(snapshot)
 
 	playerProjection := turn.RenderVisibleProjection(visibleEvents, snapshot.Characters)
@@ -909,7 +859,7 @@ func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, s
 
 // recordPlayerExperience writes what each participant experienced from the
 // player's own attempt in this turn.
-func (a *App) recordPlayerExperience(snapshot *turn.Snapshot, output *turnOutput, run wiaworld.Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
+func (a *App) recordPlayerExperience(snapshot *turn.Snapshot, output *turn.Output, run wiaworld.Run, intent turn.TurnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
 	def := turnDefinition(snapshot)
 
 	for _, characterID := range participantIDs {
@@ -921,7 +871,7 @@ func (a *App) recordPlayerExperience(snapshot *turn.Snapshot, output *turnOutput
 // includeNewCharactersInSceneViews gives every character present in the world a view
 // of the closing result when the scene projection predates them, so a roster change
 // does not invalidate the turn.
-func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot, output *turnOutput) error {
+func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot, output *turn.Output) error {
 	current, err := store.LoadCharacters(ctx)
 	if err != nil {
 		return err
@@ -963,7 +913,7 @@ func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *stora
 	return nil
 }
 
-func appendNPCDecisionOutput(output *turnOutput, run wiaworld.Run, character wiaworld.Character, decision turn.NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
+func appendNPCDecisionOutput(output *turn.Output, run wiaworld.Run, character wiaworld.Character, decision turn.NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
@@ -990,7 +940,7 @@ func appendNPCDecisionOutput(output *turnOutput, run wiaworld.Run, character wia
 	return reply
 }
 
-func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []story.Bystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
+func appendHostOutcomes(output *turn.Output, run wiaworld.Run, participants []wiaworld.Character, bystanders []story.Bystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
 	actions := make(map[string]wiaworld.Event)
 	for _, event := range output.Events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
@@ -1156,7 +1106,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 	return firstErr
 }
 
-func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) (hostResult, int, error) {
+func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) (hostResult, int, error) {
 	if generator == nil {
 		return hostResult{}, 0, ErrModelNotConfigured
 	}
@@ -1441,8 +1391,38 @@ func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields
 	if err := decoder.Decode(target); err != nil {
 		return generatedDecodeError(err, target)
 	}
+	if intent, ok := target.(*turn.TurnIntent); ok {
+		return validateTurnIntent(intent)
+	}
 	if validator, ok := target.(interface{ validateGeneratedFields() error }); ok {
 		return validator.validateGeneratedFields()
+	}
+	return nil
+}
+
+// validateTurnIntent checks and normalizes what a model produced for a player's intent.
+//
+// The rules live here rather than on the type because the error they return is part of
+// this application's diagnostics: a repair pass needs to know which field was wrong and
+// what was expected, and that vocabulary belongs with the rest of the generation errors.
+// The three fields are constrained here and nowhere else, so every decode into a
+// TurnIntent gets the same rules. Normalizing first means a model answering "Speak" is
+// accepted rather than rejected on case.
+func validateTurnIntent(intent *turn.TurnIntent) error {
+	intent.IntentType = strings.ToLower(wire.Clean(intent.IntentType))
+	intent.Visibility = strings.ToLower(wire.Clean(intent.Visibility))
+	intent.AddresseeID = wire.Clean(intent.AddresseeID)
+	field, expected := "", ""
+	switch {
+	case intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act":
+		field, expected = "intent_type", "speak|observe|act"
+	case intent.Visibility != "public" && intent.Visibility != "private":
+		field, expected = "visibility", "public|private"
+	case intent.WaitMinutes < 0 || intent.WaitMinutes > 120:
+		field, expected = "wait_minutes", "integer:0..120"
+	}
+	if field != "" {
+		return &generationJSONError{Code: "json_field_value", Field: field, Expected: expected, Cause: ErrGenerationFailed}
 	}
 	return nil
 }

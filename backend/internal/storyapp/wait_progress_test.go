@@ -77,7 +77,7 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := waitResultGenerator{hostResult{TimeMinutes: tc.minutes, Scene: "客栈", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}, InterruptSources: tc.ids}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "run"}, turnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
+			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "run"}, turn.TurnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
 			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%t error=%v", tc.valid, err)
 			}
@@ -90,7 +90,7 @@ func TestRequestedWaitIsAnUpperBound(t *testing.T) {
 		s := turn.Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: definition, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
 		for _, minutes := range []int{5, 30} {
 			g := waitResultGenerator{hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "wait"}, turnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
+			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "wait"}, turn.TurnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
 			if (err == nil) != (minutes == 5) {
 				t.Fatalf("plot=%t minutes=%d err=%v", definition != nil, minutes, err)
 			}

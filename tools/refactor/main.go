@@ -57,6 +57,10 @@ func main() {
 		runTxCensus(args)
 	case "txnwrap":
 		runTxWrap(args)
+	case "vocab":
+		runVocab(args)
+	case "cutlines":
+		runCutLines(args)
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -81,6 +85,7 @@ commands:
   dropfunc   delete whole function declarations by name
   txcensus   report which functions open a transaction and what they call
   txnwrap    rewrite a BeginTx/Commit skeleton into a storage.InTx closure
+  vocab      rename a package's vocabulary to the package that now owns it
 
 run a command with -h for its own flags.
 `)

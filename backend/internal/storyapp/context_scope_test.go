@@ -44,8 +44,8 @@ func readContextSnapshot(t *testing.T, a *App, id string) turn.Snapshot {
 func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
 	s := contextFixture()
 	run := wiaworld.Run{RunID: "run"}
-	intent := turnIntent{Visibility: "private", AddresseeID: "npc:innkeeper"}
-	output := turnOutput{Events: []wiaworld.Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
+	intent := turn.TurnIntent{Visibility: "private", AddresseeID: "npc:innkeeper"}
+	output := turn.Output{Events: []wiaworld.Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
 	for _, test := range []struct {
 		name            string
 		ids, recipients []string
@@ -264,7 +264,7 @@ func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
 		{EventID: "foreign", RunID: "foreign", Stage: 1, EventType: "player_attempt"},
 		{EventID: "future", RunID: "current", Stage: 9, EventType: "npc_dialogue"},
 	}
-	sources := sceneSources(s, wiaworld.Run{RunID: "current"}, turnIntent{Visibility: "public"}, events)
+	sources := sceneSources(s, wiaworld.Run{RunID: "current"}, turn.TurnIntent{Visibility: "public"}, events)
 	var valid bool
 	for _, source := range sources {
 		if source.ID == "foreign" || source.ID == "future" {

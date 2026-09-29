@@ -174,7 +174,7 @@ func plotContext(snapshot turn.Snapshot) string {
 
 // A single node is settled per turn. The clock stops at that node; a subsequent
 // input can continue waiting against the newly committed consequences.
-func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, output *turn.Output) ([]wiaworld.Event, error) {
 	if snapshot.Plot == nil {
 		return nil, nil
 	}
@@ -220,7 +220,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	return visible, nil
 }
 
-func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, result plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, result plotResolution, output *turn.Output) ([]wiaworld.Event, error) {
 	var visible []wiaworld.Event
 	if result.Status != "deferred" {
 		event := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
@@ -264,7 +264,7 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 	return visible, nil
 }
 
-func composePlot(snapshot turn.Snapshot, run wiaworld.Run, node plot.Node, output *turnOutput) contextMaterial {
+func composePlot(snapshot turn.Snapshot, run wiaworld.Run, node plot.Node, output *turn.Output) contextMaterial {
 	snapshot.SceneViews = output.SceneViews
 	snapshot.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	for i := range snapshot.Characters {
@@ -304,7 +304,7 @@ func plotEvidenceSections(events []wiaworld.Event) []contextSection {
 	return result
 }
 
-func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turnOutput, result plotResolution) error {
+func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.Output, result plotResolution) error {
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
 		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
 	}
@@ -359,7 +359,7 @@ func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turnO
 	return nil
 }
 
-func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *turn.Output) ([]wiaworld.Event, error) {
 	base := snapshot
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
@@ -398,7 +398,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	if err := a.decideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
 		return nil, err
 	}
-	extra := turnOutput{SceneVersion: output.SceneVersion}
+	extra := turn.Output{SceneVersion: output.SceneVersion}
 	allowed := map[string][]string{}
 	var visible []wiaworld.Event
 	for _, c := range snapshot.Characters {
@@ -521,7 +521,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	return visible, nil
 }
 
-func plotActionSceneContract(output turnOutput, allowed map[string][]string) string {
+func plotActionSceneContract(output turn.Output, allowed map[string][]string) string {
 	sources := map[string]sceneSource{}
 	for _, v := range output.SceneViews {
 		id := "view:" + v.Recipient

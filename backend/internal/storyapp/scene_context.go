@@ -75,7 +75,7 @@ func initialSceneViews(snapshot turn.Snapshot) []turn.SceneView {
 	return views
 }
 
-func sceneSources(snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, events []wiaworld.Event) []sceneSource {
+func sceneSources(snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, events []wiaworld.Event) []sceneSource {
 	var sources []sceneSource
 	for _, view := range snapshot.SceneViews {
 		sources = append(sources, sceneSource{ID: "view:" + view.Recipient, Content: view.Content, Recipients: []string{view.Recipient}, Canonical: view.SourceIDs})
@@ -102,13 +102,13 @@ func sceneSources(snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, e
 	return sources
 }
 
-func sceneSourcePrompt(snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, events []wiaworld.Event) string {
+func sceneSourcePrompt(snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, events []wiaworld.Event) string {
 	data, _ := json.Marshal(sceneSources(snapshot, run, intent, events))
 	const scope = "\n引用范围：scene_updates.source_ids 仅从本节 id 或本轮 outcomes.action_id 选择。保留旧状态时引用 view:接收者ID；未在本节 id 清单中的旧历史 event_id、视图内部 source_ids、剧情根事件ID及原始输入 ID 均不是本阶段可直接引用的场景来源。等待中断的 interrupt_source_ids 使用另一份历史证据合同，不能复制进 scene_updates.source_ids。"
 	return scope + "\n场景来源(JSON)：" + string(data) + "\n场景视图合同：scene_updates 必须是数组，无变化返回 []。每项包含 content（该接收者回合结束时的完整简明情境）、source_ids（依据 ID 数组）、recipients（接收者 ID 数组）。此前视图 view:ID 仅属于该 ID；不同接收者分别更新。玩家表达与对白使用上述来源 ID，新行动结果使用本轮对应 outcome 的 action_id（只能在该 outcome 的 recipients 与行动者范围内）。每位接收者最多一次更新；每个引用都必须允许该接收者读取。人物对白是声称，不当成真相；行动尝试不是成功。无来源不更新，不加入未获知的隐情。scene 只作协调记录，不作为任何人的共享事实；玩家位置或环境有变化时必须通过 player 的 scene_updates 表达。"
 }
 
-func applySceneUpdates(snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, output turnOutput, host hostResult) ([]turn.SceneView, error) {
+func applySceneUpdates(snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output turn.Output, host hostResult) ([]turn.SceneView, error) {
 	byID := map[string]sceneSource{}
 	for _, source := range sceneSources(snapshot, run, intent, output.Events) {
 		byID[source.ID] = source
@@ -163,7 +163,7 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 
 // Later stages read only committed views and the projections already granted in
 // this workspace. An author's plot result is never a scene source for a player.
-func plotSceneSources(output turnOutput, visible []wiaworld.Event) map[string]sceneSource {
+func plotSceneSources(output turn.Output, visible []wiaworld.Event) map[string]sceneSource {
 	sources := map[string]sceneSource{}
 	for _, view := range output.SceneViews {
 		sources["view:"+view.Recipient] = sceneSource{ID: "view:" + view.Recipient, Content: view.Content, Recipients: []string{view.Recipient}, Canonical: view.SourceIDs}
@@ -190,7 +190,7 @@ func plotSceneSources(output turnOutput, visible []wiaworld.Event) map[string]sc
 	return sources
 }
 
-func applyPlotSceneUpdates(output *turnOutput, sources map[string]sceneSource, updates []sceneUpdate) error {
+func applyPlotSceneUpdates(output *turn.Output, sources map[string]sceneSource, updates []sceneUpdate) error {
 	if len(updates) == 0 {
 		return nil
 	}

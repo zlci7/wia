@@ -1528,7 +1528,7 @@ func TestRequiredJSONFieldsRejectEmptyObjects(t *testing.T) {
 }
 
 func TestNullableJSONFieldMustExistButMayBeNull(t *testing.T) {
-	var intent turnIntent
+	var intent turn.TurnIntent
 	err := generateJSONWithNullableFields(
 		context.Background(),
 		fixedJSONGenerator{text: `{"intent_type":"observe","addressee_id":null,"visibility":"public"}`},
@@ -1566,7 +1566,7 @@ func TestGenerateJSONRetriesOnlyInvalidModelOutput(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			generator := &sequenceJSONGenerator{responses: tc.responses, errors: tc.errors}
-			var intent turnIntent
+			var intent turn.TurnIntent
 			err := generateJSONWithNullableFields(
 				context.Background(), generator, "system", "input", &intent, 100,
 				[]string{"addressee_id"},

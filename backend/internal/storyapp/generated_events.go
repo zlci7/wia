@@ -119,7 +119,7 @@ func eventOpportunityContract(s turn.Snapshot) string {
 	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
 }
 
-func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turn.Output) ([]wiaworld.Event, error) {
 	p := snapshot.Definition.EventGeneration
 	if p == nil {
 		return nil, nil

@@ -26,7 +26,7 @@ func composeIntent(snapshot turn.Snapshot, run wiaworld.Run) contextMaterial {
 	return contextMaterial{System: "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", RequiredSources: append([]string{run.RunID + ":input"}, sceneViewSources(snapshot, "player")...), Required: input, Optional: dialogueSections(snapshot)}
 }
 
-func composeCoordination(snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) contextMaterial {
+func composeCoordination(snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) contextMaterial {
 	policy, revision := behaviorPolicy(snapshot.Narrative, "coordination")
 	var actionCandidates []wiaworld.Event
 	for _, event := range events {

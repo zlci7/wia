@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -76,7 +77,7 @@ func TestIntentRecipientUsesBoundedRepair(t *testing.T) {
 func TestIntentEnumsUseOneBoundedFormatRepair(t *testing.T) {
 	for _, invalid := range []bool{false, true} {
 		g := &intentEnumGenerator{invalid: invalid}
-		var result turnIntent
+		var result turn.TurnIntent
 		repairs, err := generateJSONMetrics(context.Background(), g, "规则", "等半小时", &result, 4096, "intent_type", "addressee_id", "visibility")
 		if (err != nil) != invalid || repairs != 1 || len(g.requests) != 2 {
 			t.Fatalf("invalid=%t repairs=%d calls=%d err=%v", invalid, repairs, len(g.requests), err)
@@ -96,7 +97,7 @@ func TestIntentValueDiagnosticsAreSafe(t *testing.T) {
 		{`{"intent_type":"act","visibility":"PRIVATE_VALUE"}`, "visibility"},
 		{`{"intent_type":"act","visibility":"public","wait_minutes":121}`, "wait_minutes"},
 	} {
-		var result turnIntent
+		var result turn.TurnIntent
 		err := decodeGeneratedJSON(tc.text, &result, nil, nil)
 		var detail *generationJSONError
 		if !errors.As(err, &detail) || detail.Field != tc.field || strings.Contains(err.Error(), "PRIVATE") {

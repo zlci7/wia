@@ -177,7 +177,7 @@ func TestPacingCommittedTeaReplay(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			probe := &pacingProbe{provider: generator, baseline: baseline}
-			host, _, err := app.coordinateTurn(context.Background(), probe, snapshot, run, turnIntent{IntentType: "speak", AddresseeID: "npc:innkeeper", Visibility: "public"}, decisions, events, speech)
+			host, _, err := app.coordinateTurn(context.Background(), probe, snapshot, run, turn.TurnIntent{IntentType: "speak", AddresseeID: "npc:innkeeper", Visibility: "public"}, decisions, events, speech)
 			if err != nil {
 				t.Fatal("coordination replay failed")
 			}
