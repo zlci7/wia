@@ -28,7 +28,7 @@ type gameDefinition struct {
 	BystanderRefs   []content.PackBystander
 	Secret          string
 	Plot            *plot.Definition
-	EventGeneration *EventGenerationPolicy
+	EventGeneration *plot.EventGenerationPolicy
 }
 
 func characterByID(def gameDefinition, id string) (wiaworld.Character, bool) {

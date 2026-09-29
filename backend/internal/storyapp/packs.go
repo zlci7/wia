@@ -49,7 +49,7 @@ type StoryPack struct {
 	NPCs            []string                    `json:"npcs"`
 	Bystanders      []content.PackBystander     `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
-	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
+	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
 

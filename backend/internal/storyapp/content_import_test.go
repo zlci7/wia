@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/plot"
 	"os"
 	"path/filepath"
 	"strings"
@@ -296,7 +297,7 @@ func TestImportPackageRoundTripKeepsFieldsAndAssets(t *testing.T) {
 	payload.Cover = "assets/cover.png"
 	payload.CoverAlt = "港口的封面"
 	payload.NPCs[0].Avatar = "assets/keeper.png"
-	payload.EventGeneration = &EventGenerationPolicy{Scope: "harbor", Locations: []string{"harbor"}, Participants: []string{"npc:keeper"}, MaxActive: 2, CooldownTurns: 3}
+	payload.EventGeneration = &plot.EventGenerationPolicy{Scope: "harbor", Locations: []string{"harbor"}, Participants: []string{"npc:keeper"}, MaxActive: 2, CooldownTurns: 3}
 	payload.NPCs[0].SpeakingExamples = []string{"灯要按时点。"}
 	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
 	if err != nil {

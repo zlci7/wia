@@ -205,7 +205,7 @@ func TestGeneratedEventsEmptyChoiceAndInvalidScope(t *testing.T) {
 	if len(s.GeneratedEvents.Active) != 0 || s.GeneratedEvents.LastOfferTurn != 1 {
 		t.Fatal(s.GeneratedEvents)
 	}
-	for _, change := range []func(*EventGenerationPolicy){func(p *EventGenerationPolicy) { p.Locations = []string{"outside"} }, func(p *EventGenerationPolicy) { p.Participants = []string{"npc:invented"} }, func(p *EventGenerationPolicy) { p.MaxActive = 4 }} {
+	for _, change := range []func(*plot.EventGenerationPolicy){func(p *plot.EventGenerationPolicy) { p.Locations = []string{"outside"} }, func(p *plot.EventGenerationPolicy) { p.Participants = []string{"npc:invented"} }, func(p *plot.EventGenerationPolicy) { p.MaxActive = 4 }} {
 		p := *s.Definition.EventGeneration
 		change(&p)
 		if validateEventPolicy(&p, s.Definition) == nil {

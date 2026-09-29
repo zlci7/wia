@@ -90,7 +90,7 @@ type ContentDraftPayload struct {
 	NPCs            []ContentDraftNPC           `json:"npcs"`
 	Bystanders      []content.PackBystander     `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
-	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
+	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
 
@@ -100,27 +100,27 @@ const payloadTooLarge = "payload is too large"
 // carry public projections; the author view is a separate explicit request and
 // never the same payload with fields hidden in the browser.
 type ContentDraftPreview struct {
-	View              string                    `json:"view"`
-	DraftID           string                    `json:"draft_id"`
-	Version           int64                     `json:"version"`
-	Title             string                    `json:"title"`
-	Mode              string                    `json:"mode"`
-	Description       string                    `json:"description"`
-	Gameplay          string                    `json:"gameplay"`
-	Background        string                    `json:"background"`
-	Opening           string                    `json:"opening"`
-	Clock             string                    `json:"clock"`
-	InitialLocation   string                    `json:"initial_location"`
-	Player            content.PlayerDefaults    `json:"player"`
-	Characters        []ContentPreviewNPC       `json:"characters"`
-	Bystanders        []content.PackBystander   `json:"bystanders"`
-	Locations         []content.PackLocation    `json:"locations"`
-	SpoilerWarning    string                    `json:"spoiler_warning,omitempty"`
-	AuthorRules       string                    `json:"author_rules,omitempty"`
-	AuthorFacts       string                    `json:"author_facts,omitempty"`
-	AuthorCharacters  []ContentPreviewAuthorNPC `json:"author_characters,omitempty"`
-	AuthorPlot        *plot.Definition          `json:"author_plot,omitempty"`
-	AuthorEventPolicy *EventGenerationPolicy    `json:"author_event_generation,omitempty"`
+	View              string                      `json:"view"`
+	DraftID           string                      `json:"draft_id"`
+	Version           int64                       `json:"version"`
+	Title             string                      `json:"title"`
+	Mode              string                      `json:"mode"`
+	Description       string                      `json:"description"`
+	Gameplay          string                      `json:"gameplay"`
+	Background        string                      `json:"background"`
+	Opening           string                      `json:"opening"`
+	Clock             string                      `json:"clock"`
+	InitialLocation   string                      `json:"initial_location"`
+	Player            content.PlayerDefaults      `json:"player"`
+	Characters        []ContentPreviewNPC         `json:"characters"`
+	Bystanders        []content.PackBystander     `json:"bystanders"`
+	Locations         []content.PackLocation      `json:"locations"`
+	SpoilerWarning    string                      `json:"spoiler_warning,omitempty"`
+	AuthorRules       string                      `json:"author_rules,omitempty"`
+	AuthorFacts       string                      `json:"author_facts,omitempty"`
+	AuthorCharacters  []ContentPreviewAuthorNPC   `json:"author_characters,omitempty"`
+	AuthorPlot        *plot.Definition            `json:"author_plot,omitempty"`
+	AuthorEventPolicy *plot.EventGenerationPolicy `json:"author_event_generation,omitempty"`
 }
 
 // ContentPreviewNPC is the public projection of an important character. Private

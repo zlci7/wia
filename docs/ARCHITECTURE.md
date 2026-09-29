@@ -123,8 +123,33 @@ api        不直接调用 Provider
 content    不进入正常 Turn 主链
 wire       只依赖标准库；不放领域概念
 plot       不 import content：剧情规则是权威，内容包只是调用方
+story      只依赖 world / plot；不得长出 Service / Loader / Repository
 turn       是唯一同时使用 context / agent / memory / plot / storage 的模块
 ```
+
+**四层归属**：
+
+```text
+content  owns external package representation   （JSON/schema/assets/digest/import/export，可删除）
+story    owns normalized immutable runtime definition
+world    owns mutable / committed world vocabulary
+plot     owns world-progression rules
+turn     consumes story + world + plot
+```
+
+依赖方向：
+
+```text
+content ─────→ story ←───── turn
+   │              │
+   └────→ plot ←──┘
+                  │
+                world
+```
+
+**为什么运行定义单独成层**：`World` 是已经运行起来的世界状态，`Story Definition` 是这个世界依据什么剧本规则初始化与运行——像类定义与对象实例的关系。把 `gameDefinition` 放 `content` 会让 `turn → content`，使内容工具成为游玩内核的 runtime dependency，与"删掉整个内容工具后玩家仍能游玩"冲突；放 `world` 则会形成 `world → plot`，破坏"`world` 只依赖标准库"。
+
+**Pack DTO 与 Runtime Definition 必须真正分开。** `story.Definition` 不得引用 `content.PackLocation` / `content.PackBystander` / `content.GameSummary`，否则等于 `story → content` 绕回去。`content.Load` 产出 `content.LoadedPack`（含 cover、digest、root、raw pack、assets），其中**包含**一份 `story.Definition`；`turn` 只拿 `pack.Definition`。运行定义与外部格式初始可能字段相同，但职责不同，格式一旦长出地区层级或 v3 归一化就会分化。
 
 **`content` 与 `plot` 的分工**：`content` 负责**内容包是否合法**（JSON 与 schema、字段类型、文件大小、资源路径、剧本包引用的 NPC 与地点是否存在），`plot` 负责**剧情定义本身是否合法**（节点、依赖、时间边界、条件、状态枚举）。依赖方向是 `content → plot` 与 `turn → plot`，**`plot` 永不 import `content`**。
 

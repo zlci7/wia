@@ -19,14 +19,6 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-type EventGenerationPolicy struct {
-	Scope         string   `json:"scope"`
-	Locations     []string `json:"locations"`
-	Participants  []string `json:"participants"`
-	MaxActive     int      `json:"max_active"`
-	CooldownTurns int64    `json:"cooldown_turns"`
-}
-
 // Opportunities reference resolved actions, never literary additions or reads.
 type eventOpportunity struct {
 	Kind     string `json:"kind"`
@@ -56,7 +48,7 @@ type eventCandidate struct {
 	Initial      plotResolution `json:"initial"`
 }
 
-func validateEventPolicy(p *EventGenerationPolicy, def gameDefinition) error {
+func validateEventPolicy(p *plot.EventGenerationPolicy, def gameDefinition) error {
 	if p == nil {
 		return nil
 	}
