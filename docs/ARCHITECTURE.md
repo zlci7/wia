@@ -333,6 +333,13 @@ backend/cmd/server  → backend/cmd/wia
 
 验收标准：**打开这个文件能在十分钟内看懂一轮故事。**
 
+**执行中的偏离（记录，不修改原计划结论）**：实际勘察后确认，`turn` 若此刻抽成独立包，需要调用 `storyapp` 约 20 个未导出方法与字段；跨包意味着把这些全部导出并把 `App` 拆成接口，属于深改而非搬移，风险远超一个阶段。因此 R2 拆成两步：
+
+1. **包内完成流水线提取（已完成）**：`executeTurn` 改为按顺序调用命名阶段，各阶段实现各自成函数，主流程可通读；行为零变化。阅读入口此时仍是 `storyapp/run.go`，其中 `executeTurn` 就是那条流水线。
+2. **模块边界（待做）**：等 `storyapp` 内部职责按 R3 清理到只剩编排之后，再把编排移入独立的 `turn/` 包，并把领域类型移入 `world/`。届时验收标准仍是"打开 `turn/service.go` 十分钟看懂一轮"。
+
+`world/` 的领域类型提取同样推迟到第 2 步：`types.go` 中的领域结构（`WorldSummary`、`Character`、`Event`、`Perception`、`Memory`、`Message`、`Run`）只依赖 `string` 与 `time.Time`，提取本身可行，但会触及约 40 个文件、数百处引用；放在模块边界那一步一次做完，避免两次大规模改名。
+
 ### R3：Context / Memory / Agent / Plot / Content 拆分
 
 按 `context` → `agent` → `memory` → `plot` → `content` 顺序抽取，每抽一个就删除 `storyapp` 中对应旧实现。**不建兼容包装层。**
