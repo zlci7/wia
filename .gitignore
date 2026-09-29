@@ -2,6 +2,9 @@
 bin/
 obj/
 backend/server.exe
+# The refactor tools are run with `go run .`, which leaves nothing behind. A compiled
+# copy was committed once; a 4 MB binary should never be tracked again.
+tools/refactor/*.exe
 
 # Release archives produced by scripts/release-runtime.ps1. A package is built
 # from a tag, so a checked-in archive could only be stale.

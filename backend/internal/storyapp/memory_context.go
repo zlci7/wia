@@ -302,66 +302,6 @@ func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]mem
 	return groups[len(groups)-1:]
 }
 
-// withLongMemoryWindow renders the required block from an explicit set of groups.
-func withLongMemoryWindow(material turn.Material, m turn.MemoryContext, kept [][]memorymodel.MemorySource, query string) turn.Material {
-	rebuilt := turn.Material{
-		PolicyRevision: material.PolicyRevision,
-		System:         material.System,
-		Required:       material.Required,
-		Optional:       []turn.Section{},
-	}
-	// Strip the previous recent block and its backlog, then render the smaller window.
-	if index := strings.Index(rebuilt.Required, "最近的已发生经历"); index >= 0 {
-		if end := strings.Index(rebuilt.Required[index:], "\n本轮职责与刺激："); end >= 0 {
-			head := rebuilt.Required[:index]
-			tail := rebuilt.Required[index+end+len("\n本轮职责与刺激："):]
-			rebuilt.Required = head + "本轮职责与刺激：" + tail
-		}
-	}
-	block := flattenGroups(kept)
-	supplied := map[string]bool{}
-	for _, record := range block {
-		supplied[record.ID] = true
-	}
-	declined := len(m.Tail) - len(block)
-	label := fmt.Sprintf("最近的已发生经历（共%d组）", len(kept))
-	if declined > 0 {
-		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(kept), declined)
-	}
-	rebuilt.Required = "已提交的连续个人回顾（非世界客观事实）：" + digestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memoryRecordsText(block) + "\n" + rebuilt.Required
-	rebuilt.RequiredSources = append([]string{}, material.RequiredSources...)
-	keptIDs := map[string]bool{}
-	for _, record := range block {
-		keptIDs[record.ID] = true
-	}
-	filtered := []string{}
-	for _, id := range rebuilt.RequiredSources {
-		if keptIDs[id] || !strings.HasPrefix(id, "memory:") {
-			filtered = append(filtered, id)
-		}
-	}
-	rebuilt.RequiredSources = filtered
-	older := [][]memorymodel.MemorySource{}
-	for _, group := range memoryGroups(m.Tail) {
-		if len(group) > 0 && !keptIDs[group[0].ID] {
-			older = append(older, group)
-		}
-	}
-	for i := len(older) - 1; i >= 0; i-- {
-		section := turn.Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(older[i])}
-		for _, record := range older[i] {
-			section.Sources = append(section.Sources, record.ID)
-			rebuilt.DeclinedSources = append(rebuilt.DeclinedSources, record.ID)
-		}
-		rebuilt.Optional = append(rebuilt.Optional, section)
-	}
-	rebuilt = withRecall(rebuilt, memoryProjection{context: m, supplied: supplied}, query)
-	// A reduced material stays reducible, so a caller can keep asking for a smaller
-	// window until it can no longer shrink.
-	rebuilt.Bounded = func(inputLimit int) (turn.Material, bool) { return rebuilt, false }
-	return rebuilt
-}
-
 // selectRecentWindow keeps the newest complete experience groups that fit the request's
 // remaining input budget. It falls back to the size-based rule when no budget is known,
 // always keeps the newest group, and never advances the digest watermark: supplying

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/story"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -135,32 +134,6 @@ func CharacterIDs(items []wiaworld.Character) []string {
 		out = append(out, character.EntityID)
 	}
 	return out
-}
-
-// SpeakingExamples supplies a character's authored dialogue samples. A turn needs them
-// to keep an existing save's characters speaking the way they were written, without
-// reading the currently installed story.
-type SpeakingExamples interface {
-	CharacterSpeakingExamples(entityID string) ([]string, bool)
-}
-
-// Definition is the definition a turn runs against: the roster comes from the world,
-// while dialogue samples come from the definition this world froze when it started,
-// never from the currently installed story. A later revision must not change how an
-// existing save's characters speak, and a world started before samples existed keeps
-// none rather than silently adopting a newer template.
-func Definition(snapshot *Snapshot, examples SpeakingExamples) story.Definition {
-	def := snapshot.Definition
-	def.Characters = snapshot.Characters
-	if examples == nil {
-		return def
-	}
-	for index := range def.Characters {
-		if samples, ok := examples.CharacterSpeakingExamples(def.Characters[index].EntityID); ok {
-			def.Characters[index].SpeakingExamples = samples
-		}
-	}
-	return def
 }
 
 // SceneCharacters is the identifiers of the characters present in the scene. The
