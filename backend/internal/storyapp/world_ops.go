@@ -102,7 +102,7 @@ func (a *App) cancelWorldRuns(ctx context.Context, worldID string) {
 	if err == nil {
 		if store, e := storage.OpenWorldDB(path); e == nil {
 			_, _ = store.Database().ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE status IN ('accepted','running')`, wire.NowText())
-			_ = store.Database().Close()
+			_ = store.Close()
 		}
 	}
 	a.runsMu.Lock()
@@ -181,7 +181,7 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 	checkStore, checkErr := storage.OpenWorldDB(sourcePath)
 	if checkErr == nil {
 		checkErr = memoryReady(ctx, checkStore.Database())
-		checkStore.Database().Close()
+		checkStore.Close()
 	}
 	if checkErr != nil {
 		worldRT.mu.Unlock()
@@ -219,9 +219,9 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 		worldRT.mu.Unlock()
 		return a.failCopy(ctx, operation, openErr)
 	}
-	activeCount, countErr := storage.CountActiveRuns(ctx, store.Database())
+	activeCount, countErr := store.CountActiveRuns(ctx)
 	if countErr != nil {
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		return a.failCopy(ctx, operation, countErr)
 	}
@@ -230,7 +230,7 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 		worldRT.pendingOperation = operation.OperationID
 		var runID string
 		_ = store.Database().QueryRowContext(ctx, `SELECT run_id FROM runs WHERE status IN ('accepted','running') ORDER BY created_at LIMIT 1`).Scan(&runID)
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		a.copyWG.Add(1)
 		go func() {
@@ -240,7 +240,7 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 		return operation, nil
 	}
 	err = a.performCopyLocked(ctx, operation, store)
-	_ = store.Database().Close()
+	_ = store.Close()
 	worldRT.mu.Unlock()
 	if err != nil {
 		return a.failCopy(ctx, operation, err)
@@ -268,8 +268,8 @@ func (a *App) waitAndCopy(ctx context.Context, operation SaveOperation, runID st
 			_, _ = a.failCopy(ctx, operation, err)
 			return
 		}
-		run, found, readErr := storage.ReadRun(ctx, store.Database(), runID)
-		store.Database().Close()
+		run, found, readErr := store.ReadRun(ctx, runID)
+		store.Close()
 		if readErr != nil || !found {
 			a.clearSavePending(operation.SourceWorldID, operation.OperationID)
 			if readErr == nil {
@@ -292,7 +292,7 @@ func (a *App) waitAndCopy(ctx context.Context, operation SaveOperation, runID st
 				if openErr == nil {
 					if run.Status == "completed" {
 						var messageHead int64
-						messageHead, err = storage.MetaInt(ctx, source.Database(), "message_head")
+						messageHead, err = source.MetaInt(ctx, "message_head")
 						if err == nil && messageHead == run.MessageSeq {
 							err = a.performCopyLocked(ctx, operation, source)
 						} else if err == nil {
@@ -301,7 +301,7 @@ func (a *App) waitAndCopy(ctx context.Context, operation SaveOperation, runID st
 					} else {
 						err = ErrSaveFailed
 					}
-					source.Database().Close()
+					source.Close()
 				}
 			}
 			if worldRT.pendingOperation == operation.OperationID {
@@ -440,8 +440,8 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 	if err != nil {
 		return err
 	}
-	activeRuns, err := storage.CountActiveRuns(ctx, store.Database())
-	_ = store.Database().Close()
+	activeRuns, err := store.CountActiveRuns(ctx)
+	_ = store.Close()
 	if err != nil {
 		return err
 	}

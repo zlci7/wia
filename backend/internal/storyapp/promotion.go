@@ -72,7 +72,7 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 	if err != nil {
 		return PromotionPreview{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
 		return PromotionPreview{}, err
@@ -137,11 +137,11 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
+	if count, err := store.CountActiveRuns(ctx); err != nil {
 		return wiaworld.Character{}, err
 	} else if count > 0 {
 		return wiaworld.Character{}, ErrWorldBusy
@@ -387,7 +387,7 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 // same person is a conflict instead of a second promotion.
 func promotedCharacter(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
 	for _, character := range snapshot.Characters {
-		raw, err := storage.MetaGet(ctx, store.Database(), "promotion:"+character.EntityID)
+		raw, err := store.MetaGet(ctx, "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}

@@ -120,7 +120,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if err != nil {
 		return Correction{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	hash := wire.MarshalJSON(request)
 	var oldHash string
 	err = store.Database().QueryRowContext(ctx, `SELECT request_hash FROM corrections WHERE request_key=?`, request.RequestKey).Scan(&oldHash)
@@ -145,7 +145,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if worldRT.savePending {
 		return Correction{}, ErrWorldBusy
 	}
-	if count, e := storage.CountActiveRuns(ctx, store.Database()); e != nil {
+	if count, e := store.CountActiveRuns(ctx); e != nil {
 		return Correction{}, e
 	} else if count > 0 {
 		return Correction{}, ErrWorldBusy

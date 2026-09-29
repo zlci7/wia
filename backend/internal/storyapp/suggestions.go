@@ -40,9 +40,9 @@ func suggestionBasis(s wiaworld.WorldSummary) SuggestionBasis {
 	return SuggestionBasis{WorldID: s.WorldID, MessageHead: s.MessageHead, EventHead: s.EventHead, Epoch: s.ContextEpoch, Revision: s.Revision}
 }
 
-func readSuggestionSet(ctx context.Context, db *sql.DB, snapshot worldSnapshot, runtime *worldRuntime) (SuggestionSet, error) {
+func readSuggestionSet(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, runtime *worldRuntime) (SuggestionSet, error) {
 	out := SuggestionSet{Enabled: true, Status: "empty", Basis: suggestionBasis(snapshot.Summary), Items: []string{}}
-	if value, err := storage.MetaGet(ctx, db, "suggestions_enabled"); err == nil {
+	if value, err := store.MetaGet(ctx, "suggestions_enabled"); err == nil {
 		if value != "true" && value != "false" {
 			return out, ErrStorageUnavailable
 		}
@@ -58,7 +58,7 @@ func readSuggestionSet(ctx context.Context, db *sql.DB, snapshot worldSnapshot, 
 		out.Status = "ended"
 		return out, nil
 	}
-	if raw, err := storage.MetaGet(ctx, db, "suggestion_set"); err == nil {
+	if raw, err := store.MetaGet(ctx, "suggestion_set"); err == nil {
 		var saved SuggestionSet
 		if err := json.Unmarshal([]byte(raw), &saved); err != nil {
 			return out, err
@@ -85,8 +85,8 @@ func (a *App) ReadSuggestions(ctx context.Context, worldID string) (SuggestionSe
 	if err != nil {
 		return SuggestionSet{}, err
 	}
-	defer store.Database().Close()
-	return readSuggestionSet(ctx, store.Database(), snapshot, w)
+	defer store.Close()
+	return readSuggestionSet(ctx, store, snapshot, w)
 }
 
 func (a *App) suggestionWorld(ctx context.Context, worldID string) (*storage.WorldStore, worldSnapshot, error) {
@@ -103,7 +103,7 @@ func (a *App) suggestionWorld(ctx context.Context, worldID string) (*storage.Wor
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 20)
 	if err != nil {
-		store.Database().Close()
+		store.Close()
 		return nil, worldSnapshot{}, err
 	}
 	return store, snapshot, nil
@@ -120,19 +120,19 @@ func (a *App) RequestSuggestions(ctx context.Context, worldID string, req Sugges
 	if err != nil {
 		return SuggestionSet{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if req.Basis != suggestionBasis(snapshot.Summary) || !a.isActive(ctx, worldID, req.ExpectedActiveRevision) || req.ExpectedActiveRevision <= 0 {
 		return SuggestionSet{}, ErrVersionConflict
 	}
 	if w.savePending {
 		return SuggestionSet{}, ErrWorldBusy
 	}
-	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
+	if count, err := store.CountActiveRuns(ctx); err != nil {
 		return SuggestionSet{}, err
 	} else if count > 0 {
 		return SuggestionSet{}, ErrWorldBusy
 	}
-	set, err := readSuggestionSet(ctx, store.Database(), snapshot, w)
+	set, err := readSuggestionSet(ctx, store, snapshot, w)
 	if err != nil {
 		return set, err
 	}
@@ -250,11 +250,11 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 	if readErr != nil {
 		return
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if suggestionBasis(current.Summary) != set.Basis {
 		return
 	}
-	if count, countErr := storage.CountActiveRuns(ctx, store.Database()); countErr != nil || count > 0 {
+	if count, countErr := store.CountActiveRuns(ctx); countErr != nil || count > 0 {
 		return
 	}
 	if memoryReady(ctx, store.Database()) != nil {

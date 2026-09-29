@@ -208,7 +208,7 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 
 func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
 	var out worldSnapshot
-	get := func(key string) (string, error) { return storage.MetaGet(ctx, store.Database(), key) }
+	get := func(key string) (string, error) { return store.MetaGet(ctx, key) }
 	var err error
 	out.Summary.GameID, err = get("game_id")
 	if err != nil {
@@ -255,17 +255,17 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 	if err != nil {
 		return out, err
 	}
-	out.Narrative, err = loadNarrativeSettings(ctx, store.Database())
+	out.Narrative, err = loadNarrativeSettings(ctx, store)
 	if err != nil {
 		return out, err
 	}
-	out.Plot, out.PlotProgress, err = readPlot(ctx, store.Database())
+	out.Plot, out.PlotProgress, err = readPlot(ctx, store)
 	if err != nil {
 		return out, err
 	}
 	out.Summary.StoryEnded = out.Summary.Mode == "guided" && out.PlotProgress.Ending != ""
 	for key, target := range map[string]*int64{"turn_seq": &out.Summary.TurnSeq, "message_head": &out.Summary.MessageHead, "event_head": &out.Summary.EventHead, "context_epoch": &out.Summary.ContextEpoch, "scene_version": &out.SceneVersion} {
-		*target, err = storage.MetaInt(ctx, store.Database(), key)
+		*target, err = store.MetaInt(ctx, key)
 		if err != nil {
 			return out, err
 		}
@@ -276,7 +276,7 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 	if value, e := get("bystanders"); e == nil {
 		_ = json.Unmarshal([]byte(value), &out.Bystanders)
 	}
-	out.Characters, err = storage.LoadCharacters(ctx, store.Database())
+	out.Characters, err = store.LoadCharacters(ctx)
 	if err != nil {
 		return out, err
 	}
@@ -286,26 +286,26 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 	}
 	out.Summary.GameTitle = out.Definition.Summary.Title
 	out.Summary.Revision = out.Definition.Revision
-	out.Messages, err = storage.LoadMessages(ctx, store.Database(), limit)
+	out.Messages, err = store.LoadMessages(ctx, limit)
 	if err != nil {
 		return out, err
 	}
-	out.Events, err = storage.LoadEvents(ctx, store.Database(), limit)
+	out.Events, err = store.LoadEvents(ctx, limit)
 	if err != nil {
 		return out, err
 	}
-	out.Dialogue, err = storage.LoadDialogue(ctx, store.Database())
+	out.Dialogue, err = store.LoadDialogue(ctx)
 	if err != nil {
 		return out, err
 	}
 	out.Perceptions = make(map[string][]wiaworld.Perception)
 	out.Memories = make(map[string][]wiaworld.Memory)
 	for _, c := range out.Characters {
-		out.Perceptions[c.EntityID], err = storage.LoadPerceptions(ctx, store.Database(), c.EntityID, 20)
+		out.Perceptions[c.EntityID], err = store.LoadPerceptions(ctx, c.EntityID, 20)
 		if err != nil {
 			return out, err
 		}
-		out.Memories[c.EntityID], err = storage.LoadMemories(ctx, store.Database(), c.EntityID, 20)
+		out.Memories[c.EntityID], err = store.LoadMemories(ctx, c.EntityID, 20)
 		if err != nil {
 			return out, err
 		}
@@ -324,7 +324,7 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 			return out, err
 		}
 	}
-	out.GeneratedEvents, err = readGeneratedEvents(ctx, store.Database(), out.Definition)
+	out.GeneratedEvents, err = readGeneratedEvents(ctx, store, out.Definition)
 	if err != nil {
 		return out, err
 	}
@@ -498,7 +498,7 @@ func cloneWorld(ctx context.Context, source *storage.WorldStore, targetPath, tar
 	if err != nil {
 		return err
 	}
-	defer target.Database().Close()
+	defer target.Close()
 	tx, err := target.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err

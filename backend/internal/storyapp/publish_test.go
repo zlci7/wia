@@ -337,11 +337,11 @@ func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	coverAsset, err := storage.MetaGet(ctx, store.Database(), "cover_asset")
+	coverAsset, err := store.MetaGet(ctx, "cover_asset")
 	if err != nil || coverAsset != "cover.png" {
 		t.Fatalf("cover record: %q %v", coverAsset, err)
 	}
-	keeperAvatar, err := storage.MetaGet(ctx, store.Database(), "avatar:npc:keeper")
+	keeperAvatar, err := store.MetaGet(ctx, "avatar:npc:keeper")
 	if err != nil || keeperAvatar != "keeper.png" {
 		t.Fatalf("avatar record: %q %v", keeperAvatar, err)
 	}

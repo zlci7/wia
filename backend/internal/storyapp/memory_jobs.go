@@ -79,7 +79,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	}
 	job, err := readMemoryJob(ctx, store.Database())
 	if err != nil || job.Status == "completed" || job.Status == "failed" {
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
@@ -89,13 +89,13 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	}
 	if err != nil {
 		failMemoryJob(ctx, store.Database(), job.Epoch, err)
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
 	if job.Completed >= len(job.Scopes) {
 		_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
@@ -108,12 +108,12 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	}
 	if err != nil {
 		failMemoryJob(ctx, store.Database(), job.Epoch, err)
-		store.Database().Close()
+		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
 	_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
-	store.Database().Close()
+	store.Close()
 	worldRT.mu.Unlock()
 	if err != nil {
 		return true, err
@@ -185,7 +185,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if checkErr != nil {
 		return true, checkErr
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	current, checkErr := readMemoryJob(ctx, store.Database())
 	if checkErr != nil {
 		return true, checkErr
@@ -298,8 +298,8 @@ func (a *App) RetryMemory(ctx context.Context, worldID string, epoch int64) erro
 	if err != nil {
 		return err
 	}
-	defer store.Database().Close()
-	current, err := storage.MetaInt(ctx, store.Database(), "context_epoch")
+	defer store.Close()
+	current, err := store.MetaInt(ctx, "context_epoch")
 	if err != nil {
 		return err
 	}

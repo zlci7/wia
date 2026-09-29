@@ -48,7 +48,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	if err != nil {
 		return out, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 100)
 	if err != nil {
 		return out, err
@@ -178,7 +178,7 @@ func (a *App) Corrections(ctx context.Context, worldID string) ([]Correction, Me
 	if err != nil {
 		return nil, MemoryJob{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	items, err := readCorrections(ctx, store.Database())
 	if err != nil {
 		return nil, MemoryJob{}, err

@@ -102,8 +102,8 @@ func (a *App) WorldCharacterAsset(ctx context.Context, worldID, entityID string)
 	if err != nil {
 		return nil, "", err
 	}
-	defer store.Database().Close()
-	name, err := storage.MetaGet(ctx, store.Database(), "avatar:"+wire.Clean(entityID))
+	defer store.Close()
+	name, err := store.MetaGet(ctx, "avatar:"+wire.Clean(entityID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, "", ErrContentNotFound

@@ -39,11 +39,11 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
+	if count, err := store.CountActiveRuns(ctx); err != nil {
 		return wiaworld.WorldSummary{}, err
 	} else if count > 0 {
 		return wiaworld.WorldSummary{}, ErrWorldBusy

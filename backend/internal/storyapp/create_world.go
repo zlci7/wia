@@ -112,7 +112,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if err = initializeWorld(ctx, store, a.userID, worldID, def, def.Summary.Mode, playerName, playerProfile); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
@@ -144,7 +144,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	if _, err = store.Database().ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, wire.NowText()); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	if err = store.Database().Close(); err != nil {
+	if err = store.Close(); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
 	tx, err := a.appDB.BeginTx(ctx, nil)
@@ -189,8 +189,8 @@ func copyWorldCover(source, target string) error {
 		if e != nil {
 			return e
 		}
-		defer store.Database().Close()
-		_, e = storage.MetaGet(context.Background(), store.Database(), "cover_type")
+		defer store.Close()
+		_, e = store.MetaGet(context.Background(), "cover_type")
 		if e == nil {
 			return ErrStorageUnavailable
 		}
@@ -229,8 +229,8 @@ func (a *App) WorldCover(ctx context.Context, id string) ([]byte, string, error)
 	if err != nil {
 		return nil, "", err
 	}
-	defer store.Database().Close()
-	mime, err := storage.MetaGet(ctx, store.Database(), "cover_type")
+	defer store.Close()
+	mime, err := store.MetaGet(ctx, "cover_type")
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrWorldNotFound
 	}

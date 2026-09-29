@@ -78,9 +78,9 @@ func validateEventPolicy(p *EventGenerationPolicy, def gameDefinition) error {
 	return nil
 }
 
-func readGeneratedEvents(ctx context.Context, db *sql.DB, def gameDefinition) (generatedEventState, error) {
+func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def gameDefinition) (generatedEventState, error) {
 	s := generatedEventState{Active: []generatedEvent{}}
-	raw, err := storage.MetaGet(ctx, db, "generated_events")
+	raw, err := store.MetaGet(ctx, "generated_events")
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, nil
 	}
@@ -108,11 +108,11 @@ func readGeneratedEvents(ctx context.Context, db *sql.DB, def gameDefinition) (g
 			}
 		}
 		for _, id := range []string{e.StartID, e.TriggerID} {
-			var exists int
-			if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM events WHERE event_id=?", id).Scan(&exists); err != nil {
+			exists, err := store.EventExists(ctx, id)
+			if err != nil {
 				return s, err
 			}
-			if exists != 1 {
+			if !exists {
 				return s, ErrContextSourceMissing
 			}
 		}

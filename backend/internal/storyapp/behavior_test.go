@@ -158,7 +158,7 @@ func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 	if _, err = store.Database().Exec("UPDATE meta SET value=? WHERE key='narrative_custom_instruction'", "旧写作偏好"); err != nil {
 		t.Fatal(err)
 	}
-	s, err := loadNarrativeSettings(ctx, store.Database())
+	s, err := loadNarrativeSettings(ctx, store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,14 +169,14 @@ func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	legacy, _ := storage.MetaGet(ctx, store.Database(), "narrative_custom_instruction")
+	legacy, _ := store.MetaGet(ctx, "narrative_custom_instruction")
 	if legacy != "" {
 		t.Fatal("two writing policy sources")
 	}
 	if _, err = store.Database().Exec("UPDATE meta SET value='invalid-json' WHERE key='behavior_policies'"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = loadNarrativeSettings(ctx, store.Database()); err == nil {
+	if _, err = loadNarrativeSettings(ctx, store); err == nil {
 		t.Fatal("corrupt policy silently replaced with defaults")
 	}
 }

@@ -24,7 +24,7 @@ type UpdateNarrativeSettingsRequest struct {
 	ExpectedContextEpoch int64                      `json:"expected_context_epoch"`
 }
 
-func loadNarrativeSettings(ctx context.Context, db *sql.DB) (wiaworld.NarrativeSettings, error) {
+func loadNarrativeSettings(ctx context.Context, store *storage.WorldStore) (wiaworld.NarrativeSettings, error) {
 	settings := wiaworld.DefaultNarrativeSettings()
 	for key, target := range map[string]*string{
 		"narrative_perspective":        &settings.Perspective,
@@ -34,13 +34,13 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) (wiaworld.NarrativeS
 		"npc_initiative":               &settings.NPCInitiative,
 		"narrative_custom_instruction": &settings.CustomInstruction,
 	} {
-		if value, err := storage.MetaGet(ctx, db, key); err == nil {
+		if value, err := store.MetaGet(ctx, key); err == nil {
 			*target = value
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return wiaworld.NarrativeSettings{}, err
 		}
 	}
-	if value, err := storage.MetaGet(ctx, db, "behavior_policies"); err == nil {
+	if value, err := store.MetaGet(ctx, "behavior_policies"); err == nil {
 		if err := json.Unmarshal([]byte(value), &settings.Policies); err != nil {
 			return wiaworld.NarrativeSettings{}, fmt.Errorf("invalid stored behavior policies: %w", err)
 		}
@@ -83,14 +83,14 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if request.Policies != nil {
 		settings.Policies = *request.Policies
 	} else {
-		current, err := loadNarrativeSettings(ctx, store.Database())
+		current, err := loadNarrativeSettings(ctx, store)
 		if err != nil {
 			return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 		}
@@ -105,7 +105,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
-	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
+	if count, err := store.CountActiveRuns(ctx); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	} else if count > 0 {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy

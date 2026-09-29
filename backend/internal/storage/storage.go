@@ -1,5 +1,5 @@
-// Package storage owns every SQL statement of a story world: the schema, the
-// queries, the transactions and the run records.
+// Package storage owns the persistence of a story world: the schema, the queries,
+// the transactions and the run records.
 //
 // It answers questions about persisted facts and nothing else. Decisions built on
 // those facts stay with the caller: CountActiveRuns reports how many runs are
@@ -7,8 +7,23 @@
 // split applies to memory readiness, which happens to read this database but means
 // "may a new turn start".
 //
-// A caller never sees the *sql.DB. The queries it needs are functions here, so the
-// database handle cannot leak into business code one ad-hoc query at a time.
+// # State of the migration
+//
+// The boundary is owned here, but the encapsulation is not finished. Most reads are
+// methods on WorldStore, so a caller never touches the handle; the writes that
+// belong to a transaction still run inside the caller's own transaction with
+// MetaGetTx, MetaSetTx and friends, because which statements must be atomic is the
+// caller's business rule.
+//
+// A temporary escape hatch remains: WorldStore.Database(). Some call sites still
+// take a raw *sql.DB through their own signatures — the memory job, correction,
+// suggestion and promotion paths, which move to their own packages later — and this
+// is what keeps them compiling until then. It is counted by a guard test that fails
+// if the number goes up:
+//
+//	never the way to write a new query
+//	no new file may call it
+//	removed once those paths have owners
 package storage
 
 import (

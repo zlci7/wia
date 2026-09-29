@@ -249,7 +249,7 @@ func (a *App) worldSummary(ctx context.Context, worldID string) (wiaworld.WorldS
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
@@ -270,7 +270,7 @@ func (a *App) ReadWorld(ctx context.Context, worldID string, limit int) (worldSn
 	if err != nil {
 		return worldSnapshot{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	return loadWorldSnapshot(ctx, store, limit)
 }
 
@@ -352,11 +352,11 @@ func (a *App) markInterrupted(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := storage.MarkRunInterrupted(ctx, store.Database()); err != nil {
-			store.Database().Close()
+		if err := store.MarkRunInterrupted(ctx); err != nil {
+			store.Close()
 			return err
 		}
-		store.Database().Close()
+		store.Close()
 	}
 	return nil
 }

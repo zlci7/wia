@@ -314,7 +314,7 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	if snapshot.SceneVersion < 3 {
 		t.Fatal("scene version did not advance")
 	}
-	history, err := storage.LoadDialogue(ctx, store.Database())
+	history, err := store.LoadDialogue(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

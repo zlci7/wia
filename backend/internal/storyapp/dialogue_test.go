@@ -46,7 +46,7 @@ func TestDialogueUsesFourCommittedTurns(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Database().Close()
-	items, err := storage.LoadDialogue(context.Background(), store.Database())
+	items, err := store.LoadDialogue(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

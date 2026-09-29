@@ -99,10 +99,10 @@ func clockMinute(clock string) (int, error) {
 	return (day-1)*1440 + hour*60 + minute, nil
 }
 
-func readPlot(ctx context.Context, db *sql.DB) (*PlotDefinition, PlotProgress, error) {
+func readPlot(ctx context.Context, store *storage.WorldStore) (*PlotDefinition, PlotProgress, error) {
 	var def PlotDefinition
 	var state PlotProgress
-	raw, err := storage.MetaGet(ctx, db, "plot_definition")
+	raw, err := store.MetaGet(ctx, "plot_definition")
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, state, nil
 	}
@@ -112,7 +112,7 @@ func readPlot(ctx context.Context, db *sql.DB) (*PlotDefinition, PlotProgress, e
 	if err = json.Unmarshal([]byte(raw), &def); err != nil {
 		return nil, state, err
 	}
-	raw, err = storage.MetaGet(ctx, db, "plot_progress")
+	raw, err = store.MetaGet(ctx, "plot_progress")
 	if err != nil {
 		return nil, state, err
 	}

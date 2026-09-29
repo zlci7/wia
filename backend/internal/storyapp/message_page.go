@@ -41,7 +41,7 @@ func (a *App) ReadMessagePage(ctx context.Context, worldID string, request Messa
 	if err != nil {
 		return MessagePage{}, err
 	}
-	defer store.Database().Close()
+	defer store.Close()
 	query := `SELECT seq,message_id,kind,content,run_id,created_at FROM messages`
 	args := []any{}
 	if request.BeforeSeq != nil {

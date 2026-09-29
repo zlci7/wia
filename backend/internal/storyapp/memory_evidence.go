@@ -9,7 +9,7 @@ import (
 )
 
 func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, input string) error {
-	events, err := storage.LoadEvents(ctx, store.Database(), int(snapshot.Summary.EventHead))
+	events, err := store.LoadEvents(ctx, int(snapshot.Summary.EventHead))
 	if err != nil {
 		return err
 	}
