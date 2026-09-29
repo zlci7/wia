@@ -384,7 +384,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.R
 		_ = store.UpdateRunStatus(context.Background(), run.RunID, "cancelled", "world_switched", "the active world changed")
 		return
 	}
-	output, err := a.executeTurn(ctx, store, run, runtime.Generator)
+	output, err := a.turnService().Execute(ctx, store, run, runtime.Generator)
 	if err != nil {
 		status, reason, message := classifyTurnFailure(err)
 		if status == "failed" {
@@ -593,41 +593,6 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 	return intent, repairCount, nil
 }
 
-// executeTurn runs one story turn. Every step below is a named stage, so the
-// pipeline can be read in order; the implementation of each stage lives in its
-// own function.
-func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turn.Output, error) {
-	snapshot, err := a.loadTurn(ctx, store, run, generator)
-	if err != nil {
-		return turn.Output{}, err
-	}
-	intent, err := a.resolveIntentStage(ctx, generator, snapshot, run)
-	if err != nil {
-		return turn.Output{}, err
-	}
-	recipient := intent.AddresseeID
-	private := intent.Visibility == "private"
-	participants := sceneCharacters(snapshot.Characters)
-	output, perceptText, stageOneInputs, playerEventID := newTurnOutput(&snapshot, intent, run, recipient, private, participants)
-	if err = a.runCharacterStages(ctx, generator, &snapshot, run, intent, participants, perceptText, stageOneInputs, &output); err != nil {
-		return turn.Output{}, err
-	}
-	a.notePlayerAction(&output, run, intent, recipient)
-	host, visibleEvents, err := a.coordinateStage(ctx, generator, &snapshot, run, intent, participants, recipient, private, &output)
-	if err != nil {
-		return turn.Output{}, err
-	}
-	visibleEvents, err = a.resolveSceneResult(ctx, generator, &snapshot, run, intent, host, participants, visibleEvents, &output)
-	if err != nil {
-		return turn.Output{}, err
-	}
-	if err = a.narrateStage(ctx, generator, &snapshot, run, intent, recipient, private, visibleEvents, &output); err != nil {
-		return turn.Output{}, err
-	}
-	a.recordPlayerExperience(&snapshot, &output, run, intent, playerEventID, characterIDs(participants), recipient, private)
-	return output, nil
-}
-
 // turnDefinition is the definition a turn runs against: the character roster comes
 // from the world, while dialogue samples come from the definition this world froze
 // when it started, never from the currently installed story. A later revision must
@@ -647,9 +612,8 @@ func turnDefinition(snapshot *turn.Snapshot) story.Definition {
 
 // loadTurn reads the frozen turn input: the world snapshot, the long-memory
 // material and the coordination evidence.
-func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turn.Snapshot, error) {
-	loadStarted := time.Now()
-	snapshot, err := loadTurnInput(ctx, store, 40)
+func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator, limit int) (turn.Snapshot, error) {
+	snapshot, err := loadTurnInput(ctx, store, limit)
 	if err != nil {
 		return turn.Snapshot{}, turn.AtStage(turn.StageLoad, err)
 	}
@@ -659,7 +623,6 @@ func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiawo
 	if err = loadCoordinationEvidence(ctx, store, &snapshot, run.Input); err != nil {
 		return turn.Snapshot{}, turn.AtStage(turn.StageLoad, err)
 	}
-	a.logRunStage(snapshot.Summary.WorldID, run, turn.StageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
 	return snapshot, nil
 }
 
@@ -814,30 +777,39 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 
 // resolveSceneResult advances the plot and the generated events and folds their
 // player-visible results into the events the narration stage renders.
-func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turn.Output) ([]wiaworld.Event, error) {
+//
+// The visible events are written into the output rather than returned, because narration
+// reads them and a return value would have to be carried across a stage boundary by
+// whoever calls what is in between.
+func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, host hostResult, participants []wiaworld.Character, output *turn.Output) error {
 	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		elapsed := wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
-		visibleEvents = append(visibleEvents, elapsed)
+		output.VisibleEvents = append(output.VisibleEvents, elapsed)
 	}
 	plotEvents, err := a.advancePlot(ctx, generator, *snapshot, run, output)
 	if err != nil {
-		return nil, turn.AtStage(turn.StageCoordination, err)
+		return turn.AtStage(turn.StageCoordination, err)
 	}
-	visibleEvents = append(visibleEvents, plotEvents...)
+	output.VisibleEvents = append(output.VisibleEvents, plotEvents...)
 	generatedVisible, err := a.advanceGeneratedEvents(ctx, generator, *snapshot, run, host.EventOpportunity, output)
 	if err != nil {
-		return nil, turn.AtStage(turn.StageCoordination, err)
+		return turn.AtStage(turn.StageCoordination, err)
 	}
-	visibleEvents = append(visibleEvents, generatedVisible...)
+	output.VisibleEvents = append(output.VisibleEvents, generatedVisible...)
 	snapshot.SceneViews, snapshot.SceneVersion = output.SceneViews, output.SceneVersion
-	return visibleEvents, nil
+	return nil
 }
 
 // narrateStage renders the player-facing prose and closes the turn with the
 // settled scene projection.
-func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turn.Output) error {
+//
+// What the player can perceive comes from the output, where scene resolution left it,
+// rather than from an argument: narration is two stages away from the place those events
+// were gathered.
+func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, recipient string, private bool, output *turn.Output) error {
 	def := turnDefinition(snapshot)
+	visibleEvents := output.VisibleEvents
 
 	playerProjection := turn.RenderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()

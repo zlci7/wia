@@ -52,6 +52,14 @@ type Output struct {
 	PublicReplies []string `json:"-"`
 	// Decisions is what each character decided, carried the same way.
 	Decisions map[string]NPCDecision `json:"-"`
+	// VisibleEvents is what the player can perceive of this turn so far, carried from
+	// scene resolution to narration, which renders it as the player's projection.
+	//
+	// It is a handoff between stages rather than a result: the stages write to the output
+	// instead of returning values the next stage would have to receive, because a stage
+	// boundary is exactly where such a value goes missing. It is not part of the committed
+	// turn — what gets committed is Events.
+	VisibleEvents []wiaworld.Event `json:"-"`
 }
 
 // SpeakingExamples supplies a character's authored dialogue samples. A turn needs them

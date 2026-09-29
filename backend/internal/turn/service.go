@@ -20,9 +20,11 @@ import (
 // capability of the application. `ResolveIntent` is a turn operation that happens to
 // still live elsewhere; `GetStore` or `AppConfig` would be the application leaking in.
 type Host interface {
-	// LogStage records how long one stage took. It is the one member that may stay:
-	// timing a turn is the application's observation of it, not part of the turn.
-	LogStage(worldID string, run wiaworld.Run, stage Stage, step, reason string, attempt int, errCode, detail string, count int, elapsed time.Duration)
+	// LogStage records one stage of a turn: what it was for, which model version it used,
+	// which events it read, who it resolved to, how many repairs it needed and how long
+	// it took. It is the one member that may stay — observing a turn is the application's
+	// business, not the turn's.
+	LogStage(worldID string, run wiaworld.Run, stage Stage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration)
 
 	// ResolveIntent reads the player's input into an intent and opens the turn's output,
 	// because both are decided at the same moment: the intent says who was addressed and
@@ -35,21 +37,27 @@ type Host interface {
 	// same move as ResolveIntent: it is the character stage of the context/agent split.
 	RunCharacters(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
 
-	// Coordinate resolves what actually happened: time, roster, action outcomes and the
-	// scene views. It goes when the coordination evidence and scene projection move.
+	// Coordinate resolves what actually happened: time, roster, action outcomes, the
+	// scene views, and the world's own progress for this turn — the plot advancing and
+	// the world opening events of its own. It goes when the coordination evidence, the
+	// scene projection and the progression rules move here.
+	//
+	// Those are one step rather than two because that is what they are in the running
+	// engine: the world's progress is resolved from the same outcome the scene is, and
+	// splitting them into separate host calls would have narration run before the events
+	// it renders existed.
 	Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
-
-	// AdvanceWorld applies the world's own progress for this turn. It goes when plot
-	// progression and generated events move here.
-	AdvanceWorld(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
 
 	// Narrate writes the player-visible text. It goes when the narration material and
 	// its narrative-reference contract move.
 	Narrate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
 
-	// LoadInput reads the turn's frozen input. It goes when the loader and the memory
-	// material it gathers move; see LoadInput for the loader itself.
-	LoadInput(ctx context.Context, store *storage.WorldStore, limit int) (Snapshot, error)
+	// LoadInput reads the turn's frozen input: the world snapshot, the long-memory
+	// material and the coordination evidence, all taken at one moment so every later
+	// stage sees one world. It goes when the loader and the memory material it gathers
+	// move: reading a turn's input means assembling memory, which is the memory module's
+	// work first.
+	LoadInput(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator, limit int) (Snapshot, error)
 }
 
 // Service runs one turn.
@@ -71,7 +79,7 @@ func New(host Host) *Service { return &Service{host: host} }
 // been resolved. A stage that fails stops the turn and reports which stage it was, so a
 // caller can tell a model failure from a storage one.
 func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Output, error) {
-	snapshot, err := s.load(ctx, store, run)
+	snapshot, err := s.load(ctx, store, run, generator)
 	if err != nil {
 		return Output{}, err
 	}
@@ -79,15 +87,15 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)
 	}
+	// The player's own words travel with the intent, because every later stage that
+	// records what the player did needs them and the run is not passed that far down.
+	intent.Input = run.Input
 	if err := s.host.RunCharacters(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNPC, err)
 	}
 	notePlayerAction(&output, run, intent)
 	if err := s.host.Coordinate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageCoordination, err)
-	}
-	if err := s.host.AdvanceWorld(ctx, generator, &snapshot, run, intent, &output); err != nil {
-		return Output{}, AtStage(StageCommit, err)
 	}
 	if err := s.host.Narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNarration, err)
@@ -97,13 +105,13 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 }
 
 // load reads the turn's frozen input and records how long it took.
-func (s *Service) load(ctx context.Context, store *storage.WorldStore, run wiaworld.Run) (Snapshot, error) {
+func (s *Service) load(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Snapshot, error) {
 	started := time.Now()
-	snapshot, err := s.host.LoadInput(ctx, store, LoadSnapshotLimit)
+	snapshot, err := s.host.LoadInput(ctx, store, run, generator, LoadSnapshotLimit)
 	if err != nil {
 		return Snapshot{}, AtStage(StageLoad, err)
 	}
-	s.host.LogStage(snapshot.Summary.WorldID, run, StageLoad, "load_snapshot", "", 0, "", "", 0, time.Since(started))
+	s.host.LogStage(snapshot.Summary.WorldID, run, StageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(started))
 	return snapshot, nil
 }
 

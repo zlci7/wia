@@ -20,7 +20,7 @@ import (
 // So the number is fixed. Raising it is a decision to be argued for, not a step to take
 // to make something compile: if a change needs an eighth method, the right move is
 // usually to move another stage into this package rather than to widen the door.
-const hostMethodBudget = 7
+const hostMethodBudget = 6
 
 // TestHostStaysSmall fails when the turn service starts asking the application for more
 // than the budget allows.
