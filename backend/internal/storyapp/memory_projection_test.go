@@ -268,7 +268,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 	if target.ID == "" || !strings.HasPrefix(target.Kind, "perception:") {
 		t.Fatalf("unexpected correction target: %+v", target)
 	}
-	correction, err := a.Correct(ctx, w.WorldID, CorrectionRequest{
+	correction, err := a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{
 		RequestKey: "corr-window", ExpectedEpoch: w.ContextEpoch, Kind: "perception", Scope: "npc:innkeeper",
 		TargetID: target.ID, Replacement: "改为在客栈柜台归还铜钥匙",
 	})

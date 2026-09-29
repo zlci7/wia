@@ -13,8 +13,8 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-func readMemoryJob(ctx context.Context, db *sql.DB) (MemoryJob, error) {
-	j := MemoryJob{Status: "completed", Scopes: []string{}}
+func readMemoryJob(ctx context.Context, db *sql.DB) (memorymodel.MemoryJob, error) {
+	j := memorymodel.MemoryJob{Status: "completed", Scopes: []string{}}
 	var scopes string
 	err := db.QueryRowContext(ctx, `SELECT epoch,status,completed,scopes,error FROM memory_jobs ORDER BY epoch DESC LIMIT 1`).Scan(&j.Epoch, &j.Status, &j.Completed, &scopes, &j.Error)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -230,8 +230,8 @@ func failMemoryJob(ctx context.Context, db *sql.DB, epoch int64, cause error) er
 // Job supersession cancels work, not accepted edits. The published digest epoch
 // is the watermark for edits already incorporated; later relevant corrections
 // invalidate a pending manual digest just as they invalidate a published one.
-func pendingDigestEdit(previous memorymodel.MemoryDigest, scope string, epoch int64, archive []memorymodel.MemorySource, corrections []Correction, eventRuns map[string]string) *Correction {
-	var edit *Correction
+func pendingDigestEdit(previous memorymodel.MemoryDigest, scope string, epoch int64, archive []memorymodel.MemorySource, corrections []memorymodel.Correction, eventRuns map[string]string) *memorymodel.Correction {
+	var edit *memorymodel.Correction
 	for _, c := range corrections {
 		if c.Kind == "digest" && c.Scope == scope && c.Epoch > previous.Epoch && c.Epoch <= epoch {
 			copy := c
@@ -250,7 +250,7 @@ func pendingDigestEdit(previous memorymodel.MemoryDigest, scope string, epoch in
 
 // Unrelated corrections advance the world epoch without invalidating a person's
 // effective digest, including an explicit edit to that digest.
-func digestNeedsRebuild(d memorymodel.MemoryDigest, scope string, archive []memorymodel.MemorySource, corrections []Correction, eventRuns map[string]string) bool {
+func digestNeedsRebuild(d memorymodel.MemoryDigest, scope string, archive []memorymodel.MemorySource, corrections []memorymodel.Correction, eventRuns map[string]string) bool {
 	for _, c := range corrections {
 		if c.Epoch <= d.Epoch || c.Kind == "digest" {
 			continue
@@ -260,7 +260,7 @@ func digestNeedsRebuild(d memorymodel.MemoryDigest, scope string, archive []memo
 		}
 		if c.Kind == "event" {
 			for _, s := range archive {
-				if s.Seq <= d.Through && (c.affects(s.EventID) || (scope == "player" && s.RunID != "" && s.RunID == eventRuns[c.TargetID])) {
+				if s.Seq <= d.Through && (c.Affects(s.EventID) || (scope == "player" && s.RunID != "" && s.RunID == eventRuns[c.TargetID])) {
 					return true
 				}
 			}

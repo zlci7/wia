@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
@@ -323,7 +324,7 @@ func TestPackCorrectionAndLegacyIsolation(t *testing.T) {
 		worlds[id] = w
 	}
 	w := worlds["orbital-repair"]
-	_, err := a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "engineer-profile", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎核对每份检修记录的工程师。"})
+	_, err := a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "engineer-profile", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎核对每份检修记录的工程师。"})
 	if err != nil {
 		t.Fatal(err)
 	}

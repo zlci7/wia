@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storyapp"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -373,7 +374,7 @@ func (s *Server) memory(w http.ResponseWriter, r *http.Request, id, route string
 	if route == "corrections" {
 		switch r.Method {
 		case "POST":
-			var request storyapp.CorrectionRequest
+			var request memorymodel.CorrectionRequest
 			if !decodeJSON(w, r, &request) {
 				return
 			}

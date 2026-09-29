@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 )
@@ -46,7 +47,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 		t.Fatal(err)
 	}
 	store.Database().Close()
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "root", ExpectedEpoch: before.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: root, Replacement: "作者秘密：铃声并未发生"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "root", ExpectedEpoch: before.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: root, Replacement: "作者秘密：铃声并未发生"})
 	if err != nil {
 		t.Fatal(err)
 	}

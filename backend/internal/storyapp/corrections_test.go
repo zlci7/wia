@@ -49,7 +49,7 @@ func TestRebuildBlocksGenerationAndCopyButAllowsDeletion(t *testing.T) {
 		}
 	}
 	store.Database().Close()
-	if _, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "block", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的老板"}); err != nil {
+	if _, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "block", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的老板"}); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -76,7 +76,7 @@ func TestRebuildBlocksGenerationAndCopyButAllowsDeletion(t *testing.T) {
 	}
 }
 
-func waitMemory(t *testing.T, a *App, id string) MemoryJob {
+func waitMemory(t *testing.T, a *App, id string) memorymodel.MemoryJob {
 	t.Helper()
 	for deadline := time.Now().Add(8 * time.Second); time.Now().Before(deadline); {
 		_, job, err := a.Corrections(context.Background(), id)
@@ -89,7 +89,7 @@ func waitMemory(t *testing.T, a *App, id string) MemoryJob {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("memory did not settle")
-	return MemoryJob{}
+	return memorymodel.MemoryJob{}
 }
 
 func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
@@ -108,7 +108,7 @@ func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 		t.Fatal(r)
 	}
 	before := readContextSnapshot(t, a, w.WorldID)
-	c := CorrectionRequest{RequestKey: "edit1", ExpectedEpoch: before.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: r.RunID + ":input", Replacement: "悄悄对沈岚说，暗号是青鹭。"}
+	c := memorymodel.CorrectionRequest{RequestKey: "edit1", ExpectedEpoch: before.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: r.RunID + ":input", Replacement: "悄悄对沈岚说，暗号是青鹭。"}
 	result, err := a.Correct(ctx, w.WorldID, c)
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestCorrectionTargetsAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := CorrectionRequest{RequestKey: "character", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的客栈老板，左手戴着旧手套。"}
+	request := memorymodel.CorrectionRequest{RequestKey: "character", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的客栈老板，左手戴着旧手套。"}
 	if _, err = a.Correct(ctx, w.WorldID, request); err != nil {
 		t.Fatal(err)
 	}
@@ -203,11 +203,11 @@ func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
 		"npc:innkeeper": {Archive: []memorymodel.MemorySource{{ID: "p1", EventID: "private", Content: "暗号白鹭"}}},
 		"npc:mercenary": {Archive: []memorymodel.MemorySource{{ID: "p2", EventID: "private", Content: "看见交谈"}}},
 	}}
-	n := correctionNotices(s, Correction{Kind: "event", TargetID: "private", Original: "暗号白鹭", Replacement: "暗号青鹭"}, "run")
+	n := correctionNotices(s, memorymodel.Correction{Kind: "event", TargetID: "private", Original: "暗号白鹭", Replacement: "暗号青鹭"}, "run")
 	if n["npc:innkeeper"] != "暗号青鹭" || strings.Contains(n["npc:mercenary"], "青鹭") || n["npc:mercenary"] == "" {
 		t.Fatal(n)
 	}
-	n = correctionNotices(s, Correction{Kind: "perception", Scope: "npc:innkeeper", Replacement: "明早在柜台归还。"}, "")
+	n = correctionNotices(s, memorymodel.Correction{Kind: "perception", Scope: "npc:innkeeper", Replacement: "明早在柜台归还。"}, "")
 	if len(n) != 1 || n["npc:innkeeper"] != "明早在柜台归还。" {
 		t.Fatal(n)
 	}
@@ -218,7 +218,7 @@ func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
 		t.Fatal(err)
 	}
 	seedMemoryHistory(t, a, w.WorldID)
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "perception", ExpectedEpoch: w.ContextEpoch, Kind: "perception", Scope: "npc:innkeeper", TargetID: "perception:1", Replacement: "明早在柜台归还。"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "perception", ExpectedEpoch: w.ContextEpoch, Kind: "perception", Scope: "npc:innkeeper", TargetID: "perception:1", Replacement: "明早在柜台归还。"})
 	if err != nil {
 		t.Fatal(err)
 	}

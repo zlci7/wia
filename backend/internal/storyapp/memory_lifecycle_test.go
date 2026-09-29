@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/llm"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
@@ -94,14 +95,14 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "digest", ExpectedEpoch: view.Epoch, Kind: "digest", Scope: "player", TargetID: fmt.Sprint(view.Digest.Revision), Replacement: "我记得约定，也记得暂时没有参与调查。"})
+	c, err := a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "digest", ExpectedEpoch: view.Epoch, Kind: "digest", Scope: "player", TargetID: fmt.Sprint(view.Digest.Revision), Replacement: "我记得约定，也记得暂时没有参与调查。"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if j := waitMemory(t, a, w.WorldID); j.Status != "completed" {
 		t.Fatal(j)
 	}
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "other", ExpectedEpoch: c.Epoch, Kind: "character", Scope: "npc:mercenary", TargetID: "profile", Replacement: "谨慎的佣兵。"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "other", ExpectedEpoch: c.Epoch, Kind: "character", Scope: "npc:mercenary", TargetID: "profile", Replacement: "谨慎的佣兵。"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +132,7 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	if err != nil || branch.Digest.Content != c.Replacement {
 		t.Fatal(branch, err)
 	}
-	_, err = a.Correct(ctx, op.TargetWorldID, CorrectionRequest{RequestKey: "branch-edit", ExpectedEpoch: branch.Epoch, Kind: "digest", Scope: "player", TargetID: fmt.Sprint(branch.Digest.Revision), Replacement: "分支自己的回顾。"})
+	_, err = a.Correct(ctx, op.TargetWorldID, memorymodel.CorrectionRequest{RequestKey: "branch-edit", ExpectedEpoch: branch.Epoch, Kind: "digest", Scope: "player", TargetID: fmt.Sprint(branch.Digest.Revision), Replacement: "分支自己的回顾。"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestMemoryFailureRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	seedMemoryHistory(t, a, w.WorldID)
-	c, err := a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "fail", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的老板。"})
+	c, err := a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "fail", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的老板。"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,11 +248,11 @@ func TestM2RealMemoryLifecycle(t *testing.T) {
 	if target == "" {
 		t.Fatal("fixture perception not available")
 	}
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "correct", ExpectedEpoch: v.Epoch, Kind: "perception", Scope: "npc:innkeeper", TargetID: target, Replacement: "旅人答应明早在客栈柜台归还铜钥匙，而非旧码头。"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "correct", ExpectedEpoch: v.Epoch, Kind: "perception", Scope: "npc:innkeeper", TargetID: target, Replacement: "旅人答应明早在客栈柜台归还铜钥匙，而非旧码头。"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var job MemoryJob
+	var job memorymodel.MemoryJob
 	for deadline := time.Now().Add(240 * time.Second); time.Now().Before(deadline); {
 		_, job, err = a.Corrections(ctx, w.WorldID)
 		if err != nil {

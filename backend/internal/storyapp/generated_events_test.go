@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
@@ -309,7 +310,7 @@ func TestGeneratedEventsCopyRestartCorrectionAndIsolation(t *testing.T) {
 	if calls == 0 {
 		t.Fatal("no captured requests")
 	}
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "event-correction", ExpectedEpoch: s.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: root, Replacement: "这次观察没有发现待核对标签。"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "event-correction", ExpectedEpoch: s.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: root, Replacement: "这次观察没有发现待核对标签。"})
 	if err != nil {
 		t.Fatal(err)
 	}

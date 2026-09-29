@@ -32,7 +32,7 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	store.Database().Close()
-	c, err := a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "first", ExpectedEpoch: w.ContextEpoch, Kind: "digest", Scope: "npc:mercenary", TargetID: "1", Replacement: "人工确认的回顾"})
+	c, err := a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "first", ExpectedEpoch: w.ContextEpoch, Kind: "digest", Scope: "npc:mercenary", TargetID: "1", Replacement: "人工确认的回顾"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("worker not blocked")
 	}
-	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "second", ExpectedEpoch: c.Epoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "另一人物的新设定"})
+	_, err = a.Correct(ctx, w.WorldID, memorymodel.CorrectionRequest{RequestKey: "second", ExpectedEpoch: c.Epoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "另一人物的新设定"})
 	if err != nil {
 		close(g.release)
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 func TestPendingDigestEditDoesNotReviveInvalidatedHistory(t *testing.T) {
 	d := memorymodel.MemoryDigest{Epoch: 1, Through: 5}
 	archive := []memorymodel.MemorySource{{Seq: 1, EventID: "projection"}}
-	cs := []Correction{{Epoch: 2, Kind: "digest", Scope: "npc:a", Replacement: "人工回顾"}, {Epoch: 3, Kind: "event", TargetID: "root", Dependents: []string{"projection"}}}
+	cs := []memorymodel.Correction{{Epoch: 2, Kind: "digest", Scope: "npc:a", Replacement: "人工回顾"}, {Epoch: 3, Kind: "event", TargetID: "root", Dependents: []string{"projection"}}}
 	if pendingDigestEdit(d, "npc:a", 3, archive, cs, nil) != nil {
 		t.Fatal("later source correction must invalidate manual digest")
 	}

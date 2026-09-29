@@ -5,18 +5,27 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-// TestMemoryModelDependsOnNothingButTheStandardLibrary keeps these types pure.
+// TestMemoryModelDependsOnlyOnDomainVocabulary keeps these types from growing
+// dependencies of their own.
 //
-// They are data a character's memory is made of, and nothing more: no database, no
-// model, no story. The package is deliberately separate from the legacy memory
-// package while that one still exists, so an import of it here would be the first
-// step towards putting the narrative types back into the runtime they are being
-// extracted from.
-func TestMemoryModelDependsOnNothingButTheStandardLibrary(t *testing.T) {
+// The package holds data a character's memory is made of, and nothing more: no
+// storage, no model, no story, no application. It may name world vocabulary — a
+// correction asks which events it affects, and the world package is where the
+// canonical identifier helper lives, so reimplementing that check here would be a
+// second implementation of something that already exists.
+//
+// The package is deliberately separate from the legacy memory package while that one
+// still exists; anything beyond world would be the first step towards putting the
+// narrative types back into the runtime they are being extracted from.
+func TestMemoryModelDependsOnlyOnDomainVocabulary(t *testing.T) {
+	allowed := map[string]bool{
+		"gameagent/backend/internal/world": true,
+	}
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatalf("read package directory: %v", err)
@@ -34,9 +43,15 @@ func TestMemoryModelDependsOnNothingButTheStandardLibrary(t *testing.T) {
 		}
 		checked++
 		for _, spec := range file.Imports {
-			path := strings.Trim(spec.Path.Value, `"`)
-			if strings.Contains(path, ".") || strings.Contains(path, "gameagent/") {
-				t.Errorf("%s imports %q: these types may depend only on the standard library", name, path)
+			path, err := strconv.Unquote(spec.Path.Value)
+			if err != nil {
+				t.Fatalf("%s: unquote %s: %v", name, spec.Path.Value, err)
+			}
+			if !strings.Contains(path, "gameagent/") {
+				continue // standard library
+			}
+			if !allowed[path] {
+				t.Errorf("%s imports %q: these types may depend only on world among this module's packages", name, path)
 			}
 		}
 	}

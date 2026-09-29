@@ -17,7 +17,7 @@ type MemoryRecord struct {
 	Content  string `json:"content"`
 }
 type MemoryView struct {
-	Corrections []Correction               `json:"corrections"`
+	Corrections []memorymodel.Correction   `json:"corrections"`
 	WorldID     string                     `json:"world_id"`
 	Epoch       int64                      `json:"context_epoch"`
 	Scope       string                     `json:"scope"`
@@ -25,14 +25,14 @@ type MemoryView struct {
 	Digest      memorymodel.MemoryDigest   `json:"digest"`
 	Sources     []memorymodel.MemorySource `json:"sources"`
 	Records     []MemoryRecord             `json:"records"`
-	Job         MemoryJob                  `json:"job"`
+	Job         memorymodel.MemoryJob      `json:"job"`
 	HasMore     bool                       `json:"has_more"`
 	NextBefore  int64                      `json:"next_before_seq,omitempty"`
 }
 
 func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool, before int64) (MemoryView, error) {
 	out := MemoryView{WorldID: worldID, Scope: scope, Scopes: []string{"player"}, Sources: []memorymodel.MemorySource{}, Records: []MemoryRecord{}}
-	out.Corrections = []Correction{}
+	out.Corrections = []memorymodel.Correction{}
 	if before < 0 || (!author && scope != "player") {
 		return out, ErrInvalidRequest
 	}
@@ -165,25 +165,25 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	return out, nil
 }
 
-func (a *App) Corrections(ctx context.Context, worldID string) ([]Correction, MemoryJob, error) {
+func (a *App) Corrections(ctx context.Context, worldID string) ([]memorymodel.Correction, memorymodel.MemoryJob, error) {
 	worldRT := a.worldRuntimeFor(worldID)
 	worldRT.mu.Lock()
 	defer worldRT.mu.Unlock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return nil, MemoryJob{}, err
+		return nil, memorymodel.MemoryJob{}, err
 	}
 	if status != "ready" {
-		return nil, MemoryJob{}, ErrWorldNotReady
+		return nil, memorymodel.MemoryJob{}, ErrWorldNotReady
 	}
 	store, err := storage.OpenWorldDB(path)
 	if err != nil {
-		return nil, MemoryJob{}, err
+		return nil, memorymodel.MemoryJob{}, err
 	}
 	defer store.Close()
 	items, err := readCorrections(ctx, store.Database())
 	if err != nil {
-		return nil, MemoryJob{}, err
+		return nil, memorymodel.MemoryJob{}, err
 	}
 	job, err := readMemoryJob(ctx, store.Database())
 	return items, job, err

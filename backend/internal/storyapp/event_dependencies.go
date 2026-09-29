@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"gameagent/backend/internal/memorymodel"
 	_ "gameagent/backend/internal/storage"
-	wiaworld "gameagent/backend/internal/world"
 )
 
 // Dependencies describe projections, not permissions to read the parent.
@@ -14,7 +14,7 @@ import (
 // The legacy writer generated numeric projection suffixes in the same run
 // and stage as a plot_result. Validate that exact contract once on upgrade.
 
-func expandCorrection(ctx context.Context, db *sql.DB, c *Correction) error {
+func expandCorrection(ctx context.Context, db *sql.DB, c *memorymodel.Correction) error {
 	if c.Kind != "event" {
 		return nil
 	}
@@ -34,8 +34,4 @@ func expandCorrection(ctx context.Context, db *sql.DB, c *Correction) error {
 		c.Dependents = append(c.Dependents, id)
 	}
 	return rows.Err()
-}
-
-func (c Correction) affects(eventID string) bool {
-	return eventID == c.TargetID || wiaworld.ContainsID(c.Dependents, eventID)
 }

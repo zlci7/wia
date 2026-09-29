@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storyapp"
 )
 
@@ -55,7 +56,7 @@ func TestMemoryRoutesRequireOwnershipAndExplicitAuthorView(t *testing.T) {
 	if response.StatusCode != 200 || !strings.Contains(string(body), "initial_concerns") {
 		t.Fatalf("author=%d %s", response.StatusCode, body)
 	}
-	payload := storyapp.CorrectionRequest{RequestKey: "api-edit", ExpectedEpoch: world.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "客栈老板"}
+	payload := memorymodel.CorrectionRequest{RequestKey: "api-edit", ExpectedEpoch: world.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "客栈老板"}
 	response, body = requestJSON(t, client, "POST", base+"/corrections", payload)
 	if response.StatusCode != 202 {
 		t.Fatalf("correct=%d %s", response.StatusCode, body)
