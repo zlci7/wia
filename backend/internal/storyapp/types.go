@@ -128,21 +128,6 @@ type Status struct {
 	ModelConfigPath string                 `json:"-"`
 }
 
-type GameSummary struct {
-	ID          string         `json:"id"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Modes       []string       `json:"modes"`
-	DefaultMode string         `json:"default_mode"`
-	Revision    string         `json:"revision"`
-	Mode        string         `json:"mode"`
-	Gameplay    string         `json:"gameplay"`
-	Background  string         `json:"background"`
-	CoverURL    string         `json:"cover_url,omitempty"`
-	CoverAlt    string         `json:"cover_alt,omitempty"`
-	Player      PlayerDefaults `json:"player"`
-}
-
 // SceneLocation is the current location's identifier. Presence is decided by
 // identity, not by comparing human-readable scene text.
 

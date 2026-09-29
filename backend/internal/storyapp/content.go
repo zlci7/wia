@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -81,13 +82,13 @@ type ContentDraftPayload struct {
 	AuthorFacts     string                      `json:"author_facts"`
 	Cover           string                      `json:"cover,omitempty"`
 	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults              `json:"player"`
+	Player          content.PlayerDefaults      `json:"player"`
 	Opening         string                      `json:"opening"`
 	InitialLocation string                      `json:"initial_location"`
 	Clock           string                      `json:"clock"`
-	Locations       []PackLocation              `json:"locations"`
+	Locations       []content.PackLocation      `json:"locations"`
 	NPCs            []ContentDraftNPC           `json:"npcs"`
-	Bystanders      []PackBystander             `json:"bystanders"`
+	Bystanders      []content.PackBystander     `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
@@ -110,10 +111,10 @@ type ContentDraftPreview struct {
 	Opening           string                    `json:"opening"`
 	Clock             string                    `json:"clock"`
 	InitialLocation   string                    `json:"initial_location"`
-	Player            PlayerDefaults            `json:"player"`
+	Player            content.PlayerDefaults    `json:"player"`
 	Characters        []ContentPreviewNPC       `json:"characters"`
-	Bystanders        []PackBystander           `json:"bystanders"`
-	Locations         []PackLocation            `json:"locations"`
+	Bystanders        []content.PackBystander   `json:"bystanders"`
+	Locations         []content.PackLocation    `json:"locations"`
 	SpoilerWarning    string                    `json:"spoiler_warning,omitempty"`
 	AuthorRules       string                    `json:"author_rules,omitempty"`
 	AuthorFacts       string                    `json:"author_facts,omitempty"`
@@ -276,10 +277,10 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 	}
 	baseRevision = wire.Clean(baseRevision)
 	payload := ContentDraftPayload{
-		SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
-		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
+		SchemaVersion: content.SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
+		NPCs: []ContentDraftNPC{}, Locations: []content.PackLocation{}, Bystanders: []content.PackBystander{},
 		// New content starts with a lead the player may adjust; the editor can lock it.
-		Player: PlayerDefaults{Editable: true},
+		Player: content.PlayerDefaults{Editable: true},
 	}
 	status := draftStatusEditing
 	draftID := wire.NewID("draft")
@@ -642,7 +643,7 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
 	definition := pack.Definition
 	payload := ContentDraftPayload{
-		SchemaVersion: packSchemaV2, GameID: gameID, Mode: definition.Summary.Mode, Title: definition.Summary.Title,
+		SchemaVersion: content.SchemaV2, GameID: gameID, Mode: definition.Summary.Mode, Title: definition.Summary.Title,
 		Description: definition.Summary.Description, Gameplay: definition.Summary.Gameplay, Background: definition.Background,
 		Rules: definition.Rules, AuthorFacts: definition.Secret, Player: definition.Summary.Player, Opening: definition.Opening,
 		Cover: pack.Story.Cover, CoverAlt: pack.Story.CoverAlt, EventGeneration: pack.Story.EventGeneration,

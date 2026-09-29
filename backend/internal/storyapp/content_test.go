@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/content"
 	"strings"
 	"testing"
 )
@@ -67,7 +68,7 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	payload.Opening = "潮水退去，灯还亮着。"
 	payload.NPCs = []ContentDraftNPC{{DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "港口看灯人", Profile: "守着潮汐表。", InitialLocation: "harbor"}}
 	if len(payload.Locations) == 0 {
-		payload.Locations = []PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
+		payload.Locations = []content.PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
 	}
 	if payload.InitialLocation == "" {
 		payload.InitialLocation = payload.Locations[0].ID
@@ -92,7 +93,7 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 		t.Fatalf("invalid mode accepted: %v", err)
 	}
 	invalid = payload
-	invalid.Locations = []PackLocation{{ID: "inn", Name: "客栈"}, {ID: "inn", Name: "客栈"}}
+	invalid.Locations = []content.PackLocation{{ID: "inn", Name: "客栈"}, {ID: "inn", Name: "客栈"}}
 	if _, err = a.SaveContentDraft(ctx, blank.DraftID, invalid, 2); !errors.Is(err, ErrContentInvalid) {
 		t.Fatalf("duplicate location accepted: %v", err)
 	}
@@ -235,12 +236,12 @@ func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 	// Internal identifiers belong to the program: a name alone is enough, and a
 	// reference to a place that no longer exists is dropped instead of failing.
 	friendly := saved.Payload
-	friendly.Locations = []PackLocation{{Name: "栈桥", Connections: []string{}}}
+	friendly.Locations = []content.PackLocation{{Name: "栈桥", Connections: []string{}}}
 	friendly.InitialLocation = ""
 	friendly.NPCs = []ContentDraftNPC{{
 		Name: "看灯人", Role: "港口看灯人", Profile: "资料", InitialLocation: "不再存在的地点",
 	}}
-	friendly.Bystanders = []PackBystander{{Name: "船夫", Description: "在栈桥等活"}}
+	friendly.Bystanders = []content.PackBystander{{Name: "船夫", Description: "在栈桥等活"}}
 	repaired, err := a.SaveContentDraft(ctx, draft.DraftID, friendly, saved.Version)
 	if err != nil {
 		t.Fatalf("a draft with only human names was rejected: %v", err)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"image"
@@ -49,16 +50,16 @@ func publishableDraft(t *testing.T, a *App, gameID string) (ContentProject, Cont
 	payload.Gameplay = "在退潮前决定帮谁。"
 	payload.Background = "港口在夜里退潮。"
 	payload.Opening = "潮水退去，灯还亮着。"
-	payload.Player = PlayerDefaults{Name: "旅人", Profile: "来到港口的外乡人。", Editable: true}
+	payload.Player = content.PlayerDefaults{Name: "旅人", Profile: "来到港口的外乡人。", Editable: true}
 	payload.Clock = "第 1 日 19:00"
 	payload.InitialLocation = "harbor"
-	payload.Locations = []PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
+	payload.Locations = []content.PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
 	payload.NPCs = []ContentDraftNPC{{
 		DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "港口看灯人",
 		Profile: "守着潮汐表。", Knowledge: "知道今晚谁该来。", InitialConcerns: "别让灯灭。", InitialLocation: "harbor",
 		SpeakingExamples: []string{"灯要按时点。"},
 	}}
-	payload.Bystanders = []PackBystander{{BystanderID: "bystander:boatman", Name: "船夫", Description: "在栈桥等活", InitialLocation: "harbor"}}
+	payload.Bystanders = []content.PackBystander{{BystanderID: "bystander:boatman", Name: "船夫", Description: "在栈桥等活", InitialLocation: "harbor"}}
 	saved, err := a.SaveContentDraft(ctx, draft.DraftID, payload, draft.Version)
 	if err != nil {
 		t.Fatal(err)
@@ -167,10 +168,10 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 
 	// Missing required package fields fail before any revision is registered.
 	broken := draft.Payload
-	broken.Locations = []PackLocation{}
+	broken.Locations = []content.PackLocation{}
 	broken.InitialLocation = ""
 	broken.NPCs = []ContentDraftNPC{}
-	broken.Bystanders = []PackBystander{}
+	broken.Bystanders = []content.PackBystander{}
 	if _, err := a.SaveContentDraft(ctx, draft.DraftID, broken, draft.Version); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +222,7 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixed := reloaded.Payload
-	fixed.Locations = []PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
+	fixed.Locations = []content.PackLocation{{ID: "harbor", Name: "港口", Connections: []string{}}}
 	fixed.InitialLocation = "harbor"
 	fixed.NPCs = []ContentDraftNPC{{
 		DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "港口看灯人",
@@ -370,7 +371,7 @@ func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
 // The published identity is stable: the same content always derives the same
 // revision identity, and a changed field derives a different one.
 func TestPackageRevisionIdentity(t *testing.T) {
-	story := StoryPack{SchemaVersion: packSchemaV2, GameID: "harbor", Mode: "open", Title: "港口的灯", Description: "d", Gameplay: "g", Opening: "o", Clock: "第 1 日 19:00", InitialLocation: "harbor", Locations: []PackLocation{{ID: "harbor", Name: "港口"}}, Bystanders: []PackBystander{}}
+	story := StoryPack{SchemaVersion: content.SchemaV2, GameID: "harbor", Mode: "open", Title: "港口的灯", Description: "d", Gameplay: "g", Opening: "o", Clock: "第 1 日 19:00", InitialLocation: "harbor", Locations: []content.PackLocation{{ID: "harbor", Name: "港口"}}, Bystanders: []content.PackBystander{}}
 	npcs := map[string]PackNPC{"npcs/keeper.json": {DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "看灯人", Profile: "资料", InitialLocation: "harbor"}}
 	first, err := newContentRevision(story, npcs, nil)
 	if err != nil {

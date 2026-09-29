@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
@@ -973,7 +974,7 @@ func appendNPCDecisionOutput(output *turnOutput, run wiaworld.Run, character wia
 	return reply
 }
 
-func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []PackBystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
+func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []content.PackBystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
 	actions := make(map[string]wiaworld.Event)
 	for _, event := range output.Events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
@@ -1245,7 +1246,7 @@ func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, p
 
 // formatBystanders lists passers-by with their stable identity so a coordinated
 // outcome can attribute experience to the one that actually took part.
-func formatBystanders(bystanders []PackBystander, names []string) string {
+func formatBystanders(bystanders []content.PackBystander, names []string) string {
 	if len(bystanders) == 0 {
 		if len(names) == 0 {
 			return "（无已记录背景人物）"

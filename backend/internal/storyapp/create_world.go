@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -205,10 +206,10 @@ func copyWorldCover(source, target string) error {
 	return os.WriteFile(filepath.Join(filepath.Dir(target), "cover"), data, 0644)
 }
 
-func (a *App) WorldGame(ctx context.Context, id string) (GameSummary, error) {
+func (a *App) WorldGame(ctx context.Context, id string) (content.GameSummary, error) {
 	s, err := a.ReadWorld(ctx, id, 1)
 	if err != nil {
-		return GameSummary{}, err
+		return content.GameSummary{}, err
 	}
 	g := s.Definition.Summary
 	if g.CoverURL != "" {

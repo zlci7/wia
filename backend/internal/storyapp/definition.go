@@ -1,6 +1,7 @@
 package storyapp
 
 import (
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
@@ -10,11 +11,11 @@ type gameDefinition struct {
 	Revision         string
 	Background       string
 	Rules            string
-	Locations        []PackLocation
+	Locations        []content.PackLocation
 	InitialLocations map[string]string
 	Settings         wiaworld.NarrativeSettings
 	SettingsSource   string
-	Summary          GameSummary
+	Summary          content.GameSummary
 	Opening          string
 	Scene            string
 	// InitialLocation is the identifier of the scene the story starts in.
@@ -24,7 +25,7 @@ type gameDefinition struct {
 	Bystanders      []string
 	// BystanderRefs carries the normalized v2 bystander definitions next to their
 	// display names so identity survives the pack boundary.
-	BystanderRefs   []PackBystander
+	BystanderRefs   []content.PackBystander
 	Secret          string
 	Plot            *plot.Definition
 	EventGeneration *EventGenerationPolicy

@@ -3,16 +3,17 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
 )
 
-func packLocationSet(ids ...string) map[string]PackLocation {
-	out := map[string]PackLocation{}
+func packLocationSet(ids ...string) map[string]content.PackLocation {
+	out := map[string]content.PackLocation{}
 	for _, id := range ids {
-		out[id] = PackLocation{ID: id}
+		out[id] = content.PackLocation{ID: id}
 	}
 	return out
 }
@@ -21,7 +22,7 @@ func packLocationSet(ids ...string) map[string]PackLocation {
 // v2 identity shape, and reads v2 objects unchanged.
 func TestPackBystandersNormalizeBothSchemaVersions(t *testing.T) {
 	locations := packLocationSet("inn", "dock")
-	legacy := []PackBystander{{Name: "打瞌睡的船夫"}, {Name: "卖花的老人"}}
+	legacy := []content.PackBystander{{Name: "打瞌睡的船夫"}, {Name: "卖花的老人"}}
 	normalized, err := normalizePackBystanders(legacy, "lantern-dusk.pack.v2", locations)
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +42,7 @@ func TestPackBystandersNormalizeBothSchemaVersions(t *testing.T) {
 		t.Fatal("legacy id ignores the definition revision")
 	}
 
-	v2 := []PackBystander{{BystanderID: "bystander:boatman", Name: "船夫", Description: "门边条凳上打瞌睡的船夫", InitialLocation: "dock", Avatar: "assets/boatman.png"}}
+	v2 := []content.PackBystander{{BystanderID: "bystander:boatman", Name: "船夫", Description: "门边条凳上打瞌睡的船夫", InitialLocation: "dock", Avatar: "assets/boatman.png"}}
 	kept, err := normalizePackBystanders(v2, "story.pack.v1", locations)
 	if err != nil || kept[0].BystanderID != "bystander:boatman" || kept[0].InitialLocation != "dock" {
 		t.Fatalf("v2 identity was rewritten: %+v %v", kept, err)
@@ -49,14 +50,14 @@ func TestPackBystandersNormalizeBothSchemaVersions(t *testing.T) {
 
 	for _, tc := range []struct {
 		name  string
-		items []PackBystander
+		items []content.PackBystander
 	}{
-		{"duplicate id", []PackBystander{{BystanderID: "bystander:a", Name: "甲"}, {BystanderID: "bystander:a", Name: "乙"}}},
-		{"duplicate name", []PackBystander{{Name: "甲"}, {Name: "甲"}}},
-		{"blank name", []PackBystander{{BystanderID: "bystander:a", Name: "  "}}},
-		{"unknown location", []PackBystander{{Name: "甲", InitialLocation: "cellar"}}},
-		{"external avatar", []PackBystander{{Name: "甲", Avatar: "../secret.png"}}},
-		{"invalid id", []PackBystander{{BystanderID: "boatman", Name: "甲"}}},
+		{"duplicate id", []content.PackBystander{{BystanderID: "bystander:a", Name: "甲"}, {BystanderID: "bystander:a", Name: "乙"}}},
+		{"duplicate name", []content.PackBystander{{Name: "甲"}, {Name: "甲"}}},
+		{"blank name", []content.PackBystander{{BystanderID: "bystander:a", Name: "  "}}},
+		{"unknown location", []content.PackBystander{{Name: "甲", InitialLocation: "cellar"}}},
+		{"external avatar", []content.PackBystander{{Name: "甲", Avatar: "../secret.png"}}},
+		{"invalid id", []content.PackBystander{{BystanderID: "boatman", Name: "甲"}}},
 	} {
 		if _, err := normalizePackBystanders(tc.items, "story.pack.v1", locations); err == nil {
 			t.Fatalf("%s accepted", tc.name)
@@ -68,7 +69,7 @@ func TestPackBystandersNormalizeBothSchemaVersions(t *testing.T) {
 // editor and export paths have a single representation.
 func TestPackBystanderJSONRoundTrip(t *testing.T) {
 	var decoded struct {
-		Bystanders []PackBystander `json:"bystanders"`
+		Bystanders []content.PackBystander `json:"bystanders"`
 	}
 	body := `{"bystanders":["打瞌睡的船夫",{"bystander_id":"bystander:boatman","name":"船夫","initial_location":"dock"}]}`
 	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
@@ -94,7 +95,7 @@ func TestPackBystanderJSONRoundTrip(t *testing.T) {
 		t.Fatalf("encode is not the v2 object form: %s", encoded)
 	}
 	var unknown struct {
-		Bystanders []PackBystander `json:"bystanders"`
+		Bystanders []content.PackBystander `json:"bystanders"`
 	}
 	if err := json.Unmarshal([]byte(`{"bystanders":[{"name":"甲","secret_field":"x"}]}`), &unknown); err == nil {
 		t.Fatal("unknown bystander field accepted")

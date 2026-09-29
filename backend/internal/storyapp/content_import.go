@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"io"
@@ -397,7 +398,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	// A card has no world structure, so the draft starts with the minimum a package
 	// needs: one usable place, a starting time, the greeting as the opening candidate
 	// and a neutral goal line the author replaces.
-	payload.Locations = []PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
+	payload.Locations = []content.PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
 	payload.InitialLocation = defaultImportLocation
 	npc.InitialLocation = defaultImportLocation
 	payload.NPCs = []ContentDraftNPC{npc}
@@ -495,11 +496,11 @@ func (a *App) ExportContentRevision(ctx context.Context, gameID, revision string
 
 func newDraftPayload(project ContentProject) ContentDraftPayload {
 	return ContentDraftPayload{
-		SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title,
-		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
+		SchemaVersion: content.SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title,
+		NPCs: []ContentDraftNPC{}, Locations: []content.PackLocation{}, Bystanders: []content.PackBystander{},
 		// Imported cards address the player as {{user}}; the default lead keeps that
 		// replacement previewable and the draft publishable.
-		Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true},
+		Player: content.PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true},
 	}
 }
 

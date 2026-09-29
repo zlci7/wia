@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -39,7 +40,7 @@ func lanternDefinition() gameDefinition {
 	return lanternFixtureDefinition(loadedPack{
 		Definition: gameDefinition{
 			Revision: "lantern-dusk.pack.v2",
-			Summary: GameSummary{
+			Summary: content.GameSummary{
 				ID:          GameID,
 				Title:       "暮灯镇的失踪信使",
 				Description: "一场小型调查冒险：雨夜的旧渡口客栈里，失踪的信使留下了一封没有寄出的信。",

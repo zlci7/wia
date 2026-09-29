@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
@@ -64,7 +65,7 @@ func validateEventPolicy(p *EventGenerationPolicy, def gameDefinition) error {
 	}
 	seen := map[string]bool{}
 	for _, id := range p.Locations {
-		if seen[id] || !slices.ContainsFunc(def.Locations, func(l PackLocation) bool { return l.ID == id }) {
+		if seen[id] || !slices.ContainsFunc(def.Locations, func(l content.PackLocation) bool { return l.ID == id }) {
 			return fmt.Errorf("story.json: invalid event_generation location")
 		}
 		seen[id] = true

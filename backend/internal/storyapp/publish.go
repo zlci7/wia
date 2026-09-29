@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/wire"
 )
 
 // Publication turns an edited draft into one immutable package revision. SQLite and
@@ -473,7 +475,7 @@ func (a *App) buildPackage(ctx context.Context, draft ContentDraft, project Cont
 	}
 	sort.Strings(names)
 	story := StoryPack{
-		SchemaVersion: packSchemaV2, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
+		SchemaVersion: content.SchemaV2, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
 		Description: payload.Description, Gameplay: payload.Gameplay, Background: payload.Background, Rules: payload.Rules,
 		AuthorFacts: payload.AuthorFacts, Cover: payload.Cover, CoverAlt: payload.CoverAlt, Player: payload.Player,
 		Opening: payload.Opening, InitialLocation: payload.InitialLocation, Clock: payload.Clock, Locations: payload.Locations,

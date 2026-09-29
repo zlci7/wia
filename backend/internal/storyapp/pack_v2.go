@@ -1,77 +1,30 @@
 package storyapp
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"gameagent/backend/internal/content"
 )
 
-// M3 pack schema v1 described bystanders as bare display names. v2 gives them a
-// stable identity plus optional public description, home location and avatar, and
-// adds optional avatars and speaking examples to important characters. Pack
-// loading normalizes both inputs into the v2 shape, and everything downstream
-// reads only that shape.
-const (
-	packSchemaV1 = 1
-	packSchemaV2 = 2
-)
-
-// PackBystander is the normalized bystander definition.
-type PackBystander struct {
-	BystanderID     string `json:"bystander_id"`
-	Name            string `json:"name"`
-	Description     string `json:"description,omitempty"`
-	InitialLocation string `json:"initial_location,omitempty"`
-	Avatar          string `json:"avatar,omitempty"`
-}
-
-// UnmarshalJSON accepts both the v1 display string and the v2 object.
-func (b *PackBystander) UnmarshalJSON(data []byte) error {
-	trimmed := bytes.TrimSpace(data)
-	if len(trimmed) == 0 {
-		return errors.New("empty bystander")
-	}
-	if trimmed[0] == '"' {
-		var name string
-		if err := json.Unmarshal(trimmed, &name); err != nil {
-			return err
-		}
-		*b = PackBystander{Name: name}
-		return nil
-	}
-	type plain PackBystander
-	var value plain
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&value); err != nil {
-		return err
-	}
-	*b = PackBystander(value)
-	return nil
-}
-
-// MarshalJSON always writes the v2 object so exported and republished content has
-// one representation.
-func (b PackBystander) MarshalJSON() ([]byte, error) {
-	type plain PackBystander
-	return json.Marshal(plain(b))
-}
+// Pack loading normalizes both schema generations into the v2 shape, and everything
+// downstream reads only that shape. The generations and the JSON representation
+// belong to the content package.
 
 var bystanderIDPattern = regexp.MustCompile(`^bystander:[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
 
 // normalizePackBystanders is the single compatibility entry: it validates the
 // v1/v2 input, fills stable ids for legacy entries and rejects duplicates.
-func normalizePackBystanders(items []PackBystander, revision string, locations map[string]PackLocation) ([]PackBystander, error) {
+func normalizePackBystanders(items []content.PackBystander, revision string, locations map[string]content.PackLocation) ([]content.PackBystander, error) {
 	if len(items) > 40 {
 		return nil, errors.New("bystanders exceed 40")
 	}
 	seenID, seenName := map[string]bool{}, map[string]bool{}
-	out := make([]PackBystander, 0, len(items))
+	out := make([]content.PackBystander, 0, len(items))
 	for index, item := range items {
-		entry := PackBystander{
+		entry := content.PackBystander{
 			BystanderID:     strings.TrimSpace(item.BystanderID),
 			Name:            strings.TrimSpace(item.Name),
 			Description:     strings.TrimSpace(item.Description),

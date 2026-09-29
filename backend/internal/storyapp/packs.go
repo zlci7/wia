@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
@@ -27,20 +28,6 @@ import (
 //go:embed packs
 var packagedStories embed.FS
 
-type PlayerDefaults struct {
-	Name         string `json:"name"`
-	Profile      string `json:"profile"`
-	Requirements string `json:"requirements"`
-	Editable     bool   `json:"editable"`
-}
-
-type PackLocation struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Connections []string `json:"connections"`
-}
-
 type StoryPack struct {
 	SchemaVersion   int                         `json:"schema_version"`
 	GameID          string                      `json:"game_id"`
@@ -54,13 +41,13 @@ type StoryPack struct {
 	AuthorFacts     string                      `json:"author_facts"`
 	Cover           string                      `json:"cover,omitempty"`
 	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults              `json:"player"`
+	Player          content.PlayerDefaults      `json:"player"`
 	Opening         string                      `json:"opening"`
 	InitialLocation string                      `json:"initial_location"`
 	Clock           string                      `json:"clock"`
-	Locations       []PackLocation              `json:"locations"`
+	Locations       []content.PackLocation      `json:"locations"`
 	NPCs            []string                    `json:"npcs"`
-	Bystanders      []PackBystander             `json:"bystanders"`
+	Bystanders      []content.PackBystander     `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
@@ -215,14 +202,14 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
-	p := StoryPack{Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
+	p := StoryPack{Player: content.PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
 	if err := strictPackJSON(data, &p); err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
 	bad := func(field string) (loadedPack, error) {
 		return result, fmt.Errorf("story.json: invalid or missing %s", field)
 	}
-	if p.SchemaVersion != packSchemaV1 && p.SchemaVersion != packSchemaV2 {
+	if p.SchemaVersion != content.SchemaV1 && p.SchemaVersion != content.SchemaV2 {
 		return bad("schema_version")
 	}
 	if !packID.MatchString(p.GameID) {
@@ -248,7 +235,7 @@ func loadPack(root string) (loadedPack, error) {
 	if len(p.Locations) == 0 || len(p.Locations) > 32 {
 		return bad("locations")
 	}
-	locations := map[string]PackLocation{}
+	locations := map[string]content.PackLocation{}
 	for _, loc := range p.Locations {
 		if !packID.MatchString(loc.ID) || loc.Name == "" || locations[loc.ID].ID != "" {
 			return bad("locations.id/name")
@@ -296,7 +283,7 @@ func loadPack(root string) (loadedPack, error) {
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
 	}
-	def.Summary = GameSummary{ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision, Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay, Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt}
+	def.Summary = content.GameSummary{ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision, Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay, Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt}
 	seen, definitions := map[string]bool{}, map[string]bool{}
 	npcBodies := make([]json.RawMessage, 0, len(p.NPCs))
 	for _, file := range p.NPCs {
@@ -566,9 +553,9 @@ func (a *App) packList() []loadedPack {
 	return out
 }
 
-func (a *App) Games() []GameSummary {
+func (a *App) Games() []content.GameSummary {
 	packs := a.packList()
-	result := make([]GameSummary, 0, len(packs))
+	result := make([]content.GameSummary, 0, len(packs))
 	for _, p := range packs {
 		result = append(result, p.Definition.Summary)
 	}
@@ -580,10 +567,10 @@ func (a *App) PackIssues() []PackIssue {
 	defer a.packsMu.RUnlock()
 	return append([]PackIssue{}, a.packErrors...)
 }
-func (a *App) Game(id string) (GameSummary, error) {
+func (a *App) Game(id string) (content.GameSummary, error) {
 	p, ok := a.pack(id)
 	if !ok {
-		return GameSummary{}, ErrWorldNotFound
+		return content.GameSummary{}, ErrWorldNotFound
 	}
 	return p.Definition.Summary, nil
 }
@@ -606,7 +593,7 @@ func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldS
 		// authority once it exists. Legacy worlds keep display names only until the
 		// next world starts from the same content.
 		if stored, e := store.MetaGet(ctx, "bystander_refs"); e == nil {
-			var refs []PackBystander
+			var refs []content.PackBystander
 			if json.Unmarshal([]byte(stored), &refs) == nil {
 				d.BystanderRefs = refs
 			}
@@ -619,7 +606,7 @@ func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldS
 		return gameDefinition{}, err
 	}
 	// Legacy worlds use only their persisted facts, never a newer installed pack.
-	d := gameDefinition{Summary: GameSummary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
+	d := gameDefinition{Summary: content.GameSummary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
 	d.Revision, _ = store.MetaGet(ctx, "game_revision")
 	d.Summary.Revision = d.Revision
 	if d.Summary.ID == GameID {
