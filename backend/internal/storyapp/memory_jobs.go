@@ -135,12 +135,12 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 			remaining = append(remaining, s)
 		}
 	}
-	groups := memoryGroups(remaining)
+	groups := memorymodel.MemoryGroups(remaining)
 	prefix := []memorymodel.MemorySource{}
 	if len(groups) > 4 {
 		for _, group := range groups[:len(groups)-4] {
 			candidate := append(append([]memorymodel.MemorySource{}, prefix...), group...)
-			if len(memoryRecordsText(candidate)) > 18000 && len(prefix) > 0 {
+			if len(memorymodel.MemoryRecordsText(candidate)) > 18000 && len(prefix) > 0 {
 				break
 			}
 			prefix = candidate
@@ -206,7 +206,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		failMemoryJob(ctx, store, job.Epoch, err)
 		return true, err
 	}
-	doneScope := len(prefix) == 0 || len(memoryGroups(afterMemory(m.Archive, d.Through))) <= 4
+	doneScope := len(prefix) == 0 || len(memorymodel.MemoryGroups(afterMemory(m.Archive, d.Through))) <= 4
 	completed := job.Completed
 	if doneScope {
 		completed++

@@ -76,7 +76,7 @@ func composeNarration(snapshot turn.Snapshot, run wiaworld.Run, def story.Defini
 
 	input += "\n公开世界背景：" + snapshot.Definition.Background + "\n世界规则：" + snapshot.Definition.Rules
 	material := turn.Material{PolicyRevision: revision, System: turn.BehaviorContract + "\n你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", RequiredSources: append(turn.EventIDs(visibleEvents), turn.SceneViewSources(snapshot, "player")...), Required: input, Optional: turn.NarrativeSections(snapshot.Messages)}
-	material = withLongMemory(material, snapshot, "player", run.Input)
+	material = turn.WithLongMemory(material, snapshot, "player", run.Input)
 	return material, maxOutputTokens, nil
 }
 
@@ -86,7 +86,7 @@ func composeNPC(snapshot turn.Snapshot, def story.Definition, character wiaworld
 	base.Perceptions = nil
 	base.Memories = nil
 	material := turn.Material{PolicyRevision: revision, System: turn.BehaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你愿意让在场者听见的公开对白；即使玩家耳语，你也只能选择公开回应或沉默，不在 speech 中声明只有玩家听见；私密信息可以不说，所有对外说出的内容必须放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), turn.SceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, stage), Optional: turn.PersonalSections(snapshot, character.EntityID)}
-	material = withLongMemory(material, snapshot, character.EntityID, stageInput.PlayerPerception+"\n"+stageInput.NewStimulus)
+	material = turn.WithLongMemory(material, snapshot, character.EntityID, stageInput.PlayerPerception+"\n"+stageInput.NewStimulus)
 	if _, ok := snapshot.LongMemory[character.EntityID]; ok {
 		committed := map[string]bool{}
 		for _, s := range snapshot.LongMemory[character.EntityID].Archive {

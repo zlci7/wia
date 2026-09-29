@@ -1,4 +1,4 @@
-package storyapp
+package turn
 
 import (
 	"strings"
@@ -6,7 +6,6 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/turn"
 )
 
 // R14: when the whole request does not fit, the recent-experience window must fall back
@@ -15,31 +14,31 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	// Small enough that the character-count rule keeps every group, so the token budget
 	// is what has to reduce the window.
 	groups := [][]memorymodel.MemorySource{}
-	for i := 0; i < targetRecentGroups; i++ {
+	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
 		record := memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("已发生的经历", 100)}
 		groups = append(groups, []memorymodel.MemorySource{record})
 	}
-	tail := flattenGroups(groups)
-	if len(memoryGroups(tail)) != targetRecentGroups {
-		t.Fatalf("fixture groups: %d", len(memoryGroups(tail)))
+	tail := memorymodel.FlattenGroups(groups)
+	if len(memorymodel.MemoryGroups(tail)) != memorymodel.TargetRecentGroups {
+		t.Fatalf("fixture groups: %d", len(memorymodel.MemoryGroups(tail)))
 	}
-	if got := len(memoryRecordsText(tail)); got > recentWindowChars {
+	if got := len(memorymodel.MemoryRecordsText(tail)); got > memorymodel.RecentWindowChars {
 		t.Fatalf("fixture must fit the size rule so the budget is what binds: %d", got)
 	}
 	// A budget that fits the base prompt and every group, measured rather than
 	// estimated, so the initial window is the whole recent history.
-	base := turn.FramedContextTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
-	testBudget := base + turn.FramedContextTokens(model.TextRequest{Input: memoryRecordsText(tail)}) + 2*budgetHeadroomTokens
-	material := withLongMemory(turn.Material{
+	base := FramedContextTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
+	testBudget := base + FramedContextTokens(model.TextRequest{Input: memorymodel.MemoryRecordsText(tail)}) + 2*budgetHeadroomTokens
+	material := WithLongMemory(Material{
 		Required: "本轮职责与刺激：玩家输入",
 		System:   "规则",
-	}, turn.Snapshot{InputBudgetTokens: testBudget, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
+	}, Snapshot{InputBudgetTokens: testBudget, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
 	if material.Bounded == nil {
 		t.Fatal("a long-memory material must be able to bound itself")
 	}
 	// Each record carries its own identifier, so counting them counts the retained
 	// groups without depending on the record text.
-	groupsIn := func(m turn.Material) int {
+	groupsIn := func(m Material) int {
 		count := 0
 		for _, id := range m.RequiredSources {
 			if strings.HasPrefix(id, "memory:") {
@@ -48,13 +47,13 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 		}
 		return count
 	}
-	if groupsIn(material) != targetRecentGroups {
+	if groupsIn(material) != memorymodel.TargetRecentGroups {
 		t.Fatalf("the initial window should carry every group, got %d", groupsIn(material))
 	}
 	// Through the composer with a window that cannot hold every group: the projection
 	// must present a smaller window instead of the turn failing.
 	window := model.WindowLimits{ContextTokens: testBudget + 512, OutputTokens: 512}
-	composer := turn.ContextComposer{Window: window}
+	composer := ContextComposer{Window: window}
 	req, _, err := composer.Build(material, "规则", 512)
 	if err != nil {
 		t.Fatalf("a reducible window still failed: %v", err)
@@ -74,11 +73,11 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 // group must report failure rather than silently dropping the newest context.
 func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	tail := []memorymodel.MemorySource{}
-	for i := 0; i < targetRecentGroups; i++ {
+	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
 		tail = append(tail, memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
 	}
 	groupsIn := func(budget int) int {
-		material := withLongMemory(turn.Material{Required: "本轮", System: "规则"}, turn.Snapshot{InputBudgetTokens: budget, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
+		material := WithLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: budget, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
 		count := 0
 		for _, id := range material.RequiredSources {
 			if strings.HasPrefix(id, "memory:") {
@@ -89,7 +88,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	generous := groupsIn(20000)
 	tight := groupsIn(1200)
-	if generous != targetRecentGroups {
+	if generous != memorymodel.TargetRecentGroups {
 		t.Fatalf("a generous budget must keep every group, got %d", generous)
 	}
 	if tight >= generous {
@@ -100,7 +99,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	// Shrinking must render from the parts: the digest header appears once and the source
 	// list describes what was included.
-	shrunk := withLongMemory(turn.Material{Required: "本轮", System: "规则"}, turn.Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
+	shrunk := WithLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
 	reduced, changed := shrunk.Bounded(recentWindowMinTokens + 200)
 	if !changed {
 		t.Fatal("the window did not shrink")
@@ -123,7 +122,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 		}
 	}
 	long := strings.Repeat("唯一的一组", 4000)
-	single := withLongMemory(turn.Material{Required: "本轮职责与刺激：玩家输入"}, turn.Snapshot{LongMemory: map[string]turn.MemoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
+	single := WithLongMemory(Material{Required: "本轮职责与刺激：玩家输入"}, Snapshot{LongMemory: map[string]MemoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
 	if single.Bounded == nil {
 		t.Fatal("expected a bounding hook")
 	}

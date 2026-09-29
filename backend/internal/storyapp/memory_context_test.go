@@ -140,11 +140,11 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	if len(items) != 12 {
 		t.Fatal("index not idempotent")
 	}
-	hits := searchMemory(snapshot.LongMemory["npc:mercenary"].Archive, "铜钥匙", 5)
+	hits := memorymodel.SearchMemory(snapshot.LongMemory["npc:mercenary"].Archive, "铜钥匙", 5)
 	if len(hits) != 0 {
 		t.Fatal("cross-scope search")
 	}
-	material := withLongMemory(turn.Material{System: "NPC", Required: "本轮", Optional: []turn.Section{{Text: "old"}}}, snapshot, "npc:innkeeper", "铜钥匙")
+	material := turn.WithLongMemory(turn.Material{System: "NPC", Required: "本轮", Optional: []turn.Section{{Text: "old"}}}, snapshot, "npc:innkeeper", "铜钥匙")
 	if !strings.Contains(material.Required, "perception:23") {
 		t.Fatal("recent tail missing")
 	}
@@ -202,11 +202,11 @@ func TestMemoryTailIsRequiredAndSearchBounded(t *testing.T) {
 	for i := 1; i <= 20; i++ {
 		archive = append(archive, memorymodel.MemorySource{ID: fmt.Sprint(i), Seq: int64(i), RunID: fmt.Sprint(i / 2), Content: "旧码头的铜钥匙"})
 	}
-	if got := searchMemory(archive, "铜钥匙", 5); len(got) != 5 || got[0].Seq != 20 {
+	if got := memorymodel.SearchMemory(archive, "铜钥匙", 5); len(got) != 5 || got[0].Seq != 20 {
 		t.Fatal(got)
 	}
 	s := turn.Snapshot{LongMemory: map[string]turn.MemoryContext{"player": {Tail: []memorymodel.MemorySource{{Content: strings.Repeat("完整经历", 15000)}}}}}
-	m := withLongMemory(turn.Material{System: "test", Required: "current"}, s, "player", "")
+	m := turn.WithLongMemory(turn.Material{System: "test", Required: "current"}, s, "player", "")
 	if _, _, err := (turn.ContextComposer{}).Build(m, m.System, 100); !errors.Is(err, turn.ErrContextCapacity) {
 		t.Fatal("silently truncated recent history", err)
 	}

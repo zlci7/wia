@@ -47,7 +47,7 @@ func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, sn
 		}
 	}
 	for _, query := range queries {
-		for _, s := range searchMemory(records, query, 5) {
+		for _, s := range memorymodel.SearchMemory(records, query, 5) {
 			selected[s.RunID] = true
 		}
 	}

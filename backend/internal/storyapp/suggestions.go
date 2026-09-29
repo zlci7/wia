@@ -201,7 +201,7 @@ func composeSuggestions(snapshot turn.Snapshot) turn.Material {
 		Required: fmt.Sprintf("公开背景：%s\n主角：%s\n主角资料：%s\n游戏内时间：%s\n玩家可见情境：%s\n眼前人物：%s", snapshot.Definition.Background, snapshot.PlayerName, snapshot.PlayerProfile, snapshot.Summary.Clock, turn.SceneFor(snapshot, "player"), turn.PublicCharacterContext(snapshot.Characters, wiaworld.CharacterIDs(sceneCharacters(snapshot.Characters)))),
 		Optional: turn.NarrativeSections(snapshot.Messages),
 	}
-	return withLongMemory(m, snapshot, "player", "")
+	return turn.WithLongMemory(m, snapshot, "player", "")
 }
 
 func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc, generator model.TextGenerator, snapshot turn.Snapshot, material turn.Material, set SuggestionSet, activeRevision int64) {

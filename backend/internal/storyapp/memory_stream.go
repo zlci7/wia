@@ -2,10 +2,7 @@ package storyapp
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
-	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 )
@@ -64,29 +61,10 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 	})
 }
 
-func memoryGroups(items []memorymodel.MemorySource) [][]memorymodel.MemorySource {
-	var groups [][]memorymodel.MemorySource
-	for _, item := range items {
-		if len(groups) == 0 || groups[len(groups)-1][0].RunID != item.RunID {
-			groups = append(groups, []memorymodel.MemorySource{})
-		}
-		groups[len(groups)-1] = append(groups[len(groups)-1], item)
-	}
-	return groups
-}
-
 func memoryScopeIDs(snapshot turn.Snapshot) []string {
 	ids := []string{"player"}
 	for _, c := range snapshot.Characters {
 		ids = append(ids, c.EntityID)
 	}
 	return ids
-}
-
-func memoryRecordsText(items []memorymodel.MemorySource) string {
-	var b strings.Builder
-	for _, s := range items {
-		fmt.Fprintf(&b, "[%s；个人序号=%d；说话者=%s；类型=%s；来源=%s；记录于=%s] %s\n", s.ID, s.Seq, s.Actor, s.Kind, s.EventID, s.CreatedAt, s.Content)
-	}
-	return b.String()
 }
