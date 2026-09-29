@@ -23,9 +23,9 @@ func TestUsagePersistencePaginationAndOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scope := ContextScope{World: world.WorldID, Run: "run-test", Purpose: "npc", Attempt: 1}
+	scope := turn.ContextScope{World: world.WorldID, Run: "run-test", Purpose: "npc", Attempt: 1}
 	for n := 0; n < 102; n++ {
-		id, err := a.beginUsage(ctx, scope, ContextBuildReport{InputTokens: 100, TotalOutputTokens: 50})
+		id, err := a.beginUsage(ctx, scope, turn.ContextBuildReport{InputTokens: 100, TotalOutputTokens: 50})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +100,7 @@ func TestUsageConcurrentActualCallsAndFailure(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			g := a.contextGenerator(usageGenerator{fail: n%2 == 0}, contextMaterial{Required: "facts"}, turn.Snapshot{}, wiaworld.Run{}, "npc", "npc:test", 1, "test")
+			g := a.contextGenerator(usageGenerator{fail: n%2 == 0}, turn.Material{Required: "facts"}, turn.Snapshot{}, wiaworld.Run{}, "npc", "npc:test", 1, "test")
 			_, _ = g.GenerateText(context.Background(), model.TextRequest{System: "system", MaxOutputTokens: 20})
 		}(n)
 	}

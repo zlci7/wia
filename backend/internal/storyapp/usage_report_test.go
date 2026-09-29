@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 )
 
 // Real-model acceptance keeps its metadata after disposable story data is removed.
@@ -68,7 +69,7 @@ func TestUsageReportSurvivesDisposableApp(t *testing.T) {
 		a := newTestApp(t, &scriptedGenerator{})
 		keepUsageReport(t, a, dir)
 		for i := 0; i < 102; i++ {
-			if _, err := a.beginUsage(context.Background(), ContextScope{Purpose: "report-test"}, ContextBuildReport{}); err != nil {
+			if _, err := a.beginUsage(context.Background(), turn.ContextScope{Purpose: "report-test"}, turn.ContextBuildReport{}); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -81,7 +81,7 @@ func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T)
 	s.Memories["npc:innkeeper"] = []wiaworld.Memory{{SourceEventID: "secret", Content: "SECRET_MEMORY"}}
 	s.SceneViews[1].Content = "PRIVATE_SCENE"
 	material := composeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", turn.StageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
-	req, _, err := (ContextComposer{}).Build(material, material.System, 1024)
+	req, _, err := (turn.ContextComposer{}).Build(material, material.System, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := joinPerceptions(s, s.Perceptions["npc:mercenary"])
+	text := turn.JoinPerceptions(s, s.Perceptions["npc:mercenary"])
 	if !strings.Contains(text, "沈岚（客栈老板）") {
 		t.Fatalf("speaker lost: %s", text)
 	}

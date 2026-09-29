@@ -55,7 +55,7 @@ func normalizeNPCActionIntent(value string) string {
 }
 
 func classifyTurnFailure(err error) (status, reason, message string) {
-	if errors.Is(err, ErrContextCapacity) || errors.Is(err, model.ErrTextInputTooLarge) {
+	if errors.Is(err, turn.ErrContextCapacity) || errors.Is(err, model.ErrTextInputTooLarge) {
 		return "failed", "context_capacity_exceeded", "required story context exceeds available model capacity"
 	}
 	if errors.Is(err, ErrContextSourceMissing) {

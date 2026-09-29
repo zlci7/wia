@@ -67,6 +67,8 @@ func main() {
 		runUnqualify(args)
 	case "cmpfunc":
 		runCmpFunc(args)
+	case "strcmp":
+		runStrCmp(args)
 	case "-h", "--help", "help":
 		usage()
 	default:

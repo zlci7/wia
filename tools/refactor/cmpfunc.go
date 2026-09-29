@@ -23,6 +23,7 @@ func runCmpFunc(args []string) {
 	name := flag.String("name", "", "function name in the original file")
 	newName := flag.String("new-name", "", "function name in the moved file")
 	oldQualifier := flag.String("old-qualifier", "", "package qualifier the original used, e.g. turn.")
+	renamedTypes := flag.String("renamed-types", "", "comma-separated old=new pairs the move renamed")
 	flag.CommandLine.Parse(args)
 
 	original, err := body(*left, *name)
@@ -38,6 +39,18 @@ func runCmpFunc(args []string) {
 	original = strings.ReplaceAll(original, *name, "NAME")
 	moved = strings.ReplaceAll(moved, *newName, "NAME")
 	original = strings.ReplaceAll(original, *oldQualifier, "")
+	// A rename applied on both sides is not a difference in the code that moved. Naming
+	// the renames keeps the check meaningful: anything else that differs is still shown.
+	for _, pair := range strings.Split(*renamedTypes, ",") {
+		if pair = strings.TrimSpace(pair); pair == "" {
+			continue
+		}
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			panic("bad renamed type pair: " + pair)
+		}
+		original = strings.ReplaceAll(original, parts[0], parts[1])
+	}
 	if original == moved {
 		fmt.Printf("%s: identical (%d bytes)\n", *name, len(moved))
 		return

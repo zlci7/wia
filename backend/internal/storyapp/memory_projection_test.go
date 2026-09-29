@@ -88,7 +88,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 			t.Fatal("backlog group must be reported as declined, not as retrieved", record.ID)
 		}
 	}
-	req, report, err := (ContextComposer{}).Build(material, material.System, 1024)
+	req, report, err := (turn.ContextComposer{}).Build(material, material.System, 1024)
 	if err != nil {
 		t.Fatalf("unsummarized history blocked the call: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 	// Retrieval starts from a fresh request that supplied nothing: the older
 	// unsummarized agreement must come back, and the window accounting must not
 	// silently consume it.
-	recalled := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, memoryProjection{context: snapshot.LongMemory["player"]}, "铜钥匙")
+	recalled := withRecall(turn.Material{System: "NPC", Required: "本轮"}, memoryProjection{context: snapshot.LongMemory["player"]}, "铜钥匙")
 	found := false
 	for _, section := range recalled.Optional {
 		if section.Name == "memory_recall" && strings.Contains(section.Text, "铜钥匙") {
@@ -116,7 +116,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 	// An in-turn appended query must reach a group the window left out while still
 	// skipping the groups this request already supplies.
 	_, _, supplied := projectRecentExperience(archive)
-	appended := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, memoryProjection{context: snapshot.LongMemory["player"], supplied: supplied}, "铜钥匙")
+	appended := withRecall(turn.Material{System: "NPC", Required: "本轮"}, memoryProjection{context: snapshot.LongMemory["player"], supplied: supplied}, "铜钥匙")
 	recalledBacklog, recalledSupplied := false, false
 	for _, section := range appended.Optional {
 		if section.Name != "memory_recall" {
@@ -133,7 +133,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 // When the newest groups together do not fit, the composer drops whole older
 // groups; if even the smallest required material does not fit, it still fails.
 func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
-	base := contextMaterial{System: "职责", Required: strings.Repeat("本轮必需资料", 1000)}
+	base := turn.Material{System: "职责", Required: strings.Repeat("本轮必需资料", 1000)}
 	tail := historyRecords(4, 1, func(group, _ int) string {
 		return fmt.Sprintf("第%d轮%s", group, strings.Repeat("已提交经历", 500))
 	})
@@ -144,7 +144,7 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 		LongMemory: map[string]turn.MemoryContext{"player": {Archive: tail, Tail: tail}},
 	}
 	material := withLongMemory(base, snapshot, "player", "")
-	req, report, err := (ContextComposer{}).Build(material, material.System, 1024)
+	req, report, err := (turn.ContextComposer{}).Build(material, material.System, 1024)
 	if err != nil {
 		t.Fatalf("window did not degrade: %v", err)
 	}
@@ -164,8 +164,8 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 			Tail:    []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
 		}},
 	}
-	tooLarge := withLongMemory(contextMaterial{System: "职责", Required: "本轮"}, oversized, "player", "")
-	if _, _, err := (ContextComposer{}).Build(tooLarge, tooLarge.System, 1024); !errors.Is(err, ErrContextCapacity) {
+	tooLarge := withLongMemory(turn.Material{System: "职责", Required: "本轮"}, oversized, "player", "")
+	if _, _, err := (turn.ContextComposer{}).Build(tooLarge, tooLarge.System, 1024); !errors.Is(err, turn.ErrContextCapacity) {
 		t.Fatalf("oversized single group must fail loudly: %v", err)
 	}
 }
@@ -292,8 +292,8 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	projection := memoryProjection{context: reloaded.LongMemory["npc:innkeeper"], supplied: map[string]bool{}}
-	material := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, projection, "铜钥匙")
-	req, _, err := (ContextComposer{}).Build(material, material.System, 4096)
+	material := withRecall(turn.Material{System: "NPC", Required: "本轮"}, projection, "铜钥匙")
+	req, _, err := (turn.ContextComposer{}).Build(material, material.System, 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,13 +301,13 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 		t.Fatal("correction did not apply to a backlog record")
 	}
 	other := turn.MemoryContext{Archive: []memorymodel.MemorySource{{ID: "other:1", Seq: 1, RunID: "run:other", Content: "铜钥匙在别人手里"}}}
-	crossScope := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, memoryProjection{context: other, supplied: map[string]bool{}}, "铜钥匙")
+	crossScope := withRecall(turn.Material{System: "NPC", Required: "本轮"}, memoryProjection{context: other, supplied: map[string]bool{}}, "铜钥匙")
 	if strings.Contains(anyOptionalText(crossScope), "旧码头") {
 		t.Fatal("recall crossed receivers")
 	}
 }
 
-func anyOptionalText(material contextMaterial) string {
+func anyOptionalText(material turn.Material) string {
 	var builder strings.Builder
 	for _, section := range material.Optional {
 		builder.WriteString(section.Text)

@@ -144,7 +144,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	if len(hits) != 0 {
 		t.Fatal("cross-scope search")
 	}
-	material := withLongMemory(contextMaterial{System: "NPC", Required: "本轮", Optional: []contextSection{{Text: "old"}}}, snapshot, "npc:innkeeper", "铜钥匙")
+	material := withLongMemory(turn.Material{System: "NPC", Required: "本轮", Optional: []turn.Section{{Text: "old"}}}, snapshot, "npc:innkeeper", "铜钥匙")
 	if !strings.Contains(material.Required, "perception:23") {
 		t.Fatal("recent tail missing")
 	}
@@ -206,8 +206,8 @@ func TestMemoryTailIsRequiredAndSearchBounded(t *testing.T) {
 		t.Fatal(got)
 	}
 	s := turn.Snapshot{LongMemory: map[string]turn.MemoryContext{"player": {Tail: []memorymodel.MemorySource{{Content: strings.Repeat("完整经历", 15000)}}}}}
-	m := withLongMemory(contextMaterial{System: "test", Required: "current"}, s, "player", "")
-	if _, _, err := (ContextComposer{}).Build(m, m.System, 100); !errors.Is(err, ErrContextCapacity) {
+	m := withLongMemory(turn.Material{System: "test", Required: "current"}, s, "player", "")
+	if _, _, err := (turn.ContextComposer{}).Build(m, m.System, 100); !errors.Is(err, turn.ErrContextCapacity) {
 		t.Fatal("silently truncated recent history", err)
 	}
 }

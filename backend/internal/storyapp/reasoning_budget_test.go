@@ -22,8 +22,8 @@ func TestReasoningBudgetPreservesVisibleLimitAndWindow(t *testing.T) {
 		{"unknown", model.WindowLimits{}, 8192, 12000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := ContextComposer{Window: tc.window, ReasoningReserve: 8192}
-			req, report, err := c.Build(contextMaterial{Required: "本轮玩家原文"}, "规则", 4096)
+			c := turn.ContextComposer{Window: tc.window, ReasoningReserve: 8192}
+			req, report, err := c.Build(turn.Material{Required: "本轮玩家原文"}, "规则", 4096)
 			if err != nil || req.MaxOutputTokens != 4096 || req.ReasoningReserveTokens != tc.reserve || req.MaxInputTokens != tc.input || report.TotalOutputTokens != 4096+tc.reserve || report.WindowKnown != (tc.name != "unknown") {
 				t.Fatalf("request=%+v report=%+v err=%v", req, report, err)
 			}
@@ -52,7 +52,7 @@ func (g *reasoningCapture) GenerateText(_ context.Context, r model.TextRequest) 
 func TestReasoningRepairRechecksRequiredCapacity(t *testing.T) {
 	provider := &reasoningCapture{}
 	app := newTestApp(t, &scriptedGenerator{})
-	g := app.contextGenerator(provider, contextMaterial{Required: "本轮原文"}, turn.Snapshot{}, wiaworld.Run{}, "test", "player", 1, "test.v1")
+	g := app.contextGenerator(provider, turn.Material{Required: "本轮原文"}, turn.Snapshot{}, wiaworld.Run{}, "test", "player", 1, "test.v1")
 	if _, err := g.GenerateText(context.Background(), model.TextRequest{System: "规则", MaxOutputTokens: 4096}); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestReasoningRepairRechecksRequiredCapacity(t *testing.T) {
 		t.Fatalf("capability lost: %+v", provider.request)
 	}
 	_, err := g.GenerateText(context.Background(), model.TextRequest{System: strings.Repeat("修复格式", 500), MaxOutputTokens: 4096})
-	if !errors.Is(err, ErrContextCapacity) || provider.calls != 1 {
+	if !errors.Is(err, turn.ErrContextCapacity) || provider.calls != 1 {
 		t.Fatalf("repair sent oversized request: calls=%d err=%v", provider.calls, err)
 	}
 }

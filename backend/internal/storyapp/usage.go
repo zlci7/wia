@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 )
 
-func (a *App) meteredText(ctx context.Context, generator model.TextGenerator, request model.TextRequest, scope ContextScope, report ContextBuildReport) (model.TextResponse, error) {
+func (a *App) meteredText(ctx context.Context, generator model.TextGenerator, request model.TextRequest, scope turn.ContextScope, report turn.ContextBuildReport) (model.TextResponse, error) {
 	id, err := a.beginUsage(ctx, scope, report)
 	if err != nil {
 		return model.TextResponse{}, err
@@ -92,7 +93,7 @@ type UsagePage struct {
 
 // Usage lives in the application ledger: copying a story does not duplicate cost.
 // Reservations survive process interruption and stay unconfirmed if usage is lost.
-func (a *App) beginUsage(ctx context.Context, scope ContextScope, report ContextBuildReport) (int64, error) {
+func (a *App) beginUsage(ctx context.Context, scope turn.ContextScope, report turn.ContextBuildReport) (int64, error) {
 	result, err := a.appDB.ExecContext(ctx, `INSERT INTO model_usage(user_id,world_id,run_id,attempt,purpose,stage,started_at,estimated_input_tokens,output_limit) VALUES(?,?,?,?,?,?,?,?,?)`, a.userID, scope.World, scope.Run, scope.Attempt, scope.Purpose, scope.Stage, time.Now().UTC().Format(time.RFC3339Nano), report.InputTokens, report.TotalOutputTokens)
 	if err != nil {
 		return 0, err

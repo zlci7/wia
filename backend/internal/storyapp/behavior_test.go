@@ -208,8 +208,8 @@ func TestBehaviorPoliciesLimitsBusyAndCapacity(t *testing.T) {
 	s.Narrative = wiaworld.DefaultNarrativeSettings()
 	s.Narrative.Policies.NPC = strings.Repeat("策略", 2000)
 	m := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
-	c := ContextComposer{Window: model.WindowLimits{ContextTokens: 1024, OutputTokens: 512}}
-	if _, _, err = c.Build(m, m.System, 512); !errors.Is(err, ErrContextCapacity) {
+	c := turn.ContextComposer{Window: model.WindowLimits{ContextTokens: 1024, OutputTokens: 512}}
+	if _, _, err = c.Build(m, m.System, 512); !errors.Is(err, turn.ErrContextCapacity) {
 		t.Fatal("required policy was truncated", err)
 	}
 }

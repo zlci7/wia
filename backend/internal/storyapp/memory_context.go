@@ -54,13 +54,13 @@ func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, 
 		for maintenance := 0; maintenance < 3; maintenance++ {
 			m := snapshot.LongMemory[scope]
 			groups := memoryGroups(m.Tail)
-			if len(groups) <= 4 || (len(groups) <= 8 && framedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(m.Tail)}) <= 6000) {
+			if len(groups) <= 4 || (len(groups) <= 8 && turn.FramedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(m.Tail)}) <= 6000) {
 				break
 			}
 			prefix := []memorymodel.MemorySource{}
 			for _, group := range groups[:len(groups)-4] {
 				candidate := append(append([]memorymodel.MemorySource{}, prefix...), group...)
-				if framedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(candidate)}) > 6500 && len(prefix) > 0 {
+				if turn.FramedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(candidate)}) > 6500 && len(prefix) > 0 {
 					break
 				}
 				prefix = candidate
@@ -107,7 +107,7 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 			sources = append(sources, s.ID)
 		}
 	}
-	material := contextMaterial{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + digestContext(previous) + "\n新增连续经历：\n" + memoryRecordsText(prefix), RequiredSources: allowed}
+	material := turn.Material{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + digestContext(previous) + "\n新增连续经历：\n" + memoryRecordsText(prefix), RequiredSources: allowed}
 	material.Required += "\nsource_ids 的完整合法记录ID列表：" + wire.MarshalJSON(allowed) + "\n本次列表仅含保留状态的必要来源与新增记录，完整历史覆盖仍由存档维护。每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
 	material.System += memoryCorrectionRule
 	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v3")
@@ -195,7 +195,7 @@ func inputBudgetTokens(generator model.TextGenerator) int {
 	return limit
 }
 
-func withLongMemory(material contextMaterial, snapshot turn.Snapshot, scope, query string) contextMaterial {
+func withLongMemory(material turn.Material, snapshot turn.Snapshot, scope, query string) turn.Material {
 	m, ok := snapshot.LongMemory[scope]
 	if !ok {
 		return material
@@ -204,7 +204,7 @@ func withLongMemory(material contextMaterial, snapshot turn.Snapshot, scope, que
 	material.System += memoryCorrectionRule
 	// The window is chosen against the request's real input budget, not a fixed size:
 	// a large base prompt must shrink the window instead of failing the turn.
-	baseTokens := framedContextTokens(model.TextRequest{System: material.System, Input: material.Required})
+	baseTokens := turn.FramedContextTokens(model.TextRequest{System: material.System, Input: material.Required})
 	budget := snapshot.InputBudgetTokens
 	if budget <= 0 {
 		budget = 12000
@@ -218,13 +218,13 @@ func withLongMemory(material contextMaterial, snapshot turn.Snapshot, scope, que
 	// groups rather than failing. The newest group always stays and the digest watermark
 	// is untouched either way.
 	full := material
-	material.Bounded = func(inputLimit int) (contextMaterial, bool) {
+	material.Bounded = func(inputLimit int) (turn.Material, bool) {
 		groups := memoryGroups(block)
 		if len(groups) <= 1 {
 			return full, false
 		}
 		// Reserve room for the system prompt and everything that is not the window.
-		baseTokens := framedContextTokens(model.TextRequest{System: full.System, Input: base})
+		baseTokens := turn.FramedContextTokens(model.TextRequest{System: full.System, Input: base})
 		budget := inputLimit - baseTokens - budgetHeadroomTokens
 		if budget < recentWindowMinTokens {
 			budget = recentWindowMinTokens
@@ -241,7 +241,7 @@ func withLongMemory(material contextMaterial, snapshot turn.Snapshot, scope, que
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material contextMaterial, base string, m turn.MemoryContext, scope string, block []memorymodel.MemorySource, query string) contextMaterial {
+func renderMemoryWindow(material turn.Material, base string, m turn.MemoryContext, scope string, block []memorymodel.MemorySource, query string) turn.Material {
 	material.Required = base
 	material.RequiredSources = nil
 	material.DeclinedSources = nil
@@ -273,7 +273,7 @@ func renderMemoryWindow(material contextMaterial, base string, m turn.MemoryCont
 		}
 	}
 	for i := len(backlog) - 1; i >= 0; i-- {
-		section := contextSection{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(backlog[i])}
+		section := turn.Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(backlog[i])}
 		for _, record := range backlog[i] {
 			section.Sources = append(section.Sources, record.ID)
 			material.DeclinedSources = append(material.DeclinedSources, record.ID)
@@ -295,7 +295,7 @@ func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]mem
 	}
 	for start := 0; start < len(groups); start++ {
 		candidate := groups[start:]
-		if framedContextTokens(model.TextRequest{Input: memoryRecordsText(flattenGroups(candidate))}) <= budget || start == len(groups)-1 {
+		if turn.FramedContextTokens(model.TextRequest{Input: memoryRecordsText(flattenGroups(candidate))}) <= budget || start == len(groups)-1 {
 			return candidate
 		}
 	}
@@ -303,12 +303,12 @@ func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]mem
 }
 
 // withLongMemoryWindow renders the required block from an explicit set of groups.
-func withLongMemoryWindow(material contextMaterial, m turn.MemoryContext, kept [][]memorymodel.MemorySource, query string) contextMaterial {
-	rebuilt := contextMaterial{
+func withLongMemoryWindow(material turn.Material, m turn.MemoryContext, kept [][]memorymodel.MemorySource, query string) turn.Material {
+	rebuilt := turn.Material{
 		PolicyRevision: material.PolicyRevision,
 		System:         material.System,
 		Required:       material.Required,
-		Optional:       []contextSection{},
+		Optional:       []turn.Section{},
 	}
 	// Strip the previous recent block and its backlog, then render the smaller window.
 	if index := strings.Index(rebuilt.Required, "最近的已发生经历"); index >= 0 {
@@ -348,7 +348,7 @@ func withLongMemoryWindow(material contextMaterial, m turn.MemoryContext, kept [
 		}
 	}
 	for i := len(older) - 1; i >= 0; i-- {
-		section := contextSection{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(older[i])}
+		section := turn.Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memoryRecordsText(older[i])}
 		for _, record := range older[i] {
 			section.Sources = append(section.Sources, record.ID)
 			rebuilt.DeclinedSources = append(rebuilt.DeclinedSources, record.ID)
@@ -358,7 +358,7 @@ func withLongMemoryWindow(material contextMaterial, m turn.MemoryContext, kept [
 	rebuilt = withRecall(rebuilt, memoryProjection{context: m, supplied: supplied}, query)
 	// A reduced material stays reducible, so a caller can keep asking for a smaller
 	// window until it can no longer shrink.
-	rebuilt.Bounded = func(inputLimit int) (contextMaterial, bool) { return rebuilt, false }
+	rebuilt.Bounded = func(inputLimit int) (turn.Material, bool) { return rebuilt, false }
 	return rebuilt
 }
 
@@ -384,7 +384,7 @@ func selectRecentWindow(items []memorymodel.MemorySource, available int) (block 
 	// when it is larger than the size rule allows.
 	for start < len(groups)-1 {
 		candidate := groups[start:]
-		if framedContextTokens(model.TextRequest{Input: memoryRecordsText(flattenGroups(candidate))}) <= available &&
+		if turn.FramedContextTokens(model.TextRequest{Input: memoryRecordsText(flattenGroups(candidate))}) <= available &&
 			len(memoryRecordsText(flattenGroups(candidate))) <= recentWindowChars {
 			break
 		}
@@ -473,11 +473,11 @@ func (p memoryProjection) alreadySupplied(id string) bool {
 	return p.supplied[id]
 }
 
-func withRecall(material contextMaterial, projection memoryProjection, query string) contextMaterial {
+func withRecall(material turn.Material, projection memoryProjection, query string) turn.Material {
 	m := projection.context
 	hits := searchMemory(m.Archive, query, 5)
 	groups := memoryGroups(m.Archive)
-	var selected []contextSection
+	var selected []turn.Section
 	// Lowest-ranked matches are removed first by the shared budgeter. A hit
 	// selects its entire committed group so attempts keep their outcomes.
 	for _, s := range hits {
@@ -494,7 +494,7 @@ func withRecall(material contextMaterial, projection memoryProjection, query str
 			if !contains || overlap {
 				continue
 			}
-			section := contextSection{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memoryRecordsText(group)}
+			section := turn.Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memoryRecordsText(group)}
 			for _, record := range group {
 				section.Sources = append(section.Sources, record.ID)
 				material.RecallSources = append(material.RecallSources, record.ID)

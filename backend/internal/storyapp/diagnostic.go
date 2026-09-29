@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 )
 
 func safeTurnErrorCode(err error) string {
@@ -18,7 +19,7 @@ func safeTurnErrorCode(err error) string {
 	switch {
 	case errors.Is(err, ErrGenerationFailed):
 		return "generated_content_invalid"
-	case errors.Is(err, ErrContextCapacity):
+	case errors.Is(err, turn.ErrContextCapacity):
 		return "context_capacity"
 	case errors.Is(err, ErrContextSourceMissing):
 		return "context_source_missing"
