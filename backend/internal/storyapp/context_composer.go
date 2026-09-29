@@ -198,13 +198,24 @@ func framedContextTokens(req model.TextRequest) int {
 	return n + 16
 }
 
+// meteredTextFunc performs one model call with usage metering. It is a function rather
+// than an interface because context assembly needs exactly one capability, and an
+// interface for a single method would describe the application's shape instead of what a
+// composed request actually requires.
+type meteredTextFunc func(ctx context.Context, generator model.TextGenerator, request model.TextRequest, scope ContextScope, report ContextBuildReport) (model.TextResponse, error)
+
 type contextGenerator struct {
-	app *App
-	model.TextGenerator
-	composer ContextComposer
-	material contextMaterial
-	logger   Logger
-	calls    int
+	// metered is how a composed request is sent. It is nil when the generator is not
+	// metered, in which case the call goes straight to the wrapped generator.
+	//
+	// It is the only thing this type ever needed from the application, and holding the
+	// whole application for it is what kept the context assemblers from moving anywhere.
+	metered       meteredTextFunc
+	TextGenerator model.TextGenerator
+	composer      ContextComposer
+	material      contextMaterial
+	logger        Logger
+	calls         int
 }
 
 func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot turn.Snapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
@@ -216,7 +227,7 @@ func (a *App) contextGenerator(generator model.TextGenerator, material contextMa
 	if provider, ok := generator.(model.TextReasoningProvider); ok {
 		reasoning = provider.TextReasoningReserve()
 	}
-	return &contextGenerator{app: a, TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
+	return &contextGenerator{metered: a.meteredText, TextGenerator: generator, material: material, logger: a.logger, composer: ContextComposer{Scope: ContextScope{Owner: a.userID, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
 }
 
 func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
@@ -238,8 +249,8 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	}
 	var response model.TextResponse
 	var callErr error
-	if g.app != nil {
-		response, callErr = g.app.meteredText(ctx, g.TextGenerator, req, scope, report)
+	if g.metered != nil {
+		response, callErr = g.metered(ctx, g.TextGenerator, req, scope, report)
 	} else {
 		response, callErr = g.TextGenerator.GenerateText(ctx, req)
 	}
