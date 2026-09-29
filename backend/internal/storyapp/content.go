@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"image"
 	"os"
 	"path/filepath"
@@ -68,27 +69,27 @@ type ContentDraftNPC struct {
 // ContentDraftPayload is the editable draft shape. Every field is optional so the
 // editor can save partial work; publish validates the strict package schema.
 type ContentDraftPayload struct {
-	SchemaVersion   int                    `json:"schema_version"`
-	GameID          string                 `json:"game_id"`
-	Mode            string                 `json:"mode"`
-	Title           string                 `json:"title"`
-	Description     string                 `json:"description"`
-	Gameplay        string                 `json:"gameplay"`
-	Background      string                 `json:"background"`
-	Rules           string                 `json:"rules"`
-	AuthorFacts     string                 `json:"author_facts"`
-	Cover           string                 `json:"cover,omitempty"`
-	CoverAlt        string                 `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults         `json:"player"`
-	Opening         string                 `json:"opening"`
-	InitialLocation string                 `json:"initial_location"`
-	Clock           string                 `json:"clock"`
-	Locations       []PackLocation         `json:"locations"`
-	NPCs            []ContentDraftNPC      `json:"npcs"`
-	Bystanders      []PackBystander        `json:"bystanders"`
-	Plot            *PlotDefinition        `json:"plot,omitempty"`
-	EventGeneration *EventGenerationPolicy `json:"event_generation,omitempty"`
-	Defaults        *NarrativeSettings     `json:"defaults,omitempty"`
+	SchemaVersion   int                         `json:"schema_version"`
+	GameID          string                      `json:"game_id"`
+	Mode            string                      `json:"mode"`
+	Title           string                      `json:"title"`
+	Description     string                      `json:"description"`
+	Gameplay        string                      `json:"gameplay"`
+	Background      string                      `json:"background"`
+	Rules           string                      `json:"rules"`
+	AuthorFacts     string                      `json:"author_facts"`
+	Cover           string                      `json:"cover,omitempty"`
+	CoverAlt        string                      `json:"cover_alt,omitempty"`
+	Player          PlayerDefaults              `json:"player"`
+	Opening         string                      `json:"opening"`
+	InitialLocation string                      `json:"initial_location"`
+	Clock           string                      `json:"clock"`
+	Locations       []PackLocation              `json:"locations"`
+	NPCs            []ContentDraftNPC           `json:"npcs"`
+	Bystanders      []PackBystander             `json:"bystanders"`
+	Plot            *PlotDefinition             `json:"plot,omitempty"`
+	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
+	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
 
 const payloadTooLarge = "payload is too large"
@@ -410,7 +411,7 @@ func validateDraftPayload(payload ContentDraftPayload) error {
 		seen[location.ID] = true
 	}
 	if payload.Defaults != nil {
-		if _, err := validateNarrativeSettings(*payload.Defaults); err != nil {
+		if _, err := wiaworld.ValidateNarrativeSettings(*payload.Defaults); err != nil {
 			return fmt.Errorf("%w: defaults", ErrContentInvalid)
 		}
 	}

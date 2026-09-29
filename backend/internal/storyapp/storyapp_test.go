@@ -414,7 +414,7 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 	}
 	snapshot := worldSnapshot{
 		Summary:      wiaworld.WorldSummary{WorldID: "world-test", Scene: def.Scene, Clock: def.Clock},
-		Narrative:    defaultNarrativeSettings(),
+		Narrative:    wiaworld.DefaultNarrativeSettings(),
 		Characters:   def.Characters,
 		Perceptions:  map[string][]wiaworld.Perception{},
 		Memories:     map[string][]wiaworld.Memory{},
@@ -453,23 +453,23 @@ func TestNarrativeSettingsPersistAndShapeNarratorPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Narrative != defaultNarrativeSettings() {
+	if snapshot.Narrative != wiaworld.DefaultNarrativeSettings() {
 		t.Fatalf("default narrative settings = %+v", snapshot.Narrative)
 	}
 
 	settings, summary, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, UpdateNarrativeSettingsRequest{
-		Perspective:          PerspectiveFirstPerson,
-		Length:               NarrativeLengthConcise,
-		Detail:               NarrativeDetailRich,
-		PlayerElaboration:    PlayerElaborationExpressive,
-		NPCInitiative:        NPCInitiativeProactive,
+		Perspective:          wiaworld.PerspectiveFirstPerson,
+		Length:               wiaworld.NarrativeLengthConcise,
+		Detail:               wiaworld.NarrativeDetailRich,
+		PlayerElaboration:    wiaworld.PlayerElaborationExpressive,
+		NPCInitiative:        wiaworld.NPCInitiativeProactive,
 		CustomInstruction:    "对白简洁，环境偏冷峻。",
 		ExpectedContextEpoch: world.ContextEpoch,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.Perspective != PerspectiveFirstPerson || summary.ContextEpoch != world.ContextEpoch+1 {
+	if settings.Perspective != wiaworld.PerspectiveFirstPerson || summary.ContextEpoch != world.ContextEpoch+1 {
 		t.Fatalf("updated settings/summary = %+v/%+v", settings, summary)
 	}
 
@@ -551,7 +551,7 @@ func TestNarrativeSettingsUseDefaultsWhenExistingWorldLacksInteractionMeta(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Narrative.PlayerElaboration != PlayerElaborationNatural || snapshot.Narrative.NPCInitiative != NPCInitiativeContextual {
+	if snapshot.Narrative.PlayerElaboration != wiaworld.PlayerElaborationNatural || snapshot.Narrative.NPCInitiative != wiaworld.NPCInitiativeContextual {
 		t.Fatalf("legacy narrative settings = %+v", snapshot.Narrative)
 	}
 }
@@ -561,12 +561,12 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 		value string
 		want  string
 	}{
-		{PlayerElaborationRestrained, "优先使用间接叙述"},
-		{PlayerElaborationNatural, "跟老板打招呼"},
-		{PlayerElaborationExpressive, "不得自行补出多轮 NPC 对话"},
+		{wiaworld.PlayerElaborationRestrained, "优先使用间接叙述"},
+		{wiaworld.PlayerElaborationNatural, "跟老板打招呼"},
+		{wiaworld.PlayerElaborationExpressive, "不得自行补出多轮 NPC 对话"},
 	}
 	for _, tc := range elaborationCases {
-		got := playerElaborationInstruction(NarrativeSettings{PlayerElaboration: tc.value})
+		got := playerElaborationInstruction(wiaworld.NarrativeSettings{PlayerElaboration: tc.value})
 		if !strings.Contains(got, tc.want) {
 			t.Fatalf("player elaboration %q = %q, want %q", tc.value, got, tc.want)
 		}
@@ -576,12 +576,12 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 		value string
 		want  string
 	}{
-		{NPCInitiativeResponsive, "处理必要事务"},
-		{NPCInitiativeContextual, "按情境主动"},
-		{NPCInitiativeProactive, "主动提问、试探、打趣"},
+		{wiaworld.NPCInitiativeResponsive, "处理必要事务"},
+		{wiaworld.NPCInitiativeContextual, "按情境主动"},
+		{wiaworld.NPCInitiativeProactive, "主动提问、试探、打趣"},
 	}
 	for _, tc := range initiativeCases {
-		got := npcInitiativeInstruction(NarrativeSettings{NPCInitiative: tc.value})
+		got := npcInitiativeInstruction(wiaworld.NarrativeSettings{NPCInitiative: tc.value})
 		if !strings.Contains(got, tc.want) {
 			t.Fatalf("NPC initiative %q = %q, want %q", tc.value, got, tc.want)
 		}
@@ -596,27 +596,30 @@ func TestNarrativeSettingsValidateEpochAndBusyWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid := UpdateNarrativeSettingsRequest{
-		Perspective:       PerspectiveSecondPerson,
-		Length:            NarrativeLengthStandard,
-		Detail:            NarrativeDetailBalanced,
-		PlayerElaboration: PlayerElaborationNatural,
-		NPCInitiative:     NPCInitiativeContextual,
+		Perspective:       wiaworld.PerspectiveSecondPerson,
+		Length:            wiaworld.NarrativeLengthStandard,
+		Detail:            wiaworld.NarrativeDetailBalanced,
+		PlayerElaboration: wiaworld.PlayerElaborationNatural,
+		NPCInitiative:     wiaworld.NPCInitiativeContextual,
 	}
 	invalid := valid
 	invalid.Perspective = "omniscient"
-	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
+	// The domain rejects the value, so the error is the domain's own: the
+	// application layer does not translate it into a request error.
+	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, wiaworld.ErrInvalidNarrativeSettings) {
 		t.Fatalf("invalid perspective error = %v", err)
 	}
 	invalid = valid
 	invalid.PlayerElaboration = "unbounded"
-	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
+	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, wiaworld.ErrInvalidNarrativeSettings) {
 		t.Fatalf("invalid player elaboration error = %v", err)
 	}
 	invalid = valid
 	invalid.NPCInitiative = "chaotic"
-	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, ErrInvalidRequest) {
+	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, invalid); !errors.Is(err, wiaworld.ErrInvalidNarrativeSettings) {
 		t.Fatalf("invalid NPC initiative error = %v", err)
 	}
+
 	stale := valid
 	stale.ExpectedContextEpoch = world.ContextEpoch + 1
 	if _, _, err := app.UpdateNarrativeSettings(context.Background(), world.WorldID, stale); !errors.Is(err, ErrVersionConflict) {
@@ -847,7 +850,7 @@ func TestSaveAsAndReadContinueIsolated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantedSettings := NarrativeSettings{Perspective: PerspectiveThirdPerson, Length: NarrativeLengthDetailed, Detail: NarrativeDetailRestrained, PlayerElaboration: PlayerElaborationExpressive, NPCInitiative: NPCInitiativeProactive, CustomInstruction: "对白留白。"}
+	wantedSettings := wiaworld.NarrativeSettings{Perspective: wiaworld.PerspectiveThirdPerson, Length: wiaworld.NarrativeLengthDetailed, Detail: wiaworld.NarrativeDetailRestrained, PlayerElaboration: wiaworld.PlayerElaborationExpressive, NPCInitiative: wiaworld.NPCInitiativeProactive, CustomInstruction: "对白留白。"}
 	if _, _, err := app.UpdateNarrativeSettings(context.Background(), original.WorldID, UpdateNarrativeSettingsRequest{
 		Perspective: wantedSettings.Perspective, Length: wantedSettings.Length, Detail: wantedSettings.Detail,
 		PlayerElaboration: wantedSettings.PlayerElaboration, NPCInitiative: wantedSettings.NPCInitiative,

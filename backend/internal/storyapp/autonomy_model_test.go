@@ -10,6 +10,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // Disposable real-model evaluation; narrative quality is reviewed separately.
@@ -62,7 +63,7 @@ func runRealStorySequence(t *testing.T, inputs []string, custom bool, modes ...s
 	for i, input := range inputs {
 		if custom && i == 2 {
 			s := readContextSnapshot(t, a, w.WorldID)
-			p := BehaviorPolicies{NPC: "依据自己的动机和眼前机会处理事务；可以保持沉默，不为活跃气氛强行插话。已经完成的行动保持完成。", Narration: "简洁呈现本轮新增内容，以有意义的动作或对白收尾。"}
+			p := wiaworld.BehaviorPolicies{NPC: "依据自己的动机和眼前机会处理事务；可以保持沉默，不为活跃气氛强行插话。已经完成的行动保持完成。", Narration: "简洁呈现本轮新增内容，以有意义的动作或对白收尾。"}
 			if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(s.Summary.ContextEpoch, p)); err != nil {
 				t.Fatal(err)
 			}

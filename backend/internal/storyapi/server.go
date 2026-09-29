@@ -701,7 +701,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeAppError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "storage_unavailable"
 	switch {
-	case errors.Is(err, storyapp.ErrInvalidRequest):
+	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings):
 		status = 400
 		code = "invalid_request"
 	case errors.Is(err, storyapp.ErrUnauthorized):

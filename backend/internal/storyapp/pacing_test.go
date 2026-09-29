@@ -47,12 +47,12 @@ func TestSecondTurnCoordinationReceivesCommittedActionResults(t *testing.T) {
 
 func TestNarrativeLengthPreferencesPreserveOutputBudgets(t *testing.T) {
 	for length, budget := range map[string]int{"concise": 768, "standard": 1536, "detailed": 3072} {
-		rule, got := narrativeLengthInstruction(NarrativeSettings{Length: length})
+		rule, got := narrativeLengthInstruction(wiaworld.NarrativeSettings{Length: length})
 		if got != budget || !strings.Contains(rule, "不设最低字数") || !strings.Contains(rule, "简单") {
 			t.Fatalf("length %s: budget=%d rule=%s", length, got, rule)
 		}
 	}
-	rich := narrativeDetailInstruction(NarrativeSettings{Detail: NarrativeDetailRich})
+	rich := narrativeDetailInstruction(wiaworld.NarrativeSettings{Detail: wiaworld.NarrativeDetailRich})
 	if strings.Contains(rich, "不得创造新事实") || !strings.Contains(rich, "低影响表现") {
 		t.Fatalf("detail boundary: %s", rich)
 	}

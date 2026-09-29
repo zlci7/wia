@@ -192,11 +192,11 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("agent settings = %d, body = %s", response.StatusCode, body)
 	}
 	var settingsEnvelope struct {
-		Settings storyapp.NarrativeSettings `json:"settings"`
+		Settings wiaworld.NarrativeSettings `json:"settings"`
 		World    wiaworld.WorldSummary      `json:"world"`
 	}
 	decodeJSONBody(t, body, &settingsEnvelope)
-	if settingsEnvelope.Settings.Perspective != storyapp.PerspectiveThirdPerson || settingsEnvelope.Settings.PlayerElaboration != storyapp.PlayerElaborationExpressive || settingsEnvelope.Settings.NPCInitiative != storyapp.NPCInitiativeProactive || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
+	if settingsEnvelope.Settings.Perspective != wiaworld.PerspectiveThirdPerson || settingsEnvelope.Settings.PlayerElaboration != wiaworld.PlayerElaborationExpressive || settingsEnvelope.Settings.NPCInitiative != wiaworld.NPCInitiativeProactive || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
 		t.Fatalf("agent settings response = %+v", settingsEnvelope)
 	}
 	world = settingsEnvelope.World
@@ -269,7 +269,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		Messages          []wiaworld.Message         `json:"messages"`
 		Bystanders        []string                   `json:"bystanders"`
 		Characters        []wiaworld.PublicCharacter `json:"characters"`
-		NarrativeSettings storyapp.NarrativeSettings `json:"narrative_settings"`
+		NarrativeSettings wiaworld.NarrativeSettings `json:"narrative_settings"`
 	}
 	decodeJSONBody(t, body, &readEnvelope)
 	if len(readEnvelope.Messages) != 3 || readEnvelope.Messages[1].Kind != "player" || readEnvelope.Messages[2].Kind != "narrative" {

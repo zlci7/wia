@@ -1,14 +1,15 @@
 // Command qualify rewrites references to a set of moved symbols so they point at
 // a different package, and adds the import that makes them resolve.
 //
-// It works on the syntax tree. A text replacement of a name like Run would also
-// hit the verb Run in method names and comments, and a name like Character is
-// sometimes a local variable; the tool therefore replaces an identifier only when
-// it is a whole expression referring to the moved declaration.
+// It works on the syntax tree in two passes. The first collects every identifier
+// that must be rewritten; the second rewrites them at their parent, which is the
+// only place a child node can be replaced. Both passes enumerate the positions
+// that can hold an expression.
 //
-// It rewrites expressions in place rather than rebuilding statements, so the only
-// node types it has to enumerate are those that can hold an expression. A missed
-// type fails the build, which is the point: nothing is silently skipped.
+// That enumeration is the risky part, so it is written once and used by both
+// passes: an earlier version enumerated positions only while rewriting and missed
+// switch cases, which silently left half the references behind with no error. The
+// comment on childExpressions is the checklist.
 package main
 
 import (
@@ -39,32 +40,28 @@ func main() {
 	tests := flag.Bool("tests", false, "rewrite test files too")
 	check := flag.Bool("check", false, "report what would change without writing")
 	flag.Parse()
+
 	if *drop != "" {
 		if *file == "" {
-			fmt.Fprintln(os.Stderr, "qualify: -drop needs -file")
-			os.Exit(2)
+			fail("-drop needs -file")
 		}
 		dropDeclarations(*file, *drop)
 		return
 	}
 	if *dir == "" {
-		fmt.Fprintln(os.Stderr, "qualify: -dir is required")
-		os.Exit(2)
+		fail("-dir is required")
 	}
 	if *vars != "" {
 		renameLocals(*dir, *vars, *tests, *check)
 		return
 	}
 	if *targetPath == "" || *names == "" {
-		fmt.Fprintln(os.Stderr, "qualify: -path and -names are required")
-		os.Exit(2)
+		fail("-path and -names are required")
 	}
 	moved := map[string]bool{}
 	for _, name := range strings.Split(*names, ",") {
 		moved[strings.TrimSpace(name)] = true
 	}
-	// A symbol that is unexported in the old package needs a new name in the new
-	// one, because the two packages are no longer the same scope.
 	renamed := map[string]string{}
 	for _, pair := range strings.Split(*renames, ",") {
 		pair = strings.TrimSpace(pair)
@@ -73,8 +70,7 @@ func main() {
 		}
 		parts := strings.SplitN(pair, "=", 2)
 		if len(parts) != 2 {
-			fmt.Fprintf(os.Stderr, "qualify: bad rename %q\n", pair)
-			os.Exit(2)
+			fail("bad rename " + pair)
 		}
 		renamed[parts[0]] = parts[1]
 	}
@@ -88,17 +84,16 @@ func main() {
 		panic(err)
 	}
 	fset := token.NewFileSet()
-	// Which composite literals name a struct of this package? That needs the type
-	// names of the whole package: ContextScope is declared in one file and used in
-	// another, and its keys are field names in either case.
-	packageTypeNames := map[string]bool{}
+	// A struct literal's key is a field name only when the literal's type is
+	// declared in this package: ContextScope is declared in one file and used in
+	// another, so the set has to come from the whole package.
+	packageTypes := map[string]bool{}
 	if *from == "" {
 		for _, entry := range entries {
-			name := entry.Name()
-			if entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 				continue
 			}
-			parsed, err := parser.ParseFile(fset, filepath.Join(*dir, name), nil, parser.SkipObjectResolution)
+			parsed, err := parser.ParseFile(fset, filepath.Join(*dir, entry.Name()), nil, parser.SkipObjectResolution)
 			if err != nil {
 				continue
 			}
@@ -108,13 +103,14 @@ func main() {
 					continue
 				}
 				for _, spec := range gen.Specs {
-					if typeSpec, ok := spec.(*ast.TypeSpec); ok && typeSpec.Name != nil {
-						packageTypeNames[typeSpec.Name.Name] = true
+					if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name != nil {
+						packageTypes[ts.Name.Name] = true
 					}
 				}
 			}
 		}
 	}
+
 	type result struct {
 		file  string
 		count int
@@ -151,17 +147,11 @@ func main() {
 				return true
 			})
 		} else {
-			fileLevelTypes := collectFileLevelTypes(file)
-			literalFields := map[*ast.Ident]bool{}
-			ast.Inspect(file, func(n ast.Node) bool {
-				rewriteExpressions(n, moved, renamed, pkgName, fileLevelTypes, packageTypeNames, literalFields, &count)
-				return true
-			})
+			count = qualifyFile(file, moved, renamed, pkgName, packageTypes)
 		}
 		if count == 0 {
 			continue
 		}
-		// Both modes leave the file referring to a package it does not import yet.
 		addImport(file, *targetPath, *alias)
 		results = append(results, result{name, count})
 		if *check {
@@ -184,9 +174,374 @@ func main() {
 	fmt.Printf("%d files, %d references\n", len(results), total)
 }
 
-// dropDeclarations deletes named declarations from one file. It is used once the
-// type that moved has its new home, so the stale copy cannot stay behind as a
-// second definition of the same concept.
+// qualifyFile rewrites the identifiers of one file that refer to a moved symbol.
+//
+// The pass is deliberately two-step. Collecting first means the decision to
+// rewrite is taken from the declaration an identifier resolves to, before any
+// replacement has changed the tree; rewriting second means every replacement
+// happens at the parent that owns the child.
+func qualifyFile(file *ast.File, moved map[string]bool, renamed map[string]string, pkgName string, packageTypes map[string]bool) int {
+	declared, packageLevel := declaredNames(file)
+	protected := protectedFields(file, packageTypes)
+	targets := map[*ast.Ident]string{}
+	collect(file, func(expr ast.Expr) {
+		id, ok := expr.(*ast.Ident)
+		if !ok {
+			return
+		}
+		if declared[id] || protected[id] {
+			return
+		}
+		newName, isRenamed := renamed[id.Name]
+		if !moved[id.Name] && !isRenamed {
+			return
+		}
+		// The name belongs to this package only when it resolves to a declaration
+		// here. Anything else is a local that happens to share the spelling.
+		if id.Obj != nil && !packageLevel[id.Obj] {
+			return
+		}
+		if !isRenamed {
+			newName = id.Name
+		}
+		targets[id] = newName
+	})
+	if len(targets) == 0 {
+		return 0
+	}
+	count := 0
+	rewriteChildren(file, func(child ast.Expr) ast.Expr {
+		id, ok := child.(*ast.Ident)
+		if !ok {
+			return child
+		}
+		newName, ok := targets[id]
+		if !ok {
+			return child
+		}
+		count++
+		return &ast.SelectorExpr{X: ast.NewIdent(pkgName), Sel: ast.NewIdent(newName)}
+	})
+	// A moved function's own declaration name is rewritten in place: the body is
+	// deleted afterwards, but leaving the old name would leave a second definition.
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			if newName, ok := renamed[fn.Name.Name]; ok && moved[fn.Name.Name] {
+				fn.Name.Name = newName
+			}
+		}
+	}
+	return count
+}
+
+// declaredNames returns two sets. The first holds the identifier nodes that are
+// themselves declarations (a function's own name, a parameter, a field, a local),
+// which are never rewritten. The second holds the objects of the package-level
+// declarations, so a use of one of them can be told apart from a local variable
+// that happens to share its spelling.
+func declaredNames(file *ast.File) (map[ast.Node]bool, map[*ast.Object]bool) {
+	nodes := map[ast.Node]bool{}
+	objects := map[*ast.Object]bool{}
+	declare := func(id *ast.Ident) {
+		if id == nil {
+			return
+		}
+		nodes[id] = true
+		if id.Obj != nil {
+			objects[id.Obj] = true
+		}
+	}
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			declare(d.Name)
+			addParamNames(nodes, d.Recv)
+			addParamNames(nodes, d.Type.Params)
+			addParamNames(nodes, d.Type.Results)
+		case *ast.GenDecl:
+			for _, spec := range d.Specs {
+				switch s := spec.(type) {
+				case *ast.TypeSpec:
+					declare(s.Name)
+				case *ast.ValueSpec:
+					for _, name := range s.Names {
+						declare(name)
+					}
+				}
+			}
+		}
+	}
+	// Inside a function body, a name that introduces something is also protected.
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.Field:
+			for _, name := range node.Names {
+				nodes[name] = true
+			}
+		case *ast.AssignStmt:
+			for _, lhs := range node.Lhs {
+				if id, ok := lhs.(*ast.Ident); ok {
+					nodes[id] = true
+				}
+			}
+		case *ast.RangeStmt:
+			if id, ok := node.Key.(*ast.Ident); ok {
+				nodes[id] = true
+			}
+			if id, ok := node.Value.(*ast.Ident); ok {
+				nodes[id] = true
+			}
+		}
+		return true
+	})
+	return nodes, objects
+}
+
+func addParamNames(out map[ast.Node]bool, list *ast.FieldList) {
+	if list == nil {
+		return
+	}
+	for _, field := range list.List {
+		for _, name := range field.Names {
+			out[name] = true
+		}
+	}
+}
+
+// protectedFields returns the struct literal keys of the file. In a literal whose
+// type this package declares, a bare key is a field name: both the keyed form
+// `Run: ...` and the embedded form `BehaviorPolicies: ...`.
+func protectedFields(file *ast.File, packageTypes map[string]bool) map[ast.Node]bool {
+	out := map[ast.Node]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		literal, ok := n.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		name, ok := literalTypeName(literal.Type)
+		if !ok || !packageTypes[name] {
+			return true
+		}
+		for _, element := range literal.Elts {
+			switch item := element.(type) {
+			case *ast.KeyValueExpr:
+				if id, ok := item.Key.(*ast.Ident); ok {
+					out[id] = true
+				}
+			case *ast.Ident:
+				out[item] = true
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// collect visits every expression node in the file.
+func collect(file *ast.File, visit func(ast.Expr)) {
+	ast.Inspect(file, func(n ast.Node) bool {
+		if expr, ok := n.(ast.Expr); ok {
+			// A selector's field name is not an expression of this package.
+			if sel, ok := expr.(*ast.SelectorExpr); ok {
+				_ = sel
+			}
+			visit(expr)
+		}
+		return true
+	})
+}
+
+// rewriteChildren replaces expressions in place at their parents. Every position
+// that can hold an expression is listed here and nowhere else.
+func rewriteChildren(file *ast.File, transform func(ast.Expr) ast.Expr) {
+	list := func(items *[]ast.Expr) {
+		for i, item := range *items {
+			(*items)[i] = transform(item)
+		}
+	}
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.ArrayType:
+			node.Elt = transform(node.Elt)
+		case *ast.MapType:
+			node.Key = transform(node.Key)
+			node.Value = transform(node.Value)
+		case *ast.StarExpr:
+			node.X = transform(node.X)
+		case *ast.ChanType:
+			node.Value = transform(node.Value)
+		case *ast.Ellipsis:
+			node.Elt = transform(node.Elt)
+		case *ast.TypeAssertExpr:
+			node.Type = transform(node.Type)
+		case *ast.CompositeLit:
+			if node.Type != nil {
+				node.Type = transform(node.Type)
+			}
+			list(&node.Elts)
+		case *ast.CallExpr:
+			node.Fun = transform(node.Fun)
+			list(&node.Args)
+		case *ast.KeyValueExpr:
+			node.Key = transform(node.Key)
+			node.Value = transform(node.Value)
+		case *ast.ReturnStmt:
+			list(&node.Results)
+		case *ast.AssignStmt:
+			list(&node.Rhs)
+		case *ast.BinaryExpr:
+			node.X = transform(node.X)
+			node.Y = transform(node.Y)
+		case *ast.UnaryExpr:
+			node.X = transform(node.X)
+		case *ast.ParenExpr:
+			node.X = transform(node.X)
+		case *ast.SliceExpr:
+			node.X = transform(node.X)
+			node.Low = transform(node.Low)
+			node.High = transform(node.High)
+			node.Max = transform(node.Max)
+		case *ast.IndexExpr:
+			node.X = transform(node.X)
+			node.Index = transform(node.Index)
+		case *ast.ExprStmt:
+			node.X = transform(node.X)
+		case *ast.ValueSpec:
+			node.Type = transform(node.Type)
+			list(&node.Values)
+		case *ast.SendStmt:
+			node.Value = transform(node.Value)
+		case *ast.RangeStmt:
+			node.X = transform(node.X)
+		case *ast.Field:
+			node.Type = transform(node.Type)
+		case *ast.CaseClause:
+			list(&node.List)
+		case *ast.SwitchStmt:
+			node.Tag = transform(node.Tag)
+		case *ast.IfStmt:
+			node.Cond = transform(node.Cond)
+		case *ast.ForStmt:
+			node.Cond = transform(node.Cond)
+		case *ast.FuncDecl:
+			if node.Recv != nil {
+				for _, field := range node.Recv.List {
+					field.Type = transform(field.Type)
+				}
+			}
+			if node.Type.Params != nil {
+				for _, field := range node.Type.Params.List {
+					field.Type = transform(field.Type)
+				}
+			}
+			if node.Type.Results != nil {
+				for _, field := range node.Type.Results.List {
+					field.Type = transform(field.Type)
+				}
+			}
+		}
+		return true
+	})
+}
+
+// literalTypeName returns the name of a composite literal's type.
+func literalTypeName(expr ast.Expr) (string, bool) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name, true
+	case *ast.StarExpr:
+		return literalTypeName(t.X)
+	case *ast.ArrayType:
+		return literalTypeName(t.Elt)
+	}
+	return "", false
+}
+
+func fail(message string) {
+	fmt.Fprintln(os.Stderr, "qualify: "+message)
+	os.Exit(2)
+}
+
+// renameLocals renames a short variable that has to change because the new package
+// name would otherwise be shadowed where it is used.
+func renameLocals(dir, pairs string, tests, check bool) {
+	mapping := map[string]string{}
+	for _, pair := range strings.Split(pairs, ",") {
+		parts := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+		if len(parts) != 2 {
+			fail("bad -vars entry " + pair)
+		}
+		mapping[parts[0]] = parts[1]
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		panic(err)
+	}
+	fset := token.NewFileSet()
+	total := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		if strings.HasSuffix(name, "_test.go") != tests {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			panic(err)
+		}
+		targets := map[*ast.Object]string{}
+		ast.Inspect(file, func(n ast.Node) bool {
+			assign, isAssign := n.(*ast.AssignStmt)
+			if !isAssign || assign.Tok != token.DEFINE || len(assign.Lhs) != len(assign.Rhs) {
+				return true
+			}
+			for _, lhs := range assign.Lhs {
+				ident, ok := lhs.(*ast.Ident)
+				if !ok || ident.Obj == nil {
+					continue
+				}
+				if replacement, wanted := mapping[ident.Name]; wanted {
+					targets[ident.Obj] = replacement
+				}
+			}
+			return true
+		})
+		if len(targets) == 0 {
+			continue
+		}
+		count := 0
+		ast.Inspect(file, func(n ast.Node) bool {
+			ident, ok := n.(*ast.Ident)
+			if !ok || ident.Obj == nil {
+				return true
+			}
+			if replacement, ok := targets[ident.Obj]; ok {
+				ident.Name = replacement
+				count++
+			}
+			return true
+		})
+		total += count
+		fmt.Printf("  %-34s %4d\n", name, count)
+		if check {
+			continue
+		}
+		var buf bytes.Buffer
+		if err := printer.Fprint(&buf, fset, file); err != nil {
+			panic(err)
+		}
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+			panic(err)
+		}
+	}
+	fmt.Printf("%d uses renamed\n", total)
+}
+
+// dropDeclarations deletes named declarations from one file, so a type that moved
+// cannot stay behind as a second definition of the same concept.
 func dropDeclarations(path, names string) {
 	wanted := map[string]bool{}
 	for _, name := range strings.Split(names, ",") {
@@ -226,240 +581,6 @@ func dropDeclarations(path, names string) {
 	}
 	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
 		panic(err)
-	}
-}
-
-// renameLocals renames a short variable that has to change because the new
-// package name would otherwise be shadowed where it is used.
-//
-// It renames by ast.Object rather than by text: the object is the declaration the
-// identifier resolves to, so only the uses of this particular variable change and
-// a comment or an unrelated name of the same word is untouched.
-func renameLocals(dir, pairs string, tests, check bool) {
-	mapping := map[string]string{}
-	for _, pair := range strings.Split(pairs, ",") {
-		parts := strings.SplitN(strings.TrimSpace(pair), "=", 2)
-		if len(parts) != 2 {
-			fmt.Fprintf(os.Stderr, "qualify: bad -vars entry %q\n", pair)
-			os.Exit(2)
-		}
-		mapping[parts[0]] = parts[1]
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		panic(err)
-	}
-	fset := token.NewFileSet()
-	total := 0
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
-			continue
-		}
-		if strings.HasSuffix(name, "_test.go") != tests {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if err != nil {
-			panic(err)
-		}
-		// Find the declarations to rename and remember their objects.
-		targets := map[*ast.Object]string{}
-		ast.Inspect(file, func(n ast.Node) bool {
-			// Only the declaring assignment matters: a later `x = ...` reuses the
-			// same ast.Object, so renaming the object covers both forms.
-			assign, isAssign := n.(*ast.AssignStmt)
-			if !isAssign || assign.Tok != token.DEFINE || len(assign.Lhs) != len(assign.Rhs) {
-				return true
-			}
-			for _, lhs := range assign.Lhs {
-				ident, ok := lhs.(*ast.Ident)
-				if !ok || ident.Obj == nil {
-					continue
-				}
-				replacement, wanted := mapping[ident.Name]
-				if wanted {
-					targets[ident.Obj] = replacement
-				}
-			}
-			return true
-		})
-		if len(targets) == 0 {
-			continue
-		}
-		count := 0
-		ast.Inspect(file, func(n ast.Node) bool {
-			ident, ok := n.(*ast.Ident)
-			if !ok || ident.Obj == nil {
-				return true
-			}
-			if replacement, ok := targets[ident.Obj]; ok {
-				ident.Name = replacement
-				count++
-			}
-			return true
-		})
-		total += count
-		fmt.Printf("  %-34s %4d\n", name, count)
-		if check {
-			continue
-		}
-		var buf bytes.Buffer
-		if err := printer.Fprint(&buf, fset, file); err != nil {
-			panic(err)
-		}
-		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Printf("%d uses renamed\n", total)
-}
-
-// collectFileLevelTypes returns the ast.Object of every type declared in this
-// file. An identifier bound to one of these objects is the type itself; an
-// identifier bound to anything else is a local variable that shares its spelling
-// and must stay as it is.
-func collectFileLevelTypes(file *ast.File) map[*ast.Object]bool {
-	objects := map[*ast.Object]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		spec, ok := n.(*ast.TypeSpec)
-		if !ok || spec.Name == nil || spec.Name.Obj == nil {
-			return true
-		}
-		objects[spec.Name.Obj] = true
-		return true
-	})
-	return objects
-}
-
-// literalTypeName returns the name of a composite literal's type, when that type
-// is written as a simple name.
-func literalTypeName(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.StarExpr:
-		return literalTypeName(t.X)
-	case *ast.ArrayType:
-		return literalTypeName(t.Elt)
-	}
-	return ""
-}
-
-// rewriteExpressions replaces, on every node that can hold an expression, each
-// expression that is a bare reference to a moved symbol.
-//
-// literalFields holds the struct literal keys of the whole file. It has to be
-// shared across the walk: the keys are collected when the composite literal is
-// visited, but they are protected when the key node itself is visited later, and
-// a per-call map would already be gone by then.
-func rewriteExpressions(n ast.Node, moved map[string]bool, renamed map[string]string, pkgName string, fileLevelTypes map[*ast.Object]bool, fileLevelTypeNames map[string]bool, literalFields map[*ast.Ident]bool, count *int) {
-	qualify := func(expr ast.Expr) ast.Expr {
-		ident, ok := expr.(*ast.Ident)
-		if !ok || !moved[ident.Name] {
-			return expr
-		}
-		// A struct literal field name is a key, not an expression: Run in
-		// model.TextRequest{Run: ...} names a field and must stay as it is.
-		if literalFields[ident] {
-			return expr
-		}
-		// A name that resolves to a file-level type declaration is the type
-		// itself. A name that resolves to anything else is a local variable that
-		// happens to be spelled the same way, and must stay as it is.
-		if ident.Obj != nil && !fileLevelTypes[ident.Obj] {
-			return expr
-		}
-		name := ident.Name
-		if replacement, ok := renamed[name]; ok {
-			name = replacement
-		}
-		*count++
-		return &ast.SelectorExpr{X: ast.NewIdent(pkgName), Sel: ast.NewIdent(name)}
-	}
-	qualifyList := func(list []ast.Expr) {
-		for i, expr := range list {
-			list[i] = qualify(expr)
-		}
-	}
-	// Keys of a literal of a type this package declares are field names, never
-	// expressions. Keys of any other literal are expressions (a map key).
-	if literal, ok := n.(*ast.CompositeLit); ok {
-		if fileLevelTypeNames[literalTypeName(literal.Type)] {
-			for _, element := range literal.Elts {
-				if kv, ok := element.(*ast.KeyValueExpr); ok {
-					if ident, ok := kv.Key.(*ast.Ident); ok {
-						literalFields[ident] = true
-					}
-				}
-			}
-		}
-	}
-	switch node := n.(type) {
-	case *ast.ArrayType:
-		node.Elt = qualify(node.Elt)
-	case *ast.MapType:
-		node.Key = qualify(node.Key)
-		node.Value = qualify(node.Value)
-	case *ast.StarExpr:
-		node.X = qualify(node.X)
-	case *ast.ChanType:
-		node.Value = qualify(node.Value)
-	case *ast.Ellipsis:
-		node.Elt = qualify(node.Elt)
-	case *ast.TypeAssertExpr:
-		node.Type = qualify(node.Type)
-	case *ast.CompositeLit:
-		if node.Type != nil {
-			node.Type = qualify(node.Type)
-		}
-	case *ast.CallExpr:
-		node.Fun = qualify(node.Fun)
-		qualifyList(node.Args)
-	case *ast.KeyValueExpr:
-		if ident, ok := node.Key.(*ast.Ident); !ok || !literalFields[ident] {
-			node.Key = qualify(node.Key)
-		}
-		node.Value = qualify(node.Value)
-	case *ast.ReturnStmt:
-		qualifyList(node.Results)
-	case *ast.AssignStmt:
-		qualifyList(node.Rhs)
-	case *ast.BinaryExpr:
-		node.X = qualify(node.X)
-		node.Y = qualify(node.Y)
-	case *ast.UnaryExpr:
-		node.X = qualify(node.X)
-	case *ast.ParenExpr:
-		node.X = qualify(node.X)
-	case *ast.SliceExpr:
-		node.X = qualify(node.X)
-	case *ast.IndexExpr:
-		node.X = qualify(node.X)
-		node.Index = qualify(node.Index)
-	case *ast.ExprStmt:
-		node.X = qualify(node.X)
-	case *ast.ValueSpec:
-		node.Type = qualify(node.Type)
-		qualifyList(node.Values)
-	case *ast.SendStmt:
-		node.Value = qualify(node.Value)
-	case *ast.RangeStmt:
-		node.X = qualify(node.X)
-	case *ast.Field:
-		node.Type = qualify(node.Type)
-	case *ast.FuncDecl:
-		if node.Recv != nil {
-			for _, field := range node.Recv.List {
-				field.Type = qualify(field.Type)
-			}
-		}
-		if node.Type.Results != nil {
-			for _, field := range node.Type.Results.List {
-				field.Type = qualify(field.Type)
-			}
-		}
 	}
 }
 

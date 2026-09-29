@@ -29,7 +29,7 @@ type worldSnapshot struct {
 	InputBudgetTokens int
 	PlayerName        string
 	PlayerProfile     string
-	Narrative         NarrativeSettings
+	Narrative         wiaworld.NarrativeSettings
 	Bystanders        []string
 	SceneVersion      int64
 	Characters        []wiaworld.Character
@@ -344,13 +344,13 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		"scene_version": "1", "scene": def.Scene, "scene_location": def.InitialLocation, "clock": def.Clock,
 		"player_name": playerName, "player_profile": playerProfile, "status": "ready",
 		"generation": "1", "plot_status": "active", "bystanders": wire.MarshalJSON(def.Bystanders),
-		"narrative_perspective": PerspectiveSecondPerson, "narrative_length": NarrativeLengthStandard,
-		"narrative_detail": NarrativeDetailBalanced, "narrative_custom_instruction": "",
-		"player_elaboration": PlayerElaborationNatural, "npc_initiative": NPCInitiativeContextual,
+		"narrative_perspective": wiaworld.PerspectiveSecondPerson, "narrative_length": wiaworld.NarrativeLengthStandard,
+		"narrative_detail": wiaworld.NarrativeDetailBalanced, "narrative_custom_instruction": "",
+		"player_elaboration": wiaworld.PlayerElaborationNatural, "npc_initiative": wiaworld.NPCInitiativeContextual,
 	}
 	settings := def.Settings
 	if settings.Perspective == "" {
-		settings = defaultNarrativeSettings()
+		settings = wiaworld.DefaultNarrativeSettings()
 	}
 	values["narrative_perspective"], values["narrative_length"], values["narrative_detail"] = settings.Perspective, settings.Length, settings.Detail
 	values["player_elaboration"], values["npc_initiative"] = settings.PlayerElaboration, settings.NPCInitiative

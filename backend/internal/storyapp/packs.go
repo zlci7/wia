@@ -40,28 +40,28 @@ type PackLocation struct {
 }
 
 type StoryPack struct {
-	SchemaVersion   int                    `json:"schema_version"`
-	GameID          string                 `json:"game_id"`
-	Revision        string                 `json:"revision"`
-	Mode            string                 `json:"mode"`
-	Title           string                 `json:"title"`
-	Description     string                 `json:"description"`
-	Gameplay        string                 `json:"gameplay"`
-	Background      string                 `json:"background"`
-	Rules           string                 `json:"rules"`
-	AuthorFacts     string                 `json:"author_facts"`
-	Cover           string                 `json:"cover,omitempty"`
-	CoverAlt        string                 `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults         `json:"player"`
-	Opening         string                 `json:"opening"`
-	InitialLocation string                 `json:"initial_location"`
-	Clock           string                 `json:"clock"`
-	Locations       []PackLocation         `json:"locations"`
-	NPCs            []string               `json:"npcs"`
-	Bystanders      []PackBystander        `json:"bystanders"`
-	Plot            *PlotDefinition        `json:"plot,omitempty"`
-	EventGeneration *EventGenerationPolicy `json:"event_generation,omitempty"`
-	Defaults        *NarrativeSettings     `json:"defaults,omitempty"`
+	SchemaVersion   int                         `json:"schema_version"`
+	GameID          string                      `json:"game_id"`
+	Revision        string                      `json:"revision"`
+	Mode            string                      `json:"mode"`
+	Title           string                      `json:"title"`
+	Description     string                      `json:"description"`
+	Gameplay        string                      `json:"gameplay"`
+	Background      string                      `json:"background"`
+	Rules           string                      `json:"rules"`
+	AuthorFacts     string                      `json:"author_facts"`
+	Cover           string                      `json:"cover,omitempty"`
+	CoverAlt        string                      `json:"cover_alt,omitempty"`
+	Player          PlayerDefaults              `json:"player"`
+	Opening         string                      `json:"opening"`
+	InitialLocation string                      `json:"initial_location"`
+	Clock           string                      `json:"clock"`
+	Locations       []PackLocation              `json:"locations"`
+	NPCs            []string                    `json:"npcs"`
+	Bystanders      []PackBystander             `json:"bystanders"`
+	Plot            *PlotDefinition             `json:"plot,omitempty"`
+	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
+	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
 
 type PackNPC struct {
@@ -274,7 +274,7 @@ func loadPack(root string) (loadedPack, error) {
 	for _, bystander := range bystanders {
 		bystanderNames = append(bystanderNames, bystander.Name)
 	}
-	settings := defaultNarrativeSettings()
+	settings := wiaworld.DefaultNarrativeSettings()
 	if p.Defaults != nil {
 		// Decode again onto defaults so omitted values inherit the application defaults.
 		var raw struct {
@@ -285,7 +285,7 @@ func loadPack(root string) (loadedPack, error) {
 			return bad("defaults")
 		}
 	}
-	settings, err = validateNarrativeSettings(settings)
+	settings, err = wiaworld.ValidateNarrativeSettings(settings)
 	if err != nil {
 		return bad("defaults")
 	}

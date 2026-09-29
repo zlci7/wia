@@ -1337,7 +1337,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	return narrativeResult{Narrative: narrative}, repairCount, nil
 }
 
-func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, playerName string, settings NarrativeSettings) []narrativeEvent {
+func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, playerName string, settings wiaworld.NarrativeSettings) []narrativeEvent {
 	result := make([]narrativeEvent, 0, len(events))
 	for _, event := range events {
 		name, role, reference := event.ActorID, "", event.ActorID

@@ -42,7 +42,7 @@ func (p *pacingProbe) GenerateText(ctx context.Context, req model.TextRequest) (
 			req.Input = req.Input[strings.Index(req.Input, "\n世界：")+1:]
 		}
 		req.System = strings.ReplaceAll(req.System, "\n叙事节奏规则："+narrativePacingInstruction(), "")
-		rule, _ := narrativeLengthInstruction(NarrativeSettings{Length: NarrativeLengthStandard})
+		rule, _ := narrativeLengthInstruction(wiaworld.NarrativeSettings{Length: wiaworld.NarrativeLengthStandard})
 		req.Input = strings.ReplaceAll(req.Input, rule, "正文使用标准篇幅，通常为 300 至 600 个汉字，完整呈现本轮变化并保持节奏。")
 	}
 	started := time.Now()

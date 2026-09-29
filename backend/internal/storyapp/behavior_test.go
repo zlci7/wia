@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
-func policyRequest(epoch int64, p BehaviorPolicies) UpdateNarrativeSettingsRequest {
-	s := defaultNarrativeSettings()
+func policyRequest(epoch int64, p wiaworld.BehaviorPolicies) UpdateNarrativeSettingsRequest {
+	s := wiaworld.DefaultNarrativeSettings()
 	return UpdateNarrativeSettingsRequest{Perspective: s.Perspective, Length: s.Length, Detail: s.Detail, PlayerElaboration: s.PlayerElaboration, NPCInitiative: s.NPCInitiative, ExpectedContextEpoch: epoch, Policies: &p}
 }
 
@@ -23,7 +24,7 @@ func TestBehaviorPoliciesReachOnlyTheirModelCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := BehaviorPolicies{NPC: "POLICY_NPC_ONLY", Coordination: "POLICY_COORD_ONLY", Narration: "POLICY_TEXT_ONLY"}
+	p := wiaworld.BehaviorPolicies{NPC: "POLICY_NPC_ONLY", Coordination: "POLICY_COORD_ONLY", Narration: "POLICY_TEXT_ONLY"}
 	_, updated, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, p))
 	if err != nil {
 		t.Fatal(err)
@@ -92,15 +93,15 @@ func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := BehaviorPolicies{NPC: "主动但不抢话", Coordination: "依情境协调", Narration: "简明收尾"}
+	p := wiaworld.BehaviorPolicies{NPC: "主动但不抢话", Coordination: "依情境协调", Narration: "简明收尾"}
 	_, updated, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, p))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, BehaviorPolicies{})); !errors.Is(err, ErrVersionConflict) {
+	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, wiaworld.BehaviorPolicies{})); !errors.Is(err, ErrVersionConflict) {
 		t.Fatal("stale policy accepted", err)
 	}
-	if readContextSnapshot(t, a, other.WorldID).Narrative.Policies != (BehaviorPolicies{}) {
+	if readContextSnapshot(t, a, other.WorldID).Narrative.Policies != (wiaworld.BehaviorPolicies{}) {
 		t.Fatal("cross world policies")
 	}
 	status, _ := a.Status(ctx)
@@ -118,7 +119,7 @@ func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 	if op.Status != "ready" {
 		t.Fatal(op.Status)
 	}
-	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(updated.ContextEpoch, BehaviorPolicies{})); err != nil {
+	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(updated.ContextEpoch, wiaworld.BehaviorPolicies{})); err != nil {
 		t.Fatal(err)
 	}
 	root := a.DataRoot()
@@ -134,11 +135,11 @@ func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 		t.Fatal("copied custom policy not preserved")
 	}
 	restored := readContextSnapshot(t, reopened, w.WorldID).Narrative
-	if restored.Policies != (BehaviorPolicies{}) {
+	if restored.Policies != (wiaworld.BehaviorPolicies{}) {
 		t.Fatal("reset not preserved")
 	}
 	_, revision := behaviorPolicy(restored, "npc")
-	if revision != BehaviorPolicyVersion+":npc" {
+	if revision != wiaworld.BehaviorPolicyVersion+":npc" {
 		t.Fatal(revision)
 	}
 }
@@ -184,23 +185,25 @@ func TestBehaviorPoliciesLimitsBusyAndCapacity(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{delay: 100 * time.Millisecond})
 	w, _ := a.createFixtureWorld(ctx, "限制", "guided", "旅人", "", true)
 	for _, text := range []string{strings.Repeat("字", 4001), "bad\x00policy"} {
-		if _, _, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, BehaviorPolicies{NPC: text})); !errors.Is(err, ErrInvalidRequest) {
+		// The domain owns policy validation now, so this is its error.
+		if _, _, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, wiaworld.BehaviorPolicies{NPC: text})); !errors.Is(err, wiaworld.ErrInvalidNarrativeSettings) {
 			t.Fatal("bad policy accepted", err)
 		}
 	}
-	if _, _, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(0, BehaviorPolicies{})); !errors.Is(err, ErrInvalidRequest) {
+
+	if _, _, err := a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(0, wiaworld.BehaviorPolicies{})); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatal("missing editing epoch")
 	}
 	run, err := a.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: "busy", Input: "我沉默"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, BehaviorPolicies{})); !errors.Is(err, ErrWorldBusy) {
+	if _, _, err = a.UpdateNarrativeSettings(ctx, w.WorldID, policyRequest(w.ContextEpoch, wiaworld.BehaviorPolicies{})); !errors.Is(err, ErrWorldBusy) {
 		t.Fatal("changed during run", err)
 	}
 	waitRun(t, a, w.WorldID, run.RunID)
 	s := contextFixture()
-	s.Narrative = defaultNarrativeSettings()
+	s.Narrative = wiaworld.DefaultNarrativeSettings()
 	s.Narrative.Policies.NPC = strings.Repeat("策略", 2000)
 	m := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", npcStageInput{PlayerPerception: "我沉默"}, "", 1)
 	c := ContextComposer{Window: model.WindowLimits{ContextTokens: 1024, OutputTokens: 512}}

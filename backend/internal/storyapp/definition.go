@@ -11,7 +11,7 @@ type gameDefinition struct {
 	Rules            string
 	Locations        []PackLocation
 	InitialLocations map[string]string
-	Settings         NarrativeSettings
+	Settings         wiaworld.NarrativeSettings
 	SettingsSource   string
 	Summary          GameSummary
 	Opening          string
