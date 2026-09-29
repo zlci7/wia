@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -99,7 +100,7 @@ func TestUsageConcurrentActualCallsAndFailure(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			g := a.contextGenerator(usageGenerator{fail: n%2 == 0}, contextMaterial{Required: "facts"}, worldSnapshot{}, wiaworld.Run{}, "npc", "npc:test", 1, "test")
+			g := a.contextGenerator(usageGenerator{fail: n%2 == 0}, contextMaterial{Required: "facts"}, turn.Snapshot{}, wiaworld.Run{}, "npc", "npc:test", 1, "test")
 			_, _ = g.GenerateText(context.Background(), model.TextRequest{System: "system", MaxOutputTokens: 20})
 		}(n)
 	}

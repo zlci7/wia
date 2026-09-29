@@ -31,7 +31,7 @@ func loadDialogue(ctx context.Context, db *sql.DB) ([]wiaworld.Event, error) {
 	return result, rows.Err()
 }
 
-func dialogueContext(snapshot worldSnapshot) string {
+func dialogueContext(snapshot turn.Snapshot) string {
 	var result strings.Builder
 	for _, event := range snapshot.Dialogue {
 		fmt.Fprintf(&result, "[来源=%s；回合=%s；类型=%s；表达者=%s；对象=%s；范围=%s] %s\n", event.EventID, event.RunID, event.EventType, turn.CharacterDisplayName(snapshot.Characters, event.ActorID), event.TargetID, event.SourceType, event.Content)

@@ -10,6 +10,7 @@ import (
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -65,12 +66,12 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 		}
 		return fmt.Sprintf("第%d轮：河面传来船笛声", group)
 	})
-	snapshot := worldSnapshot{
+	snapshot := turn.Snapshot{
 		PlayerName: "旅人",
 		Definition: story.Definition{Background: "旧渡口客栈的雨夜"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_projection", GameID: GameID, Clock: "第 1 日 19:00"},
 		Messages:   []wiaworld.Message{{MessageID: "msg:1", Kind: "narrative", Content: "雨声敲着窗沿。"}},
-		LongMemory: map[string]memoryContext{"player": {Archive: archive, Tail: archive}},
+		LongMemory: map[string]turn.MemoryContext{"player": {Archive: archive, Tail: archive}},
 	}
 	material := composeSuggestions(snapshot)
 	if !strings.Contains(material.Required, "本次提供最近") || !strings.Contains(material.Required, "尚未整理") {
@@ -136,11 +137,11 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	tail := historyRecords(4, 1, func(group, _ int) string {
 		return fmt.Sprintf("第%d轮%s", group, strings.Repeat("已提交经历", 500))
 	})
-	snapshot := worldSnapshot{
+	snapshot := turn.Snapshot{
 		PlayerName: "旅人",
 		Definition: story.Definition{Background: "背景"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_window", Clock: "第 1 日 19:00"},
-		LongMemory: map[string]memoryContext{"player": {Archive: tail, Tail: tail}},
+		LongMemory: map[string]turn.MemoryContext{"player": {Archive: tail, Tail: tail}},
 	}
 	material := withLongMemory(base, snapshot, "player", "")
 	req, report, err := (ContextComposer{}).Build(material, material.System, 1024)
@@ -154,11 +155,11 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	if !strings.Contains(req.Input, newest.ID) {
 		t.Fatal("newest required group was dropped")
 	}
-	oversized := worldSnapshot{
+	oversized := turn.Snapshot{
 		PlayerName: "旅人",
 		Definition: story.Definition{Background: "背景"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_oversized", Clock: "第 1 日 19:00"},
-		LongMemory: map[string]memoryContext{"player": {
+		LongMemory: map[string]turn.MemoryContext{"player": {
 			Archive: []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
 			Tail:    []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
 		}},
@@ -196,7 +197,7 @@ func TestFailedMaintenanceKeepsStoredHistoryAndWatermark(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 40)
+	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +253,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 40)
+	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +284,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store2.Database().Close()
-	reloaded, err := loadWorldSnapshot(ctx, store2, 40)
+	reloaded, err := loadTurnSnapshot(ctx, store2, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +300,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 	if !strings.Contains(req.Input, "客栈柜台") {
 		t.Fatal("correction did not apply to a backlog record")
 	}
-	other := memoryContext{Archive: []memorymodel.MemorySource{{ID: "other:1", Seq: 1, RunID: "run:other", Content: "铜钥匙在别人手里"}}}
+	other := turn.MemoryContext{Archive: []memorymodel.MemorySource{{ID: "other:1", Seq: 1, RunID: "run:other", Content: "铜钥匙在别人手里"}}}
 	crossScope := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, memoryProjection{context: other, supplied: map[string]bool{}}, "铜钥匙")
 	if strings.Contains(anyOptionalText(crossScope), "旧码头") {
 		t.Fatal("recall crossed receivers")

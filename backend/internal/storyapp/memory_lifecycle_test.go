@@ -83,7 +83,7 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	seedMemoryHistory(t, a, w.WorldID)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
 	s, _ := storage.OpenWorldDB(path)
-	snapshot, err := loadWorldSnapshot(ctx, s, 40)
+	snapshot, err := loadTurnSnapshot(ctx, s, 40)
 	if err == nil {
 		err = a.prepareLongMemory(ctx, s, &snapshot, wiaworld.Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{})
 	}

@@ -49,7 +49,7 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 	} else if count > 0 {
 		return wiaworld.WorldSummary{}, ErrWorldBusy
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 1)
+	snapshot, err := loadTurnSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}

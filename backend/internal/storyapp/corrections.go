@@ -10,6 +10,7 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 )
 
@@ -87,7 +88,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 	} else if count > 0 {
 		return memorymodel.Correction{}, ErrWorldBusy
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 100)
+	snapshot, err := loadTurnSnapshot(ctx, store, 100)
 	if err != nil {
 		return memorymodel.Correction{}, err
 	}
@@ -155,7 +156,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 	return c, nil
 }
 
-func correctionNotices(snapshot worldSnapshot, c memorymodel.Correction, eventRun string) map[string]string {
+func correctionNotices(snapshot turn.Snapshot, c memorymodel.Correction, eventRun string) map[string]string {
 	if c.Kind == "perception" || c.Kind == "subjective" {
 		return map[string]string{c.Scope: c.Replacement}
 	}
@@ -178,7 +179,7 @@ func correctionNotices(snapshot worldSnapshot, c memorymodel.Correction, eventRu
 	return notices
 }
 
-func correctionOriginal(ctx context.Context, store *storage.WorldStore, s worldSnapshot, r memorymodel.CorrectionRequest) (string, error) {
+func correctionOriginal(ctx context.Context, store *storage.WorldStore, s turn.Snapshot, r memorymodel.CorrectionRequest) (string, error) {
 	switch r.Kind {
 	case "event":
 		if r.Scope != "author" {
@@ -249,7 +250,7 @@ func correctedSource(s memorymodel.MemorySource, corrections []memorymodel.Corre
 
 // correctionNotices reports the stream entries a correction writes for each scope.
 
-func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s *worldSnapshot) error {
+func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s *turn.Snapshot) error {
 	list, err := readCorrections(ctx, store)
 	if err != nil {
 		return err
@@ -272,7 +273,7 @@ func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s 
 			}
 		}
 		if c.Kind == "event" {
-			active := make([]generatedEvent, 0, len(s.GeneratedEvents.Active))
+			active := make([]turn.GeneratedEvent, 0, len(s.GeneratedEvents.Active))
 			for _, e := range s.GeneratedEvents.Active {
 				if !c.Affects(e.StartID) && !c.Affects(e.TriggerID) {
 					active = append(active, e)

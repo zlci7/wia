@@ -216,7 +216,7 @@ const (
 )
 
 type turnOutput struct {
-	GeneratedEvents *generatedEventState
+	GeneratedEvents *turn.GeneratedEventState
 	Narrative       string
 	Clock           string
 	Scene           string
@@ -225,7 +225,7 @@ type turnOutput struct {
 	SceneLocation   string
 	SceneVersion    int64
 	SceneCharacters []string
-	SceneViews      []SceneView
+	SceneViews      []turn.SceneView
 	PlotProgress    *plot.Progress
 	Events          []wiaworld.Event
 	Perceptions     []wiaworld.Perception
@@ -287,7 +287,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if err := memoryReady(ctx, store); err != nil {
 		return wiaworld.Run{}, err
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 1)
+	snapshot, err := loadTurnSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
@@ -341,7 +341,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 // The whole thing is one transaction because an accepted run and the input sequence it
 // consumed must agree; a reader that saw the run without the sequence, or the reverse,
 // would have the wrong idea of what the world has already taken in.
-func (a *App) submitRunTx(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, request RunRequest, attempt int, now time.Time) (wiaworld.Run, error) {
+func (a *App) submitRunTx(ctx context.Context, store *storage.WorldStore, snapshot turn.Snapshot, request RunRequest, attempt int, now time.Time) (wiaworld.Run, error) {
 	var accepted wiaworld.Run
 	err := store.InTx(ctx, func(tx *storage.WorldTx) error {
 		inputID := wire.Clean(request.inputID)
@@ -608,7 +608,7 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 	})
 }
 
-func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run) (turnIntent, int, error) {
+func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turnIntent, int, error) {
 	participants := sceneCharacters(snapshot.Characters)
 	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
@@ -683,7 +683,7 @@ func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wi
 // when it started, never from the currently installed story. A later revision must
 // not change how an existing save's characters speak, and a world started before
 // samples existed keeps none rather than silently adopting a newer template.
-func turnDefinition(snapshot *worldSnapshot) story.Definition {
+func turnDefinition(snapshot *turn.Snapshot) story.Definition {
 	def := snapshot.Definition
 	frozen := def.Characters
 	def.Characters = snapshot.Characters
@@ -697,24 +697,24 @@ func turnDefinition(snapshot *worldSnapshot) story.Definition {
 
 // loadTurn reads the frozen turn input: the world snapshot, the long-memory
 // material and the coordination evidence.
-func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (worldSnapshot, error) {
+func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turn.Snapshot, error) {
 	loadStarted := time.Now()
-	snapshot, err := loadTurnSnapshot(ctx, store, 40)
+	snapshot, err := loadTurnInput(ctx, store, 40)
 	if err != nil {
-		return worldSnapshot{}, turn.AtStage(turn.StageLoad, err)
+		return turn.Snapshot{}, turn.AtStage(turn.StageLoad, err)
 	}
 	if err = a.prepareLongMemory(ctx, store, &snapshot, run, generator); err != nil {
-		return worldSnapshot{}, turn.AtStage(turn.StageLoad, err)
+		return turn.Snapshot{}, turn.AtStage(turn.StageLoad, err)
 	}
 	if err = loadCoordinationEvidence(ctx, store, &snapshot, run.Input); err != nil {
-		return worldSnapshot{}, turn.AtStage(turn.StageLoad, err)
+		return turn.Snapshot{}, turn.AtStage(turn.StageLoad, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turn.StageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
 	return snapshot, nil
 }
 
 // resolveIntentStage decides what the player is trying to do and who it addresses.
-func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run) (turnIntent, error) {
+func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run) (turnIntent, error) {
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
@@ -727,7 +727,7 @@ func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenera
 // newTurnOutput builds the turn output skeleton: it freezes the definition this
 // turn speaks through, records the player's own attempt and derives the
 // stage-one perception inputs.
-func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turnOutput, map[string]string, map[string]turn.StageInput, string) {
+func newTurnOutput(snapshot *turn.Snapshot, intent turnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turnOutput, map[string]string, map[string]turn.StageInput, string) {
 	def := turnDefinition(snapshot)
 
 	now := time.Now().UTC()
@@ -754,7 +754,7 @@ func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run wiaworld.Run,
 
 // runCharacterStages runs the two character decision stages and keeps the public
 // reply log and the merged decisions on the output for the coordination stage.
-func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]turn.StageInput, output *turnOutput) error {
+func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]turn.StageInput, output *turnOutput) error {
 	def := turnDefinition(snapshot)
 
 	playerEventID := run.RunID + ":input"
@@ -812,7 +812,7 @@ func (a *App) notePlayerAction(output *turnOutput, run wiaworld.Run, intent turn
 
 // coordinateStage resolves the scene: time, roster, action outcomes and the
 // scene views, and returns the events the player can perceive so far.
-func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, recipient string, private bool, output *turnOutput) (hostResult, []wiaworld.Event, error) {
+func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, recipient string, private bool, output *turnOutput) (hostResult, []wiaworld.Event, error) {
 	publicReplies := strings.Join(output.publicReplies, "\n")
 	coordinationStarted := time.Now()
 	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, *snapshot, run, intent, output.decisions, output.Events, publicReplies)
@@ -864,7 +864,7 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 
 // resolveSceneResult advances the plot and the generated events and folds their
 // player-visible results into the events the narration stage renders.
-func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turnOutput) ([]wiaworld.Event, error) {
 	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		elapsed := wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
@@ -886,7 +886,7 @@ func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenera
 
 // narrateStage renders the player-facing prose and closes the turn with the
 // settled scene projection.
-func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turnOutput) error {
+func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turnOutput) error {
 	def := turnDefinition(snapshot)
 
 	playerProjection := turn.RenderVisibleProjection(visibleEvents, snapshot.Characters)
@@ -909,7 +909,7 @@ func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, s
 
 // recordPlayerExperience writes what each participant experienced from the
 // player's own attempt in this turn.
-func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput, run wiaworld.Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
+func (a *App) recordPlayerExperience(snapshot *turn.Snapshot, output *turnOutput, run wiaworld.Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
 	def := turnDefinition(snapshot)
 
 	for _, characterID := range participantIDs {
@@ -921,7 +921,7 @@ func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput
 // includeNewCharactersInSceneViews gives every character present in the world a view
 // of the closing result when the scene projection predates them, so a roster change
 // does not invalidate the turn.
-func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, output *turnOutput) error {
+func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot, output *turnOutput) error {
 	current, err := store.LoadCharacters(ctx)
 	if err != nil {
 		return err
@@ -948,7 +948,7 @@ func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *stora
 		// Only a character that genuinely appeared between the snapshot and the commit
 		// needs a view, and it must be that character's own starting state rather than
 		// the player's whole projection.
-		output.SceneViews = append(output.SceneViews, SceneView{
+		output.SceneViews = append(output.SceneViews, turn.SceneView{
 			Recipient: character.EntityID,
 			Content:   fmt.Sprintf("%s 此刻在原地，尚未有属于本人的已提交结果。", character.Name),
 			Version:   output.SceneVersion + 1,
@@ -1088,7 +1088,7 @@ func describeRecipient(def story.Definition, recipient string) string {
 	return "未明确指定具体人物"
 }
 
-func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]turn.StageInput, priorTurn map[string]string, decisions map[string]turn.NPCDecision, stage int) error {
+func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]turn.StageInput, priorTurn map[string]string, decisions map[string]turn.NPCDecision, stage int) error {
 	if generator == nil {
 		return ErrModelNotConfigured
 	}
@@ -1156,7 +1156,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 	return firstErr
 }
 
-func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, intent turnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) (hostResult, int, error) {
+func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, intent turnIntent, decisions map[string]turn.NPCDecision, events []wiaworld.Event, publicReplies string) (hostResult, int, error) {
 	if generator == nil {
 		return hostResult{}, 0, ErrModelNotConfigured
 	}
@@ -1209,7 +1209,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	return result, repairCount, nil
 }
 
-func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
+func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}

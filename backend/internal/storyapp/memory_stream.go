@@ -7,6 +7,7 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 )
 
 const memorySchema = `
@@ -74,7 +75,7 @@ func memoryGroups(items []memorymodel.MemorySource) [][]memorymodel.MemorySource
 	return groups
 }
 
-func memoryScopeIDs(snapshot worldSnapshot) []string {
+func memoryScopeIDs(snapshot turn.Snapshot) []string {
 	ids := []string{"player"}
 	for _, c := range snapshot.Characters {
 		ids = append(ids, c.EntityID)

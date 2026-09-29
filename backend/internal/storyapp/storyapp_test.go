@@ -414,7 +414,7 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 	if !ok {
 		t.Fatal("mercenary definition missing")
 	}
-	snapshot := worldSnapshot{
+	snapshot := turn.Snapshot{
 		Summary:      wiaworld.WorldSummary{WorldID: "world-test", Scene: def.Scene, Clock: def.Clock},
 		Narrative:    wiaworld.DefaultNarrativeSettings(),
 		Characters:   def.Characters,

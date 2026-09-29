@@ -15,6 +15,7 @@ import (
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -24,21 +25,6 @@ type eventOpportunity struct {
 	Kind     string `json:"kind"`
 	Location string `json:"location"`
 	ActionID string `json:"action_id"`
-}
-
-type generatedEvent struct {
-	Node      plot.Node      `json:"node"`
-	State     plot.NodeState `json:"state"`
-	StartID   string         `json:"start_id"`
-	TriggerID string         `json:"trigger_id"`
-	Location  string         `json:"location"`
-	Premise   string         `json:"premise"`
-}
-
-type generatedEventState struct {
-	Active        []generatedEvent `json:"active"`
-	LastOfferTurn int64            `json:"last_offer_turn"`
-	Completed     int64            `json:"completed"`
 }
 
 type eventCandidate struct {
@@ -72,8 +58,8 @@ func validateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) er
 	return nil
 }
 
-func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def story.Definition) (generatedEventState, error) {
-	s := generatedEventState{Active: []generatedEvent{}}
+func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def story.Definition) (turn.GeneratedEventState, error) {
+	s := turn.GeneratedEventState{Active: []turn.GeneratedEvent{}}
 	raw, err := store.MetaGet(ctx, "generated_events")
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, nil
@@ -114,7 +100,7 @@ func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def sto
 	return s, nil
 }
 
-func nextGeneratedEvent(s worldSnapshot) (int, int, bool) {
+func nextGeneratedEvent(s turn.Snapshot) (int, int, bool) {
 	index, due := -1, 0
 	for i, e := range s.GeneratedEvents.Active {
 		at := max(e.Node.AtMinute, e.State.NextCheck)
@@ -125,7 +111,7 @@ func nextGeneratedEvent(s worldSnapshot) (int, int, bool) {
 	return index, due, index >= 0
 }
 
-func eventOpportunityContract(s worldSnapshot) string {
+func eventOpportunityContract(s turn.Snapshot) string {
 	p := s.Definition.EventGeneration
 	if p == nil {
 		return ""
@@ -133,13 +119,13 @@ func eventOpportunityContract(s worldSnapshot) string {
 	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
 }
 
-func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turnOutput) ([]wiaworld.Event, error) {
 	p := snapshot.Definition.EventGeneration
 	if p == nil {
 		return nil, nil
 	}
 	state := snapshot.GeneratedEvents
-	state.Active = append([]generatedEvent{}, state.Active...)
+	state.Active = append([]turn.GeneratedEvent{}, state.Active...)
 	output.GeneratedEvents = &state
 	current, err := plot.ClockMinute(output.Clock)
 	if err != nil {
@@ -177,8 +163,8 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 		}
 		return visible, nil
 	}
-	turn := snapshot.Summary.TurnSeq + 1
-	if opportunity == nil || len(state.Active) >= p.MaxActive || (state.LastOfferTurn > 0 && turn-state.LastOfferTurn < p.CooldownTurns) {
+	nextTurn := snapshot.Summary.TurnSeq + 1
+	if opportunity == nil || len(state.Active) >= p.MaxActive || (state.LastOfferTurn > 0 && nextTurn-state.LastOfferTurn < p.CooldownTurns) {
 		return nil, nil
 	}
 	if (opportunity.Kind != "arrival" && opportunity.Kind != "significant_change") || !slices.Contains(p.Locations, opportunity.Location) {
@@ -196,7 +182,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	if trigger.EventID == "" {
 		return nil, fmt.Errorf("%w: event_opportunity_result", ErrContextSourceMissing)
 	}
-	state.LastOfferTurn = turn
+	state.LastOfferTurn = nextTurn
 	material := contextMaterial{
 		System:          behaviorContract + "\n你是开放世界事件协调器。在作者范围内，依据已确认的新情境选择是否发生一个小型外部事件。沿用现有事件优先；没有合适事件时返回空候选。重要NPC的新决定只由本人作出，玩家不自动接受任务。只返回JSON。",
 		Required:        fmt.Sprintf("世界规则：%s\n作者事实：%s\n生成范围：%s\n地点目录：%s\n机会：%s\n已确认触发结果：%s\n游戏内时间：%s\n在场人物：%s\n接收者场景：%s\n当前已有事件：%s\n作者剧情：%s\n返回candidates数组，0或1项。每项condition(何时可收束)、development(有干预与不参与时的后续可能及结束条件)、after_minutes(1到120)、initial对象。initial字段status必须occurred，content为本次外部事实，source_ids只能引用触发结果ID，projections按接收者给出content及可选scene，decision_requests只含本次确实得到新刺激且需要本人决定的NPC，ending为空。不得新增重要NPC、地图地点、强迫玩家承诺、覆写作者主线、把计划写成已发生事实。后续发展须可通过等待、参与或拒绝自然结算。只向真实目击或有来源获知者投影，不广播作者秘密。参与者上限=%s加player。背景人物可有符合设定的日常反应。所有数组使用[]，不使用null。", snapshot.Definition.Rules, snapshot.Definition.Secret, p.Scope, wire.MarshalJSON(snapshot.Definition.Locations), wire.MarshalJSON(opportunity), wire.MarshalJSON(trigger), output.Clock, wire.MarshalJSON(output.SceneCharacters), wire.MarshalJSON(output.SceneViews), wire.MarshalJSON(state.Active), wire.MarshalJSON(snapshot.Plot), wire.MarshalJSON(p.Participants)),
@@ -241,7 +227,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 			output.Events[i].ProjectionParentID = trigger.EventID
 		}
 	}
-	state.Active = append(state.Active, generatedEvent{Node: node, StartID: root, TriggerID: trigger.EventID, Location: opportunity.Location, Premise: c.Initial.Content})
+	state.Active = append(state.Active, turn.GeneratedEvent{Node: node, StartID: root, TriggerID: trigger.EventID, Location: opportunity.Location, Premise: c.Initial.Content})
 	// The author plan is archived with the same transaction, never projected as facts.
 	output.Events = append(output.Events, wiaworld.Event{EventID: root + ":plan", EventType: "generated_event_plan", ActorID: "world", Content: wire.MarshalJSON(state.Active[len(state.Active)-1]), RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "author_plan", ProjectionParentID: root, CreatedAt: time.Now().UTC()})
 	return visible, nil

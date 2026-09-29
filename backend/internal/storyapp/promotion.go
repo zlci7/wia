@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -75,7 +76,7 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 		return PromotionPreview{}, err
 	}
 	defer store.Close()
-	snapshot, err := loadWorldSnapshot(ctx, store, 1)
+	snapshot, err := loadTurnSnapshot(ctx, store, 1)
 	if err != nil {
 		return PromotionPreview{}, err
 	}
@@ -148,7 +149,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	} else if count > 0 {
 		return wiaworld.Character{}, ErrWorldBusy
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 1)
+	snapshot, err := loadTurnSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
@@ -271,7 +272,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	// deferring this to the next turn would leave the save unreadable. The view holds
 	// what the player already knows plus the person's own authorized results, never
 	// another character's private material.
-	views := append([]SceneView{}, snapshot.SceneViews...)
+	views := append([]turn.SceneView{}, snapshot.SceneViews...)
 	nextSceneVersion := snapshot.SceneVersion
 	replaced := false
 	for index := range views {
@@ -283,7 +284,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	}
 	if !replaced {
 		nextSceneVersion++
-		views = append(views, SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
+		views = append(views, turn.SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
 	}
 	if err = storage.MetaSetTx(ctx, tx, "scene_views", wire.MarshalJSON(views)); err != nil {
 		return wiaworld.Character{}, err
@@ -387,7 +388,7 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 // promotedCharacter finds the character a previous promotion created for one
 // passer-by. The same request key returns that character; a different key for the
 // same person is a conflict instead of a second promotion.
-func promotedCharacter(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
+func promotedCharacter(ctx context.Context, store *storage.WorldStore, snapshot turn.Snapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
 	for _, character := range snapshot.Characters {
 		raw, err := store.MetaGet(ctx, "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -435,7 +436,7 @@ func promotionRequestHash(request PromotionRequest, selected []string) string {
 // promotionSceneContent seeds the promoted person's own view. It states where they
 // are and what they themselves lived through, and never borrows another character's
 // private material to fill the gap.
-func promotionSceneContent(bystander story.Bystander, draft PromotionDraft, snapshot worldSnapshot) string {
+func promotionSceneContent(bystander story.Bystander, draft PromotionDraft, snapshot turn.Snapshot) string {
 	parts := []string{}
 	location := bystanderLocation(snapshot, bystander)
 	if location != "" {
@@ -479,7 +480,7 @@ func bystanderByID(items []story.Bystander, id string) (story.Bystander, bool) {
 
 // bystanderLocation reports where the person currently is. Promotion never falls
 // back to the definition's starting location for someone already in a scene.
-func bystanderLocation(snapshot worldSnapshot, bystander story.Bystander) string {
+func bystanderLocation(snapshot turn.Snapshot, bystander story.Bystander) string {
 	if bystanderInScene(snapshot, bystander) {
 		return snapshot.Summary.Scene
 	}
@@ -487,14 +488,14 @@ func bystanderLocation(snapshot worldSnapshot, bystander story.Bystander) string
 }
 
 // bystanderStartingLocation is the place the person was defined to be in.
-func bystanderStartingLocation(snapshot worldSnapshot, bystander story.Bystander) string {
+func bystanderStartingLocation(snapshot turn.Snapshot, bystander story.Bystander) string {
 	if initial := snapshot.Definition.InitialLocations[bystander.BystanderID]; initial != "" {
 		return initial
 	}
 	return bystander.InitialLocation
 }
 
-func bystanderInScene(snapshot worldSnapshot, bystander story.Bystander) bool {
+func bystanderInScene(snapshot turn.Snapshot, bystander story.Bystander) bool {
 	initial := bystanderStartingLocation(snapshot, bystander)
 	if initial == "" {
 		return true
@@ -509,7 +510,7 @@ func bystanderInScene(snapshot worldSnapshot, bystander story.Bystander) bool {
 	return initial == current
 }
 
-func sceneIDFor(snapshot worldSnapshot) string {
+func sceneIDFor(snapshot turn.Snapshot) string {
 	if snapshot.SceneLocation != "" {
 		return snapshot.SceneLocation
 	}

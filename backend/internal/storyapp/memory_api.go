@@ -51,7 +51,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 		return out, err
 	}
 	defer store.Close()
-	snapshot, err := loadWorldSnapshot(ctx, store, 100)
+	snapshot, err := loadTurnSnapshot(ctx, store, 100)
 	if err != nil {
 		return out, err
 	}

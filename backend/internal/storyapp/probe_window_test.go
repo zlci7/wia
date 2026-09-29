@@ -6,6 +6,7 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 )
 
 // R14: when the whole request does not fit, the recent-experience window must fall back
@@ -32,7 +33,7 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	material := withLongMemory(contextMaterial{
 		Required: "本轮职责与刺激：玩家输入",
 		System:   "规则",
-	}, worldSnapshot{InputBudgetTokens: testBudget, LongMemory: map[string]memoryContext{"player": {Tail: tail}}}, "player", "")
+	}, turn.Snapshot{InputBudgetTokens: testBudget, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
 	if material.Bounded == nil {
 		t.Fatal("a long-memory material must be able to bound itself")
 	}
@@ -77,8 +78,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 		tail = append(tail, memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
 	}
 	groupsIn := func(budget int) int {
-		material := withLongMemory(contextMaterial{Required: "本轮", System: "规则"},
-			worldSnapshot{InputBudgetTokens: budget, LongMemory: map[string]memoryContext{"player": {Tail: tail}}}, "player", "")
+		material := withLongMemory(contextMaterial{Required: "本轮", System: "规则"}, turn.Snapshot{InputBudgetTokens: budget, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
 		count := 0
 		for _, id := range material.RequiredSources {
 			if strings.HasPrefix(id, "memory:") {
@@ -100,8 +100,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	// Shrinking must render from the parts: the digest header appears once and the source
 	// list describes what was included.
-	shrunk := withLongMemory(contextMaterial{Required: "本轮", System: "规则"},
-		worldSnapshot{InputBudgetTokens: 20000, LongMemory: map[string]memoryContext{"player": {Tail: tail}}}, "player", "")
+	shrunk := withLongMemory(contextMaterial{Required: "本轮", System: "规则"}, turn.Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]turn.MemoryContext{"player": {Tail: tail}}}, "player", "")
 	reduced, changed := shrunk.Bounded(recentWindowMinTokens + 200)
 	if !changed {
 		t.Fatal("the window did not shrink")
@@ -124,8 +123,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 		}
 	}
 	long := strings.Repeat("唯一的一组", 4000)
-	single := withLongMemory(contextMaterial{Required: "本轮职责与刺激：玩家输入"},
-		worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
+	single := withLongMemory(contextMaterial{Required: "本轮职责与刺激：玩家输入"}, turn.Snapshot{LongMemory: map[string]turn.MemoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
 	if single.Bounded == nil {
 		t.Fatal("expected a bounding hook")
 	}

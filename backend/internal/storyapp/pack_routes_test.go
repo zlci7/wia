@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -130,7 +131,7 @@ func closeoutRealApp(t *testing.T) *App {
 	return a
 }
 
-func realPackTurn(t *testing.T, a *App, world, input string, number int) worldSnapshot {
+func realPackTurn(t *testing.T, a *App, world, input string, number int) turn.Snapshot {
 	t.Helper()
 	ctx := context.Background()
 	start := time.Now()

@@ -85,7 +85,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		worldRT.mu.Unlock()
 		return true, err
 	}
-	snapshot, err := loadWorldSnapshot(ctx, store, 40)
+	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err == nil {
 		err = loadLongMemory(ctx, store, &snapshot)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -62,7 +63,7 @@ func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 }
 
 func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
-	s := worldSnapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
+	s := turn.Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
 	s.Events = []wiaworld.Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
 	events := []wiaworld.Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
 	for _, tc := range []struct {
@@ -86,7 +87,7 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 
 func TestRequestedWaitIsAnUpperBound(t *testing.T) {
 	for _, definition := range []*plot.Definition{nil, lanternPlotDefinition()} {
-		s := worldSnapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: definition, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
+		s := turn.Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: definition, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
 		for _, minutes := range []int{5, 30} {
 			g := waitResultGenerator{hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}}
 			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "wait"}, turnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")

@@ -17,13 +17,13 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-func contextFixture() worldSnapshot {
-	s := worldSnapshot{Summary: wiaworld.WorldSummary{GameID: GameID, WorldID: "fixture", Scene: "不应共享的全知旧场景"}, SceneVersion: 1, Characters: lanternDefinition().Characters, Perceptions: map[string][]wiaworld.Perception{}, Memories: map[string][]wiaworld.Memory{}, Sources: map[string]sourceMetadata{}}
+func contextFixture() turn.Snapshot {
+	s := turn.Snapshot{Summary: wiaworld.WorldSummary{GameID: GameID, WorldID: "fixture", Scene: "不应共享的全知旧场景"}, SceneVersion: 1, Characters: lanternDefinition().Characters, Perceptions: map[string][]wiaworld.Perception{}, Memories: map[string][]wiaworld.Memory{}, Sources: map[string]turn.SourceMetadata{}}
 	s.SceneViews = initialSceneViews(s)
 	return s
 }
 
-func readContextSnapshot(t *testing.T, a *App, id string) worldSnapshot {
+func readContextSnapshot(t *testing.T, a *App, id string) turn.Snapshot {
 	t.Helper()
 	path, _, err := a.worldRecord(context.Background(), id)
 	if err != nil {
@@ -34,7 +34,7 @@ func readContextSnapshot(t *testing.T, a *App, id string) worldSnapshot {
 		t.Fatal(err)
 	}
 	defer store.Database().Close()
-	s, err := loadTurnSnapshot(context.Background(), store, 40)
+	s, err := loadTurnInput(context.Background(), store, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s, err := loadWorldSnapshot(context.Background(), store, 40)
+	s, err := loadTurnSnapshot(context.Background(), store, 40)
 	if err != nil {
 		t.Fatal(err)
 	}

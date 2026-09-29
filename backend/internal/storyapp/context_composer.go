@@ -207,7 +207,7 @@ type contextGenerator struct {
 	calls    int
 }
 
-func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot worldSnapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
+func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot turn.Snapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
 	window := model.WindowLimits{}
 	if provider, ok := generator.(model.WindowProvider); ok {
 		window = provider.ModelWindow()
@@ -254,7 +254,7 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	return response, callErr
 }
 
-func dialogueSections(snapshot worldSnapshot) []contextSection {
+func dialogueSections(snapshot turn.Snapshot) []contextSection {
 	var groups []contextSection
 	for _, event := range snapshot.Dialogue {
 		if len(groups) == 0 || groups[len(groups)-1].Name != "dialogue:"+event.RunID {
@@ -282,7 +282,7 @@ func narrativeSections(messages []wiaworld.Message) []contextSection {
 	return sections
 }
 
-func personalSections(snapshot worldSnapshot, recipient string) []contextSection {
+func personalSections(snapshot turn.Snapshot, recipient string) []contextSection {
 	groups := map[string]contextSection{}
 	sequence := map[string]int64{}
 	keyFor := func(id string) string {
@@ -336,7 +336,7 @@ func personalSections(snapshot worldSnapshot, recipient string) []contextSection
 	return result
 }
 
-func sceneViewSources(snapshot worldSnapshot, recipient string) []string {
+func sceneViewSources(snapshot turn.Snapshot, recipient string) []string {
 	var ids []string
 	for _, view := range snapshot.SceneViews {
 		if recipient == "" || view.Recipient == recipient {

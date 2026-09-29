@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -51,7 +52,7 @@ func (g *reasoningCapture) GenerateText(_ context.Context, r model.TextRequest) 
 func TestReasoningRepairRechecksRequiredCapacity(t *testing.T) {
 	provider := &reasoningCapture{}
 	app := newTestApp(t, &scriptedGenerator{})
-	g := app.contextGenerator(provider, contextMaterial{Required: "本轮原文"}, worldSnapshot{}, wiaworld.Run{}, "test", "player", 1, "test.v1")
+	g := app.contextGenerator(provider, contextMaterial{Required: "本轮原文"}, turn.Snapshot{}, wiaworld.Run{}, "test", "player", 1, "test.v1")
 	if _, err := g.GenerateText(context.Background(), model.TextRequest{System: "规则", MaxOutputTokens: 4096}); err != nil {
 		t.Fatal(err)
 	}

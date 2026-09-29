@@ -5,14 +5,15 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 )
 
-func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, input string) error {
+func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot, input string) error {
 	events, err := store.LoadEvents(ctx, int(snapshot.Summary.EventHead))
 	if err != nil {
 		return err
 	}
-	effective := worldSnapshot{Events: events}
+	effective := turn.Snapshot{Events: events}
 	if err = applySnapshotCorrections(ctx, store, &effective); err != nil {
 		return err
 	}

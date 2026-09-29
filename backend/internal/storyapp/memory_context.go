@@ -11,21 +11,16 @@ import (
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
-type memoryContext struct {
-	Digest  memorymodel.MemoryDigest
-	Tail    []memorymodel.MemorySource
-	Archive []memorymodel.MemorySource
-}
-
-func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot) error {
+func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot) error {
 	if err := indexMemorySources(ctx, store); err != nil {
 		return err
 	}
-	snapshot.LongMemory = map[string]memoryContext{}
+	snapshot.LongMemory = map[string]turn.MemoryContext{}
 	for _, scope := range memoryScopeIDs(*snapshot) {
 		archive, err := readMemorySources(ctx, store, scope, 0)
 		if err != nil {
@@ -35,7 +30,7 @@ func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *wo
 		if err != nil {
 			return err
 		}
-		m := memoryContext{Digest: d, Archive: archive}
+		m := turn.MemoryContext{Digest: d, Archive: archive}
 		for _, s := range archive {
 			if s.Seq > d.Through {
 				m.Tail = append(m.Tail, s)
@@ -48,7 +43,7 @@ func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *wo
 
 // Maintenance reads only committed prefixes while the owning run protects the
 // world from deletion/copy. Publication is version checked outside model calls.
-func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, run wiaworld.Run, generator model.TextGenerator) error {
+func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *turn.Snapshot, run wiaworld.Run, generator model.TextGenerator) error {
 	if err := loadLongMemory(ctx, store, snapshot); err != nil {
 		return err
 	}
@@ -97,7 +92,7 @@ func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, 
 	return nil
 }
 
-func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, scope string, previous memorymodel.MemoryDigest, prefix []memorymodel.MemorySource) (memorymodel.MemoryDigest, error) {
+func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, scope string, previous memorymodel.MemoryDigest, prefix []memorymodel.MemorySource) (memorymodel.MemoryDigest, error) {
 	d := previous
 	if len(prefix) == 0 {
 		return d, nil
@@ -200,7 +195,7 @@ func inputBudgetTokens(generator model.TextGenerator) int {
 	return limit
 }
 
-func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, query string) contextMaterial {
+func withLongMemory(material contextMaterial, snapshot turn.Snapshot, scope, query string) contextMaterial {
 	m, ok := snapshot.LongMemory[scope]
 	if !ok {
 		return material
@@ -246,7 +241,7 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material contextMaterial, base string, m memoryContext, scope string, block []memorymodel.MemorySource, query string) contextMaterial {
+func renderMemoryWindow(material contextMaterial, base string, m turn.MemoryContext, scope string, block []memorymodel.MemorySource, query string) contextMaterial {
 	material.Required = base
 	material.RequiredSources = nil
 	material.DeclinedSources = nil
@@ -308,7 +303,7 @@ func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]mem
 }
 
 // withLongMemoryWindow renders the required block from an explicit set of groups.
-func withLongMemoryWindow(material contextMaterial, m memoryContext, kept [][]memorymodel.MemorySource, query string) contextMaterial {
+func withLongMemoryWindow(material contextMaterial, m turn.MemoryContext, kept [][]memorymodel.MemorySource, query string) contextMaterial {
 	rebuilt := contextMaterial{
 		PolicyRevision: material.PolicyRevision,
 		System:         material.System,
@@ -468,7 +463,7 @@ const (
 )
 
 type memoryProjection struct {
-	context memoryContext
+	context turn.MemoryContext
 	// supplied marks the records this request already provides; anything else the
 	// receiver may lawfully recall stays eligible for retrieval.
 	supplied map[string]bool

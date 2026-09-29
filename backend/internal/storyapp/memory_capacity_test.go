@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
 func TestRecallBudgetPreservesRequiredAndCausalGroups(t *testing.T) {
 	archive := []memorymodel.MemorySource{{ID: "attempt", Seq: 1, RunID: "old", Content: "铜钥匙" + strings.Repeat("长篇旧经历", 15000)}, {ID: "result", Seq: 2, RunID: "old", Content: "尝试失败"}}
-	m := withRecall(contextMaterial{System: "NPC", Required: "本轮刺激与完整近期经历", RequiredSources: []string{"current"}}, memoryProjection{context: memoryContext{Archive: archive}}, "铜钥匙")
+	m := withRecall(contextMaterial{System: "NPC", Required: "本轮刺激与完整近期经历", RequiredSources: []string{"current"}}, memoryProjection{context: turn.MemoryContext{Archive: archive}}, "铜钥匙")
 	req, report, err := (ContextComposer{}).Build(m, m.System, 100)
 	if err != nil {
 		t.Fatalf("optional recall blocked current turn: %v", err)
@@ -34,7 +35,7 @@ func TestDigestPromptDoesNotGrowWithCoverageIDs(t *testing.T) {
 	g := &digestGenerator{}
 	for i := 0; i < 2; i++ {
 		prefix := []memorymodel.MemorySource{{ID: fmt.Sprint("new:", i), Seq: int64(10001 + i), Content: "新进展"}}
-		d, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, wiaworld.Run{BaseContextEpoch: 1}, "npc:a", previous, prefix)
+		d, err := newTestApp(t, g).summarizeMemory(context.Background(), g, turn.Snapshot{}, wiaworld.Run{BaseContextEpoch: 1}, "npc:a", previous, prefix)
 		if err != nil {
 			t.Fatalf("coverage IDs exhausted prompt: %v", err)
 		}
@@ -59,7 +60,7 @@ func TestDigestStateSourcesUseCurrentCatalog(t *testing.T) {
 		valid bool
 	}{{"covered", false}, {"retained", true}, {"new", true}} {
 		g := fixedJSONGenerator{text: fmt.Sprintf(`{"content":"有效回顾","states":[{"kind":"belief","content":"判断","source_ids":[%q]}]}`, tc.id)}
-		_, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, wiaworld.Run{}, "npc:a", previous, []memorymodel.MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
+		_, err := newTestApp(t, g).summarizeMemory(context.Background(), g, turn.Snapshot{}, wiaworld.Run{}, "npc:a", previous, []memorymodel.MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
 		if (err == nil) != tc.valid {
 			t.Fatalf("source=%s err=%v", tc.id, err)
 		}

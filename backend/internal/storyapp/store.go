@@ -13,37 +13,15 @@ import (
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	_ "modernc.org/sqlite"
 )
 
-type worldSnapshot struct {
-	GeneratedEvents generatedEventState
-	Definition      story.Definition
-	Summary         wiaworld.WorldSummary
-	SceneLocation   string
-	// InputBudgetTokens is how many input tokens this world's requests may use; the long
-	// memory projection reads it so a small model window shrinks the recent window
-	// instead of failing the turn.
-	InputBudgetTokens int
-	PlayerName        string
-	PlayerProfile     string
-	Narrative         wiaworld.NarrativeSettings
-	Bystanders        []string
-	SceneVersion      int64
-	Characters        []wiaworld.Character
-	Messages          []wiaworld.Message
-	Events            []wiaworld.Event
-	Dialogue          []wiaworld.Event
-	SceneViews        []SceneView
-	Sources           map[string]sourceMetadata
-	Perceptions       map[string][]wiaworld.Perception
-	Memories          map[string][]wiaworld.Memory
-	Plot              *plot.Definition
-	PlotProgress      plot.Progress
-	LongMemory        map[string]memoryContext
-}
+// InputBudgetTokens is how many input tokens this world's requests may use; the long
+// memory projection reads it so a small model window shrinks the recent window
+// instead of failing the turn.
 
 type worldStore struct {
 	path string
@@ -210,8 +188,8 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 	})
 }
 
-func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
-	var out worldSnapshot
+func loadTurnSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (turn.Snapshot, error) {
+	var out turn.Snapshot
 	get := func(key string) (string, error) { return store.MetaGet(ctx, key) }
 	var err error
 	out.Summary.GameID, err = get("game_id")
@@ -341,7 +319,7 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 // A promoted or authored character can carry its own avatar; the world copy is
 // recorded separately under the world's assets.
 
-func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *plot.Progress, generated ...*generatedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []turn.SceneView, plotState *plot.Progress, generated ...*turn.GeneratedEventState) (int64, error) {
 	var messageHead int64
 	var eventHead int64
 	var turnSeq int64

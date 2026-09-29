@@ -24,6 +24,7 @@ import (
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -607,7 +608,7 @@ func (a *App) GameCover(id, revision string) ([]byte, string, error) {
 	return p.Cover, p.CoverType, nil
 }
 
-func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldSnapshot) (story.Definition, error) {
+func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s turn.Snapshot) (story.Definition, error) {
 	raw, err := store.MetaGet(ctx, "definition_snapshot")
 	if err == nil {
 		var d story.Definition

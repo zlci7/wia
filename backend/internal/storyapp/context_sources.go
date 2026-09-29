@@ -8,22 +8,14 @@ import (
 	"strings"
 
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 )
 
 var ErrContextSourceMissing = errors.New("context source is missing")
 
 // No event body crosses this metadata lookup. Perception content remains authoritative.
-type sourceMetadata struct {
-	ID           string
-	Actor        string
-	Kind         string
-	Seq          int64
-	RunID        string
-	Stage        int
-	SceneVersion int64
-}
 
-func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot) (map[string]sourceMetadata, error) {
+func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot turn.Snapshot) (map[string]turn.SourceMetadata, error) {
 	ids := []string{}
 	seen := map[string]bool{}
 	add := func(id string) {
@@ -55,7 +47,7 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot)
 			}
 		}
 	}
-	result := map[string]sourceMetadata{}
+	result := map[string]turn.SourceMetadata{}
 	for start := 0; start < len(ids); start += 200 {
 		end := min(start+200, len(ids))
 		args := make([]any, 0, end-start)
@@ -67,7 +59,7 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot)
 			return nil, err
 		}
 		for rows.Next() {
-			var m sourceMetadata
+			var m turn.SourceMetadata
 			if err := rows.Scan(&m.ID, &m.Actor, &m.Kind, &m.Seq, &m.RunID, &m.Stage, &m.SceneVersion); err != nil {
 				rows.Close()
 				return nil, err
@@ -86,8 +78,11 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot)
 	return result, nil
 }
 
-func loadTurnSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
-	snapshot, err := loadWorldSnapshot(ctx, store, limit)
+// loadTurnInput builds the turn's frozen input: the world snapshot plus the provenance
+// of every projection in it, so a stage can tell where a fact came from without
+// re-reading the event it was derived from.
+func loadTurnInput(ctx context.Context, store *storage.WorldStore, limit int) (turn.Snapshot, error) {
+	snapshot, err := loadTurnSnapshot(ctx, store, limit)
 	if err != nil {
 		return snapshot, err
 	}

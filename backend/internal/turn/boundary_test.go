@@ -12,19 +12,22 @@ import (
 
 // TestTurnDoesNotDependOnTheApplication guards the direction of the extraction.
 //
-// turn is the story's own vocabulary: what a turn input is, where a failure came
-// from, how a player-visible projection is rendered. It may depend on what is
-// already below it — world, wire, model and storage — but not on storyapp or
-// storyapi, which are the application around it. An import in that direction would
-// mean the module was extracted while still being called from the code above it,
-// and the only symptom would be a build that keeps working while the boundary stops
-// meaning anything.
+// turn is the story's own vocabulary: what a turn's frozen input is, where a failure
+// came from, how a player-visible projection is rendered. It may depend on what is
+// already below it — world, wire, model, storage, plot, story and the memory types —
+// but not on storyapp or storyapi, which are the application around it. An import in
+// that direction would mean the module was extracted while still being called from the
+// code above it, and the only symptom would be a build that keeps working while the
+// boundary stops meaning anything.
 func TestTurnDoesNotDependOnTheApplication(t *testing.T) {
 	allowed := map[string]bool{
-		"gameagent/backend/internal/world":   true,
-		"gameagent/backend/internal/wire":    true,
-		"gameagent/backend/internal/model":   true,
-		"gameagent/backend/internal/storage": true,
+		"gameagent/backend/internal/world":       true,
+		"gameagent/backend/internal/wire":        true,
+		"gameagent/backend/internal/model":       true,
+		"gameagent/backend/internal/storage":     true,
+		"gameagent/backend/internal/plot":        true,
+		"gameagent/backend/internal/story":       true,
+		"gameagent/backend/internal/memorymodel": true,
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 )
 
@@ -199,7 +200,7 @@ func TestCorrectionTargetsAndRestart(t *testing.T) {
 }
 
 func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
-	s := worldSnapshot{LongMemory: map[string]memoryContext{
+	s := turn.Snapshot{LongMemory: map[string]turn.MemoryContext{
 		"npc:innkeeper": {Archive: []memorymodel.MemorySource{{ID: "p1", EventID: "private", Content: "暗号白鹭"}}},
 		"npc:mercenary": {Archive: []memorymodel.MemorySource{{ID: "p2", EventID: "private", Content: "看见交谈"}}},
 	}}

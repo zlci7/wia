@@ -120,7 +120,7 @@ func readPlot(ctx context.Context, store *storage.WorldStore) (*plot.Definition,
 	return &def, state, nil
 }
 
-func nextPlotNode(snapshot worldSnapshot) (plot.Node, int, bool) {
+func nextPlotNode(snapshot turn.Snapshot) (plot.Node, int, bool) {
 	if snapshot.Plot == nil || (snapshot.Summary.Mode == "guided" && snapshot.PlotProgress.Ending != "") {
 		return plot.Node{}, 0, false
 	}
@@ -147,7 +147,7 @@ func nextPlotNode(snapshot worldSnapshot) (plot.Node, int, bool) {
 	return chosen, due, found
 }
 
-func plotTimeLimit(snapshot worldSnapshot) int {
+func plotTimeLimit(snapshot turn.Snapshot) int {
 	_, due, ok := nextPlotNode(snapshot)
 	if _, eventDue, found := nextGeneratedEvent(snapshot); found && (!ok || eventDue < due) {
 		due, ok = eventDue, true
@@ -162,7 +162,7 @@ func plotTimeLimit(snapshot worldSnapshot) int {
 	return min(120, max(0, due-current))
 }
 
-func plotContext(snapshot worldSnapshot) string {
+func plotContext(snapshot turn.Snapshot) string {
 	if snapshot.Plot == nil && len(snapshot.GeneratedEvents.Active) == 0 {
 		return ""
 	}
@@ -174,7 +174,7 @@ func plotContext(snapshot worldSnapshot) string {
 
 // A single node is settled per turn. The clock stops at that node; a subsequent
 // input can continue waiting against the newly committed consequences.
-func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, output *turnOutput) ([]wiaworld.Event, error) {
 	if snapshot.Plot == nil {
 		return nil, nil
 	}
@@ -220,7 +220,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	return visible, nil
 }
 
-func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, rootID string, result plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, result plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
 	var visible []wiaworld.Event
 	if result.Status != "deferred" {
 		event := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
@@ -264,7 +264,7 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 	return visible, nil
 }
 
-func composePlot(snapshot worldSnapshot, run wiaworld.Run, node plot.Node, output *turnOutput) contextMaterial {
+func composePlot(snapshot turn.Snapshot, run wiaworld.Run, node plot.Node, output *turnOutput) contextMaterial {
 	snapshot.SceneViews = output.SceneViews
 	snapshot.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	for i := range snapshot.Characters {
@@ -304,7 +304,7 @@ func plotEvidenceSections(events []wiaworld.Event) []contextSection {
 	return result
 }
 
-func validatePlotResolution(snapshot worldSnapshot, node plot.Node, output turnOutput, result plotResolution) error {
+func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turnOutput, result plotResolution) error {
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
 		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
 	}
@@ -323,7 +323,7 @@ func validatePlotResolution(snapshot worldSnapshot, node plot.Node, output turnO
 	}
 	// Retained views and node results are provided even when their originating
 	// event body falls outside the optional history window. Metadata is world-local.
-	provided := sceneViewSources(worldSnapshot{SceneViews: output.SceneViews}, "")
+	provided := sceneViewSources(turn.Snapshot{SceneViews: output.SceneViews}, "")
 	for _, state := range snapshot.PlotProgress.Nodes {
 		provided = append(provided, state.EventID)
 	}
@@ -359,18 +359,18 @@ func validatePlotResolution(snapshot worldSnapshot, node plot.Node, output turnO
 	return nil
 }
 
-func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
+func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
 	base := snapshot
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
 	base.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	base.Perceptions = map[string][]wiaworld.Perception{}
-	base.Sources = map[string]sourceMetadata{}
+	base.Sources = map[string]turn.SourceMetadata{}
 	for id, source := range snapshot.Sources {
 		base.Sources[id] = source
 	}
 	for _, e := range output.Events {
-		base.Sources[e.EventID] = sourceMetadata{ID: e.EventID, Actor: e.ActorID, Kind: e.EventType, RunID: e.RunID, Stage: e.Stage, SceneVersion: e.SceneVersion}
+		base.Sources[e.EventID] = turn.SourceMetadata{ID: e.EventID, Actor: e.ActorID, Kind: e.EventType, RunID: e.RunID, Stage: e.Stage, SceneVersion: e.SceneVersion}
 	}
 	for id, items := range snapshot.Perceptions {
 		base.Perceptions[id] = append([]wiaworld.Perception{}, items...)

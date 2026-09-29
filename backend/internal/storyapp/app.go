@@ -18,6 +18,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -249,7 +250,7 @@ func (a *App) worldSummary(ctx context.Context, worldID string) (wiaworld.WorldS
 		return wiaworld.WorldSummary{}, err
 	}
 	defer store.Close()
-	snapshot, err := loadWorldSnapshot(ctx, store, 1)
+	snapshot, err := loadTurnSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
@@ -257,20 +258,20 @@ func (a *App) worldSummary(ctx context.Context, worldID string) (wiaworld.WorldS
 	return snapshot.Summary, nil
 }
 
-func (a *App) ReadWorld(ctx context.Context, worldID string, limit int) (worldSnapshot, error) {
+func (a *App) ReadWorld(ctx context.Context, worldID string, limit int) (turn.Snapshot, error) {
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return worldSnapshot{}, err
+		return turn.Snapshot{}, err
 	}
 	if status != "ready" {
-		return worldSnapshot{}, ErrWorldNotReady
+		return turn.Snapshot{}, ErrWorldNotReady
 	}
 	store, err := storage.OpenWorldDB(path)
 	if err != nil {
-		return worldSnapshot{}, err
+		return turn.Snapshot{}, err
 	}
 	defer store.Close()
-	return loadWorldSnapshot(ctx, store, limit)
+	return loadTurnSnapshot(ctx, store, limit)
 }
 
 func (a *App) ReadMessages(ctx context.Context, worldID string, limit int) ([]wiaworld.Message, error) {
