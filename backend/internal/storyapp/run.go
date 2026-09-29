@@ -198,6 +198,10 @@ type turnOutput struct {
 	Events          []Event
 	Perceptions     []Perception
 	Memories        []Memory
+	// publicReplies and decisions carry stage state from the character stages to
+	// the coordination stage; they stay internal to the turn.
+	publicReplies []string               `json:"-"`
+	decisions     map[string]npcDecision `json:"-"`
 }
 
 func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest) (Run, error) {
@@ -589,40 +593,93 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 	return intent, repairCount, nil
 }
 
+// executeTurn runs one story turn. Every step below is a named stage, so the
+// pipeline can be read in order; the implementation of each stage lives in its
+// own function.
 func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, generator model.TextGenerator) (turnOutput, error) {
-	loadStarted := time.Now()
-	snapshot, err := loadTurnSnapshot(ctx, store, 40)
+	snapshot, err := a.loadTurn(ctx, store, run, generator)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageLoad, err)
+		return turnOutput{}, err
 	}
-	if err = a.prepareLongMemory(ctx, store, &snapshot, run, generator); err != nil {
-		return turnOutput{}, atTurnStage(turnStageLoad, err)
+	intent, err := a.resolveIntentStage(ctx, generator, snapshot, run)
+	if err != nil {
+		return turnOutput{}, err
 	}
-	if err = loadCoordinationEvidence(ctx, store, &snapshot, run.Input); err != nil {
-		return turnOutput{}, atTurnStage(turnStageLoad, err)
+	recipient := intent.AddresseeID
+	private := intent.Visibility == "private"
+	participants := sceneCharacters(snapshot.Characters)
+	output, perceptText, stageOneInputs, playerEventID := newTurnOutput(&snapshot, intent, run, recipient, private, participants)
+	if err = a.runCharacterStages(ctx, generator, &snapshot, run, intent, participants, perceptText, stageOneInputs, &output); err != nil {
+		return turnOutput{}, err
 	}
-	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
+	a.notePlayerAction(&output, run, intent, recipient)
+	host, visibleEvents, err := a.coordinateStage(ctx, generator, &snapshot, run, intent, participants, recipient, private, &output)
+	if err != nil {
+		return turnOutput{}, err
+	}
+	visibleEvents, err = a.resolveSceneResult(ctx, generator, &snapshot, run, intent, host, participants, visibleEvents, &output)
+	if err != nil {
+		return turnOutput{}, err
+	}
+	if err = a.narrateStage(ctx, generator, &snapshot, run, intent, recipient, private, visibleEvents, &output); err != nil {
+		return turnOutput{}, err
+	}
+	a.recordPlayerExperience(&snapshot, &output, run, intent, playerEventID, characterIDs(participants), recipient, private)
+	return output, nil
+}
+
+// turnDefinition is the definition a turn runs against: the character roster comes
+// from the world, while dialogue samples come from the definition this world froze
+// when it started, never from the currently installed story. A later revision must
+// not change how an existing save's characters speak, and a world started before
+// samples existed keeps none rather than silently adopting a newer template.
+func turnDefinition(snapshot *worldSnapshot) gameDefinition {
 	def := snapshot.Definition
 	frozen := def.Characters
 	def.Characters = snapshot.Characters
-	// Dialogue samples come from the definition this world froze when it started, never
-	// from the currently installed story: a later revision must not change how an
-	// existing save's characters speak. A world started before samples existed keeps none
-	// rather than silently adopting a newer template.
 	for index := range def.Characters {
 		if samples, ok := characterSpeakingExamples(frozen, def.Characters[index].EntityID); ok {
 			def.Characters[index].SpeakingExamples = samples
 		}
 	}
+	return def
+}
+
+// loadTurn reads the frozen turn input: the world snapshot, the long-memory
+// material and the coordination evidence.
+func (a *App) loadTurn(ctx context.Context, store *worldStore, run Run, generator model.TextGenerator) (worldSnapshot, error) {
+	loadStarted := time.Now()
+	snapshot, err := loadTurnSnapshot(ctx, store, 40)
+	if err != nil {
+		return worldSnapshot{}, atTurnStage(turnStageLoad, err)
+	}
+	if err = a.prepareLongMemory(ctx, store, &snapshot, run, generator); err != nil {
+		return worldSnapshot{}, atTurnStage(turnStageLoad, err)
+	}
+	if err = loadCoordinationEvidence(ctx, store, &snapshot, run.Input); err != nil {
+		return worldSnapshot{}, atTurnStage(turnStageLoad, err)
+	}
+	a.logRunStage(snapshot.Summary.WorldID, run, turnStageLoad, "load_snapshot", "", 0, "", nil, "", 0, time.Since(loadStarted))
+	return snapshot, nil
+}
+
+// resolveIntentStage decides what the player is trying to do and who it addresses.
+func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run) (turnIntent, error) {
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageIntent, err)
+		return turnIntent{}, atTurnStage(turnStageIntent, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageIntent, "resolve_intent", "", 0, intentPromptVersion, nil, intent.AddresseeID, intentRepairs, time.Since(intentStarted))
-	recipient := intent.AddresseeID
-	private := intent.Visibility == "private"
-	participants := sceneCharacters(snapshot.Characters)
+	return intent, nil
+}
+
+// newTurnOutput builds the turn output skeleton: it freezes the definition this
+// turn speaks through, records the player's own attempt and derives the
+// stage-one perception inputs.
+func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run Run, recipient string, private bool, participants []Character) (turnOutput, map[string]string, map[string]npcStageInput, string) {
+	def := turnDefinition(snapshot)
+
 	now := time.Now().UTC()
 	playerEventID := run.RunID + ":input"
 	output := turnOutput{
@@ -631,7 +688,6 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		Events:          []Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
 		Memories:        []Memory{}, Perceptions: []Perception{},
 	}
-	decisions := make(map[string]npcDecision)
 	perceptText := make(map[string]string)
 	stageOneInputs := make(map[string]npcStageInput)
 	for _, character := range participants {
@@ -643,13 +699,23 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		output.Perceptions = append(output.Perceptions, Perception{RecipientID: character.EntityID, SourceEventID: playerEventID, SourceType: sourceTypeFor(private, character.EntityID, recipient, intent.IntentType), Content: perceptText[character.EntityID], Stage: 1, SceneVersion: snapshot.SceneVersion, CreatedAt: now})
 		stageOneInputs[character.EntityID] = npcStageInput{PlayerPerception: perceptText[character.EntityID], SourceEventIDs: []string{playerEventID}}
 	}
-	if err := a.decideNPCs(ctx, generator, snapshot, def, run, recipient, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
-		return turnOutput{}, atTurnStage(turnStageNPC, err)
+	return output, perceptText, stageOneInputs, playerEventID
+}
+
+// runCharacterStages runs the two character decision stages and keeps the public
+// reply log and the merged decisions on the output for the coordination stage.
+func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, participants []Character, perceptText map[string]string, stageOneInputs map[string]npcStageInput, output *turnOutput) error {
+	def := turnDefinition(snapshot)
+
+	playerEventID := run.RunID + ":input"
+	decisions := make(map[string]npcDecision)
+	if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
+		return atTurnStage(turnStageNPC, err)
 	}
 	var publicReplyLog []string
 	for _, character := range participants {
 		decision := decisions[character.EntityID]
-		if reply := appendNPCDecisionOutput(&output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
+		if reply := appendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
 			publicReplyLog = append(publicReplyLog, reply)
 		}
 	}
@@ -662,8 +728,8 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 			priorTurn[characterID] = fmt.Sprintf("第一阶段自己的决定：%s", formatSelfDecision(decisions[characterID]))
 		}
 		followDecisions := make(map[string]npcDecision)
-		if err := a.decideNPCs(ctx, generator, snapshot, def, run, recipient, intent.IntentType, stageTwoInputs, priorTurn, followDecisions, 2); err != nil {
-			return turnOutput{}, atTurnStage(turnStageNPC, err)
+		if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageTwoInputs, priorTurn, followDecisions, 2); err != nil {
+			return atTurnStage(turnStageNPC, err)
 		}
 		for _, character := range participants {
 			decision, ok := followDecisions[character.EntityID]
@@ -675,26 +741,38 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 			if len(input.SourceEventIDs) > 0 {
 				sourceEventID = input.SourceEventIDs[0]
 			}
-			if reply := appendNPCDecisionOutput(&output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2); reply != "" {
+			if reply := appendNPCDecisionOutput(output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2); reply != "" {
 				publicReplyLog = append(publicReplyLog, reply)
 			}
 			decisions[character.EntityID] = mergeNPCDecision(decisions[character.EntityID], decision)
 		}
 	}
+	output.publicReplies = publicReplyLog
+	output.decisions = decisions
+	return nil
+}
 
-	publicReplies := strings.Join(publicReplyLog, "\n")
+// notePlayerAction records the player's own attempt as an action the coordinator
+// has to resolve when the turn can produce an outcome for it.
+func (a *App) notePlayerAction(output *turnOutput, run Run, intent turnIntent, recipient string) {
 	if intent.IntentType != "speak" || recipient == "" {
-		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: snapshot.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
+		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
 	}
+}
+
+// coordinateStage resolves the scene: time, roster, action outcomes and the
+// scene views, and returns the events the player can perceive so far.
+func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, participants []Character, recipient string, private bool, output *turnOutput) (hostResult, []Event, error) {
+	publicReplies := strings.Join(output.publicReplies, "\n")
 	coordinationStarted := time.Now()
-	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, snapshot, run, intent, decisions, output.Events, publicReplies)
+	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, *snapshot, run, intent, output.decisions, output.Events, publicReplies)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+		return hostResult{}, nil, atTurnStage(turnStageCoordination, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageCoordination, "coordinate_scene", "scene", 0, coordinationPromptVersion, eventIDs(output.Events), recipient, coordinationRepairs, time.Since(coordinationStarted))
 	output.Clock = advanceClock(snapshot.Summary.Clock, host.TimeMinutes)
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
-	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || sceneFor(snapshot, "player") != snapshot.Summary.Scene {
+	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || sceneFor(*snapshot, "player") != snapshot.Summary.Scene {
 		output.SceneVersion = snapshot.SceneVersion + 1
 	}
 	// Stage 3 outcomes may be witnessed on arrival. Earlier expressions retain
@@ -705,22 +783,22 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 			resultParticipants = append(resultParticipants, character)
 		}
 	}
-	visibleOutcomes, err := appendHostOutcomes(&output, run, resultParticipants, snapshot.Definition.BystanderRefs, host.Outcomes)
+	visibleOutcomes, err := appendHostOutcomes(output, run, resultParticipants, snapshot.Definition.BystanderRefs, host.Outcomes)
 	if err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story coordination validation failed: run_id=%q boundary=action_outcomes", run.RunID)
 		}
-		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+		return hostResult{}, nil, atTurnStage(turnStageCoordination, err)
 	}
-	output.SceneViews, err = applySceneUpdates(snapshot, run, intent, output, host)
+	output.SceneViews, err = applySceneUpdates(*snapshot, run, intent, *output, host)
 	if err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story coordination validation failed: run_id=%q boundary=scene_sources", run.RunID)
 		}
-		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+		return hostResult{}, nil, atTurnStage(turnStageCoordination, err)
 	}
 	snapshot.SceneViews = output.SceneViews
-	output.Scene = sceneFor(snapshot, "player")
+	output.Scene = sceneFor(*snapshot, "player")
 	// The identifier behind the scene text, kept so presence is never decided by
 	// comparing prose. A description that names no known place leaves the location
 	// unchanged rather than clearing it.
@@ -731,27 +809,41 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 	snapshot.SceneVersion = output.SceneVersion
 	playerNarrativeInput := run.Input
 	visibleEvents := visibleTurnEvents(output.Events, visibleOutcomes, playerNarrativeInput)
+	return host, visibleEvents, nil
+}
+
+// resolveSceneResult advances the plot and the generated events and folds their
+// player-visible results into the events the narration stage renders.
+func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, host hostResult, participants []Character, visibleEvents []Event, output *turnOutput) ([]Event, error) {
 	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
 		elapsed := Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
 		visibleEvents = append(visibleEvents, elapsed)
 	}
-	plotEvents, err := a.advancePlot(ctx, generator, snapshot, run, &output)
+	plotEvents, err := a.advancePlot(ctx, generator, *snapshot, run, output)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+		return nil, atTurnStage(turnStageCoordination, err)
 	}
 	visibleEvents = append(visibleEvents, plotEvents...)
-	generatedVisible, err := a.advanceGeneratedEvents(ctx, generator, snapshot, run, host.EventOpportunity, &output)
+	generatedVisible, err := a.advanceGeneratedEvents(ctx, generator, *snapshot, run, host.EventOpportunity, output)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageCoordination, err)
+		return nil, atTurnStage(turnStageCoordination, err)
 	}
 	visibleEvents = append(visibleEvents, generatedVisible...)
 	snapshot.SceneViews, snapshot.SceneVersion = output.SceneViews, output.SceneVersion
+	return visibleEvents, nil
+}
+
+// narrateStage renders the player-facing prose and closes the turn with the
+// settled scene projection.
+func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, recipient string, private bool, visibleEvents []Event, output *turnOutput) error {
+	def := turnDefinition(snapshot)
+
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
-	result, narrationRepairs, err := a.narrateVisible(ctx, generator, snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
+	result, narrationRepairs, err := a.narrateVisible(ctx, generator, *snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
 	if err != nil {
-		return turnOutput{}, atTurnStage(turnStageNarration, err)
+		return atTurnStage(turnStageNarration, err)
 	}
 	a.logRunStage(snapshot.Summary.WorldID, run, turnStageNarration, "render_player_text", "scene", 0, narrationPromptVersion, eventIDs(visibleEvents), recipient, narrationRepairs, time.Since(narrationStarted))
 	output.Narrative = result.Narrative
@@ -762,11 +854,18 @@ func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, gener
 		}
 	}
 	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
-	for _, character := range participants {
-		kind, memory := playerExperienceMemory(intent.IntentType, private, character.EntityID, recipient, run.Input, def)
-		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
+	return nil
+}
+
+// recordPlayerExperience writes what each participant experienced from the
+// player's own attempt in this turn.
+func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput, run Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
+	def := turnDefinition(snapshot)
+
+	for _, characterID := range participantIDs {
+		kind, memory := playerExperienceMemory(intent.IntentType, private, characterID, recipient, run.Input, def)
+		output.Memories = append(output.Memories, Memory{RecipientID: characterID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
 	}
-	return output, nil
 }
 
 // includeNewCharactersInSceneViews gives every character present in the world a view
