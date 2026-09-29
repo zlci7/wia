@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 const (
@@ -117,14 +118,14 @@ type ModelConfigRequest struct {
 }
 
 type Status struct {
-	Ready           bool          `json:"ready"`
-	Model           ModelInfo     `json:"model"`
-	ModelError      string        `json:"model_error,omitempty"`
-	UserID          string        `json:"user_id"`
-	ActiveWorld     *WorldSummary `json:"active_world"`
-	ActiveRevision  int64         `json:"active_revision"`
-	DataRoot        string        `json:"-"`
-	ModelConfigPath string        `json:"-"`
+	Ready           bool                   `json:"ready"`
+	Model           ModelInfo              `json:"model"`
+	ModelError      string                 `json:"model_error,omitempty"`
+	UserID          string                 `json:"user_id"`
+	ActiveWorld     *wiaworld.WorldSummary `json:"active_world"`
+	ActiveRevision  int64                  `json:"active_revision"`
+	DataRoot        string                 `json:"-"`
+	ModelConfigPath string                 `json:"-"`
 }
 
 type GameSummary struct {
@@ -142,134 +143,29 @@ type GameSummary struct {
 	Player      PlayerDefaults `json:"player"`
 }
 
-type WorldSummary struct {
-	GameTitle    string `json:"game_title"`
-	Revision     string `json:"revision"`
-	GameID       string `json:"game_id"`
-	WorldID      string `json:"world_id"`
-	Name         string `json:"name"`
-	Mode         string `json:"mode"`
-	TurnSeq      int64  `json:"turn_seq"`
-	MessageHead  int64  `json:"message_head"`
-	EventHead    int64  `json:"event_head"`
-	ContextEpoch int64  `json:"context_epoch"`
-	Clock        string `json:"clock"`
-	Scene        string `json:"scene"`
-	// SceneLocation is the current location's identifier. Presence is decided by
-	// identity, not by comparing human-readable scene text.
-	SceneLocation string    `json:"scene_location,omitempty"`
-	Status        string    `json:"status"`
-	StoryEnded    bool      `json:"story_ended"`
-	UpdatedAt     time.Time `json:"updated_at"`
-}
+// SceneLocation is the current location's identifier. Presence is decided by
+// identity, not by comparing human-readable scene text.
 
-type Character struct {
-	DefinitionRevision string `json:"definition_revision,omitempty"`
-	Appearance         string `json:"appearance,omitempty"`
-	// Avatar is a package-relative asset reference from the definition, not a world
-	// resource name; the world snapshot records its own copy separately.
-	Avatar          string `json:"avatar,omitempty"`
-	EntityID        string `json:"entity_id"`
-	DefinitionID    string `json:"definition_id"`
-	Name            string `json:"name"`
-	Role            string `json:"role"`
-	Profile         string `json:"profile"`
-	Knowledge       string `json:"knowledge"`
-	InitialConcerns string `json:"initial_concerns"`
-	// SpeakingExamples are authored dialogue samples showing how this character
-	// sounds. They are style material, never events that happened.
-	SpeakingExamples []string `json:"speaking_examples,omitempty"`
-	InScene          bool     `json:"in_scene"`
-}
+// Avatar is a package-relative asset reference from the definition, not a world
+// resource name; the world snapshot records its own copy separately.
+
+// SpeakingExamples are authored dialogue samples showing how this character
+// sounds. They are style material, never events that happened.
 
 // PublicCharacter is the player-facing character projection. Private role
 // material stays inside the story runtime and is never sent through ordinary
 // play routes.
-type PublicCharacter struct {
-	Appearance   string `json:"appearance,omitempty"`
-	EntityID     string `json:"entity_id"`
-	DefinitionID string `json:"definition_id"`
-	Name         string `json:"name"`
-	Role         string `json:"role"`
-	InScene      bool   `json:"in_scene"`
-}
 
-func PublicCharacterViews(characters []Character) []PublicCharacter {
-	views := make([]PublicCharacter, 0, len(characters))
+func PublicCharacterViews(characters []wiaworld.Character) []wiaworld.PublicCharacter {
+	views := make([]wiaworld.PublicCharacter, 0, len(characters))
 	for _, character := range characters {
-		views = append(views, PublicCharacter{
+		views = append(views, wiaworld.PublicCharacter{
 			Appearance: character.Appearance,
 			EntityID:   character.EntityID, DefinitionID: character.DefinitionID,
 			Name: character.Name, Role: character.Role, InScene: character.InScene,
 		})
 	}
 	return views
-}
-
-type Message struct {
-	Seq       int64     `json:"seq"`
-	MessageID string    `json:"message_id"`
-	Kind      string    `json:"kind"`
-	Content   string    `json:"content"`
-	RunID     string    `json:"run_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Event struct {
-	ProjectionParentID string    `json:"-"`
-	Seq                int64     `json:"seq"`
-	EventID            string    `json:"event_id"`
-	EventType          string    `json:"event_type"`
-	ActorID            string    `json:"actor_id,omitempty"`
-	TargetID           string    `json:"target_id,omitempty"`
-	Content            string    `json:"content"`
-	RunID              string    `json:"run_id"`
-	Stage              int       `json:"stage"`
-	SceneVersion       int64     `json:"scene_version"`
-	SourceType         string    `json:"source_type"`
-	CreatedAt          time.Time `json:"created_at"`
-}
-
-type Perception struct {
-	Seq           int64     `json:"seq"`
-	RecipientID   string    `json:"recipient_id"`
-	SourceEventID string    `json:"source_event_id"`
-	SourceType    string    `json:"source_type"`
-	Content       string    `json:"content"`
-	Stage         int       `json:"stage"`
-	SceneVersion  int64     `json:"scene_version"`
-	CreatedAt     time.Time `json:"created_at"`
-}
-
-type Memory struct {
-	Seq           int64     `json:"seq"`
-	RecipientID   string    `json:"recipient_id"`
-	Kind          string    `json:"kind"`
-	Content       string    `json:"content"`
-	SourceEventID string    `json:"source_event_id"`
-	CreatedAt     time.Time `json:"created_at"`
-}
-
-type Run struct {
-	RunID            string    `json:"run_id"`
-	RequestKey       string    `json:"request_key"`
-	RequestHash      string    `json:"request_hash"`
-	Input            string    `json:"input"`
-	AddresseeID      string    `json:"addressee_id,omitempty"`
-	Attempt          int       `json:"attempt"`
-	Status           string    `json:"status"`
-	Reason           string    `json:"reason,omitempty"`
-	Error            string    `json:"error,omitempty"`
-	MessageSeq       int64     `json:"message_seq,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	InputID          string    `json:"-"`
-	InputSeq         int64     `json:"-"`
-	BaseTurnSeq      int64     `json:"-"`
-	BaseMessageHead  int64     `json:"-"`
-	BaseEventHead    int64     `json:"-"`
-	BaseContextEpoch int64     `json:"-"`
-	BaseSceneVersion int64     `json:"-"`
 }
 
 type SaveOperation struct {

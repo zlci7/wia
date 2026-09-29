@@ -1,6 +1,9 @@
 package storyapp
 
-import "strings"
+import (
+	wiaworld "gameagent/backend/internal/world"
+	"strings"
+)
 
 type gameDefinition struct {
 	Revision         string
@@ -16,7 +19,7 @@ type gameDefinition struct {
 	// InitialLocation is the identifier of the scene the story starts in.
 	InitialLocation string
 	Clock           string
-	Characters      []Character
+	Characters      []wiaworld.Character
 	Bystanders      []string
 	// BystanderRefs carries the normalized v2 bystander definitions next to their
 	// display names so identity survives the pack boundary.
@@ -26,17 +29,17 @@ type gameDefinition struct {
 	EventGeneration *EventGenerationPolicy
 }
 
-func characterByID(def gameDefinition, id string) (Character, bool) {
+func characterByID(def gameDefinition, id string) (wiaworld.Character, bool) {
 	for _, c := range def.Characters {
 		if c.EntityID == strings.TrimSpace(id) {
 			return c, true
 		}
 	}
-	return Character{}, false
+	return wiaworld.Character{}, false
 }
 
-func sceneCharacters(characters []Character) []Character {
-	result := make([]Character, 0, len(characters))
+func sceneCharacters(characters []wiaworld.Character) []wiaworld.Character {
+	result := make([]wiaworld.Character, 0, len(characters))
 	for _, character := range characters {
 		if character.InScene {
 			result = append(result, character)
@@ -45,11 +48,11 @@ func sceneCharacters(characters []Character) []Character {
 	return result
 }
 
-func findSceneCharacter(characters []Character, id string) (Character, bool) {
+func findSceneCharacter(characters []wiaworld.Character, id string) (wiaworld.Character, bool) {
 	for _, character := range characters {
 		if character.InScene && character.EntityID == strings.TrimSpace(id) {
 			return character, true
 		}
 	}
-	return Character{}, false
+	return wiaworld.Character{}, false
 }

@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 )
 
@@ -32,9 +33,9 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	if before < 0 || (!author && scope != "player") {
 		return out, ErrInvalidRequest
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return out, err
@@ -76,7 +77,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	if author {
 		out.Scopes = append(memoryScopeIDs(snapshot), "author")
 	}
-	if !containsID(out.Scopes, scope) {
+	if !wiaworld.ContainsID(out.Scopes, scope) {
 		return out, ErrInvalidRequest
 	}
 	if scope == "author" {
@@ -162,9 +163,9 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 }
 
 func (a *App) Corrections(ctx context.Context, worldID string) ([]Correction, MemoryJob, error) {
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return nil, MemoryJob{}, err

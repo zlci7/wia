@@ -13,6 +13,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type SubjectiveState struct {
@@ -82,7 +83,7 @@ func loadLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnaps
 
 // Maintenance reads only committed prefixes while the owning run protects the
 // world from deletion/copy. Publication is version checked outside model calls.
-func (a *App) prepareLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnapshot, run Run, generator model.TextGenerator) error {
+func (a *App) prepareLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnapshot, run wiaworld.Run, generator model.TextGenerator) error {
 	if err := loadLongMemory(ctx, store, snapshot); err != nil {
 		return err
 	}
@@ -131,7 +132,7 @@ func (a *App) prepareLongMemory(ctx context.Context, store *worldStore, snapshot
 	return nil
 }
 
-func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot worldSnapshot, run Run, scope string, previous MemoryDigest, prefix []MemorySource) (MemoryDigest, error) {
+func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, scope string, previous MemoryDigest, prefix []MemorySource) (MemoryDigest, error) {
 	d := previous
 	if len(prefix) == 0 {
 		return d, nil
@@ -139,10 +140,10 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	sources := append([]string{}, previous.Sources...)
 	allowed := retainedStateSources(previous)
 	for _, s := range prefix {
-		if !containsID(allowed, s.ID) {
+		if !wiaworld.ContainsID(allowed, s.ID) {
 			allowed = append(allowed, s.ID)
 		}
-		if !containsID(sources, s.ID) {
+		if !wiaworld.ContainsID(sources, s.ID) {
 			sources = append(sources, s.ID)
 		}
 	}
@@ -164,12 +165,12 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 		return d, ErrGenerationFailed
 	}
 	for _, state := range result.States {
-		if !containsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || wire.Clean(state.Content) == "" || len(state.Sources) == 0 {
+		if !wiaworld.ContainsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || wire.Clean(state.Content) == "" || len(state.Sources) == 0 {
 			a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_fields")
 			return d, ErrGenerationFailed
 		}
 		for _, id := range state.Sources {
-			if !containsID(allowed, id) {
+			if !wiaworld.ContainsID(allowed, id) {
 				a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_source")
 				return d, ErrGenerationFailed
 			}
@@ -520,7 +521,7 @@ func withRecall(material contextMaterial, projection memoryProjection, query str
 	// Lowest-ranked matches are removed first by the shared budgeter. A hit
 	// selects its entire committed group so attempts keep their outcomes.
 	for _, s := range hits {
-		if projection.alreadySupplied(s.ID) || containsID(material.RecallSources, s.ID) {
+		if projection.alreadySupplied(s.ID) || wiaworld.ContainsID(material.RecallSources, s.ID) {
 			continue
 		}
 		for _, group := range groups {
@@ -528,7 +529,7 @@ func withRecall(material contextMaterial, projection memoryProjection, query str
 			overlap := false
 			for _, record := range group {
 				contains = contains || record.ID == s.ID
-				overlap = overlap || projection.alreadySupplied(record.ID) || containsID(material.RecallSources, record.ID)
+				overlap = overlap || projection.alreadySupplied(record.ID) || wiaworld.ContainsID(material.RecallSources, record.ID)
 			}
 			if !contains || overlap {
 				continue
@@ -552,7 +553,7 @@ func retainedStateSources(d MemoryDigest) []string {
 	var ids []string
 	for _, state := range d.States {
 		for _, id := range state.Sources {
-			if !containsID(ids, id) {
+			if !wiaworld.ContainsID(ids, id) {
 				ids = append(ids, id)
 			}
 		}

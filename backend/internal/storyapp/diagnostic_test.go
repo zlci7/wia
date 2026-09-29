@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 	"os"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ func TestDiagnosticClassificationAndPrivateFailure(t *testing.T) {
 		logger := &recordingLogger{}
 		a := newTestApp(t, &scriptedGenerator{})
 		a.logger = logger
-		a.logRunFailure("world", Run{RunID: "run"}, "narration", reason, err)
+		a.logRunFailure("world", wiaworld.Run{RunID: "run"}, "narration", reason, err)
 		if strings.Contains(logger.String(), "PRIVATE") || !strings.Contains(logger.String(), tc.code) {
 			t.Fatal(logger.String())
 		}

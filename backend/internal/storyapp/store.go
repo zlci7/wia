@@ -14,13 +14,14 @@ import (
 	"time"
 
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	_ "modernc.org/sqlite"
 )
 
 type worldSnapshot struct {
 	GeneratedEvents generatedEventState
 	Definition      gameDefinition
-	Summary         WorldSummary
+	Summary         wiaworld.WorldSummary
 	SceneLocation   string
 	// InputBudgetTokens is how many input tokens this world's requests may use; the long
 	// memory projection reads it so a small model window shrinks the recent window
@@ -31,14 +32,14 @@ type worldSnapshot struct {
 	Narrative         NarrativeSettings
 	Bystanders        []string
 	SceneVersion      int64
-	Characters        []Character
-	Messages          []Message
-	Events            []Event
-	Dialogue          []Event
+	Characters        []wiaworld.Character
+	Messages          []wiaworld.Message
+	Events            []wiaworld.Event
+	Dialogue          []wiaworld.Event
 	SceneViews        []SceneView
 	Sources           map[string]sourceMetadata
-	Perceptions       map[string][]Perception
-	Memories          map[string][]Memory
+	Perceptions       map[string][]wiaworld.Perception
+	Memories          map[string][]wiaworld.Memory
 	Plot              *PlotDefinition
 	PlotProgress      PlotProgress
 	LongMemory        map[string]memoryContext
@@ -492,8 +493,8 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if err != nil {
 		return out, err
 	}
-	out.Perceptions = make(map[string][]Perception)
-	out.Memories = make(map[string][]Memory)
+	out.Perceptions = make(map[string][]wiaworld.Perception)
+	out.Memories = make(map[string][]wiaworld.Memory)
 	for _, c := range out.Characters {
 		out.Perceptions[c.EntityID], err = loadPerceptions(ctx, store.db, c.EntityID, 20)
 		if err != nil {
@@ -528,15 +529,15 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	return out, nil
 }
 
-func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
+func loadCharacters(ctx context.Context, db *sql.DB) ([]wiaworld.Character, error) {
 	rows, err := db.QueryContext(ctx, `SELECT c.entity_id,c.definition_id,c.name,c.role,c.profile,c.knowledge,c.in_scene,COALESCE(m.value,'') FROM characters c LEFT JOIN meta m ON m.key='initial_concerns:' || c.entity_id ORDER BY c.entity_id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []Character
+	var result []wiaworld.Character
 	for rows.Next() {
-		var c Character
+		var c wiaworld.Character
 		var in int
 		if err := rows.Scan(&c.EntityID, &c.DefinitionID, &c.Name, &c.Role, &c.Profile, &c.Knowledge, &in, &c.InitialConcerns); err != nil {
 			return nil, err
@@ -573,7 +574,7 @@ func loadCharacters(ctx context.Context, db *sql.DB) ([]Character, error) {
 	return result, nil
 }
 
-func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]Message, error) {
+func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]wiaworld.Message, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -582,9 +583,9 @@ func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]Message, error)
 		return nil, err
 	}
 	defer rows.Close()
-	var result []Message
+	var result []wiaworld.Message
 	for rows.Next() {
-		var m Message
+		var m wiaworld.Message
 		var created string
 		if err := rows.Scan(&m.Seq, &m.MessageID, &m.Kind, &m.Content, &m.RunID, &created); err != nil {
 			return nil, err
@@ -598,7 +599,7 @@ func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]Message, error)
 	return result, rows.Err()
 }
 
-func loadEvents(ctx context.Context, db *sql.DB, limit int) ([]Event, error) {
+func loadEvents(ctx context.Context, db *sql.DB, limit int) ([]wiaworld.Event, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -607,9 +608,9 @@ func loadEvents(ctx context.Context, db *sql.DB, limit int) ([]Event, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []Event
+	var result []wiaworld.Event
 	for rows.Next() {
-		var e Event
+		var e wiaworld.Event
 		var created string
 		if err := rows.Scan(&e.Seq, &e.EventID, &e.EventType, &e.ActorID, &e.TargetID, &e.Content, &e.RunID, &e.Stage, &e.SceneVersion, &e.SourceType, &created); err != nil {
 			return nil, err
@@ -623,15 +624,15 @@ func loadEvents(ctx context.Context, db *sql.DB, limit int) ([]Event, error) {
 	return result, rows.Err()
 }
 
-func loadPerceptions(ctx context.Context, db *sql.DB, recipient string, limit int) ([]Perception, error) {
+func loadPerceptions(ctx context.Context, db *sql.DB, recipient string, limit int) ([]wiaworld.Perception, error) {
 	rows, err := db.QueryContext(ctx, `SELECT seq,recipient_id,source_event_id,source_type,content,stage,scene_version,created_at FROM perceptions WHERE recipient_id=? ORDER BY seq DESC LIMIT ?`, recipient, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []Perception
+	var result []wiaworld.Perception
 	for rows.Next() {
-		var p Perception
+		var p wiaworld.Perception
 		var created string
 		if err := rows.Scan(&p.Seq, &p.RecipientID, &p.SourceEventID, &p.SourceType, &p.Content, &p.Stage, &p.SceneVersion, &created); err != nil {
 			return nil, err
@@ -645,15 +646,15 @@ func loadPerceptions(ctx context.Context, db *sql.DB, recipient string, limit in
 	return result, rows.Err()
 }
 
-func loadMemories(ctx context.Context, db *sql.DB, recipient string, limit int) ([]Memory, error) {
+func loadMemories(ctx context.Context, db *sql.DB, recipient string, limit int) ([]wiaworld.Memory, error) {
 	rows, err := db.QueryContext(ctx, `SELECT seq,recipient_id,kind,content,source_event_id,created_at FROM memories WHERE recipient_id=? ORDER BY seq DESC LIMIT ?`, recipient, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []Memory
+	var result []wiaworld.Memory
 	for rows.Next() {
-		var m Memory
+		var m wiaworld.Memory
 		var created string
 		if err := rows.Scan(&m.Seq, &m.RecipientID, &m.Kind, &m.Content, &m.SourceEventID, &created); err != nil {
 			return nil, err
@@ -667,27 +668,27 @@ func loadMemories(ctx context.Context, db *sql.DB, recipient string, limit int) 
 	return result, rows.Err()
 }
 
-func scanRun(row interface{ Scan(...any) error }) (Run, bool, error) {
-	var r Run
+func scanRun(row interface{ Scan(...any) error }) (wiaworld.Run, bool, error) {
+	var r wiaworld.Run
 	var created, updated string
 	var foundErr error
 	foundErr = row.Scan(&r.RunID, &r.RequestKey, &r.RequestHash, &r.Input, &r.AddresseeID, &r.Attempt, &r.Status, &r.Reason, &r.Error, &r.MessageSeq, &r.InputID, &r.InputSeq, &r.BaseTurnSeq, &r.BaseMessageHead, &r.BaseEventHead, &r.BaseContextEpoch, &r.BaseSceneVersion, &created, &updated)
 	if errors.Is(foundErr, sql.ErrNoRows) {
-		return Run{}, false, nil
+		return wiaworld.Run{}, false, nil
 	}
 	if foundErr != nil {
-		return Run{}, false, foundErr
+		return wiaworld.Run{}, false, foundErr
 	}
 	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	r.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	return r, true, nil
 }
 
-func readRun(ctx context.Context, db *sql.DB, runID string) (Run, bool, error) {
+func readRun(ctx context.Context, db *sql.DB, runID string) (wiaworld.Run, bool, error) {
 	return scanRun(db.QueryRowContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs WHERE run_id=?`, runID))
 }
 
-func readRunByRequest(ctx context.Context, db *sql.DB, key string) (Run, bool, error) {
+func readRunByRequest(ctx context.Context, db *sql.DB, key string) (wiaworld.Run, bool, error) {
 	return scanRun(db.QueryRowContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs WHERE request_key=?`, key))
 }
 
@@ -708,7 +709,7 @@ func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
 	return count, err
 }
 
-func commitTurn(ctx context.Context, store *worldStore, run Run, narrative string, events []Event, perceptions []Perception, memories []Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err

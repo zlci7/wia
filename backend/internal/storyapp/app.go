@@ -19,6 +19,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 var writeModelConfig = atomicfile.Write
@@ -183,7 +184,7 @@ func (a *App) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	var active *WorldSummary
+	var active *wiaworld.WorldSummary
 	if activeID != "" {
 		summary, err := a.worldSummary(ctx, activeID)
 		if err != nil && !errors.Is(err, ErrWorldNotFound) {
@@ -195,7 +196,7 @@ func (a *App) Status(ctx context.Context) (Status, error) {
 	return Status{Ready: ready, Model: info, ModelError: modelErr, UserID: a.userID, ActiveWorld: active, ActiveRevision: revision, DataRoot: a.dataRoot, ModelConfigPath: a.modelPath}, nil
 }
 
-func (a *App) ListWorlds(ctx context.Context) ([]WorldSummary, error) {
+func (a *App) ListWorlds(ctx context.Context) ([]wiaworld.WorldSummary, error) {
 	rows, err := a.appDB.QueryContext(ctx, `SELECT world_id,name,status,updated_at FROM worlds WHERE user_id=? AND status='ready' ORDER BY updated_at DESC`, a.userID)
 	if err != nil {
 		return nil, err
@@ -219,7 +220,7 @@ func (a *App) ListWorlds(ctx context.Context) ([]WorldSummary, error) {
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	result := make([]WorldSummary, 0, len(refs))
+	result := make([]wiaworld.WorldSummary, 0, len(refs))
 	for _, ref := range refs {
 		summary, err := a.worldSummary(ctx, ref.id)
 		if err != nil {
@@ -233,22 +234,22 @@ func (a *App) ListWorlds(ctx context.Context) ([]WorldSummary, error) {
 	return result, nil
 }
 
-func (a *App) worldSummary(ctx context.Context, worldID string) (WorldSummary, error) {
+func (a *App) worldSummary(ctx context.Context, worldID string) (wiaworld.WorldSummary, error) {
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if status != "ready" {
-		return WorldSummary{}, ErrWorldNotReady
+		return wiaworld.WorldSummary{}, ErrWorldNotReady
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	defer store.db.Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	snapshot.Summary.Status = status
 	return snapshot.Summary, nil
@@ -270,19 +271,19 @@ func (a *App) ReadWorld(ctx context.Context, worldID string, limit int) (worldSn
 	return loadWorldSnapshot(ctx, store, limit)
 }
 
-func (a *App) ReadMessages(ctx context.Context, worldID string, limit int) ([]Message, error) {
+func (a *App) ReadMessages(ctx context.Context, worldID string, limit int) ([]wiaworld.Message, error) {
 	snap, err := a.ReadWorld(ctx, worldID, limit)
 	return snap.Messages, err
 }
-func (a *App) ReadCharacters(ctx context.Context, worldID string) ([]Character, error) {
+func (a *App) ReadCharacters(ctx context.Context, worldID string) ([]wiaworld.Character, error) {
 	snap, err := a.ReadWorld(ctx, worldID, 1)
 	return snap.Characters, err
 }
-func (a *App) ReadMemories(ctx context.Context, worldID, recipient string) ([]Memory, error) {
+func (a *App) ReadMemories(ctx context.Context, worldID, recipient string) ([]wiaworld.Memory, error) {
 	snap, err := a.ReadWorld(ctx, worldID, 1)
 	return snap.Memories[recipient], err
 }
-func (a *App) ReadPerceptions(ctx context.Context, worldID, recipient string) ([]Perception, error) {
+func (a *App) ReadPerceptions(ctx context.Context, worldID, recipient string) ([]wiaworld.Perception, error) {
 	snap, err := a.ReadWorld(ctx, worldID, 1)
 	return snap.Perceptions[recipient], err
 }

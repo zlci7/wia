@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"strconv"
 	"strings"
 )
@@ -127,9 +128,9 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) (NarrativeSettings, 
 	return validated, nil
 }
 
-func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, request UpdateNarrativeSettingsRequest) (NarrativeSettings, WorldSummary, error) {
+func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, request UpdateNarrativeSettingsRequest) (NarrativeSettings, wiaworld.WorldSummary, error) {
 	if request.Policies != nil && (request.ExpectedContextEpoch <= 0 || request.CustomInstruction != "") {
-		return NarrativeSettings{}, WorldSummary{}, ErrInvalidRequest
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	settings, err := validateNarrativeSettings(NarrativeSettings{
 		Perspective: request.Perspective, Length: request.Length, Detail: request.Detail,
@@ -137,35 +138,35 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		CustomInstruction: request.CustomInstruction,
 	})
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if status != "ready" {
-		return NarrativeSettings{}, WorldSummary{}, ErrWorldNotReady
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldNotReady
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
-	if world.savePending {
-		return NarrativeSettings{}, WorldSummary{}, ErrWorldBusy
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
+	if worldRT.savePending {
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	defer store.db.Close()
 	if err := memoryReady(ctx, store.db); err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if request.Policies != nil {
 		settings.Policies = *request.Policies
 	} else {
 		current, err := loadNarrativeSettings(ctx, store.db)
 		if err != nil {
-			return NarrativeSettings{}, WorldSummary{}, err
+			return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 		}
 		settings.Policies = current.Policies
 		// Legacy clients submit writing preferences through the existing field.
@@ -176,28 +177,28 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	settings = migrateWritingPreference(settings)
 	settings, err = validateNarrativeSettings(settings)
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if count, err := countActiveRuns(ctx, store.db); err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	} else if count > 0 {
-		return NarrativeSettings{}, WorldSummary{}, ErrWorldBusy
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy
 	}
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	defer tx.Rollback()
 	currentEpochText, err := metaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
 	if err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if request.ExpectedContextEpoch > 0 && request.ExpectedContextEpoch != currentEpoch {
-		return NarrativeSettings{}, WorldSummary{}, ErrVersionConflict
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, ErrVersionConflict
 	}
 	values := map[string]string{
 		"behavior_policies":            wire.MarshalJSON(settings.Policies),
@@ -212,14 +213,14 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	}
 	for key, value := range values {
 		if err := metaSetTx(ctx, tx, key, value); err != nil {
-			return NarrativeSettings{}, WorldSummary{}, err
+			return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if err := a.touchWorld(ctx, worldID); err != nil {
-		return NarrativeSettings{}, WorldSummary{}, err
+		return NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	summary, err := a.worldSummary(ctx, worldID)
 	return settings, summary, err

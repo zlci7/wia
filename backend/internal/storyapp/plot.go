@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // Plot content is frozen with each world. Conditions are narrative material,
@@ -58,7 +59,7 @@ type plotActionResult struct {
 	ActorInScene *bool `json:"actor_in_scene,omitempty"`
 }
 
-func plotActionPresence(current []string, events []Event, outcomes []plotActionResult) ([]string, error) {
+func plotActionPresence(current []string, events []wiaworld.Event, outcomes []plotActionResult) ([]string, error) {
 	ids := append([]string{}, current...)
 	seen := map[string]bool{}
 	for _, o := range outcomes {
@@ -201,7 +202,7 @@ func plotContext(snapshot worldSnapshot) string {
 
 // A single node is settled per turn. The clock stops at that node; a subsequent
 // input can continue waiting against the newly committed consequences.
-func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, output *turnOutput) ([]Event, error) {
+func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, output *turnOutput) ([]wiaworld.Event, error) {
 	if snapshot.Plot == nil {
 		return nil, nil
 	}
@@ -247,10 +248,10 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	return visible, nil
 }
 
-func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, rootID string, result plotResolution, output *turnOutput) ([]Event, error) {
-	var visible []Event
+func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, rootID string, result plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
+	var visible []wiaworld.Event
 	if result.Status != "deferred" {
-		event := Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
+		event := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, event)
 		for i, p := range result.Projections {
 			// Projection IDs have their own text. Possessing their ID never grants the
@@ -261,7 +262,7 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 			projection.SourceType = "plot_observed"
 			projection.ProjectionParentID = event.EventID
 			output.Events = append(output.Events, projection)
-			output.Perceptions = append(output.Perceptions, Perception{RecipientID: p.Recipient, SourceEventID: projection.EventID, SourceType: "plot_observed", Content: p.Content, Stage: 4, SceneVersion: output.SceneVersion, CreatedAt: event.CreatedAt})
+			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: p.Recipient, SourceEventID: projection.EventID, SourceType: "plot_observed", Content: p.Content, Stage: 4, SceneVersion: output.SceneVersion, CreatedAt: event.CreatedAt})
 			if p.Recipient == "player" {
 				visible = append(visible, projection)
 			}
@@ -291,15 +292,15 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 	return visible, nil
 }
 
-func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOutput) contextMaterial {
+func composePlot(snapshot worldSnapshot, run wiaworld.Run, node PlotNode, output *turnOutput) contextMaterial {
 	snapshot.SceneViews = output.SceneViews
-	snapshot.Characters = append([]Character{}, snapshot.Characters...)
+	snapshot.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	for i := range snapshot.Characters {
 		snapshot.Characters[i].InScene = slices.Contains(output.SceneCharacters, snapshot.Characters[i].EntityID)
 	}
 	material := contextMaterial{
 		System:          behaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
-		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
+		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(wiaworld.PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
 		RequiredSources: eventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
@@ -314,7 +315,7 @@ func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOut
 	return material
 }
 
-func plotEvidenceSections(events []Event) []contextSection {
+func plotEvidenceSections(events []wiaworld.Event) []contextSection {
 	var result []contextSection
 	for _, e := range events {
 		if e.EventType == "turn_settled" {
@@ -345,7 +346,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 		return fmt.Errorf("%w: plot_deferred_effects", ErrGenerationFailed)
 	}
 	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
-	for _, e := range append(append([]Event{}, snapshot.Events...), output.Events...) {
+	for _, e := range append(append([]wiaworld.Event{}, snapshot.Events...), output.Events...) {
 		known[e.EventID] = true
 	}
 	// Retained views and node results are provided even when their originating
@@ -386,12 +387,12 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	return nil
 }
 
-func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, rootID string, resolution plotResolution, output *turnOutput) ([]Event, error) {
+func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *turnOutput) ([]wiaworld.Event, error) {
 	base := snapshot
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
-	base.Characters = append([]Character{}, snapshot.Characters...)
-	base.Perceptions = map[string][]Perception{}
+	base.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
+	base.Perceptions = map[string][]wiaworld.Perception{}
 	base.Sources = map[string]sourceMetadata{}
 	for id, source := range snapshot.Sources {
 		base.Sources[id] = source
@@ -400,14 +401,14 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		base.Sources[e.EventID] = sourceMetadata{ID: e.EventID, Actor: e.ActorID, Kind: e.EventType, RunID: e.RunID, Stage: e.Stage, SceneVersion: e.SceneVersion}
 	}
 	for id, items := range snapshot.Perceptions {
-		base.Perceptions[id] = append([]Perception{}, items...)
+		base.Perceptions[id] = append([]wiaworld.Perception{}, items...)
 	}
 	for _, p := range output.Perceptions {
 		base.Perceptions[p.RecipientID] = append(base.Perceptions[p.RecipientID], p)
 	}
 	for _, e := range output.Events {
 		if e.EventType == "npc_dialogue" {
-			base.Perceptions[e.ActorID] = append(base.Perceptions[e.ActorID], Perception{RecipientID: e.ActorID, SourceEventID: e.EventID, SourceType: "own_speech", Content: e.Content, Stage: e.Stage, SceneVersion: e.SceneVersion})
+			base.Perceptions[e.ActorID] = append(base.Perceptions[e.ActorID], wiaworld.Perception{RecipientID: e.ActorID, SourceEventID: e.EventID, SourceType: "own_speech", Content: e.Content, Stage: e.Stage, SceneVersion: e.SceneVersion})
 		}
 	}
 	inputs := map[string]npcStageInput{}
@@ -427,13 +428,13 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	}
 	extra := turnOutput{SceneVersion: output.SceneVersion}
 	allowed := map[string][]string{}
-	var visible []Event
+	var visible []wiaworld.Event
 	for _, c := range snapshot.Characters {
 		d, ok := decisions[c.EntityID]
 		if !ok {
 			continue
 		}
-		observers := []Character{c}
+		observers := []wiaworld.Character{c}
 		audience := []string{c.EntityID}
 		if slices.Contains(output.SceneCharacters, c.EntityID) {
 			observers = nil
@@ -442,7 +443,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 					observers = append(observers, other)
 				}
 			}
-			audience = append([]string{"player"}, characterIDs(observers)...)
+			audience = append([]string{"player"}, wiaworld.CharacterIDs(observers)...)
 		}
 		start := len(extra.Events)
 		appendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)

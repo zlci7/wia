@@ -10,6 +10,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type suggestionProbe struct {
@@ -38,7 +39,7 @@ func (g *suggestionProbe) GenerateText(ctx context.Context, r model.TextRequest)
 	return model.TextResponse{Text: `{"items":["我向老板打招呼。","我看看窗外。","我在一旁稍作停留。"]}`}, nil
 }
 
-func suggestionWorldFixture(t *testing.T, g model.TextGenerator) (*App, WorldSummary, SuggestionRequest) {
+func suggestionWorldFixture(t *testing.T, g model.TextGenerator) (*App, wiaworld.WorldSummary, SuggestionRequest) {
 	t.Helper()
 	a := newTestApp(t, g)
 	w, err := a.CreateWorld(context.Background(), "suggestions", "guided", "旅人", "寻找答案", true)
@@ -224,7 +225,7 @@ func TestSuggestionsFailedInputExcludedAndFailuresBounded(t *testing.T) {
 }
 
 func TestSuggestionComposerHidesOtherPeoplesKnowledge(t *testing.T) {
-	s := worldSnapshot{PlayerName: "你", Definition: gameDefinition{Background: "公开背景", Secret: "AUTHOR_SECRET"}, Characters: []Character{{EntityID: "npc:a", Name: "甲", Knowledge: "NPC_SECRET", Profile: "PRIVATE_PROFILE", InScene: true}}, LongMemory: map[string]memoryContext{"npc:a": {Digest: MemoryDigest{Content: "PRIVATE_DIGEST"}}, "player": {Digest: MemoryDigest{Content: "玩家回顾"}, Tail: []MemorySource{{ID: "visible", Content: "公开信息"}}}}}
+	s := worldSnapshot{PlayerName: "你", Definition: gameDefinition{Background: "公开背景", Secret: "AUTHOR_SECRET"}, Characters: []wiaworld.Character{{EntityID: "npc:a", Name: "甲", Knowledge: "NPC_SECRET", Profile: "PRIVATE_PROFILE", InScene: true}}, LongMemory: map[string]memoryContext{"npc:a": {Digest: MemoryDigest{Content: "PRIVATE_DIGEST"}}, "player": {Digest: MemoryDigest{Content: "玩家回顾"}, Tail: []MemorySource{{ID: "visible", Content: "公开信息"}}}}}
 	m := composeSuggestions(s)
 	raw, _ := json.Marshal(m)
 	for _, secret := range []string{"AUTHOR_SECRET", "NPC_SECRET", "PRIVATE_PROFILE", "PRIVATE_DIGEST"} {

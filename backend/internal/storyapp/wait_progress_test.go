@@ -8,6 +8,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type waitResultGenerator struct{ host hostResult }
@@ -60,9 +61,9 @@ func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 }
 
 func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
-	s := worldSnapshot{Summary: WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
-	s.Events = []Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
-	events := []Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
+	s := worldSnapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
+	s.Events = []wiaworld.Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
+	events := []wiaworld.Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
 	for _, tc := range []struct {
 		name    string
 		minutes int
@@ -74,7 +75,7 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := waitResultGenerator{hostResult{TimeMinutes: tc.minutes, Scene: "客栈", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}, InterruptSources: tc.ids}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, Run{RunID: "run"}, turnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
+			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "run"}, turnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
 			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%t error=%v", tc.valid, err)
 			}
@@ -84,10 +85,10 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 
 func TestRequestedWaitIsAnUpperBound(t *testing.T) {
 	for _, plot := range []*PlotDefinition{nil, lanternPlotDefinition()} {
-		s := worldSnapshot{Summary: WorldSummary{Clock: "第 1 日 19:00"}, Plot: plot, PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
+		s := worldSnapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: plot, PlotProgress: PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}}
 		for _, minutes := range []int{5, 30} {
 			g := waitResultGenerator{hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, Run{RunID: "wait"}, turnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
+			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "wait"}, turnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
 			if (err == nil) != (minutes == 5) {
 				t.Fatalf("plot=%t minutes=%d err=%v", plot != nil, minutes, err)
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	wiaworld "gameagent/backend/internal/world"
 	"strconv"
 	"strings"
 )
@@ -88,5 +89,5 @@ func expandCorrection(ctx context.Context, db *sql.DB, c *Correction) error {
 }
 
 func (c Correction) affects(eventID string) bool {
-	return eventID == c.TargetID || containsID(c.Dependents, eventID)
+	return eventID == c.TargetID || wiaworld.ContainsID(c.Dependents, eventID)
 }

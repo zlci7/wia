@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
@@ -63,8 +64,8 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 	snapshot := worldSnapshot{
 		PlayerName: "旅人",
 		Definition: gameDefinition{Background: "旧渡口客栈的雨夜"},
-		Summary:    WorldSummary{WorldID: "world_projection", GameID: GameID, Clock: "第 1 日 19:00"},
-		Messages:   []Message{{MessageID: "msg:1", Kind: "narrative", Content: "雨声敲着窗沿。"}},
+		Summary:    wiaworld.WorldSummary{WorldID: "world_projection", GameID: GameID, Clock: "第 1 日 19:00"},
+		Messages:   []wiaworld.Message{{MessageID: "msg:1", Kind: "narrative", Content: "雨声敲着窗沿。"}},
 		LongMemory: map[string]memoryContext{"player": {Archive: archive, Tail: archive}},
 	}
 	material := composeSuggestions(snapshot)
@@ -78,7 +79,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 		if strings.Contains(material.Required, record.ID) {
 			t.Fatal("backlog group entered required material", record.ID)
 		}
-		if !containsID(material.DeclinedSources, record.ID) || containsID(material.RecallSources, record.ID) {
+		if !wiaworld.ContainsID(material.DeclinedSources, record.ID) || wiaworld.ContainsID(material.RecallSources, record.ID) {
 			t.Fatal("backlog group must be reported as declined, not as retrieved", record.ID)
 		}
 	}
@@ -134,7 +135,7 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	snapshot := worldSnapshot{
 		PlayerName: "旅人",
 		Definition: gameDefinition{Background: "背景"},
-		Summary:    WorldSummary{WorldID: "world_window", Clock: "第 1 日 19:00"},
+		Summary:    wiaworld.WorldSummary{WorldID: "world_window", Clock: "第 1 日 19:00"},
 		LongMemory: map[string]memoryContext{"player": {Archive: tail, Tail: tail}},
 	}
 	material := withLongMemory(base, snapshot, "player", "")
@@ -152,7 +153,7 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	oversized := worldSnapshot{
 		PlayerName: "旅人",
 		Definition: gameDefinition{Background: "背景"},
-		Summary:    WorldSummary{WorldID: "world_oversized", Clock: "第 1 日 19:00"},
+		Summary:    wiaworld.WorldSummary{WorldID: "world_oversized", Clock: "第 1 日 19:00"},
 		LongMemory: map[string]memoryContext{"player": {
 			Archive: []MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
 			Tail:    []MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
@@ -195,14 +196,14 @@ func TestFailedMaintenanceKeepsStoredHistoryAndWatermark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.prepareLongMemory(ctx, store, &snapshot, Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{fail: true}); err != nil {
+	if err = a.prepareLongMemory(ctx, store, &snapshot, wiaworld.Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{fail: true}); err != nil {
 		t.Fatal(err)
 	}
 	lagging := snapshot.LongMemory["npc:innkeeper"]
 	if lagging.Digest.Through != 0 || len(lagging.Tail) != 12 || len(lagging.Archive) != 12 {
 		t.Fatalf("failed maintenance changed stored history: through=%d tail=%d archive=%d", lagging.Digest.Through, len(lagging.Tail), len(lagging.Archive))
 	}
-	if err = a.prepareLongMemory(ctx, store, &snapshot, Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{}); err != nil {
+	if err = a.prepareLongMemory(ctx, store, &snapshot, wiaworld.Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{}); err != nil {
 		t.Fatal(err)
 	}
 	recovered := snapshot.LongMemory["npc:innkeeper"]

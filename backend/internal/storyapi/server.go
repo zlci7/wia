@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/storyapp"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type Options struct {
@@ -350,7 +351,7 @@ func (s *Server) world(w http.ResponseWriter, r *http.Request, id string) {
 			writeAppError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": storyapp.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": storyapp.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders, "bystander_refs": snapshot.Definition.BystanderRefs})
+		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": storyapp.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": wiaworld.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders, "bystander_refs": snapshot.Definition.BystanderRefs})
 	case "DELETE":
 		raw := strings.TrimSpace(r.URL.Query().Get("expected_active_revision"))
 		expectedRevision, err := strconv.ParseInt(raw, 10, 64)
@@ -483,7 +484,7 @@ func (s *Server) entities(w http.ResponseWriter, r *http.Request, id string) {
 		writeAppError(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"entities": storyapp.PublicCharacterViews(entities)})
+	writeJSON(w, 200, map[string]any{"entities": wiaworld.PublicCharacterViews(entities)})
 }
 func (s *Server) activate(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method != "POST" {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 	"time"
@@ -113,7 +114,7 @@ func TestPlotActionPresencePersistsAndControlsNextRound(t *testing.T) {
 
 func TestPlotPresenceRejectsUnresolvedMovement(t *testing.T) {
 	p := false
-	events := []Event{{EventID: "a", ActorID: "npc:a", EventType: "npc_action_intent"}}
+	events := []wiaworld.Event{{EventID: "a", ActorID: "npc:a", EventType: "npc_action_intent"}}
 	for _, status := range []string{"failed", "not_executed"} {
 		if _, err := plotActionPresence([]string{"npc:a"}, events, []plotActionResult{{hostActionResult: hostActionResult{ActionID: "a", Status: status}, ActorInScene: &p}}); err == nil {
 			t.Fatal("unresolved movement accepted")
@@ -161,7 +162,7 @@ func (g actionConsistencyGenerator) GenerateText(ctx context.Context, req model.
 	case strings.Contains(req.System, "重要 NPC"):
 		return model.TextResponse{Text: `{"speech":"","action_intent":"","silent":true,"memory":""}`}, nil
 	case strings.Contains(req.System, "场景协调 Agent"):
-		var candidates []Event
+		var candidates []wiaworld.Event
 		raw := strings.SplitN(strings.SplitN(req.Input, "待裁定行动(JSON)：", 2)[1], "\n", 2)[0]
 		if err := json.Unmarshal([]byte(raw), &candidates); err != nil {
 			return model.TextResponse{}, err

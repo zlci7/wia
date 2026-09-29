@@ -12,6 +12,7 @@ import (
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type packPlotGenerator struct {
@@ -65,7 +66,7 @@ func (g *packPlotGenerator) GenerateText(ctx context.Context, req model.TextRequ
 	return r, err
 }
 
-func createPackWorld(t *testing.T, a *App, game string) WorldSummary {
+func createPackWorld(t *testing.T, a *App, game string) wiaworld.WorldSummary {
 	t.Helper()
 	p, err := a.Game(game)
 	if err != nil {
@@ -210,7 +211,7 @@ func TestM2RealWaitIntent(t *testing.T) {
 		s.Characters[i].InScene = s.Characters[i].EntityID == "npc:innkeeper"
 	}
 	for i := 0; i < 2; i++ {
-		_, _, err := a.resolveTurnIntent(context.Background(), a.generator, s, Run{RunID: fmt.Sprint("wait-probe", i), Input: "我在安全位置等待半小时，不参加维修，也不替任何人签字。"})
+		_, _, err := a.resolveTurnIntent(context.Background(), a.generator, s, wiaworld.Run{RunID: fmt.Sprint("wait-probe", i), Input: "我在安全位置等待半小时，不参加维修，也不替任何人签字。"})
 		if err != nil {
 			t.Error(err)
 		}

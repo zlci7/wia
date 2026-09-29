@@ -12,10 +12,11 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func contextFixture() worldSnapshot {
-	s := worldSnapshot{Summary: WorldSummary{GameID: GameID, WorldID: "fixture", Scene: "不应共享的全知旧场景"}, SceneVersion: 1, Characters: lanternDefinition().Characters, Perceptions: map[string][]Perception{}, Memories: map[string][]Memory{}, Sources: map[string]sourceMetadata{}}
+	s := worldSnapshot{Summary: wiaworld.WorldSummary{GameID: GameID, WorldID: "fixture", Scene: "不应共享的全知旧场景"}, SceneVersion: 1, Characters: lanternDefinition().Characters, Perceptions: map[string][]wiaworld.Perception{}, Memories: map[string][]wiaworld.Memory{}, Sources: map[string]sourceMetadata{}}
 	s.SceneViews = initialSceneViews(s)
 	return s
 }
@@ -40,9 +41,9 @@ func readContextSnapshot(t *testing.T, a *App, id string) worldSnapshot {
 
 func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
 	s := contextFixture()
-	run := Run{RunID: "run"}
+	run := wiaworld.Run{RunID: "run"}
 	intent := turnIntent{Visibility: "private", AddresseeID: "npc:innkeeper"}
-	output := turnOutput{Events: []Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
+	output := turnOutput{Events: []wiaworld.Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
 	for _, test := range []struct {
 		name            string
 		ids, recipients []string
@@ -75,7 +76,7 @@ func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
 
 func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T) {
 	s := contextFixture()
-	s.Memories["npc:innkeeper"] = []Memory{{SourceEventID: "secret", Content: "SECRET_MEMORY"}}
+	s.Memories["npc:innkeeper"] = []wiaworld.Memory{{SourceEventID: "secret", Content: "SECRET_MEMORY"}}
 	s.SceneViews[1].Content = "PRIVATE_SCENE"
 	material := composeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", npcStageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
 	req, _, err := (ContextComposer{}).Build(material, material.System, 1024)
@@ -125,7 +126,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	if _, ok := eventByID(s.Events, r.RunID+":input"); ok {
 		t.Fatal("fixture did not push event outside window")
 	}
-	s.Perceptions["npc:mercenary"] = append(s.Perceptions["npc:mercenary"], Perception{SourceEventID: "missing"})
+	s.Perceptions["npc:mercenary"] = append(s.Perceptions["npc:mercenary"], wiaworld.Perception{SourceEventID: "missing"})
 	if _, err := loadSourceMetadata(context.Background(), store.db, s); !errors.Is(err, ErrContextSourceMissing) {
 		t.Fatalf("missing=%v", err)
 	}
@@ -194,8 +195,8 @@ func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
 func TestLegacySceneViewsUseOnlyAuthorizedRecords(t *testing.T) {
 	s := contextFixture()
 	s.Summary.TurnSeq = 10
-	s.Events = []Event{{EventID: "public-result", EventType: "turn_settled", Content: "茶在桌上。"}, {EventID: "secret", EventType: "npc_action_result", Content: "隐藏信件。"}}
-	s.Perceptions["npc:mercenary"] = []Perception{{SourceEventID: "public-result", SourceType: "action_succeeded", Content: "茶在桌上。"}}
+	s.Events = []wiaworld.Event{{EventID: "public-result", EventType: "turn_settled", Content: "茶在桌上。"}, {EventID: "secret", EventType: "npc_action_result", Content: "隐藏信件。"}}
+	s.Perceptions["npc:mercenary"] = []wiaworld.Perception{{SourceEventID: "public-result", SourceType: "action_succeeded", Content: "茶在桌上。"}}
 	s.SceneViews = initialSceneViews(s)
 	for _, id := range []string{"player", "npc:mercenary"} {
 		if sceneFor(s, id) != "茶在桌上。" {
@@ -239,7 +240,7 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 }
 
 func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
-	events := narrativeEvents([]Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", NarrativeSettings{})
+	events := narrativeEvents([]wiaworld.Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", NarrativeSettings{})
 	if len(events) != 1 || events[0].SpeechScope != "public_current_scene" {
 		t.Fatalf("%+v", events)
 	}
@@ -247,7 +248,7 @@ func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
 
 func TestNarrativeEventsPreservePlayerAudibility(t *testing.T) {
 	for _, test := range []struct{ source, scope string }{{"player_public", "public_current_scene"}, {"player_private", "private_recipient"}} {
-		events := narrativeEvents([]Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", NarrativeSettings{})
+		events := narrativeEvents([]wiaworld.Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", NarrativeSettings{})
 		if len(events) != 1 || events[0].SpeechScope != test.scope {
 			t.Fatalf("%+v", events)
 		}
@@ -256,12 +257,12 @@ func TestNarrativeEventsPreservePlayerAudibility(t *testing.T) {
 
 func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
 	s := contextFixture()
-	events := []Event{
+	events := []wiaworld.Event{
 		{EventID: "valid", RunID: "current", Stage: 1, EventType: "player_attempt"},
 		{EventID: "foreign", RunID: "foreign", Stage: 1, EventType: "player_attempt"},
 		{EventID: "future", RunID: "current", Stage: 9, EventType: "npc_dialogue"},
 	}
-	sources := sceneSources(s, Run{RunID: "current"}, turnIntent{Visibility: "public"}, events)
+	sources := sceneSources(s, wiaworld.Run{RunID: "current"}, turnIntent{Visibility: "public"}, events)
 	var valid bool
 	for _, source := range sources {
 		if source.ID == "foreign" || source.ID == "future" {

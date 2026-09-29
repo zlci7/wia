@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type plotTestGenerator struct {
@@ -67,7 +68,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 				ids = strings.Split(value, ",")
 			}
 		}
-		var candidates []Event
+		var candidates []wiaworld.Event
 		raw := strings.SplitN(strings.SplitN(req.Input, "待裁定行动(JSON)：", 2)[1], "\n", 2)[0]
 		if err := json.Unmarshal([]byte(raw), &candidates); err != nil {
 			return model.TextResponse{}, err
@@ -92,7 +93,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		result := plotResolution{Status: "occurred", Content: "作者隐藏事实：信使去向", SourceIDs: []string{"definition:" + definitionRef}, Projections: []plotProjection{{Recipient: "player", Content: "你听见码头铃声。"}}, DecisionRequests: []string{}}
 		result.Projections[0].Scene = "你仍在客栈，刚听见码头铃声。"
 		if g.intervene && node.ID == "courier_window" {
-			var events []Event
+			var events []wiaworld.Event
 			data := strings.SplitN(strings.SplitN(req.Input, "本轮已确认记录：", 2)[1], "\n", 2)[0]
 			if err := json.Unmarshal([]byte(data), &events); err != nil {
 				return model.TextResponse{}, err
@@ -125,7 +126,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		return model.TextResponse{Text: wire.MarshalJSON(result)}, nil
 	}
 	if strings.Contains(req.System, "世界剧情行动协调器") {
-		var records []Event
+		var records []wiaworld.Event
 		raw := strings.SplitN(strings.SplitN(req.Input, "待处理NPC记录：", 2)[1], "\n", 2)[0]
 		if err := json.Unmarshal([]byte(raw), &records); err != nil {
 			return model.TextResponse{}, err
@@ -324,7 +325,7 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 }
 
 func TestPlotSceneSourcesPreserveAudience(t *testing.T) {
-	output := turnOutput{SceneVersion: 1, SceneViews: []SceneView{{Recipient: "player", Content: "客栈", Version: 1}, {Recipient: "npc:innkeeper", Content: "柜台", Version: 1}}, Events: []Event{{EventID: "author", Content: "隐藏答案"}}, Perceptions: []Perception{{RecipientID: "npc:innkeeper", SourceEventID: "private", Content: "私人结果", Stage: 4}, {RecipientID: "player", SourceEventID: "public", Content: "铃声", Stage: 4}, {RecipientID: "npc:innkeeper", SourceEventID: "old", Content: "早前私聊", Stage: 1}}}
+	output := turnOutput{SceneVersion: 1, SceneViews: []SceneView{{Recipient: "player", Content: "客栈", Version: 1}, {Recipient: "npc:innkeeper", Content: "柜台", Version: 1}}, Events: []wiaworld.Event{{EventID: "author", Content: "隐藏答案"}}, Perceptions: []wiaworld.Perception{{RecipientID: "npc:innkeeper", SourceEventID: "private", Content: "私人结果", Stage: 4}, {RecipientID: "player", SourceEventID: "public", Content: "铃声", Stage: 4}, {RecipientID: "npc:innkeeper", SourceEventID: "old", Content: "早前私聊", Stage: 1}}}
 	sources := plotSceneSources(output, nil)
 	for _, id := range []string{"author", "private", "old", "view:npc:innkeeper", "future"} {
 		candidate := output

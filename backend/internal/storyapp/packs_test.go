@@ -17,6 +17,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func packFixture(t *testing.T, id string) string {
@@ -244,7 +245,7 @@ func (g *packGenerator) GenerateText(ctx context.Context, r model.TextRequest) (
 	case strings.Contains(r.System, "场景协调 Agent"):
 		start := strings.Index(r.Input, "待裁定行动(JSON)：") + len("待裁定行动(JSON)：")
 		end := strings.Index(r.Input[start:], "\n")
-		var candidates []Event
+		var candidates []wiaworld.Event
 		_ = json.Unmarshal([]byte(r.Input[start:start+end]), &candidates)
 		outcomes := []hostActionResult{}
 		for _, c := range candidates {
@@ -311,7 +312,7 @@ func TestPackRequestsUseFrozenDefinitionAndScopedKnowledge(t *testing.T) {
 func TestPackCorrectionAndLegacyIsolation(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &packGenerator{})
-	worlds := map[string]WorldSummary{}
+	worlds := map[string]wiaworld.WorldSummary{}
 	for _, id := range []string{"lantern-dusk", "orbital-repair"} {
 		g, _ := a.Game(id)
 		w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: id, ExpectedRevision: g.Revision, RequestKey: id})

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	wiaworld "gameagent/backend/internal/world"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -319,7 +320,7 @@ func loadPack(root string) (loadedPack, error) {
 		def.InitialLocations[npc.EntityID] = npc.InitialLocation
 		// The character's authored dialogue samples belong to its definition, so anything
 		// reading the loaded package sees them without a second lookup.
-		def.Characters = append(def.Characters, Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples, InScene: npc.InitialLocation == p.InitialLocation})
+		def.Characters = append(def.Characters, wiaworld.Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples, InScene: npc.InitialLocation == p.InitialLocation})
 	}
 	if p.Plot != nil {
 		if err := validatePlot(*p.Plot, PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}); err != nil {
@@ -534,7 +535,7 @@ func (a *App) setPack(id string, pack loadedPack) {
 
 // characterSpeakingExamples reads the samples a frozen definition recorded for one
 // character, so the running turn uses the world's own version.
-func characterSpeakingExamples(characters []Character, entityID string) ([]string, bool) {
+func characterSpeakingExamples(characters []wiaworld.Character, entityID string) ([]string, bool) {
 	for _, character := range characters {
 		if character.EntityID == entityID {
 			if len(character.SpeakingExamples) == 0 {

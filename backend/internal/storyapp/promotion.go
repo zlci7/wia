@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"strconv"
 	"strings"
 )
@@ -109,44 +110,44 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 
 // PromoteCharacter turns one passers-by into an important character in a single world
 // transaction: identity, chosen experience, scene membership and epoch move together.
-func (a *App) PromoteCharacter(ctx context.Context, worldID string, request PromotionRequest) (Character, error) {
+func (a *App) PromoteCharacter(ctx context.Context, worldID string, request PromotionRequest) (wiaworld.Character, error) {
 	request.BystanderID = wire.Clean(request.BystanderID)
 	if wire.Clean(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedContextEpoch < 1 || request.BystanderID == "" {
-		return Character{}, ErrInvalidRequest
+		return wiaworld.Character{}, ErrInvalidRequest
 	}
 	draft, err := validatePromotionDraft(request.Draft)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if status != "ready" {
-		return Character{}, ErrWorldNotReady
+		return wiaworld.Character{}, ErrWorldNotReady
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
-	if world.savePending {
-		return Character{}, ErrWorldBusy
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
+	if worldRT.savePending {
+		return wiaworld.Character{}, ErrWorldBusy
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	defer store.db.Close()
 	if err := memoryReady(ctx, store.db); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if count, err := countActiveRuns(ctx, store.db); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	} else if count > 0 {
-		return Character{}, ErrWorldBusy
+		return wiaworld.Character{}, ErrWorldBusy
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	// A repeat request returns the character this world already created for that
 	// passer-by. The comparison uses the normalized request, so blanks or spacing in the
@@ -154,17 +155,17 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	early := request
 	early.SourceIDs = normalizedSourceIDs(request.SourceIDs)
 	if existing, found, err := promotedCharacter(ctx, store, snapshot, request.BystanderID, request.RequestKey, promotionRequestHash(early, early.SourceIDs)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	} else if found {
 		return existing, nil
 	}
 	bystander, ok := bystanderByID(snapshot.Definition.BystanderRefs, request.BystanderID)
 	if !ok {
-		return Character{}, ErrContentNotFound
+		return wiaworld.Character{}, ErrContentNotFound
 	}
 	experiences, err := readBystanderExperiences(ctx, store.db, bystander.BystanderID)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	authorized := map[string]bool{}
 	for _, record := range experiences {
@@ -173,7 +174,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	selected := normalizedSourceIDs(request.SourceIDs)
 	for _, id := range selected {
 		if !authorized[id] {
-			return Character{}, fmt.Errorf("%w: %s is not an experience of this person", ErrContentInvalid, id)
+			return wiaworld.Character{}, fmt.Errorf("%w: %s is not an experience of this person", ErrContentInvalid, id)
 		}
 	}
 	// The authoritative hash uses the validated selection, so a repeat whose source list
@@ -181,39 +182,39 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	requestHash := promotionRequestHash(request, selected)
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	defer tx.Rollback()
 	currentEpochText, err := metaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if currentEpoch != request.ExpectedContextEpoch {
-		return Character{}, ErrVersionConflict
+		return wiaworld.Character{}, ErrVersionConflict
 	}
 	entityID, definitionID := promotionIdentity(bystander, snapshot.Definition)
 	// A repeated request key with the same payload is idempotent; a different payload
 	// is a conflict rather than a second promotion.
 	rows, err := tx.QueryContext(ctx, `SELECT value FROM meta WHERE key LIKE 'promotion:%'`)
 	if err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	records := []string{}
 	for rows.Next() {
 		var value string
 		if err = rows.Scan(&value); err != nil {
 			rows.Close()
-			return Character{}, err
+			return wiaworld.Character{}, err
 		}
 		records = append(records, value)
 	}
 	rows.Close()
 	if err = rows.Err(); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	for _, value := range records {
 		var record struct {
@@ -221,24 +222,24 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 			RequestHash string `json:"request_hash"`
 		}
 		if json.Unmarshal([]byte(value), &record) == nil && record.RequestKey == request.RequestKey && record.RequestHash != requestHash {
-			return Character{}, ErrIdempotencyConflict
+			return wiaworld.Character{}, ErrIdempotencyConflict
 		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`,
 		entityID, definitionID, bystander.Name, draft.Role, draft.Profile, draft.Knowledge, wire.BoolInt(bystanderInScene(snapshot, bystander))); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	// The origin record states what the character came from and which of the person's
 	// own experiences were carried over.
 	for _, origin := range selected {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
 			entityID, "bystander_experience", origin, wire.NowText()); err != nil {
-			return Character{}, err
+			return wiaworld.Character{}, err
 		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
 		entityID, "bystander", bystander.BystanderID, wire.NowText()); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	for key, value := range map[string]string{
 		"avatar:" + entityID:              bystander.Avatar,
@@ -247,7 +248,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		"promoted_from:" + entityID:       bystander.BystanderID,
 	} {
 		if err = metaSetTx(ctx, tx, key, value); err != nil {
-			return Character{}, err
+			return wiaworld.Character{}, err
 		}
 	}
 	if entityID != bystander.BystanderID && len(selected) > 0 {
@@ -259,7 +260,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 			args = append(args, id)
 		}
 		if _, err = tx.ExecContext(ctx, `UPDATE perceptions SET recipient_id=? WHERE recipient_id=? AND source_event_id IN (`+placeholders+`)`, args...); err != nil {
-			return Character{}, err
+			return wiaworld.Character{}, err
 		}
 	}
 	// The promoted person needs a committed scene view of their own: the world's
@@ -282,14 +283,14 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		views = append(views, SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
 	}
 	if err = metaSetTx(ctx, tx, "scene_views", wire.MarshalJSON(views)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(nextSceneVersion, 10)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	remarks := wire.MarshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "promotion:"+entityID, remarks); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	// The person leaves the passer-by list; their position does not change.
 	remaining := []PackBystander{}
@@ -302,25 +303,25 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		names = append(names, item.Name)
 	}
 	if err = metaSetTx(ctx, tx, "bystander_refs", wire.MarshalJSON(remaining)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "bystanders", wire.MarshalJSON(names)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "context_epoch", strconv.FormatInt(currentEpoch+1, 10)); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	// Derived optional material built on the previous roster is no longer a basis.
 	if _, err = tx.ExecContext(ctx, `DELETE FROM meta WHERE key='suggestion_set'`); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
 	if err = tx.Commit(); err != nil {
-		return Character{}, err
+		return wiaworld.Character{}, err
 	}
-	return Character{EntityID: entityID, DefinitionID: definitionID, Name: bystander.Name, Role: draft.Role, Profile: draft.Profile, Knowledge: draft.Knowledge, InitialConcerns: draft.InitialConcerns, InScene: bystanderInScene(snapshot, bystander)}, nil
+	return wiaworld.Character{EntityID: entityID, DefinitionID: definitionID, Name: bystander.Name, Role: draft.Role, Profile: draft.Profile, Knowledge: draft.Knowledge, InitialConcerns: draft.InitialConcerns, InScene: bystanderInScene(snapshot, bystander)}, nil
 }
 
 func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
@@ -383,14 +384,14 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 // promotedCharacter finds the character a previous promotion created for one
 // passer-by. The same request key returns that character; a different key for the
 // same person is a conflict instead of a second promotion.
-func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (Character, bool, error) {
+func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
 	for _, character := range snapshot.Characters {
 		raw, err := metaGet(ctx, store.db, "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
 		if err != nil {
-			return Character{}, false, err
+			return wiaworld.Character{}, false, err
 		}
 		var record struct {
 			BystanderID string `json:"bystander_id"`
@@ -401,11 +402,11 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 			continue
 		}
 		if record.RequestKey != "" && (record.RequestKey != requestKey || (requestHash != "" && record.RequestHash != requestHash)) {
-			return Character{}, false, ErrIdempotencyConflict
+			return wiaworld.Character{}, false, ErrIdempotencyConflict
 		}
 		return character, true, nil
 	}
-	return Character{}, false, nil
+	return wiaworld.Character{}, false, nil
 }
 
 // normalizedSourceIDs trims the chosen experiences and drops blanks, so the request hash

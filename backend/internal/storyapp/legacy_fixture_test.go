@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	// lanternFixtureDefinition is the definition a fixture world starts from. It is derived
 	// from the real package whenever one is loaded, so the fixture cannot drift away from
 	// what the shipped story actually says.
@@ -14,17 +15,17 @@ func lanternFixtureDefinition(pack loadedPack) gameDefinition {
 	return def
 }
 
-func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (WorldSummary, error) {
+func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (wiaworld.WorldSummary, error) {
 	p, ok := a.pack(GameID)
 	if !ok {
-		return WorldSummary{}, ErrWorldNotFound
+		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
 	p.Definition = lanternFixtureDefinition(p)
 	if mode == "" {
 		mode = p.Definition.Summary.Mode
 	}
 	if mode != "open" && mode != "guided" {
-		return WorldSummary{}, ErrInvalidRequest
+		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	p.Definition.Summary.Mode = mode
 	request := CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("fixture"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate}
@@ -49,7 +50,7 @@ func lanternDefinition() gameDefinition {
 			Scene:   "旧渡口客栈",
 			Clock:   "第 1 日 19:00",
 			Secret:  "沈岚在柜台下藏着一枚染血的信蜡，知道失踪信使曾在今晚来过；铁杉只注意到有人和沈岚低声交谈过，不知道谈话内容。",
-			Characters: []Character{
+			Characters: []wiaworld.Character{
 				{EntityID: "npc:innkeeper", DefinitionID: "innkeeper.v1", Name: "沈岚", Role: "客栈老板", Profile: "谨慎、善于观察，不愿让客人恐慌。她熟悉旧渡口的每一条消息，遇到危险时先保护客栈和无辜者。", InitialConcerns: "今晚的异常让她担心客栈和客人的安全。她想知道还有多少时间能准备，也想弄清眼前这个陌生人会不会把麻烦带进店里；对自己的发现只说到有把握的程度。", SpeakingExamples: []string{"先把雨衣挂上，别站在门口灌风。", "这话我只说一遍：今晚店里不出事，比什么都强。"}, Knowledge: "知道失踪信使曾在今晚来过；知道柜台下的染血信蜡，但不会主动向陌生人承认。", InScene: true},
 				{EntityID: "npc:mercenary", DefinitionID: "mercenary.v1", Name: "铁杉", Role: "佣兵", Profile: "寡言、务实、对危险敏感。会根据自己看见和听见的迹象判断，不会凭空知道别人的秘密。", InitialConcerns: "他察觉到的异常要么是危险，要么与他无关，他想在事情变大之前分清是哪一种；不愿替别人出头，也看不惯有人在自己眼皮底下糊弄。", SpeakingExamples: []string{"坐这儿。有事说事。", "我听见了，别的不知道。"}, Knowledge: "看见客栈里的人进出和异常动静；不知道沈岚藏着什么。", InScene: true},
 			},

@@ -10,6 +10,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func seedMemoryHistory(t *testing.T, a *App, id string) {
@@ -82,7 +83,7 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	s, _ := openWorldDB(path)
 	snapshot, err := loadWorldSnapshot(ctx, s, 40)
 	if err == nil {
-		err = a.prepareLongMemory(ctx, s, &snapshot, Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{})
+		err = a.prepareLongMemory(ctx, s, &snapshot, wiaworld.Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{})
 	}
 	s.db.Close()
 	if err != nil {

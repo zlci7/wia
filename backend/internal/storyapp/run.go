@@ -13,6 +13,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type npcDecision struct {
@@ -196,92 +197,94 @@ type turnOutput struct {
 	SceneCharacters []string
 	SceneViews      []SceneView
 	PlotProgress    *PlotProgress
-	Events          []Event
-	Perceptions     []Perception
-	Memories        []Memory
-	// publicReplies and decisions carry stage state from the character stages to
-	// the coordination stage; they stay internal to the turn.
+	Events          []wiaworld.Event
+	Perceptions     []wiaworld.Perception
+	Memories        []wiaworld.
+		// publicReplies and decisions carry stage state from the character stages to
+		// the coordination stage; they stay internal to the turn.
+		Memory
+
 	publicReplies []string               `json:"-"`
 	decisions     map[string]npcDecision `json:"-"`
 }
 
-func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest) (Run, error) {
+func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest) (wiaworld.Run, error) {
 	request.Input = wire.Clean(request.Input)
 	request.RequestKey = strings.TrimSpace(request.RequestKey)
 	request.AddresseeID = wire.Clean(request.AddresseeID)
 	if request.RequestKey == "" || request.Input == "" || len([]rune(request.Input)) > 4000 {
-		return Run{}, ErrInvalidRequest
+		return wiaworld.Run{}, ErrInvalidRequest
 	}
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	store, err := openWorldDB(path)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	defer store.db.Close()
 	if existing, found, err := readRunByRequest(ctx, store.db, request.RequestKey); err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	} else if found {
 		if existing.RequestHash != a.hashRun(request) {
-			return Run{}, ErrIdempotencyConflict
+			return wiaworld.Run{}, ErrIdempotencyConflict
 		}
 		return existing, nil
 	}
 	activeID, activeRevision, err := a.activeWorld(ctx)
 	if err != nil || activeID != worldID {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if request.ExpectedActiveRevision > 0 && request.ExpectedActiveRevision != activeRevision {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if status != "ready" {
-		return Run{}, ErrWorldNotReady
+		return wiaworld.Run{}, ErrWorldNotReady
 	}
 	a.modelMu.RLock()
 	generator := a.generator
 	a.modelMu.RUnlock()
 	if generator == nil {
-		return Run{}, ErrModelNotConfigured
+		return wiaworld.Run{}, ErrModelNotConfigured
 	}
-	if world.savePending {
-		return Run{}, ErrWorldBusy
+	if worldRT.savePending {
+		return wiaworld.Run{}, ErrWorldBusy
 	}
 	if err := memoryReady(ctx, store.db); err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	if snapshot.Summary.StoryEnded {
-		return Run{}, ErrStoryEnded
+		return wiaworld.Run{}, ErrStoryEnded
 	}
 	if (request.requireBaseline || request.ExpectedMessageHead > 0) && request.ExpectedMessageHead != snapshot.Summary.MessageHead {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if (request.requireBaseline || request.ExpectedEventHead > 0) && request.ExpectedEventHead != snapshot.Summary.EventHead {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if (request.requireBaseline || request.ExpectedContextEpoch > 0) && request.ExpectedContextEpoch != snapshot.Summary.ContextEpoch {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if request.requireBaseline && (request.expectedTurnSeq != snapshot.Summary.TurnSeq || request.expectedSceneVersion != snapshot.SceneVersion) {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if request.AddresseeID != "" {
 		if _, ok := findSceneCharacter(snapshot.Characters, request.AddresseeID); !ok {
-			return Run{}, ErrInvalidRequest
+			return wiaworld.Run{}, ErrInvalidRequest
 		}
 	}
 	if count, err := countActiveRuns(ctx, store.db); err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	} else if count > 0 {
-		return Run{}, ErrWorldBusy
+		return wiaworld.Run{}, ErrWorldBusy
 	}
 	now := time.Now().UTC()
 	attempt := request.attempt
@@ -290,45 +293,45 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	}
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	defer tx.Rollback()
 	inputID := wire.Clean(request.inputID)
 	inputSeq := request.inputSeq
 	if inputSeq > 0 {
 		if inputID == "" {
-			return Run{}, ErrVersionConflict
+			return wiaworld.Run{}, ErrVersionConflict
 		}
 		var latestInputSeq int64
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(input_seq),0) FROM runs`).Scan(&latestInputSeq); err != nil {
-			return Run{}, err
+			return wiaworld.Run{}, err
 		}
 		if latestInputSeq != inputSeq {
-			return Run{}, ErrVersionConflict
+			return wiaworld.Run{}, ErrVersionConflict
 		}
 		var completed int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM runs WHERE input_id=? AND status='completed'`, inputID).Scan(&completed); err != nil {
-			return Run{}, err
+			return wiaworld.Run{}, err
 		}
 		if completed > 0 {
-			return Run{}, ErrVersionConflict
+			return wiaworld.Run{}, ErrVersionConflict
 		}
 	} else {
 		value, err := metaGetTx(ctx, tx, "input_seq")
 		if err != nil {
-			return Run{}, err
+			return wiaworld.Run{}, err
 		}
 		inputSeq, err = strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return Run{}, err
+			return wiaworld.Run{}, err
 		}
 		inputSeq++
 		inputID = wire.NewID("input")
 		if err := metaSetTx(ctx, tx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
-			return Run{}, err
+			return wiaworld.Run{}, err
 		}
 	}
-	run := Run{
+	run := wiaworld.Run{
 		RunID: wire.NewID("run"), RequestKey: request.RequestKey, RequestHash: a.hashRun(request),
 		Input: request.Input, AddresseeID: wire.Clean(request.AddresseeID), Attempt: attempt,
 		Status: "accepted", CreatedAt: now, UpdatedAt: now,
@@ -343,13 +346,13 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 		run.AddresseeID, run.Attempt, run.Status, run.InputID, run.InputSeq, run.BaseTurnSeq, run.BaseMessageHead, run.BaseEventHead,
 		run.BaseContextEpoch, run.BaseSceneVersion, run.CreatedAt.Format(time.RFC3339Nano), run.UpdatedAt.Format(time.RFC3339Nano))
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	world.cancelSuggestions()
+	worldRT.cancelSuggestions()
 	runtime := &runRuntime{Cancel: cancel, Done: make(chan struct{}), WorldID: worldID, RunID: run.RunID, ActiveRevision: activeRevision, Generator: generator}
 	a.runsMu.Lock()
 	a.runs[run.RunID] = runtime
@@ -358,7 +361,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	return run, nil
 }
 
-func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
+func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.Run) {
 	defer close(runtime.Done)
 	defer func() {
 		a.runsMu.Lock()
@@ -419,14 +422,14 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run Run) {
 	_ = a.touchWorld(context.Background(), runtime.WorldID)
 }
 
-func (a *App) logRunFailure(worldID string, run Run, stage, reason string, err error) {
+func (a *App) logRunFailure(worldID string, run wiaworld.Run, stage, reason string, err error) {
 	if a.logger == nil || err == nil {
 		return
 	}
 	a.logger.Printf("story turn failed: world_id=%q run_id=%q attempt=%d stage=%q reason=%q error_code=%q", worldID, run.RunID, run.Attempt, stage, reason, safeTurnErrorCode(err))
 }
 
-func (a *App) logRunStage(worldID string, run Run, stage turnStage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration) {
+func (a *App) logRunStage(worldID string, run wiaworld.Run, stage turnStage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration) {
 	if a.logger == nil {
 		return
 	}
@@ -438,30 +441,30 @@ func (a *App) logRunStage(worldID string, run Run, stage turnStage, purpose, act
 		strings.Join(sourceEventIDs, ","), promptVersion, modelInfo.Provider, modelInfo.Model, repairCount, elapsed.Milliseconds())
 }
 
-func (a *App) Run(ctx context.Context, worldID, runID string) (Run, error) {
+func (a *App) Run(ctx context.Context, worldID, runID string) (wiaworld.Run, error) {
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	if status != "ready" {
-		return Run{}, ErrWorldNotReady
+		return wiaworld.Run{}, ErrWorldNotReady
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	defer store.db.Close()
 	run, found, err := readRun(ctx, store.db, runID)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	if !found {
-		return Run{}, ErrRunNotFound
+		return wiaworld.Run{}, ErrRunNotFound
 	}
 	return run, nil
 }
 
-func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...string) ([]Run, error) {
+func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...string) ([]wiaworld.Run, error) {
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return nil, err
@@ -480,16 +483,16 @@ func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...strin
 			return nil, err
 		}
 		if !found {
-			return []Run{}, nil
+			return []wiaworld.Run{}, nil
 		}
-		return []Run{run}, nil
+		return []wiaworld.Run{run}, nil
 	}
 	rows, err := store.db.QueryContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	runs := make([]Run, 0)
+	runs := make([]wiaworld.Run, 0)
 	for rows.Next() {
 		run, found, err := scanRun(rows)
 		if err != nil {
@@ -524,28 +527,28 @@ func (a *App) CancelRun(ctx context.Context, worldID, runID string) error {
 	return nil
 }
 
-func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (Run, error) {
+func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (wiaworld.Run, error) {
 	path, _, err := a.worldRecord(ctx, worldID)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	run, found, err := readRun(ctx, store.db, runID)
 	_ = store.db.Close()
 	if err != nil {
-		return Run{}, err
+		return wiaworld.Run{}, err
 	}
 	if !found {
-		return Run{}, ErrRunNotFound
+		return wiaworld.Run{}, ErrRunNotFound
 	}
 	if run.Status != "failed" && run.Status != "cancelled" && run.Status != "interrupted" {
-		return Run{}, ErrInvalidRequest
+		return wiaworld.Run{}, ErrInvalidRequest
 	}
 	if run.InputID == "" || run.InputSeq <= 0 {
-		return Run{}, ErrVersionConflict
+		return wiaworld.Run{}, ErrVersionConflict
 	}
 	if strings.TrimSpace(requestKey) == "" {
 		requestKey = wire.NewID("retry")
@@ -559,7 +562,7 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 	})
 }
 
-func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run) (turnIntent, int, error) {
+func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run) (turnIntent, int, error) {
 	participants := sceneCharacters(snapshot.Characters)
 	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
@@ -597,7 +600,7 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 // executeTurn runs one story turn. Every step below is a named stage, so the
 // pipeline can be read in order; the implementation of each stage lives in its
 // own function.
-func (a *App) executeTurn(ctx context.Context, store *worldStore, run Run, generator model.TextGenerator) (turnOutput, error) {
+func (a *App) executeTurn(ctx context.Context, store *worldStore, run wiaworld.Run, generator model.TextGenerator) (turnOutput, error) {
 	snapshot, err := a.loadTurn(ctx, store, run, generator)
 	if err != nil {
 		return turnOutput{}, err
@@ -648,7 +651,7 @@ func turnDefinition(snapshot *worldSnapshot) gameDefinition {
 
 // loadTurn reads the frozen turn input: the world snapshot, the long-memory
 // material and the coordination evidence.
-func (a *App) loadTurn(ctx context.Context, store *worldStore, run Run, generator model.TextGenerator) (worldSnapshot, error) {
+func (a *App) loadTurn(ctx context.Context, store *worldStore, run wiaworld.Run, generator model.TextGenerator) (worldSnapshot, error) {
 	loadStarted := time.Now()
 	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
@@ -665,7 +668,7 @@ func (a *App) loadTurn(ctx context.Context, store *worldStore, run Run, generato
 }
 
 // resolveIntentStage decides what the player is trying to do and who it addresses.
-func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run) (turnIntent, error) {
+func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run) (turnIntent, error) {
 	intentStarted := time.Now()
 	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
@@ -678,7 +681,7 @@ func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenera
 // newTurnOutput builds the turn output skeleton: it freezes the definition this
 // turn speaks through, records the player's own attempt and derives the
 // stage-one perception inputs.
-func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run Run, recipient string, private bool, participants []Character) (turnOutput, map[string]string, map[string]npcStageInput, string) {
+func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turnOutput, map[string]string, map[string]npcStageInput, string) {
 	def := turnDefinition(snapshot)
 
 	now := time.Now().UTC()
@@ -686,8 +689,8 @@ func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run Run, recipien
 	output := turnOutput{
 		Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
 		SceneCharacters: characterIDs(participants),
-		Events:          []Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
-		Memories:        []Memory{}, Perceptions: []Perception{},
+		Events:          []wiaworld.Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
+		Memories:        []wiaworld.Memory{}, Perceptions: []wiaworld.Perception{},
 	}
 	perceptText := make(map[string]string)
 	stageOneInputs := make(map[string]npcStageInput)
@@ -697,7 +700,7 @@ func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run Run, recipien
 		} else {
 			perceptText[character.EntityID] = run.Input
 		}
-		output.Perceptions = append(output.Perceptions, Perception{RecipientID: character.EntityID, SourceEventID: playerEventID, SourceType: sourceTypeFor(private, character.EntityID, recipient, intent.IntentType), Content: perceptText[character.EntityID], Stage: 1, SceneVersion: snapshot.SceneVersion, CreatedAt: now})
+		output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: playerEventID, SourceType: sourceTypeFor(private, character.EntityID, recipient, intent.IntentType), Content: perceptText[character.EntityID], Stage: 1, SceneVersion: snapshot.SceneVersion, CreatedAt: now})
 		stageOneInputs[character.EntityID] = npcStageInput{PlayerPerception: perceptText[character.EntityID], SourceEventIDs: []string{playerEventID}}
 	}
 	return output, perceptText, stageOneInputs, playerEventID
@@ -705,7 +708,7 @@ func newTurnOutput(snapshot *worldSnapshot, intent turnIntent, run Run, recipien
 
 // runCharacterStages runs the two character decision stages and keeps the public
 // reply log and the merged decisions on the output for the coordination stage.
-func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, participants []Character, perceptText map[string]string, stageOneInputs map[string]npcStageInput, output *turnOutput) error {
+func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]npcStageInput, output *turnOutput) error {
 	def := turnDefinition(snapshot)
 
 	playerEventID := run.RunID + ":input"
@@ -755,15 +758,15 @@ func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenera
 
 // notePlayerAction records the player's own attempt as an action the coordinator
 // has to resolve when the turn can produce an outcome for it.
-func (a *App) notePlayerAction(output *turnOutput, run Run, intent turnIntent, recipient string) {
+func (a *App) notePlayerAction(output *turnOutput, run wiaworld.Run, intent turnIntent, recipient string) {
 	if intent.IntentType != "speak" || recipient == "" {
-		output.Events = append(output.Events, Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
+		output.Events = append(output.Events, wiaworld.Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
 	}
 }
 
 // coordinateStage resolves the scene: time, roster, action outcomes and the
 // scene views, and returns the events the player can perceive so far.
-func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, participants []Character, recipient string, private bool, output *turnOutput) (hostResult, []Event, error) {
+func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, participants []wiaworld.Character, recipient string, private bool, output *turnOutput) (hostResult, []wiaworld.Event, error) {
 	publicReplies := strings.Join(output.publicReplies, "\n")
 	coordinationStarted := time.Now()
 	host, coordinationRepairs, err := a.coordinateTurn(ctx, generator, *snapshot, run, intent, output.decisions, output.Events, publicReplies)
@@ -778,9 +781,9 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 	}
 	// Stage 3 outcomes may be witnessed on arrival. Earlier expressions retain
 	// their original recipients and are never replayed to the final roster.
-	resultParticipants := []Character{}
+	resultParticipants := []wiaworld.Character{}
 	for _, character := range snapshot.Characters {
-		if character.InScene || containsID(host.SceneCharacters, character.EntityID) {
+		if character.InScene || wiaworld.ContainsID(host.SceneCharacters, character.EntityID) {
 			resultParticipants = append(resultParticipants, character)
 		}
 	}
@@ -815,9 +818,9 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 
 // resolveSceneResult advances the plot and the generated events and folds their
 // player-visible results into the events the narration stage renders.
-func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, host hostResult, participants []Character, visibleEvents []Event, output *turnOutput) ([]Event, error) {
+func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, host hostResult, participants []wiaworld.Character, visibleEvents []wiaworld.Event, output *turnOutput) ([]wiaworld.Event, error) {
 	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
-		elapsed := Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
+		elapsed := wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
 		visibleEvents = append(visibleEvents, elapsed)
 	}
@@ -837,7 +840,7 @@ func (a *App) resolveSceneResult(ctx context.Context, generator model.TextGenera
 
 // narrateStage renders the player-facing prose and closes the turn with the
 // settled scene projection.
-func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run Run, intent turnIntent, recipient string, private bool, visibleEvents []Event, output *turnOutput) error {
+func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, snapshot *worldSnapshot, run wiaworld.Run, intent turnIntent, recipient string, private bool, visibleEvents []wiaworld.Event, output *turnOutput) error {
 	def := turnDefinition(snapshot)
 
 	playerProjection := renderVisibleProjection(visibleEvents, snapshot.Characters)
@@ -854,18 +857,18 @@ func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, s
 			settledStage = 7
 		}
 	}
-	output.Events = append(output.Events, Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
+	output.Events = append(output.Events, wiaworld.Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
 	return nil
 }
 
 // recordPlayerExperience writes what each participant experienced from the
 // player's own attempt in this turn.
-func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput, run Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
+func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput, run wiaworld.Run, intent turnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
 	def := turnDefinition(snapshot)
 
 	for _, characterID := range participantIDs {
 		kind, memory := playerExperienceMemory(intent.IntentType, private, characterID, recipient, run.Input, def)
-		output.Memories = append(output.Memories, Memory{RecipientID: characterID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
+		output.Memories = append(output.Memories, wiaworld.Memory{RecipientID: characterID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
 	}
 }
 
@@ -914,20 +917,20 @@ func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *world
 	return nil
 }
 
-func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, decision npcDecision, participants []Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
+func appendNPCDecisionOutput(output *turnOutput, run wiaworld.Run, character wiaworld.Character, decision npcDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
-		output.Events = append(output.Events, Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: "player", Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", CreatedAt: time.Now().UTC()})
+		output.Events = append(output.Events, wiaworld.Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: "player", Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", CreatedAt: time.Now().UTC()})
 		sourceEventID = actionEventID
 	}
 	var reply string
 	if decision.Speech != "" {
 		eventID := fmt.Sprintf("%s:%s:speech:%d", run.RunID, character.EntityID, stage)
-		output.Events = append(output.Events, Event{EventID: eventID, EventType: "npc_dialogue", ActorID: character.EntityID, TargetID: "player", Content: decision.Speech, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "visible_dialogue", CreatedAt: time.Now().UTC()})
+		output.Events = append(output.Events, wiaworld.Event{EventID: eventID, EventType: "npc_dialogue", ActorID: character.EntityID, TargetID: "player", Content: decision.Speech, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "visible_dialogue", CreatedAt: time.Now().UTC()})
 		for _, other := range participants {
 			if other.EntityID != character.EntityID {
-				output.Perceptions = append(output.Perceptions, Perception{RecipientID: other.EntityID, SourceEventID: eventID, SourceType: "heard_public_reply", Content: fmt.Sprintf("%s（%s）公开说：%s", character.Name, character.Role, decision.Speech), Stage: stage, SceneVersion: sceneVersion, CreatedAt: time.Now().UTC()})
+				output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: other.EntityID, SourceEventID: eventID, SourceType: "heard_public_reply", Content: fmt.Sprintf("%s（%s）公开说：%s", character.Name, character.Role, decision.Speech), Stage: stage, SceneVersion: sceneVersion, CreatedAt: time.Now().UTC()})
 			}
 		}
 		if decision.ActionIntent == "" {
@@ -936,13 +939,13 @@ func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, d
 		reply = fmt.Sprintf("%s（%s）说：%s", character.Name, character.Role, decision.Speech)
 	}
 	if decision.Memory != "" {
-		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: "character_judgment", Content: wire.Clean(decision.Memory), SourceEventID: sourceEventID, CreatedAt: time.Now().UTC()})
+		output.Memories = append(output.Memories, wiaworld.Memory{RecipientID: character.EntityID, Kind: "character_judgment", Content: wire.Clean(decision.Memory), SourceEventID: sourceEventID, CreatedAt: time.Now().UTC()})
 	}
 	return reply
 }
 
-func appendHostOutcomes(output *turnOutput, run Run, participants []Character, bystanders []PackBystander, outcomes []hostActionResult) ([]Event, error) {
-	actions := make(map[string]Event)
+func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []PackBystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
+	actions := make(map[string]wiaworld.Event)
 	for _, event := range output.Events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
 			actions[event.EventID] = event
@@ -960,7 +963,7 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 		definedBystanders[bystander.BystanderID] = true
 	}
 	seen := make(map[string]bool, len(outcomes))
-	var visible []Event
+	var visible []wiaworld.Event
 	for index, outcome := range outcomes {
 		outcome.ActionID = wire.Clean(outcome.ActionID)
 		outcome.Status = strings.ToLower(wire.Clean(outcome.Status))
@@ -981,14 +984,14 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 		// An actor always observes the resolved result of its own attempt.
 		recipients[action.ActorID] = true
 		resultID := fmt.Sprintf("%s:result:%d", outcome.ActionID, index+1)
-		resultEvent := Event{EventID: resultID, EventType: "npc_action_result", ActorID: action.ActorID, TargetID: action.TargetID, Content: outcome.Content, RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "action_" + outcome.Status, CreatedAt: time.Now().UTC()}
+		resultEvent := wiaworld.Event{EventID: resultID, EventType: "npc_action_result", ActorID: action.ActorID, TargetID: action.TargetID, Content: outcome.Content, RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "action_" + outcome.Status, CreatedAt: time.Now().UTC()}
 		if action.ActorID == "player" {
 			resultEvent.EventType = "player_action_result"
 		}
 		output.Events = append(output.Events, resultEvent)
 		for _, character := range participants {
 			if recipients[character.EntityID] {
-				output.Perceptions = append(output.Perceptions, Perception{RecipientID: character.EntityID, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
+				output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
 			}
 		}
 		if recipients["player"] {
@@ -1006,13 +1009,13 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 				return nil, fmt.Errorf("%w: outcome %q attributes an undefined bystander %q", ErrGenerationFailed, outcome.ActionID, id)
 			}
 			involved[id] = true
-			output.Perceptions = append(output.Perceptions, Perception{RecipientID: id, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
+			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
 		}
 	}
 	return visible, nil
 }
 
-func renderVisibleProjection(events []Event, characters []Character) string {
+func renderVisibleProjection(events []wiaworld.Event, characters []wiaworld.Character) string {
 	parts := make([]string, 0, len(events))
 	for _, event := range events {
 		if event.EventType == "player_attempt" {
@@ -1034,8 +1037,8 @@ func renderVisibleProjection(events []Event, characters []Character) string {
 	return strings.Join(parts, "\n")
 }
 
-func visibleTurnEvents(events, visibleOutcomes []Event, playerNarrativeInput string) []Event {
-	result := make([]Event, 0, len(events)+len(visibleOutcomes))
+func visibleTurnEvents(events, visibleOutcomes []wiaworld.Event, playerNarrativeInput string) []wiaworld.Event {
+	result := make([]wiaworld.Event, 0, len(events)+len(visibleOutcomes))
 	for _, event := range events {
 		if event.EventType == "player_attempt" || event.EventType == "npc_dialogue" {
 			if event.EventType == "player_attempt" {
@@ -1047,7 +1050,7 @@ func visibleTurnEvents(events, visibleOutcomes []Event, playerNarrativeInput str
 	return append(result, visibleOutcomes...)
 }
 
-func eventIDs(events []Event) []string {
+func eventIDs(events []wiaworld.Event) []string {
 	result := make([]string, 0, len(events))
 	for _, event := range events {
 		if event.EventID != "" {
@@ -1057,7 +1060,7 @@ func eventIDs(events []Event) []string {
 	return result
 }
 
-func publicReplyStageInputs(perceptions []Perception, playerPerceptions map[string]string, sourceStage int) map[string]npcStageInput {
+func publicReplyStageInputs(perceptions []wiaworld.Perception, playerPerceptions map[string]string, sourceStage int) map[string]npcStageInput {
 	texts := make(map[string][]string)
 	sources := make(map[string][]string)
 	for _, perception := range perceptions {
@@ -1147,7 +1150,7 @@ func describeRecipient(def gameDefinition, recipient string) string {
 	return "未明确指定具体人物"
 }
 
-func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, def gameDefinition, run Run, recipient, intentType string, inputs map[string]npcStageInput, priorTurn map[string]string, decisions map[string]npcDecision, stage int) error {
+func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, def gameDefinition, run wiaworld.Run, recipient, intentType string, inputs map[string]npcStageInput, priorTurn map[string]string, decisions map[string]npcDecision, stage int) error {
 	if generator == nil {
 		return ErrModelNotConfigured
 	}
@@ -1237,16 +1240,16 @@ func formatSelfDecision(decision npcDecision) string {
 	return fmt.Sprintf("已进入本轮交谈的本人公开对白：%q\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.ActionIntent, decision.Silent, decision.Memory)
 }
 
-func eventByID(events []Event, id string) (Event, bool) {
+func eventByID(events []wiaworld.Event, id string) (wiaworld.Event, bool) {
 	for _, event := range events {
 		if event.EventID == id {
 			return event, true
 		}
 	}
-	return Event{}, false
+	return wiaworld.Event{}, false
 }
 
-func characterDisplayName(characters []Character, id string) string {
+func characterDisplayName(characters []wiaworld.Character, id string) string {
 	for _, character := range characters {
 		if character.EntityID == id {
 			return fmt.Sprintf("%s（%s）", character.Name, character.Role)
@@ -1258,7 +1261,7 @@ func characterDisplayName(characters []Character, id string) string {
 	return id
 }
 
-func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, intent turnIntent, decisions map[string]npcDecision, events []Event, publicReplies string) (hostResult, int, error) {
+func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, intent turnIntent, decisions map[string]npcDecision, events []wiaworld.Event, publicReplies string) (hostResult, int, error) {
 	if generator == nil {
 		return hostResult{}, 0, ErrModelNotConfigured
 	}
@@ -1311,7 +1314,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	return result, repairCount, nil
 }
 
-func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, def gameDefinition, recipient, intentType string, visibleEvents []Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
+func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, def gameDefinition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}
@@ -1334,7 +1337,7 @@ func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator,
 	return narrativeResult{Narrative: narrative}, repairCount, nil
 }
 
-func narrativeEvents(events []Event, characters []Character, playerName string, settings NarrativeSettings) []narrativeEvent {
+func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, playerName string, settings NarrativeSettings) []narrativeEvent {
 	result := make([]narrativeEvent, 0, len(events))
 	for _, event := range events {
 		name, role, reference := event.ActorID, "", event.ActorID
@@ -1362,7 +1365,7 @@ func narrativeEvents(events []Event, characters []Character, playerName string, 
 	return result
 }
 
-func publicCharacterContext(characters []Character, sceneCharacterIDs []string) string {
+func publicCharacterContext(characters []wiaworld.Character, sceneCharacterIDs []string) string {
 	inScene := make(map[string]bool, len(sceneCharacterIDs))
 	for _, id := range sceneCharacterIDs {
 		inScene[id] = true
@@ -1456,8 +1459,8 @@ func parseNarrativeText(text string) (string, error) {
 	return text, nil
 }
 
-func coordinationContinuity(events []Event) string {
-	completed := make([]Event, 0)
+func coordinationContinuity(events []wiaworld.Event) string {
+	completed := make([]wiaworld.Event, 0)
 	for _, event := range events {
 		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
 			completed = append(completed, event)
@@ -1470,7 +1473,7 @@ func coordinationContinuity(events []Event) string {
 	return "连续状态规则：scene 是本轮结束后的简明状态快照，写人物位置、物件状态及仍成立的环境，不是动作回放或对白记录。此前已提交行动结果是连续状态的依据；按时间顺序接续，较新的明确结果覆盖同一事项的旧状态。上一场景中取碗、斟茶、递物等进行式描述，若对应结果已经完成，应写为完成后的状态，不能再次执行。输入与已完成动作重叠时，结合当前状态承接新意图。本轮未提出或未确认的新行动不能借 scene 补出；没有动作变化时沿用完成状态，不把人物移回原位置。\n此前已提交行动结果（仅作状态依据，不属于本轮待裁定行动）：" + string(data) + "\n"
 }
 
-func coordinationDecisionContext(decisions map[string]npcDecision, characters []Character) string {
+func coordinationDecisionContext(decisions map[string]npcDecision, characters []wiaworld.Character) string {
 	var parts []string
 	for _, character := range sceneCharacters(characters) {
 		decision := decisions[character.EntityID]
@@ -1482,7 +1485,7 @@ func coordinationDecisionContext(decisions map[string]npcDecision, characters []
 	return strings.Join(parts, "\n")
 }
 
-func characterIDs(items []Character) []string {
+func characterIDs(items []wiaworld.Character) []string {
 	result := make([]string, 0, len(items))
 	for _, character := range items {
 		result = append(result, character.EntityID)
@@ -1490,7 +1493,7 @@ func characterIDs(items []Character) []string {
 	return result
 }
 
-func availableCharacterIDs(items []Character) string {
+func availableCharacterIDs(items []wiaworld.Character) string {
 	var ids []string
 	for _, character := range items {
 		ids = append(ids, fmt.Sprintf("%s=%s（%s）", character.EntityID, character.Name, character.Role))
@@ -1498,7 +1501,7 @@ func availableCharacterIDs(items []Character) string {
 	return strings.Join(ids, "、")
 }
 
-func validateSceneCharacters(ids []string, characters []Character) error {
+func validateSceneCharacters(ids []string, characters []wiaworld.Character) error {
 	available := make(map[string]bool, len(characters))
 	for _, character := range characters {
 		available[character.EntityID] = true

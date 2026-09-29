@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type generatedTestGenerator struct {
@@ -68,7 +69,7 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 		if noCandidate {
 			return model.TextResponse{Text: `{"candidates":[]}`}, nil
 		}
-		var trigger Event
+		var trigger wiaworld.Event
 		raw := strings.SplitN(strings.SplitN(req.Input, "已确认触发结果：", 2)[1], "\n", 2)[0]
 		if err := json.Unmarshal([]byte(raw), &trigger); err != nil {
 			return model.TextResponse{}, err
@@ -106,7 +107,7 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 	return (actionConsistencyGenerator{status: "succeeded"}).GenerateText(ctx, req)
 }
 
-func eventTestWorld(t *testing.T, g *generatedTestGenerator) (*App, WorldSummary) {
+func eventTestWorld(t *testing.T, g *generatedTestGenerator) (*App, wiaworld.WorldSummary) {
 	t.Helper()
 	a := newTestApp(t, g)
 	p := a.packs["orbital-repair"]
@@ -115,7 +116,7 @@ func eventTestWorld(t *testing.T, g *generatedTestGenerator) (*App, WorldSummary
 	return a, createPackWorld(t, a, "orbital-repair")
 }
 
-func generatedTurn(t *testing.T, a *App, w WorldSummary, key string) Run {
+func generatedTurn(t *testing.T, a *App, w wiaworld.WorldSummary, key string) wiaworld.Run {
 	t.Helper()
 	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: key, Input: "走到检修间观察"})
 	if err != nil {
@@ -213,7 +214,7 @@ func TestGeneratedEventsEmptyChoiceAndInvalidScope(t *testing.T) {
 	for _, opportunity := range []eventOpportunity{{Kind: "arrival", Location: "workshop", ActionID: "nonexistent"}, {Kind: "arrival", Location: "outside", ActionID: "x"}, {Kind: "refresh", Location: "workshop", ActionID: "x"}} {
 		s.Summary.TurnSeq = 10
 		out := turnOutput{Clock: s.Summary.Clock}
-		if _, err := a.advanceGeneratedEvents(context.Background(), g, s, Run{RunID: "r"}, &opportunity, &out); err == nil {
+		if _, err := a.advanceGeneratedEvents(context.Background(), g, s, wiaworld.Run{RunID: "r"}, &opportunity, &out); err == nil {
 			t.Fatal("invalid opportunity accepted")
 		}
 	}
@@ -273,7 +274,7 @@ func TestDeferredAuthoredEventConsumesWorldRound(t *testing.T) {
 	w := createPackWorld(t, a, "orbital-repair")
 	s := readContextSnapshot(t, a, w.WorldID)
 	out := turnOutput{Clock: "第 1 日 09:05", PlotProgress: &PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{"inspection_notice": {Status: "deferred", NextCheck: 560}}}}
-	_, err := a.advanceGeneratedEvents(context.Background(), g, s, Run{RunID: "deferred"}, &eventOpportunity{Kind: "arrival", Location: "workshop", ActionID: "not-evaluated"}, &out)
+	_, err := a.advanceGeneratedEvents(context.Background(), g, s, wiaworld.Run{RunID: "deferred"}, &eventOpportunity{Kind: "arrival", Location: "workshop", ActionID: "not-evaluated"}, &out)
 	if err != nil || len(g.requests) != 0 || out.GeneratedEvents.LastOfferTurn != 0 {
 		t.Fatal("authored deferral started a second world-event round", err)
 	}

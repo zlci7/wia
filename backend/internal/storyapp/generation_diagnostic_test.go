@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func TestGeneratedJSONDiagnosticIsSafeAndSpecific(t *testing.T) {
@@ -65,7 +66,7 @@ func TestIntentRecipientUsesBoundedRepair(t *testing.T) {
 		a := newTestApp(t, g)
 		w := createPackWorld(t, a, GameID)
 		s := readContextSnapshot(t, a, w.WorldID)
-		intent, repairs, err := a.resolveTurnIntent(context.Background(), g, s, Run{RunID: "recipient", Input: "请船夫帮伤者上船"})
+		intent, repairs, err := a.resolveTurnIntent(context.Background(), g, s, wiaworld.Run{RunID: "recipient", Input: "请船夫帮伤者上船"})
 		if err != nil || repairs != 1 || len(g.requests) != 2 || intent.AddresseeID != "" {
 			t.Fatalf("repairs=%d calls=%d err=%v", repairs, len(g.requests), err)
 		}

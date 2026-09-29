@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func TestContextBudgetPreservesRequiredAndDropsWholeOldGroups(t *testing.T) {
@@ -83,8 +84,8 @@ func TestRepairIsRecomposedAndCanFailBeforeSecondProviderRequest(t *testing.T) {
 func TestPersonalCausalGroupsAreIndivisible(t *testing.T) {
 	s := contextFixture()
 	s.Sources = map[string]sourceMetadata{"action": {Seq: 1, Kind: "npc_action_intent"}, "action:result:1": {Seq: 2, Kind: "npc_action_result"}}
-	s.Memories["npc:innkeeper"] = []Memory{{SourceEventID: "action", Content: "我想递茶"}}
-	s.Perceptions["npc:innkeeper"] = []Perception{{SourceEventID: "action:result:1", Content: "茶已经递完", SourceType: "action_succeeded"}}
+	s.Memories["npc:innkeeper"] = []wiaworld.Memory{{SourceEventID: "action", Content: "我想递茶"}}
+	s.Perceptions["npc:innkeeper"] = []wiaworld.Perception{{SourceEventID: "action:result:1", Content: "茶已经递完", SourceType: "action_succeeded"}}
 	groups := personalSections(s, "npc:innkeeper")
 	if len(groups) != 1 || len(groups[0].Sources) != 2 || !strings.Contains(groups[0].Text, "茶已经递完") || !strings.Contains(groups[0].Text, "我想递茶") {
 		t.Fatalf("%+v", groups)

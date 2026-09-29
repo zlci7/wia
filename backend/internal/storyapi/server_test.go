@@ -15,6 +15,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storyapp"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type apiGenerator struct{}
@@ -27,7 +28,7 @@ func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest)
 		return model.TextResponse{Text: `{"intent_type":"speak","addressee_id":"npc:innkeeper","visibility":"private"}`}, nil
 	}
 	if strings.Contains(request.System, "场景协调 Agent") {
-		var candidates []storyapp.Event
+		var candidates []wiaworld.Event
 		start := strings.Index(request.Input, "待裁定行动(JSON)：")
 		end := strings.Index(request.Input, "\n所有可用重要人物：")
 		if start < 0 || end < start || json.Unmarshal([]byte(request.Input[start+len("待裁定行动(JSON)："):end]), &candidates) != nil {
@@ -148,7 +149,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("create world = %d, body = %s", response.StatusCode, body)
 	}
 	var worldEnvelope struct {
-		World storyapp.WorldSummary `json:"world"`
+		World wiaworld.WorldSummary `json:"world"`
 	}
 	decodeJSONBody(t, body, &worldEnvelope)
 	world := worldEnvelope.World
@@ -192,7 +193,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	}
 	var settingsEnvelope struct {
 		Settings storyapp.NarrativeSettings `json:"settings"`
-		World    storyapp.WorldSummary      `json:"world"`
+		World    wiaworld.WorldSummary      `json:"world"`
 	}
 	decodeJSONBody(t, body, &settingsEnvelope)
 	if settingsEnvelope.Settings.Perspective != storyapp.PerspectiveThirdPerson || settingsEnvelope.Settings.PlayerElaboration != storyapp.PlayerElaborationExpressive || settingsEnvelope.Settings.NPCInitiative != storyapp.NPCInitiativeProactive || settingsEnvelope.World.ContextEpoch != world.ContextEpoch+1 {
@@ -216,7 +217,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("submit run = %d, body = %s", response.StatusCode, body)
 	}
 	var runEnvelope struct {
-		Run storyapp.Run `json:"run"`
+		Run wiaworld.Run `json:"run"`
 	}
 	decodeJSONBody(t, body, &runEnvelope)
 	run := runEnvelope.Run
@@ -242,7 +243,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("list runs = %d, body = %s", response.StatusCode, body)
 	}
 	var runsEnvelope struct {
-		Runs []storyapp.Run `json:"runs"`
+		Runs []wiaworld.Run `json:"runs"`
 	}
 	decodeJSONBody(t, body, &runsEnvelope)
 	if len(runsEnvelope.Runs) != 1 || runsEnvelope.Runs[0].RunID != run.RunID {
@@ -265,9 +266,9 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("read world = %d, body = %s", response.StatusCode, body)
 	}
 	var readEnvelope struct {
-		Messages          []storyapp.Message         `json:"messages"`
+		Messages          []wiaworld.Message         `json:"messages"`
 		Bystanders        []string                   `json:"bystanders"`
-		Characters        []storyapp.PublicCharacter `json:"characters"`
+		Characters        []wiaworld.PublicCharacter `json:"characters"`
 		NarrativeSettings storyapp.NarrativeSettings `json:"narrative_settings"`
 	}
 	decodeJSONBody(t, body, &readEnvelope)

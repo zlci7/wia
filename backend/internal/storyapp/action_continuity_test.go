@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,7 @@ func (g *overlappingActionGenerator) GenerateText(ctx context.Context, req model
 	if strings.Contains(req.System, "场景协调 Agent") {
 		start := strings.Index(req.Input, "待裁定行动(JSON)：") + len("待裁定行动(JSON)：")
 		end := strings.Index(req.Input, "\n所有可用重要人物：")
-		var actions []Event
+		var actions []wiaworld.Event
 		if start < 0 || end < start || json.Unmarshal([]byte(req.Input[start:end]), &actions) != nil || len(actions) != 3 {
 			return model.TextResponse{}, errors.New("missing action sources")
 		}
@@ -96,13 +97,13 @@ func TestPendingActionsAndNotExecutedResultsSurviveAtomicTurn(t *testing.T) {
 }
 
 func TestNotExecutedStillRequiresEveryActionAndValidRecipients(t *testing.T) {
-	run := Run{RunID: "r"}
+	run := wiaworld.Run{RunID: "r"}
 	actor := lanternDefinition().Characters[0]
-	out := turnOutput{Events: []Event{{EventID: "action", ActorID: actor.EntityID, EventType: "npc_action_intent", RunID: "r", Stage: 1}}}
-	if _, err := appendHostOutcomes(&out, run, []Character{actor}, nil, nil); err == nil {
+	out := turnOutput{Events: []wiaworld.Event{{EventID: "action", ActorID: actor.EntityID, EventType: "npc_action_intent", RunID: "r", Stage: 1}}}
+	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, nil); err == nil {
 		t.Fatal("missing outcome accepted")
 	}
-	if _, err := appendHostOutcomes(&out, run, []Character{actor}, nil, []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}); err == nil {
+	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}); err == nil {
 		t.Fatal("unknown recipient accepted")
 	}
 }

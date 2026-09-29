@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func readMemoryJob(ctx context.Context, db *sql.DB) (MemoryJob, error) {
@@ -63,22 +64,22 @@ func (a *App) startMemoryRebuild(worldID string) {
 // Each read/publish phase holds the world lock and closes its database before
 // model execution. Deletion can complete and late results cannot recreate a DB.
 func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, error) {
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil || status != "ready" {
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	store, err := openWorldDB(path)
 	if err != nil {
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	job, err := readMemoryJob(ctx, store.db)
 	if err != nil || job.Status == "completed" || job.Status == "failed" {
 		store.db.Close()
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 40)
@@ -88,13 +89,13 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if err != nil {
 		failMemoryJob(ctx, store.db, job.Epoch, err)
 		store.db.Close()
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	if job.Completed >= len(job.Scopes) {
 		_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
 		store.db.Close()
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	scope := job.Scopes[job.Completed]
@@ -107,12 +108,12 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if err != nil {
 		failMemoryJob(ctx, store.db, job.Epoch, err)
 		store.db.Close()
-		world.mu.Unlock()
+		worldRT.mu.Unlock()
 		return true, err
 	}
 	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
 	store.db.Close()
-	world.mu.Unlock()
+	worldRT.mu.Unlock()
 	if err != nil {
 		return true, err
 	}
@@ -154,7 +155,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		if generator == nil {
 			err = ErrModelNotConfigured
 		} else {
-			d, err = a.summarizeMemory(ctx, generator, snapshot, Run{RunID: fmt.Sprintf("memory:%d", job.Epoch), BaseContextEpoch: job.Epoch}, scope, basis, prefix)
+			d, err = a.summarizeMemory(ctx, generator, snapshot, wiaworld.Run{RunID: fmt.Sprintf("memory:%d", job.Epoch), BaseContextEpoch: job.Epoch}, scope, basis, prefix)
 			d.Revision = previous.Revision + 1
 		}
 	}
@@ -173,8 +174,8 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		d.Head = m.Archive[len(m.Archive)-1].Seq
 	}
 
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, checkErr := a.worldRecord(ctx, worldID)
 	if checkErr != nil || status != "ready" {
 		return true, checkErr
@@ -282,9 +283,9 @@ func (a *App) RetryMemory(ctx context.Context, worldID string, epoch int64) erro
 			a.startMemoryRebuild(worldID)
 		}
 	}()
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return err

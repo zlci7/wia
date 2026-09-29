@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,14 +25,14 @@ type CreateWorldRequest struct {
 	Activate         bool   `json:"activate"`
 }
 
-func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) (WorldSummary, error) {
+func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) (wiaworld.WorldSummary, error) {
 	if !packID.MatchString(request.GameID) || !packID.MatchString(request.ExpectedRevision) || strings.TrimSpace(request.RequestKey) == "" || len(request.RequestKey) > 200 {
-		return WorldSummary{}, ErrInvalidRequest
+		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	a.copyMu.Lock()
 	if a.closing {
 		a.copyMu.Unlock()
-		return WorldSummary{}, ErrWorldBusy
+		return wiaworld.WorldSummary{}, ErrWorldBusy
 	}
 	a.copyWG.Add(1)
 	a.copyMu.Unlock()
@@ -45,37 +46,37 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 	err := a.appDB.QueryRowContext(ctx, `SELECT world_id,request_hash FROM creation_operations WHERE user_id=? AND request_key=?`, a.userID, request.RequestKey).Scan(&priorID, &priorHash)
 	if err == nil {
 		if priorHash != hash {
-			return WorldSummary{}, ErrIdempotencyConflict
+			return wiaworld.WorldSummary{}, ErrIdempotencyConflict
 		}
 		return a.worldSummary(ctx, priorID)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	pack, ok := a.pack(request.GameID)
 	if !ok {
-		return WorldSummary{}, ErrWorldNotFound
+		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
 	if pack.Definition.Revision != request.ExpectedRevision {
-		return WorldSummary{}, ErrVersionConflict
+		return wiaworld.WorldSummary{}, ErrVersionConflict
 	}
 	return a.createWorldFromPack(ctx, pack, request, hash)
 }
 
 // CreateWorld is a convenience for local callers; the public HTTP API requires
 // the selected game and revision. The author-owned mode cannot be overridden.
-func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (WorldSummary, error) {
+func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (wiaworld.WorldSummary, error) {
 	p, ok := a.pack(GameID)
 	if !ok {
-		return WorldSummary{}, ErrWorldNotFound
+		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
 	if mode != "" && mode != p.Definition.Summary.Mode {
-		return WorldSummary{}, ErrInvalidRequest
+		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
 }
 
-func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request CreateWorldRequest, hash string) (WorldSummary, error) {
+func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request CreateWorldRequest, hash string) (wiaworld.WorldSummary, error) {
 	def := pack.Definition
 	name := wire.Clean(request.Name)
 	if name == "" {
@@ -94,32 +95,32 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	// A selected template is copied into the world; later template edits never
 	// reach a world that already exists.
 	if personaName, personaProfile, err := a.personaDefaults(ctx, request.PersonaID, def); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	} else if personaName != "" {
 		playerName, playerProfile = personaName, personaProfile
 	}
 	if len([]rune(name)) > 160 || len([]rune(playerName)) > 80 || len([]rune(playerProfile)) > 2000 {
-		return WorldSummary{}, ErrInvalidRequest
+		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	if !def.Summary.Player.Editable && (playerName != def.Summary.Player.Name || playerProfile != def.Summary.Player.Profile) {
-		return WorldSummary{}, ErrInvalidRequest
+		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	worldID := wire.NewID("world")
 	path := a.worldPathFor(def.Summary.ID, worldID)
 	store, err := openWorldDB(path)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	defer store.db.Close()
 	if err = initializeWorld(ctx, store, a.userID, worldID, def, def.Summary.Mode, playerName, playerProfile); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if len(pack.Cover) > 0 {
 		if err = os.WriteFile(filepath.Join(filepath.Dir(path), "cover"), pack.Cover, 0644); err != nil {
-			return WorldSummary{}, err
+			return wiaworld.WorldSummary{}, err
 		}
 		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_type',?)`, pack.CoverType); err != nil {
-			return WorldSummary{}, err
+			return wiaworld.WorldSummary{}, err
 		}
 	}
 	// A world keeps the images it started with, so a later edit, republish or
@@ -127,45 +128,45 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	worldDir := filepath.Dir(path)
 	coverAsset, avatars, err := a.snapshotWorldAssets(pack, worldDir)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if coverAsset != "" {
 		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_asset',?)`, coverAsset); err != nil {
-			return WorldSummary{}, err
+			return wiaworld.WorldSummary{}, err
 		}
 	}
 	for entityID, asset := range avatars {
 		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "avatar:"+entityID, asset); err != nil {
-			return WorldSummary{}, err
+			return wiaworld.WorldSummary{}, err
 		}
 	}
 	if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, wire.NowText()); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if err = store.db.Close(); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	tx, err := a.appDB.BeginTx(ctx, nil)
 	if err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	defer tx.Rollback()
 	now := wire.NowText()
 	if _, err = tx.ExecContext(ctx, `INSERT INTO worlds(user_id,game_id,world_id,name,path,status,created_at,updated_at) VALUES(?,?,?,?,?,'ready',?,?)`, a.userID, def.Summary.ID, worldID, name, path, now, now); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO creation_operations(user_id,request_key,request_hash,world_id) VALUES(?,?,?,?)`, a.userID, request.RequestKey, hash, worldID); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if err = tx.Commit(); err != nil {
-		return WorldSummary{}, err
+		return wiaworld.WorldSummary{}, err
 	}
 	if request.Activate {
 		a.activationMu.Lock()
 		err = a.activate(ctx, worldID, 0)
 		a.activationMu.Unlock()
 		if err != nil {
-			return WorldSummary{}, err
+			return wiaworld.WorldSummary{}, err
 		}
 	}
 	return a.worldSummary(ctx, worldID)

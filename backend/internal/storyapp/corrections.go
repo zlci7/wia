@@ -105,9 +105,9 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if status != "ready" {
 		return Correction{}, ErrWorldNotReady
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, err = a.worldRecord(ctx, worldID)
 	if err != nil {
 		return Correction{}, err
@@ -141,7 +141,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if !errors.Is(err, sql.ErrNoRows) {
 		return Correction{}, err
 	}
-	if world.savePending {
+	if worldRT.savePending {
 		return Correction{}, ErrWorldBusy
 	}
 	if count, e := countActiveRuns(ctx, store.db); e != nil {

@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	wiaworld "gameagent/backend/internal/world"
 	"time"
 )
 
@@ -12,10 +13,10 @@ type MessagePageRequest struct {
 }
 
 type MessagePage struct {
-	Messages      []Message `json:"messages"`
-	HasMore       bool      `json:"has_more"`
-	NextBeforeSeq *int64    `json:"next_before_seq,omitempty"`
-	NextAfterSeq  *int64    `json:"next_after_seq,omitempty"`
+	Messages      []wiaworld.Message `json:"messages"`
+	HasMore       bool               `json:"has_more"`
+	NextBeforeSeq *int64             `json:"next_before_seq,omitempty"`
+	NextAfterSeq  *int64             `json:"next_after_seq,omitempty"`
 }
 
 func (a *App) ReadMessagePage(ctx context.Context, worldID string, request MessagePageRequest) (MessagePage, error) {
@@ -25,9 +26,9 @@ func (a *App) ReadMessagePage(ctx context.Context, worldID string, request Messa
 	if request.Limit < 1 || request.Limit > 200 || (request.BeforeSeq != nil && request.AfterSeq != nil) || (request.BeforeSeq != nil && *request.BeforeSeq <= 0) || (request.AfterSeq != nil && *request.AfterSeq < 0) {
 		return MessagePage{}, ErrInvalidRequest
 	}
-	world := a.worldRuntimeFor(worldID)
-	world.mu.Lock()
-	defer world.mu.Unlock()
+	worldRT := a.worldRuntimeFor(worldID)
+	worldRT.mu.Lock()
+	defer worldRT.mu.Unlock()
 	path, status, err := a.worldRecord(ctx, worldID)
 	if err != nil {
 		return MessagePage{}, err
@@ -61,9 +62,9 @@ func (a *App) ReadMessagePage(ctx context.Context, worldID string, request Messa
 		return MessagePage{}, err
 	}
 	defer rows.Close()
-	page := MessagePage{Messages: []Message{}}
+	page := MessagePage{Messages: []wiaworld.Message{}}
 	for rows.Next() {
-		var m Message
+		var m wiaworld.Message
 		var created string
 		if err := rows.Scan(&m.Seq, &m.MessageID, &m.Kind, &m.Content, &m.RunID, &created); err != nil {
 			return MessagePage{}, err

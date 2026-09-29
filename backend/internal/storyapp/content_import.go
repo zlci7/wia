@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 	"io"
 	"os"
 	"path"
@@ -661,7 +662,7 @@ func mustJSON(value any) []byte {
 
 // draftNPCRefs projects characters into the asset-reference shape used by
 // referencedAssets, so package loading can collect the images a package uses.
-func draftNPCRefs(characters []Character) []ContentDraftNPC {
+func draftNPCRefs(characters []wiaworld.Character) []ContentDraftNPC {
 	out := make([]ContentDraftNPC, 0, len(characters))
 	for _, character := range characters {
 		out = append(out, ContentDraftNPC{Avatar: character.Avatar})

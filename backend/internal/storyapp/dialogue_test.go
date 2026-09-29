@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
@@ -14,7 +15,7 @@ func TestDialogueUsesFourCommittedTurns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var runs []Run
+	var runs []wiaworld.Run
 	for i := 0; i < 5; i++ {
 		r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: fmt.Sprint(i), Input: fmt.Sprintf("老板，第%d次问候", i)})
 		if err != nil {

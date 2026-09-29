@@ -12,6 +12,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/tokenestimate"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type contextSection struct {
@@ -174,14 +175,14 @@ func (c ContextComposer) Build(material contextMaterial, system string, output i
 		sections = sections[1:]
 	}
 	for _, id := range material.RequiredSources {
-		if !containsID(report.SelectedSources, id) {
+		if !wiaworld.ContainsID(report.SelectedSources, id) {
 			report.SelectedSources = append(report.SelectedSources, id)
 		}
 	}
 	for _, section := range sections {
 		report.Sections = append(report.Sections, section.Name)
 		for _, id := range section.Sources {
-			if !containsID(report.SelectedSources, id) {
+			if !wiaworld.ContainsID(report.SelectedSources, id) {
 				report.SelectedSources = append(report.SelectedSources, id)
 			}
 		}
@@ -205,7 +206,7 @@ type contextGenerator struct {
 	calls    int
 }
 
-func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot worldSnapshot, run Run, purpose, recipient string, stage int, template string) model.TextGenerator {
+func (a *App) contextGenerator(generator model.TextGenerator, material contextMaterial, snapshot worldSnapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
 	window := model.WindowLimits{}
 	if provider, ok := generator.(model.WindowProvider); ok {
 		window = provider.ModelWindow()
@@ -260,14 +261,14 @@ func dialogueSections(snapshot worldSnapshot) []contextSection {
 		}
 		i := len(groups) - 1
 		part := snapshot
-		part.Dialogue = []Event{event}
+		part.Dialogue = []wiaworld.Event{event}
 		groups[i].Text += "此前已提交对话：" + dialogueContext(part)
 		groups[i].Sources = append(groups[i].Sources, event.EventID)
 	}
 	return groups
 }
 
-func narrativeSections(messages []Message) []contextSection {
+func narrativeSections(messages []wiaworld.Message) []contextSection {
 	var sections []contextSection
 	for _, message := range messages {
 		if message.Kind == "narrative" && wire.Clean(message.Content) != "" {
@@ -300,17 +301,17 @@ func personalSections(snapshot worldSnapshot, recipient string) []contextSection
 		key := keyFor(p.SourceEventID)
 		group := groups[key]
 		group.Name = "personal_history"
-		if !containsID(group.Sources, p.SourceEventID) {
+		if !wiaworld.ContainsID(group.Sources, p.SourceEventID) {
 			group.Sources = append(group.Sources, p.SourceEventID)
 		}
-		group.Text += "此前已提交个人感知：" + joinPerceptions(snapshot, []Perception{p}) + "\n"
+		group.Text += "此前已提交个人感知：" + joinPerceptions(snapshot, []wiaworld.Perception{p}) + "\n"
 		groups[key] = group
 	}
 	for _, m := range snapshot.Memories[recipient] {
 		key := keyFor(m.SourceEventID)
 		group := groups[key]
 		group.Name = "personal_history"
-		if !containsID(group.Sources, m.SourceEventID) {
+		if !wiaworld.ContainsID(group.Sources, m.SourceEventID) {
 			group.Sources = append(group.Sources, m.SourceEventID)
 		}
 		group.Text += "本人主观记忆（不是世界事实）：" + m.Kind + "：" + m.Content + "\n"
@@ -339,7 +340,7 @@ func sceneViewSources(snapshot worldSnapshot, recipient string) []string {
 	for _, view := range snapshot.SceneViews {
 		if recipient == "" || view.Recipient == recipient {
 			for _, id := range view.SourceIDs {
-				if !containsID(ids, id) {
+				if !wiaworld.ContainsID(ids, id) {
 					ids = append(ids, id)
 				}
 			}
@@ -348,14 +349,14 @@ func sceneViewSources(snapshot worldSnapshot, recipient string) []string {
 	return ids
 }
 
-func coordinationSections(events []Event) []contextSection {
-	var groups [][]Event
+func coordinationSections(events []wiaworld.Event) []contextSection {
+	var groups [][]wiaworld.Event
 	for _, event := range events {
 		if event.EventType != "npc_action_result" && event.EventType != "player_action_result" {
 			continue
 		}
 		if len(groups) == 0 || groups[len(groups)-1][0].RunID != event.RunID {
-			groups = append(groups, []Event{})
+			groups = append(groups, []wiaworld.Event{})
 		}
 		groups[len(groups)-1] = append(groups[len(groups)-1], event)
 	}

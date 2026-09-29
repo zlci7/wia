@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 			t.Fatal("initial concern not copied")
 		}
 	}
-	public, _ := json.Marshal(PublicCharacterViews(s.Characters))
+	public, _ := json.Marshal(wiaworld.PublicCharacterViews(s.Characters))
 	for _, c := range s.Characters {
 		if strings.Contains(string(public), c.InitialConcerns) {
 			t.Fatal("private concern in public projection")
@@ -52,7 +53,7 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 
 func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
 	var out turnOutput
-	run := Run{RunID: "autonomy"}
+	run := wiaworld.Run{RunID: "autonomy"}
 	actor := lanternDefinition().Characters[0]
 	appendNPCDecisionOutput(&out, run, actor, npcDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
 	var actions int

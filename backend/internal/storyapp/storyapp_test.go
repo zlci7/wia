@@ -15,6 +15,7 @@ import (
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type scriptedGenerator struct {
@@ -92,7 +93,7 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		return model.TextResponse{Text: `{"speech":"","action_intent":"保持观察","silent":true,"memory":"我看见有人在客栈里行动。"}`}, nil
 	}
 	if strings.Contains(req.System, "场景协调 Agent") {
-		var candidates []Event
+		var candidates []wiaworld.Event
 		start := strings.Index(req.Input, "待裁定行动(JSON)：")
 		end := strings.Index(req.Input, "\n所有可用重要人物：")
 		if start < 0 || end < start || json.Unmarshal([]byte(req.Input[start+len("待裁定行动(JSON)："):end]), &candidates) != nil {
@@ -158,7 +159,7 @@ func newTestApp(t *testing.T, generator model.TextGenerator) *App {
 	return app
 }
 
-func waitRun(t *testing.T, app *App, worldID, runID string) Run {
+func waitRun(t *testing.T, app *App, worldID, runID string) wiaworld.Run {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -172,7 +173,7 @@ func waitRun(t *testing.T, app *App, worldID, runID string) Run {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("run did not finish")
-	return Run{}
+	return wiaworld.Run{}
 }
 
 func TestListWorldsReleasesApplicationRowsBeforeLoadingWorlds(t *testing.T) {
@@ -412,11 +413,11 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 		t.Fatal("mercenary definition missing")
 	}
 	snapshot := worldSnapshot{
-		Summary:      WorldSummary{WorldID: "world-test", Scene: def.Scene, Clock: def.Clock},
+		Summary:      wiaworld.WorldSummary{WorldID: "world-test", Scene: def.Scene, Clock: def.Clock},
 		Narrative:    defaultNarrativeSettings(),
 		Characters:   def.Characters,
-		Perceptions:  map[string][]Perception{},
-		Memories:     map[string][]Memory{},
+		Perceptions:  map[string][]wiaworld.Perception{},
+		Memories:     map[string][]wiaworld.Memory{},
 		SceneVersion: 1,
 	}
 	prompt := buildNPCPrompt(snapshot, def, character, "", "act", npcStageInput{PlayerPerception: "走进大门看看"}, "", 1)

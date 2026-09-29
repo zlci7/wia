@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // Opt-in comparison uses only disposable worlds and never edits the supplied config.
@@ -158,16 +159,16 @@ func TestPacingCommittedTeaReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot.Summary.Scene = "旧渡口客栈内。旅人已经进堂。沈岚从柜台后取碗斟茶，把碗放到门边桌角。铁杉仍坐在窗边。"
-	snapshot.Messages = []Message{{Kind: "narrative", Content: "你已进入客栈并扶正灯架。沈岚把热茶放在门边桌角，站在桌旁：‘先坐下歇歇。’"}}
-	snapshot.Events = []Event{{Seq: 5, EventID: "prior-tea", EventType: "npc_action_result", ActorID: "npc:innkeeper", Content: "沈岚已把热茶放到门边桌角，现在站在桌边。"}}
+	snapshot.Messages = []wiaworld.Message{{Kind: "narrative", Content: "你已进入客栈并扶正灯架。沈岚把热茶放在门边桌角，站在桌旁：‘先坐下歇歇。’"}}
+	snapshot.Events = []wiaworld.Event{{Seq: 5, EventID: "prior-tea", EventType: "npc_action_result", ActorID: "npc:innkeeper", Content: "沈岚已把热茶放到门边桌角，现在站在桌边。"}}
 	for i := range snapshot.SceneViews {
 		snapshot.SceneViews[i].Content = "旧渡口客栈。沈岚已把热茶放到门边桌角，现在站在桌边。"
 		snapshot.SceneViews[i].SourceIDs = []string{"prior-tea"}
 	}
-	run := Run{RunID: "replay", Input: "我走进去跟老板打了声招呼，观测起四周"}
+	run := wiaworld.Run{RunID: "replay", Input: "我走进去跟老板打了声招呼，观测起四周"}
 	speech := "晚上好，茶刚沏好，趁热。"
 	decisions := map[string]npcDecision{"npc:innkeeper": {Speech: speech}, "npc:mercenary": {Silent: true}}
-	events := []Event{{EventID: "current-greeting", RunID: "replay", Stage: 1, EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: speech}, {EventID: "current-input", RunID: "replay", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: run.Input}}
+	events := []wiaworld.Event{{EventID: "current-greeting", RunID: "replay", Stage: 1, EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: speech}, {EventID: "current-input", RunID: "replay", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: run.Input}}
 	for _, baseline := range []bool{true, false} {
 		name := "current"
 		if baseline {

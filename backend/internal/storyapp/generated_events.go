@@ -13,6 +13,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type EventGenerationPolicy struct {
@@ -137,7 +138,7 @@ func eventOpportunityContract(s worldSnapshot) string {
 	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
 }
 
-func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, opportunity *eventOpportunity, output *turnOutput) ([]Event, error) {
+func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turnOutput) ([]wiaworld.Event, error) {
 	p := snapshot.Definition.EventGeneration
 	if p == nil {
 		return nil, nil
@@ -188,7 +189,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	if (opportunity.Kind != "arrival" && opportunity.Kind != "significant_change") || !slices.Contains(p.Locations, opportunity.Location) {
 		return nil, fmt.Errorf("%w: event_opportunity_scope", ErrGenerationFailed)
 	}
-	var trigger Event
+	var trigger wiaworld.Event
 	for _, e := range output.Events {
 		suffix, matches := strings.CutPrefix(e.EventID, opportunity.ActionID+":result:")
 		n, parseErr := strconv.Atoi(suffix)
@@ -247,6 +248,6 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	}
 	state.Active = append(state.Active, generatedEvent{Node: node, StartID: root, TriggerID: trigger.EventID, Location: opportunity.Location, Premise: c.Initial.Content})
 	// The author plan is archived with the same transaction, never projected as facts.
-	output.Events = append(output.Events, Event{EventID: root + ":plan", EventType: "generated_event_plan", ActorID: "world", Content: wire.MarshalJSON(state.Active[len(state.Active)-1]), RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "author_plan", ProjectionParentID: root, CreatedAt: time.Now().UTC()})
+	output.Events = append(output.Events, wiaworld.Event{EventID: root + ":plan", EventType: "generated_event_plan", ActorID: "world", Content: wire.MarshalJSON(state.Active[len(state.Active)-1]), RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "author_plan", ProjectionParentID: root, CreatedAt: time.Now().UTC()})
 	return visible, nil
 }
