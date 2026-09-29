@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"strconv"
@@ -299,7 +300,7 @@ func correctionOriginal(ctx context.Context, store *storage.WorldStore, s worldS
 
 // A corrected author event does not grant its replacement to recipients that
 // originally received only a partial projection. Those projections are retracted.
-func correctedSource(s MemorySource, corrections []Correction, eventRuns map[string]string) MemorySource {
+func correctedSource(s memorymodel.MemorySource, corrections []Correction, eventRuns map[string]string) memorymodel.MemorySource {
 	for _, c := range corrections {
 		if (c.Kind == "perception" || c.Kind == "subjective") && c.Scope == s.Scope && c.TargetID == s.ID {
 			s.Content = c.Replacement
@@ -371,7 +372,7 @@ func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s 
 				if s.Events[i].EventID == c.TargetID {
 					s.Events[i].Content = c.Replacement
 				} else if c.affects(s.Events[i].EventID) {
-					s.Events[i].Content = correctedSource(MemorySource{EventID: s.Events[i].EventID, Content: s.Events[i].Content}, []Correction{c}, nil).Content
+					s.Events[i].Content = correctedSource(memorymodel.MemorySource{EventID: s.Events[i].EventID, Content: s.Events[i].Content}, []Correction{c}, nil).Content
 				}
 			}
 			for i := range s.Dialogue {
@@ -401,7 +402,7 @@ func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s 
 		for i := range items {
 			p := &items[i]
 			id := "perception:" + strconv.FormatInt(p.Seq, 10)
-			v := correctedSource(MemorySource{Scope: scope, ID: id, EventID: p.SourceEventID, Content: p.Content}, list, nil)
+			v := correctedSource(memorymodel.MemorySource{Scope: scope, ID: id, EventID: p.SourceEventID, Content: p.Content}, list, nil)
 			p.Content = v.Content
 		}
 		s.Perceptions[scope] = items
@@ -410,7 +411,7 @@ func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s 
 		for i := range items {
 			p := &items[i]
 			id := "memory:" + strconv.FormatInt(p.Seq, 10)
-			v := correctedSource(MemorySource{Scope: scope, ID: id, EventID: p.SourceEventID, Content: p.Content}, list, nil)
+			v := correctedSource(memorymodel.MemorySource{Scope: scope, ID: id, EventID: p.SourceEventID, Content: p.Content}, list, nil)
 			p.Content = v.Content
 		}
 		s.Memories[scope] = items

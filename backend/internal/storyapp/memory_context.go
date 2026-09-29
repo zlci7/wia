@@ -11,37 +11,21 @@ import (
 	"time"
 	"unicode"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
-type SubjectiveState struct {
-	Kind    string   `json:"kind"`
-	Content string   `json:"content"`
-	Sources []string `json:"source_ids"`
-}
-
-type MemoryDigest struct {
-	Scope    string            `json:"scope"`
-	Revision int64             `json:"revision"`
-	Epoch    int64             `json:"epoch"`
-	Through  int64             `json:"through_seq"`
-	Head     int64             `json:"source_head"`
-	Content  string            `json:"content"`
-	States   []SubjectiveState `json:"states"`
-	Sources  []string          `json:"source_ids"`
-}
-
 type memoryContext struct {
-	Digest  MemoryDigest
-	Tail    []MemorySource
-	Archive []MemorySource
+	Digest  memorymodel.MemoryDigest
+	Tail    []memorymodel.MemorySource
+	Archive []memorymodel.MemorySource
 }
 
-func readDigest(ctx context.Context, db *sql.DB, scope string) (MemoryDigest, error) {
-	d := MemoryDigest{Scope: scope, States: []SubjectiveState{}, Sources: []string{}}
+func readDigest(ctx context.Context, db *sql.DB, scope string) (memorymodel.MemoryDigest, error) {
+	d := memorymodel.MemoryDigest{Scope: scope, States: []memorymodel.SubjectiveState{}, Sources: []string{}}
 	var states, sources string
 	err := db.QueryRowContext(ctx, `SELECT revision,epoch,through_seq,source_head,content,states,sources FROM memory_digests WHERE scope=? ORDER BY revision DESC LIMIT 1`, scope).Scan(&d.Revision, &d.Epoch, &d.Through, &d.Head, &d.Content, &states, &sources)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -98,9 +82,9 @@ func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, 
 			if len(groups) <= 4 || (len(groups) <= 8 && framedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(m.Tail)}) <= 6000) {
 				break
 			}
-			prefix := []MemorySource{}
+			prefix := []memorymodel.MemorySource{}
 			for _, group := range groups[:len(groups)-4] {
-				candidate := append(append([]MemorySource{}, prefix...), group...)
+				candidate := append(append([]memorymodel.MemorySource{}, prefix...), group...)
 				if framedContextTokens(model.TextRequest{System: "memory", Input: memoryRecordsText(candidate)}) > 6500 && len(prefix) > 0 {
 					break
 				}
@@ -133,7 +117,7 @@ func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, 
 	return nil
 }
 
-func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, scope string, previous MemoryDigest, prefix []MemorySource) (MemoryDigest, error) {
+func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, scope string, previous memorymodel.MemoryDigest, prefix []memorymodel.MemorySource) (memorymodel.MemoryDigest, error) {
 	d := previous
 	if len(prefix) == 0 {
 		return d, nil
@@ -153,8 +137,8 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	material.System += memoryCorrectionRule
 	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v3")
 	var result struct {
-		Content string            `json:"content"`
-		States  []SubjectiveState `json:"states"`
+		Content string                        `json:"content"`
+		States  []memorymodel.SubjectiveState `json:"states"`
 	}
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -177,7 +161,7 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 			}
 		}
 	}
-	return MemoryDigest{Scope: scope, Revision: previous.Revision + 1, Epoch: run.BaseContextEpoch, Through: prefix[len(prefix)-1].Seq, Head: prefix[len(prefix)-1].Seq, Content: result.Content, States: result.States, Sources: sources}, nil
+	return memorymodel.MemoryDigest{Scope: scope, Revision: previous.Revision + 1, Epoch: run.BaseContextEpoch, Through: prefix[len(prefix)-1].Seq, Head: prefix[len(prefix)-1].Seq, Content: result.Content, States: result.States, Sources: sources}, nil
 }
 
 func (a *App) logMemoryValidation(world, scope, boundary string) {
@@ -186,7 +170,7 @@ func (a *App) logMemoryValidation(world, scope, boundary string) {
 	}
 }
 
-func publishDigest(ctx context.Context, store *storage.WorldStore, d MemoryDigest, previous, epoch int64) error {
+func publishDigest(ctx context.Context, store *storage.WorldStore, d memorymodel.MemoryDigest, previous, epoch int64) error {
 	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -282,7 +266,7 @@ func withLongMemory(material contextMaterial, snapshot worldSnapshot, scope, que
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material contextMaterial, base string, m memoryContext, scope string, block []MemorySource, query string) contextMaterial {
+func renderMemoryWindow(material contextMaterial, base string, m memoryContext, scope string, block []memorymodel.MemorySource, query string) contextMaterial {
 	material.Required = base
 	material.RequiredSources = nil
 	material.DeclinedSources = nil
@@ -307,7 +291,7 @@ func renderMemoryWindow(material contextMaterial, base string, m memoryContext, 
 	}
 	// Groups that did not fit stay retrievable: they remain in the archive and are
 	// reported as declined rather than as already retrieved.
-	backlog := [][]MemorySource{}
+	backlog := [][]memorymodel.MemorySource{}
 	for _, group := range memoryGroups(m.Tail) {
 		if len(group) > 0 && !included[group[0].ID] {
 			backlog = append(backlog, group)
@@ -330,7 +314,7 @@ func renderMemoryWindow(material contextMaterial, base string, m memoryContext, 
 
 // groupsWithinBudget keeps the newest complete groups that fit, and always keeps the
 // newest one so a turn never loses its own most recent context.
-func groupsWithinBudget(groups [][]MemorySource, budget int) [][]MemorySource {
+func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]memorymodel.MemorySource {
 	if len(groups) == 0 {
 		return nil
 	}
@@ -344,7 +328,7 @@ func groupsWithinBudget(groups [][]MemorySource, budget int) [][]MemorySource {
 }
 
 // withLongMemoryWindow renders the required block from an explicit set of groups.
-func withLongMemoryWindow(material contextMaterial, m memoryContext, kept [][]MemorySource, query string) contextMaterial {
+func withLongMemoryWindow(material contextMaterial, m memoryContext, kept [][]memorymodel.MemorySource, query string) contextMaterial {
 	rebuilt := contextMaterial{
 		PolicyRevision: material.PolicyRevision,
 		System:         material.System,
@@ -382,7 +366,7 @@ func withLongMemoryWindow(material contextMaterial, m memoryContext, kept [][]Me
 		}
 	}
 	rebuilt.RequiredSources = filtered
-	older := [][]MemorySource{}
+	older := [][]memorymodel.MemorySource{}
 	for _, group := range memoryGroups(m.Tail) {
 		if len(group) > 0 && !keptIDs[group[0].ID] {
 			older = append(older, group)
@@ -407,7 +391,7 @@ func withLongMemoryWindow(material contextMaterial, m memoryContext, kept [][]Me
 // remaining input budget. It falls back to the size-based rule when no budget is known,
 // always keeps the newest group, and never advances the digest watermark: supplying
 // fewer groups must not claim they were summarized.
-func selectRecentWindow(items []MemorySource, available int) (block []MemorySource, backlog [][]MemorySource, supplied map[string]bool) {
+func selectRecentWindow(items []memorymodel.MemorySource, available int) (block []memorymodel.MemorySource, backlog [][]memorymodel.MemorySource, supplied map[string]bool) {
 	supplied = map[string]bool{}
 	groups := memoryGroups(items)
 	if len(groups) == 0 {
@@ -451,7 +435,7 @@ const (
 // projectRecentExperience splits the unsummarized tail into the groups supplied to
 // this request and the older backlog that stays recall-only. The digest watermark
 // is never advanced here: supplying fewer groups must not claim they were summarized.
-func projectRecentExperience(items []MemorySource) (block []MemorySource, backlog [][]MemorySource, supplied map[string]bool) {
+func projectRecentExperience(items []memorymodel.MemorySource) (block []memorymodel.MemorySource, backlog [][]memorymodel.MemorySource, supplied map[string]bool) {
 	supplied = map[string]bool{}
 	groups := memoryGroups(items)
 	if len(groups) == 0 {
@@ -474,8 +458,8 @@ func projectRecentExperience(items []MemorySource) (block []MemorySource, backlo
 	return block, backlog, supplied
 }
 
-func flattenGroups(groups [][]MemorySource) []MemorySource {
-	out := []MemorySource{}
+func flattenGroups(groups [][]memorymodel.MemorySource) []memorymodel.MemorySource {
+	out := []memorymodel.MemorySource{}
 	for _, group := range groups {
 		out = append(out, group...)
 	}
@@ -484,12 +468,12 @@ func flattenGroups(groups [][]MemorySource) []MemorySource {
 
 const memoryCorrectionRule = "\n记录类型 correction:* 是对本人资料已经生效的纠正，优先于此前关于同一内容的解释、回忆或自己的旧对白。保留曾经说过旧话这一历史，但后续判断使用纠正后的内容；纠正本身不是故事里新发生的对话，也不授予其他人物这些知识。"
 
-func digestContext(d MemoryDigest) string {
+func digestContext(d memorymodel.MemoryDigest) string {
 	return wire.MarshalJSON(struct {
-		Scope   string            `json:"scope"`
-		Through int64             `json:"through_seq"`
-		Content string            `json:"content"`
-		States  []SubjectiveState `json:"states"`
+		Scope   string                        `json:"scope"`
+		Through int64                         `json:"through_seq"`
+		Content string                        `json:"content"`
+		States  []memorymodel.SubjectiveState `json:"states"`
 	}{d.Scope, d.Through, d.Content, d.States})
 }
 
@@ -550,7 +534,7 @@ func withRecall(material contextMaterial, projection memoryProjection, query str
 	return material
 }
 
-func retainedStateSources(d MemoryDigest) []string {
+func retainedStateSources(d memorymodel.MemoryDigest) []string {
 	var ids []string
 	for _, state := range d.States {
 		for _, id := range state.Sources {
@@ -563,7 +547,7 @@ func retainedStateSources(d MemoryDigest) []string {
 }
 
 // Search receives one authorized scope, not the world's unprojected events.
-func searchMemory(items []MemorySource, query string, limit int) []MemorySource {
+func searchMemory(items []memorymodel.MemorySource, query string, limit int) []memorymodel.MemorySource {
 	tokens := map[string]bool{}
 	for _, word := range strings.FieldsFunc(strings.ToLower(query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) }) {
 		rs := []rune(word)
@@ -576,7 +560,7 @@ func searchMemory(items []MemorySource, query string, limit int) []MemorySource 
 		}
 	}
 	type ranked struct {
-		s     MemorySource
+		s     memorymodel.MemorySource
 		score int
 	}
 	var candidates []ranked
@@ -598,7 +582,7 @@ func searchMemory(items []MemorySource, query string, limit int) []MemorySource 
 		}
 		return candidates[i].score > candidates[j].score
 	})
-	result := []MemorySource{}
+	result := []memorymodel.MemorySource{}
 	for i := 0; i < min(limit, len(candidates)); i++ {
 		result = append(result, candidates[i].s)
 	}

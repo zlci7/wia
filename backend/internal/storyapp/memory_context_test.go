@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
@@ -40,8 +41,8 @@ func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
 	}
 	s := readContextSnapshot(t, a, w.WorldID)
 	s.LongMemory = map[string]memoryContext{
-		"npc:innkeeper": {Archive: []MemorySource{{ID: "personal-old", Seq: 1, Content: "铜钥匙须在柜台归还"}}},
-		"npc:mercenary": {Archive: []MemorySource{{ID: "other-secret", Seq: 1, Content: "他人的铜钥匙秘密"}}},
+		"npc:innkeeper": {Archive: []memorymodel.MemorySource{{ID: "personal-old", Seq: 1, Content: "铜钥匙须在柜台归还"}}},
+		"npc:mercenary": {Archive: []memorymodel.MemorySource{{ID: "other-secret", Seq: 1, Content: "他人的铜钥匙秘密"}}},
 	}
 	s.Perceptions["npc:innkeeper"] = []wiaworld.Perception{{SourceEventID: "current-done", Content: "此前已完成添茶，不是新提案。", SourceType: "action_result"}}
 	s.Sources["current-done"] = sourceMetadata{ID: "current-done", Actor: "npc:innkeeper", Kind: "npc_action_result"}
@@ -197,14 +198,14 @@ func TestMemoryOptionalFailureKeepsCompleteTail(t *testing.T) {
 }
 
 func TestMemoryTailIsRequiredAndSearchBounded(t *testing.T) {
-	var archive []MemorySource
+	var archive []memorymodel.MemorySource
 	for i := 1; i <= 20; i++ {
-		archive = append(archive, MemorySource{ID: fmt.Sprint(i), Seq: int64(i), RunID: fmt.Sprint(i / 2), Content: "旧码头的铜钥匙"})
+		archive = append(archive, memorymodel.MemorySource{ID: fmt.Sprint(i), Seq: int64(i), RunID: fmt.Sprint(i / 2), Content: "旧码头的铜钥匙"})
 	}
 	if got := searchMemory(archive, "铜钥匙", 5); len(got) != 5 || got[0].Seq != 20 {
 		t.Fatal(got)
 	}
-	s := worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []MemorySource{{Content: strings.Repeat("完整经历", 15000)}}}}}
+	s := worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []memorymodel.MemorySource{{Content: strings.Repeat("完整经历", 15000)}}}}}
 	m := withLongMemory(contextMaterial{System: "test", Required: "current"}, s, "player", "")
 	if _, _, err := (ContextComposer{}).Build(m, m.System, 100); !errors.Is(err, ErrContextCapacity) {
 		t.Fatal("silently truncated recent history", err)

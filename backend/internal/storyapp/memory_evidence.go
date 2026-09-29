@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	// Coordinator history consists of world events, never player literary memory.
 	// Recent runs stay whole; old evidence is selected by the current input and the
@@ -20,13 +21,13 @@ func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, sn
 	events = effective.Events
 	runs := []string{}
 	seen := map[string]bool{}
-	records := []MemorySource{}
+	records := []memorymodel.MemorySource{}
 	for _, e := range events {
 		if !seen[e.RunID] {
 			seen[e.RunID] = true
 			runs = append(runs, e.RunID)
 		}
-		records = append(records, MemorySource{ID: e.EventID, Seq: e.Seq, RunID: e.RunID, Content: e.Content})
+		records = append(records, memorymodel.MemorySource{ID: e.EventID, Seq: e.Seq, RunID: e.RunID, Content: e.Content})
 	}
 	selected := map[string]bool{}
 	for i := max(0, len(runs)-4); i < len(runs); i++ {

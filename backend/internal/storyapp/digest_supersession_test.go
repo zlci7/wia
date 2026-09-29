@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"testing"
 	"time"
@@ -71,8 +72,8 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 }
 
 func TestPendingDigestEditDoesNotReviveInvalidatedHistory(t *testing.T) {
-	d := MemoryDigest{Epoch: 1, Through: 5}
-	archive := []MemorySource{{Seq: 1, EventID: "projection"}}
+	d := memorymodel.MemoryDigest{Epoch: 1, Through: 5}
+	archive := []memorymodel.MemorySource{{Seq: 1, EventID: "projection"}}
 	cs := []Correction{{Epoch: 2, Kind: "digest", Scope: "npc:a", Replacement: "人工回顾"}, {Epoch: 3, Kind: "event", TargetID: "root", Dependents: []string{"projection"}}}
 	if pendingDigestEdit(d, "npc:a", 3, archive, cs, nil) != nil {
 		t.Fatal("later source correction must invalidate manual digest")

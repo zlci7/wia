@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
 
-func historyRecords(groups, perGroup int, content func(group, index int) string) []MemorySource {
-	var out []MemorySource
+func historyRecords(groups, perGroup int, content func(group, index int) string) []memorymodel.MemorySource {
+	var out []memorymodel.MemorySource
 	seq := int64(0)
 	for group := 1; group <= groups; group++ {
 		for index := 1; index <= perGroup; index++ {
 			seq++
-			out = append(out, MemorySource{
+			out = append(out, memorymodel.MemorySource{
 				ID:      fmt.Sprintf("record:%02d:%d", group, index),
 				Seq:     seq,
 				RunID:   fmt.Sprintf("run:%02d", group),
@@ -156,8 +157,8 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 		Definition: gameDefinition{Background: "背景"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_oversized", Clock: "第 1 日 19:00"},
 		LongMemory: map[string]memoryContext{"player": {
-			Archive: []MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
-			Tail:    []MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
+			Archive: []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
+			Tail:    []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
 		}},
 	}
 	tooLarge := withLongMemory(contextMaterial{System: "职责", Required: "本轮"}, oversized, "player", "")
@@ -256,7 +257,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 	if err = loadLongMemory(ctx, store, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	var target MemorySource
+	var target memorymodel.MemorySource
 	for _, record := range snapshot.LongMemory["npc:innkeeper"].Archive {
 		if strings.Contains(record.Content, "第1轮") {
 			target = record
@@ -296,7 +297,7 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 	if !strings.Contains(req.Input, "客栈柜台") {
 		t.Fatal("correction did not apply to a backlog record")
 	}
-	other := memoryContext{Archive: []MemorySource{{ID: "other:1", Seq: 1, RunID: "run:other", Content: "铜钥匙在别人手里"}}}
+	other := memoryContext{Archive: []memorymodel.MemorySource{{ID: "other:1", Seq: 1, RunID: "run:other", Content: "铜钥匙在别人手里"}}}
 	crossScope := withRecall(contextMaterial{System: "NPC", Required: "本轮"}, memoryProjection{context: other, supplied: map[string]bool{}}, "铜钥匙")
 	if strings.Contains(anyOptionalText(crossScope), "旧码头") {
 		t.Fatal("recall crossed receivers")

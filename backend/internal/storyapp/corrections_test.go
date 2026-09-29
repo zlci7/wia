@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
@@ -198,8 +199,8 @@ func TestCorrectionTargetsAndRestart(t *testing.T) {
 
 func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
 	s := worldSnapshot{LongMemory: map[string]memoryContext{
-		"npc:innkeeper": {Archive: []MemorySource{{ID: "p1", EventID: "private", Content: "暗号白鹭"}}},
-		"npc:mercenary": {Archive: []MemorySource{{ID: "p2", EventID: "private", Content: "看见交谈"}}},
+		"npc:innkeeper": {Archive: []memorymodel.MemorySource{{ID: "p1", EventID: "private", Content: "暗号白鹭"}}},
+		"npc:mercenary": {Archive: []memorymodel.MemorySource{{ID: "p2", EventID: "private", Content: "看见交谈"}}},
 	}}
 	n := correctionNotices(s, Correction{Kind: "event", TargetID: "private", Original: "暗号白鹭", Replacement: "暗号青鹭"}, "run")
 	if n["npc:innkeeper"] != "暗号青鹭" || strings.Contains(n["npc:mercenary"], "青鹭") || n["npc:mercenary"] == "" {

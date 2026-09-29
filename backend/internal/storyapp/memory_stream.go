@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"strings"
 )
@@ -22,18 +23,6 @@ CREATE TABLE IF NOT EXISTS memory_digests (
  content TEXT NOT NULL, states TEXT NOT NULL, sources TEXT NOT NULL, created_at TEXT NOT NULL,
  PRIMARY KEY(scope,revision)
 );`
-
-type MemorySource struct {
-	Scope     string `json:"scope"`
-	Seq       int64  `json:"seq"`
-	ID        string `json:"id"`
-	EventID   string `json:"event_id"`
-	RunID     string `json:"run_id"`
-	Actor     string `json:"actor"`
-	Kind      string `json:"kind"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
-}
 
 // This index copies only already-authorized projections. Joining an event grants
 // speaker/time metadata, never its body, except the speaker's own public speech.
@@ -68,9 +57,9 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 	if err != nil {
 		return err
 	}
-	var records []MemorySource
+	var records []memorymodel.MemorySource
 	for rows.Next() {
-		var r MemorySource
+		var r memorymodel.MemorySource
 		if err = rows.Scan(&r.Scope, &r.ID, &r.EventID, &r.RunID, &r.Actor, &r.Kind, &r.Content, &r.CreatedAt); err != nil {
 			rows.Close()
 			return err
@@ -91,15 +80,15 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 	return tx.Commit()
 }
 
-func readMemorySources(ctx context.Context, db *sql.DB, scope string, after int64) ([]MemorySource, error) {
+func readMemorySources(ctx context.Context, db *sql.DB, scope string, after int64) ([]memorymodel.MemorySource, error) {
 	rows, err := db.QueryContext(ctx, `SELECT scope,seq,source_id,event_id,run_id,actor,kind,content,created_at FROM memory_sources WHERE scope=? AND seq>? ORDER BY seq`, scope, after)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []MemorySource{}
+	items := []memorymodel.MemorySource{}
 	for rows.Next() {
-		var s MemorySource
+		var s memorymodel.MemorySource
 		if err = rows.Scan(&s.Scope, &s.Seq, &s.ID, &s.EventID, &s.RunID, &s.Actor, &s.Kind, &s.Content, &s.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -124,11 +113,11 @@ func readMemorySources(ctx context.Context, db *sql.DB, scope string, after int6
 	return items, nil
 }
 
-func memoryGroups(items []MemorySource) [][]MemorySource {
-	var groups [][]MemorySource
+func memoryGroups(items []memorymodel.MemorySource) [][]memorymodel.MemorySource {
+	var groups [][]memorymodel.MemorySource
 	for _, item := range items {
 		if len(groups) == 0 || groups[len(groups)-1][0].RunID != item.RunID {
-			groups = append(groups, []MemorySource{})
+			groups = append(groups, []memorymodel.MemorySource{})
 		}
 		groups[len(groups)-1] = append(groups[len(groups)-1], item)
 	}
@@ -143,7 +132,7 @@ func memoryScopeIDs(snapshot worldSnapshot) []string {
 	return ids
 }
 
-func memoryRecordsText(items []MemorySource) string {
+func memoryRecordsText(items []memorymodel.MemorySource) string {
 	var b strings.Builder
 	for _, s := range items {
 		fmt.Fprintf(&b, "[%s；个人序号=%d；说话者=%s；类型=%s；来源=%s；记录于=%s] %s\n", s.ID, s.Seq, s.Actor, s.Kind, s.EventID, s.CreatedAt, s.Content)

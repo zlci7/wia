@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 )
 
@@ -12,10 +13,10 @@ import (
 func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	// Small enough that the character-count rule keeps every group, so the token budget
 	// is what has to reduce the window.
-	groups := [][]MemorySource{}
+	groups := [][]memorymodel.MemorySource{}
 	for i := 0; i < targetRecentGroups; i++ {
-		record := MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("已发生的经历", 100)}
-		groups = append(groups, []MemorySource{record})
+		record := memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("已发生的经历", 100)}
+		groups = append(groups, []memorymodel.MemorySource{record})
 	}
 	tail := flattenGroups(groups)
 	if len(memoryGroups(tail)) != targetRecentGroups {
@@ -71,9 +72,9 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 // A smaller budget must produce a strictly smaller window, and a material with a single
 // group must report failure rather than silently dropping the newest context.
 func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
-	tail := []MemorySource{}
+	tail := []memorymodel.MemorySource{}
 	for i := 0; i < targetRecentGroups; i++ {
-		tail = append(tail, MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
+		tail = append(tail, memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
 	}
 	groupsIn := func(budget int) int {
 		material := withLongMemory(contextMaterial{Required: "本轮", System: "规则"},
@@ -124,7 +125,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	long := strings.Repeat("唯一的一组", 4000)
 	single := withLongMemory(contextMaterial{Required: "本轮职责与刺激：玩家输入"},
-		worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
+		worldSnapshot{LongMemory: map[string]memoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
 	if single.Bounded == nil {
 		t.Fatal("expected a bounding hook")
 	}

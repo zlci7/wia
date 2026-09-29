@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
@@ -15,21 +16,21 @@ type MemoryRecord struct {
 	Content  string `json:"content"`
 }
 type MemoryView struct {
-	Corrections []Correction   `json:"corrections"`
-	WorldID     string         `json:"world_id"`
-	Epoch       int64          `json:"context_epoch"`
-	Scope       string         `json:"scope"`
-	Scopes      []string       `json:"scopes"`
-	Digest      MemoryDigest   `json:"digest"`
-	Sources     []MemorySource `json:"sources"`
-	Records     []MemoryRecord `json:"records"`
-	Job         MemoryJob      `json:"job"`
-	HasMore     bool           `json:"has_more"`
-	NextBefore  int64          `json:"next_before_seq,omitempty"`
+	Corrections []Correction               `json:"corrections"`
+	WorldID     string                     `json:"world_id"`
+	Epoch       int64                      `json:"context_epoch"`
+	Scope       string                     `json:"scope"`
+	Scopes      []string                   `json:"scopes"`
+	Digest      memorymodel.MemoryDigest   `json:"digest"`
+	Sources     []memorymodel.MemorySource `json:"sources"`
+	Records     []MemoryRecord             `json:"records"`
+	Job         MemoryJob                  `json:"job"`
+	HasMore     bool                       `json:"has_more"`
+	NextBefore  int64                      `json:"next_before_seq,omitempty"`
 }
 
 func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool, before int64) (MemoryView, error) {
-	out := MemoryView{WorldID: worldID, Scope: scope, Scopes: []string{"player"}, Sources: []MemorySource{}, Records: []MemoryRecord{}}
+	out := MemoryView{WorldID: worldID, Scope: scope, Scopes: []string{"player"}, Sources: []memorymodel.MemorySource{}, Records: []MemoryRecord{}}
 	out.Corrections = []Correction{}
 	if before < 0 || (!author && scope != "player") {
 		return out, ErrInvalidRequest
@@ -88,7 +89,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 			return out, e
 		}
 		for rows.Next() {
-			s := MemorySource{Scope: "author"}
+			s := memorymodel.MemorySource{Scope: "author"}
 			if e = rows.Scan(&s.Seq, &s.ID, &s.Actor, &s.Kind, &s.Content, &s.RunID, &s.CreatedAt); e != nil {
 				rows.Close()
 				return out, e

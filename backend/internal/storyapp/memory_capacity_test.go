@@ -3,13 +3,14 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/memorymodel"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 )
 
 func TestRecallBudgetPreservesRequiredAndCausalGroups(t *testing.T) {
-	archive := []MemorySource{{ID: "attempt", Seq: 1, RunID: "old", Content: "铜钥匙" + strings.Repeat("长篇旧经历", 15000)}, {ID: "result", Seq: 2, RunID: "old", Content: "尝试失败"}}
+	archive := []memorymodel.MemorySource{{ID: "attempt", Seq: 1, RunID: "old", Content: "铜钥匙" + strings.Repeat("长篇旧经历", 15000)}, {ID: "result", Seq: 2, RunID: "old", Content: "尝试失败"}}
 	m := withRecall(contextMaterial{System: "NPC", Required: "本轮刺激与完整近期经历", RequiredSources: []string{"current"}}, memoryProjection{context: memoryContext{Archive: archive}}, "铜钥匙")
 	req, report, err := (ContextComposer{}).Build(m, m.System, 100)
 	if err != nil {
@@ -24,14 +25,14 @@ func TestRecallBudgetPreservesRequiredAndCausalGroups(t *testing.T) {
 }
 
 func TestDigestPromptDoesNotGrowWithCoverageIDs(t *testing.T) {
-	previous := MemoryDigest{Scope: "npc:a", Revision: 10, Epoch: 1, Content: "既有回顾", States: []SubjectiveState{{Kind: "commitment", Content: "尚未归还铜钥匙", Sources: []string{"old:0"}}}}
+	previous := memorymodel.MemoryDigest{Scope: "npc:a", Revision: 10, Epoch: 1, Content: "既有回顾", States: []memorymodel.SubjectiveState{{Kind: "commitment", Content: "尚未归还铜钥匙", Sources: []string{"old:0"}}}}
 	for i := 0; i < 10000; i++ {
 		previous.Sources = append(previous.Sources, fmt.Sprintf("old:%05d:long-source-identity", i))
 	}
 	previous.Sources = append(previous.Sources, "old:0")
 	g := &digestGenerator{}
 	for i := 0; i < 2; i++ {
-		prefix := []MemorySource{{ID: fmt.Sprint("new:", i), Seq: int64(10001 + i), Content: "新进展"}}
+		prefix := []memorymodel.MemorySource{{ID: fmt.Sprint("new:", i), Seq: int64(10001 + i), Content: "新进展"}}
 		d, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, wiaworld.Run{BaseContextEpoch: 1}, "npc:a", previous, prefix)
 		if err != nil {
 			t.Fatalf("coverage IDs exhausted prompt: %v", err)
@@ -51,13 +52,13 @@ func TestDigestPromptDoesNotGrowWithCoverageIDs(t *testing.T) {
 }
 
 func TestDigestStateSourcesUseCurrentCatalog(t *testing.T) {
-	previous := MemoryDigest{Sources: []string{"covered", "retained"}, States: []SubjectiveState{{Kind: "belief", Content: "已保留判断", Sources: []string{"retained"}}}}
+	previous := memorymodel.MemoryDigest{Sources: []string{"covered", "retained"}, States: []memorymodel.SubjectiveState{{Kind: "belief", Content: "已保留判断", Sources: []string{"retained"}}}}
 	for _, tc := range []struct {
 		id    string
 		valid bool
 	}{{"covered", false}, {"retained", true}, {"new", true}} {
 		g := fixedJSONGenerator{text: fmt.Sprintf(`{"content":"有效回顾","states":[{"kind":"belief","content":"判断","source_ids":[%q]}]}`, tc.id)}
-		_, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, wiaworld.Run{}, "npc:a", previous, []MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
+		_, err := newTestApp(t, g).summarizeMemory(context.Background(), g, worldSnapshot{}, wiaworld.Run{}, "npc:a", previous, []memorymodel.MemorySource{{ID: "new", Seq: 10, Content: "新经历"}})
 		if (err == nil) != tc.valid {
 			t.Fatalf("source=%s err=%v", tc.id, err)
 		}
