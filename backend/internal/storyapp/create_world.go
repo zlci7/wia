@@ -212,7 +212,7 @@ func (a *App) WorldGame(ctx context.Context, id string) (content.GameSummary, er
 	if err != nil {
 		return content.GameSummary{}, err
 	}
-	g, gameErr := a.Game(s.Definition.Summary.GameID)
+	g, gameErr := a.Game(s.Definition.Summary.ID)
 	if gameErr != nil {
 		// The catalog entry normally comes from the pack, which is where the fields a
 		// world never uses live. A world whose pack is no longer installed still answers
@@ -224,10 +224,40 @@ func (a *App) WorldGame(ctx context.Context, id string) (content.GameSummary, er
 			Player: content.PlayerDefaults{Name: s.Definition.Summary.Player.Name, Profile: s.Definition.Summary.Player.Profile, Editable: s.Definition.Summary.Player.Editable},
 		}
 	}
-	if g.CoverURL != "" {
+	// Whether a world has a cover is a fact about that world, not about the pack it came
+	// from: the image was copied into the world when it was created, so it survives the
+	// pack being removed. Asking the world keeps the two cases from disagreeing.
+	if cover, err := a.worldCoverType(ctx, id); err != nil {
+		return content.GameSummary{}, err
+	} else if cover != "" {
 		g.CoverURL = "/api/v1/worlds/" + id + "/cover"
 	}
 	return g, nil
+}
+
+// worldCoverType reports the media type of the world's own copy of its cover, or an
+// empty string when the world has none.
+func (a *App) worldCoverType(ctx context.Context, id string) (string, error) {
+	path, status, err := a.worldRecord(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if status != "ready" {
+		return "", nil
+	}
+	store, err := storage.OpenWorldDB(path)
+	if err != nil {
+		return "", err
+	}
+	defer store.Close()
+	mime, err := store.MetaGet(ctx, "cover_type")
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return mime, nil
 }
 
 func (a *App) WorldCover(ctx context.Context, id string) ([]byte, string, error) {

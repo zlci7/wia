@@ -20,30 +20,41 @@ import (
 
 // Location is a place a story starts in and the places reachable from it, after
 // validation and normalization. The pack format has its own representation of this.
+//
+// Like Bystander below, the JSON names are the shape a world's frozen definition has
+// always been stored under, so they are part of the contract with existing saves.
 type Location struct {
-	ID          string
-	Name        string
-	Description string
-	Connections []string
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Connections []string `json:"connections"`
 }
 
 // Bystander is a background person the story may place in the world: stable identity,
 // display name, and the public material used to present them.
+//
+// The JSON names are the wire contract this shape has always had: a world's frozen
+// definition is stored as JSON and read back by later releases, and the API hands the
+// bystander list to the client. Without the tags the fields would serialise under their
+// Go names, which both breaks the stored form and changes what the client sees.
 type Bystander struct {
-	BystanderID     string
-	Name            string
-	Description     string
-	InitialLocation string
-	Avatar          string
+	BystanderID     string `json:"bystander_id"`
+	Name            string `json:"name"`
+	Description     string `json:"description,omitempty"`
+	InitialLocation string `json:"initial_location,omitempty"`
+	Avatar          string `json:"avatar,omitempty"`
 }
 
 // Summary is the running world's view of what this story is. It carries only what a
 // turn needs to read; the catalog the content tooling and the API display is a
 // separate, wider shape that belongs to them — a cover URL, for instance, is a route
 // the API serves, not part of the definition.
+//
+// The story is identified once, by ID. There is deliberately no second field holding the
+// same value: a world's frozen definition is read back from storage, and a duplicate
+// identifier is one more thing that can disagree with itself.
 type Summary struct {
 	ID          string
-	GameID      string
 	Revision    string
 	Title       string
 	Mode        string

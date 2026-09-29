@@ -299,7 +299,7 @@ func loadPack(root string) (loadedPack, error) {
 	// is wider — cover URL, description, modes — and is built at the route from the
 	// pack, so a route path never becomes part of a world's definition.
 	def.Summary = story.Summary{
-		ID: p.GameID, GameID: p.GameID, Revision: p.Revision, Title: p.Title,
+		ID: p.GameID, Revision: p.Revision, Title: p.Title,
 		Mode: p.Mode, Gameplay: p.Gameplay, Description: p.Description,
 		Player: story.Player{Name: p.Player.Name, Profile: p.Player.Profile, Editable: p.Player.Editable},
 	}
@@ -632,7 +632,7 @@ func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s turn.S
 		return story.Definition{}, err
 	}
 	// Legacy worlds use only their persisted facts, never a newer installed pack.
-	d := story.Definition{Summary: story.Summary{ID: s.Summary.GameID, GameID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
+	d := story.Definition{Summary: story.Summary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
 	d.Revision, _ = store.MetaGet(ctx, "game_revision")
 	d.Summary.Revision = d.Revision
 	if d.Summary.ID == GameID {
