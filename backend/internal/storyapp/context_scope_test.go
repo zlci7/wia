@@ -68,7 +68,7 @@ func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
 			if err == nil {
 				next := s
 				next.SceneViews = views
-				if strings.Contains(sceneFor(next, "npc:mercenary"), "私密") {
+				if strings.Contains(turn.SceneFor(next, "npc:mercenary"), "私密") {
 					t.Fatal("private scene broadcast")
 				}
 			}
@@ -201,8 +201,8 @@ func TestLegacySceneViewsUseOnlyAuthorizedRecords(t *testing.T) {
 	s.Perceptions["npc:mercenary"] = []wiaworld.Perception{{SourceEventID: "public-result", SourceType: "action_succeeded", Content: "茶在桌上。"}}
 	s.SceneViews = initialSceneViews(s)
 	for _, id := range []string{"player", "npc:mercenary"} {
-		if sceneFor(s, id) != "茶在桌上。" {
-			t.Fatalf("%s: %s", id, sceneFor(s, id))
+		if turn.SceneFor(s, id) != "茶在桌上。" {
+			t.Fatalf("%s: %s", id, turn.SceneFor(s, id))
 		}
 	}
 }
@@ -294,7 +294,7 @@ func TestPrivateSceneViewsSurviveCopyAndRuntimeRestart(t *testing.T) {
 		t.Fatalf("%+v", done)
 	}
 	before := readContextSnapshot(t, a, w.WorldID)
-	if sceneFor(before, "npc:innkeeper") != "隐藏原文" || strings.Contains(sceneFor(before, "npc:mercenary"), "隐藏原文") {
+	if turn.SceneFor(before, "npc:innkeeper") != "隐藏原文" || strings.Contains(turn.SceneFor(before, "npc:mercenary"), "隐藏原文") {
 		t.Fatal("invalid scoped scene")
 	}
 	status, err := a.Status(context.Background())

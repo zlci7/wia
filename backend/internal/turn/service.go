@@ -60,7 +60,7 @@ type Host interface {
 	LoadInput(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator, limit int) (Snapshot, error)
 }
 
-// Service runs one turn.
+// Service runs one
 //
 // Execute is the whole of it, and it is meant to be read: the steps below are the story
 // of a turn, in the order they happen. Everything else in this package is either a piece

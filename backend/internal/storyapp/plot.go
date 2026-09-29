@@ -120,58 +120,6 @@ func readPlot(ctx context.Context, store *storage.WorldStore) (*plot.Definition,
 	return &def, state, nil
 }
 
-func nextPlotNode(snapshot turn.Snapshot) (plot.Node, int, bool) {
-	if snapshot.Plot == nil || (snapshot.Summary.Mode == "guided" && snapshot.PlotProgress.Ending != "") {
-		return plot.Node{}, 0, false
-	}
-	var chosen plot.Node
-	var due int
-	found := false
-	for _, node := range snapshot.Plot.Nodes {
-		state := snapshot.PlotProgress.Nodes[node.ID]
-		if state.Status == "occurred" || state.Status == "skipped" {
-			continue
-		}
-		eligible := true
-		for _, dep := range node.After {
-			s := snapshot.PlotProgress.Nodes[dep].Status
-			if s != "occurred" && s != "skipped" {
-				eligible = false
-			}
-		}
-		at := max(node.AtMinute, state.NextCheck)
-		if eligible && (!found || at < due) {
-			chosen, due, found = node, at, true
-		}
-	}
-	return chosen, due, found
-}
-
-func plotTimeLimit(snapshot turn.Snapshot) int {
-	_, due, ok := nextPlotNode(snapshot)
-	if _, eventDue, found := nextGeneratedEvent(snapshot); found && (!ok || eventDue < due) {
-		due, ok = eventDue, true
-	}
-	if !ok {
-		return 120
-	}
-	current, err := plot.ClockMinute(snapshot.Summary.Clock)
-	if err != nil {
-		return 0
-	}
-	return min(120, max(0, due-current))
-}
-
-func plotContext(snapshot turn.Snapshot) string {
-	if snapshot.Plot == nil && len(snapshot.GeneratedEvents.Active) == 0 {
-		return ""
-	}
-	if snapshot.Plot == nil {
-		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", plotTimeLimit(snapshot), wire.MarshalJSON(snapshot.GeneratedEvents.Active))
-	}
-	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", plotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, wire.MarshalJSON(snapshot.PlotProgress))
-}
-
 // A single node is settled per turn. The clock stops at that node; a subsequent
 // input can continue waiting against the newly committed consequences.
 func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, output *turn.Output) ([]wiaworld.Event, error) {
@@ -182,7 +130,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	for id, state := range snapshot.PlotProgress.Nodes {
 		output.PlotProgress.Nodes[id] = state
 	}
-	node, due, ok := nextPlotNode(snapshot)
+	node, due, ok := turn.NextPlotNode(snapshot)
 	current, err := plot.ClockMinute(output.Clock)
 	if err != nil {
 		return nil, err

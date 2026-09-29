@@ -1,0 +1,90 @@
+// cmpfunc compares one function's bytes between two files.
+//
+// It exists because a shell on Windows cannot be trusted to show this repository's
+// Chinese text: reading a UTF-8 file through the wrong code page renders it as mojibake
+// while the bytes are fine, and the reverse is also possible. Comparing bytes in Go
+// answers the only question that matters after a move — is this the same text, or did
+// something rewrite it?
+//
+// The comparison normalizes nothing but the function's own name and its package
+// qualifier, because those legitimately change when a declaration moves.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func runCmpFunc(args []string) {
+	left := flag.String("left", "", "file holding the original")
+	right := flag.String("right", "", "file holding the moved copy")
+	name := flag.String("name", "", "function name in the original file")
+	newName := flag.String("new-name", "", "function name in the moved file")
+	oldQualifier := flag.String("old-qualifier", "", "package qualifier the original used, e.g. turn.")
+	flag.CommandLine.Parse(args)
+
+	original, err := body(*left, *name)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "left:", err)
+		os.Exit(2)
+	}
+	moved, err := body(*right, *newName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "right:", err)
+		os.Exit(2)
+	}
+	original = strings.ReplaceAll(original, *name, "NAME")
+	moved = strings.ReplaceAll(moved, *newName, "NAME")
+	original = strings.ReplaceAll(original, *oldQualifier, "")
+	if original == moved {
+		fmt.Printf("%s: identical (%d bytes)\n", *name, len(moved))
+		return
+	}
+	fmt.Printf("%s: DIFFERENT\n", *name)
+	olines := strings.Split(original, "\n")
+	mlines := strings.Split(moved, "\n")
+	for i := 0; i < len(olines) || i < len(mlines); i++ {
+		var a, b string
+		if i < len(olines) {
+			a = olines[i]
+		}
+		if i < len(mlines) {
+			b = mlines[i]
+		}
+		if a != b {
+			fmt.Printf("  line %d\n    original: %s\n    moved:    %s\n", i+1, a, b)
+		}
+	}
+}
+
+// body returns the text of one function, from its declaration to its closing brace.
+func body(path, name string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	text := string(data)
+	// A byte order mark is not part of the source; a shell that wrote the file may have
+	// added one, and it would otherwise sit in front of the first declaration.
+	text = strings.TrimPrefix(text, "\ufeff")
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	start := strings.Index(text, "func "+name+"(")
+	if start < 0 {
+		return "", fmt.Errorf("func %s not found", name)
+	}
+	depth := 0
+	for index := start; index < len(text); index++ {
+		switch text[index] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return text[start : index+1], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("func %s has no closing brace", name)
+}

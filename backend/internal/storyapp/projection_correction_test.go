@@ -8,6 +8,7 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 )
 
@@ -68,8 +69,8 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 			t.Fatalf("invalid effective memory for %s: %s", scope, text)
 		}
 	}
-	if !strings.Contains(sceneFor(after, "player"), "已纠正") {
-		t.Fatal("stale scene survived", sceneFor(after, "player"))
+	if !strings.Contains(turn.SceneFor(after, "player"), "已纠正") {
+		t.Fatal("stale scene survived", turn.SceneFor(after, "player"))
 	}
 	for _, e := range after.Events {
 		if strings.HasPrefix(e.EventID, root+":projection:") && !strings.Contains(e.Content, "已失效") {
@@ -118,7 +119,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 	defer reopened.Close()
 	for _, id := range []string{w.WorldID, op.TargetWorldID} {
 		s := readContextSnapshot(t, reopened, id)
-		if !strings.Contains(sceneFor(s, "player"), "已纠正") {
+		if !strings.Contains(turn.SceneFor(s, "player"), "已纠正") {
 			t.Fatal("copy/restart lost scene correction")
 		}
 		m, err := reopened.ReadMemory(ctx, id, "npc:mercenary", true, 0)

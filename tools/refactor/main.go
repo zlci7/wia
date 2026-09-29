@@ -63,6 +63,10 @@ func main() {
 		runCutLines(args)
 	case "importers":
 		runImporters(args)
+	case "unqualify":
+		runUnqualify(args)
+	case "cmpfunc":
+		runCmpFunc(args)
 	case "-h", "--help", "help":
 		usage()
 	default:

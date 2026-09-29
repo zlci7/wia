@@ -100,25 +100,6 @@ func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def sto
 	return s, nil
 }
 
-func nextGeneratedEvent(s turn.Snapshot) (int, int, bool) {
-	index, due := -1, 0
-	for i, e := range s.GeneratedEvents.Active {
-		at := max(e.Node.AtMinute, e.State.NextCheck)
-		if index < 0 || at < due {
-			index, due = i, at
-		}
-	}
-	return index, due, index >= 0
-}
-
-func eventOpportunityContract(s turn.Snapshot) string {
-	p := s.Definition.EventGeneration
-	if p == nil {
-		return ""
-	}
-	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
-}
-
 func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot turn.Snapshot, run wiaworld.Run, opportunity *eventOpportunity, output *turn.Output) ([]wiaworld.Event, error) {
 	p := snapshot.Definition.EventGeneration
 	if p == nil {
@@ -132,10 +113,10 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 		return nil, err
 	}
 	// An authored evaluation consumes the round even when it defers without an event.
-	if _, due, ok := nextPlotNode(snapshot); ok && current >= due {
+	if _, due, ok := turn.NextPlotNode(snapshot); ok && current >= due {
 		return nil, nil
 	}
-	if index, due, ok := nextGeneratedEvent(snapshot); ok && current >= due {
+	if index, due, ok := turn.NextGeneratedEvent(snapshot); ok && current >= due {
 		e := state.Active[index]
 		base := snapshot
 		base.Plot = &plot.Definition{Revision: "generated.v1", Facts: snapshot.Definition.Secret + "\n本事件已成立起点：" + e.Premise, Nodes: []plot.Node{e.Node}}

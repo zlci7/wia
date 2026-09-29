@@ -259,13 +259,13 @@ func TestOpenAuthoredLinesAreIndependent(t *testing.T) {
 	w := createPackWorld(t, a, "orbital-repair")
 	s := readContextSnapshot(t, a, w.WorldID)
 	s.PlotProgress.Nodes["inspection_notice"] = plot.NodeState{Status: "deferred", NextCheck: 560}
-	n, due, ok := nextPlotNode(s)
+	n, due, ok := turn.NextPlotNode(s)
 	if !ok || n.ID != "freight_notice" || due != 550 {
 		t.Fatal("unrelated freight starved", n, due)
 	}
 	s.PlotProgress.Nodes["freight_notice"] = plot.NodeState{Status: "occurred", EventID: "notice"}
 	s.PlotProgress.Nodes["inspection_notice"] = plot.NodeState{Status: "deferred", NextCheck: 600}
-	n, _, _ = nextPlotNode(s)
+	n, _, _ = turn.NextPlotNode(s)
 	if n.ID != "freight_result" {
 		t.Fatal("freight depends on inspection", n)
 	}

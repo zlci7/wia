@@ -699,7 +699,7 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 	a.logRunStage(snapshot.Summary.WorldID, run, turn.StageCoordination, "coordinate_scene", "scene", 0, coordinationPromptVersion, turn.EventIDs(output.Events), recipient, coordinationRepairs, time.Since(coordinationStarted))
 	output.Clock = turn.AdvanceClock(snapshot.Summary.Clock, host.TimeMinutes)
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
-	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || sceneFor(*snapshot, "player") != snapshot.Summary.Scene {
+	if len(host.SceneUpdates) > 0 || !reflect.DeepEqual(output.SceneCharacters, characterIDs(participants)) || turn.SceneFor(*snapshot, "player") != snapshot.Summary.Scene {
 		output.SceneVersion = snapshot.SceneVersion + 1
 	}
 	// Stage 3 outcomes may be witnessed on arrival. Earlier expressions retain
@@ -725,7 +725,7 @@ func (a *App) coordinateStage(ctx context.Context, generator model.TextGenerator
 		return hostResult{}, nil, turn.AtStage(turn.StageCoordination, err)
 	}
 	snapshot.SceneViews = output.SceneViews
-	output.Scene = sceneFor(*snapshot, "player")
+	output.Scene = turn.SceneFor(*snapshot, "player")
 	// The identifier behind the scene text, kept so presence is never decided by
 	// comparing prose. A description that names no known place leaves the location
 	// unchanged rather than clearing it.
@@ -1047,7 +1047,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	}
 	result.Scene = wire.Clean(result.Scene)
 	if intent.WaitMinutes > 0 {
-		if result.TimeMinutes > min(intent.WaitMinutes, plotTimeLimit(snapshot)) {
+		if result.TimeMinutes > min(intent.WaitMinutes, turn.PlotTimeLimit(snapshot)) {
 			return hostResult{}, repairCount, fmt.Errorf("%w: waiting exceeds requested duration", ErrGenerationFailed)
 		}
 		for _, id := range result.InterruptSources {
@@ -1061,16 +1061,16 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 				return hostResult{}, repairCount, fmt.Errorf("%w: invalid wait interruption source", ErrGenerationFailed)
 			}
 		}
-		if result.TimeMinutes < min(intent.WaitMinutes, plotTimeLimit(snapshot)) && len(result.InterruptSources) == 0 {
+		if result.TimeMinutes < min(intent.WaitMinutes, turn.PlotTimeLimit(snapshot)) && len(result.InterruptSources) == 0 {
 			if a.logger != nil {
 				a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_shortened", run.RunID)
 			}
 			return hostResult{}, repairCount, fmt.Errorf("%w: waiting shortened without interruption evidence", ErrGenerationFailed)
 		}
 	}
-	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > plotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
+	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > turn.PlotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
 		if a.logger != nil {
-			a.logger.Printf("story coordination validation failed: run_id=%q boundary=required_fields time_minutes=%d limit=%d", run.RunID, result.TimeMinutes, plotTimeLimit(snapshot))
+			a.logger.Printf("story coordination validation failed: run_id=%q boundary=required_fields time_minutes=%d limit=%d", run.RunID, result.TimeMinutes, turn.PlotTimeLimit(snapshot))
 		}
 		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", ErrGenerationFailed)
 	}

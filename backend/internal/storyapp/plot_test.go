@@ -310,7 +310,7 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sceneFor(snapshot, "npc:mercenary") != "门闩已经查看，锁扣完好。" || sceneFor(snapshot, "player") != "你仍在客栈，刚听见码头铃声。" {
+	if turn.SceneFor(snapshot, "npc:mercenary") != "门闩已经查看，锁扣完好。" || turn.SceneFor(snapshot, "player") != "你仍在客栈，刚听见码头铃声。" {
 		t.Fatal("plot stage state did not reach recipient views")
 	}
 	if snapshot.SceneVersion < 3 {
@@ -368,7 +368,7 @@ func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 	if copy.Summary.Clock != "第 1 日 19:05" || len(copy.PlotProgress.Nodes) != 1 {
 		t.Fatalf("bad copy: %+v", copy)
 	}
-	if sceneFor(copy, "player") != "你仍在客栈，刚听见码头铃声。" || copy.SceneVersion < 2 {
+	if turn.SceneFor(copy, "player") != "你仍在客栈，刚听见码头铃声。" || copy.SceneVersion < 2 {
 		t.Fatal("copy lost the plot's final scene view")
 	}
 	path, _, _ := app.worldRecord(ctx, w.WorldID)
@@ -484,7 +484,7 @@ func TestPlotRestartAndCopyRemainIndependent(t *testing.T) {
 		if s.Summary.Clock != "第 1 日 19:05" || len(s.PlotProgress.Nodes) != 1 {
 			t.Fatal("restart advanced clock or lost node")
 		}
-		if sceneFor(s, "player") != "你仍在客栈，刚听见码头铃声。" {
+		if turn.SceneFor(s, "player") != "你仍在客栈，刚听见码头铃声。" {
 			t.Fatal("restart lost the final plot scene")
 		}
 	}

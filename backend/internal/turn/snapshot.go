@@ -25,7 +25,7 @@ type Snapshot struct {
 	SceneLocation   string
 	// InputBudgetTokens is how many input tokens this world's requests may use; the long
 	// memory projection reads it so a small model window shrinks the recent window
-	// instead of failing the turn.
+	// instead of failing the
 	InputBudgetTokens int
 	PlayerName        string
 	PlayerProfile     string

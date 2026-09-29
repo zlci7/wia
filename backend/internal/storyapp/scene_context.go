@@ -25,15 +25,6 @@ type sceneSource struct {
 	Canonical  []string `json:"-"`
 }
 
-func sceneFor(snapshot turn.Snapshot, recipient string) string {
-	for _, view := range snapshot.SceneViews {
-		if view.Recipient == recipient {
-			return view.Content
-		}
-	}
-	return "当前情境以本人获准经历为依据。"
-}
-
 func initialSceneViews(snapshot turn.Snapshot) []turn.SceneView {
 	recipients := []string{"player"}
 	for _, c := range snapshot.Characters {
@@ -200,7 +191,7 @@ func applyPlotSceneUpdates(output *turn.Output, sources map[string]sceneSource, 
 	}
 	output.SceneVersion++
 	output.SceneViews = views
-	output.Scene = sceneFor(turn.Snapshot{SceneViews: views}, "player")
+	output.Scene = turn.SceneFor(turn.Snapshot{SceneViews: views}, "player")
 	return nil
 }
 
