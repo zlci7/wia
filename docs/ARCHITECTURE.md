@@ -54,17 +54,17 @@
 
 ```text
 Frontend
-   ↓ HTTP
+   | HTTP
 API
-   ↓
+   |
 Turn Engine
-   ├─ Agent（人物决策 / 场景主持）
-   ├─ Context
-   ├─ Memory
-   └─ Plot / World
-   ↓
+   |- Agent（人物决策 / 场景主持）
+   |- Context
+   |- Memory
+   |- Plot / World
+   |
 Model
-   ↓
+   |
 Storage
 ```
 
@@ -141,29 +141,29 @@ content    不进入正常 Turn 主链
 
 ```text
                   api
-                   │
-                   ▼
+                   |
+                   v
                  turn
-       ┌───────────┼────────────┐
-       ▼           ▼            ▼
+       +-----------+------------+
+       v           v            v
      agent       memory        plot
-       │           │            │
-       └─────┬─────┴──────┬─────┘
-             ▼            ▼
+       |           |            |
+       +-----+-----+------+-----+
+             v            v
            context       world
-             │
-             ▼
+             |
+             v
            model
 
  turn / memory / content
-             │
-             ▼
+             |
+             v
          storage
 ```
 
 `world` 是**底层语言，不是总服务**。所有模块都依赖它，它不依赖任何模块，否则很快形成循环。
 
-**`content` 与游玩内核必须隔离。** 依赖方向是 `content → 发布的 StoryDefinition → 世界创建`，不是 `turn ↔ content`。即使整个内容工具明天被删除，玩家仍能加载 `stories/foo/` 正常游玩。这是架构验收条件之一。
+**`content` 与游玩内核必须隔离。** 依赖方向是 `content -> 发布的 StoryDefinition -> 世界创建`，不是 `turn <-> content`。即使整个内容工具明天被删除，玩家仍能加载 `stories/foo/` 正常游玩。这是架构验收条件之一。
 
 ## 6. Turn Engine
 
@@ -205,13 +205,13 @@ turn/
 
 ```text
 读取快照（无事务）
-    ↓
+    |
 模型调用（无事务；可能几十秒）
-    ↓
-开事务 → 校验 context_epoch 与 scene_version → 写入 → 提交
+    |
+开事务 -> 校验 context_epoch 与 scene_version -> 写入 -> 提交
 ```
 
-并发陈旧回合在提交时被拒绝，而不是靠长时间持锁。这条经验来自现有实现，必须原样保留，不允许实现成"开事务 → 调模型 → 提交"。
+并发陈旧回合在提交时被拒绝，而不是靠长时间持锁。这条经验来自现有实现，必须原样保留，不允许实现成"开事务 -> 调模型 -> 提交"。
 
 ### 6.3 Agent 划分
 
@@ -248,7 +248,7 @@ type Call struct {
 **`purpose` 属于 ModelService，不属于 Provider。** Provider 不必知道这是 NPC 还是记忆，否则 OpenAI / DeepSeek 实现会开始理解业务概念。依赖方向固定为：
 
 ```text
-业务 purpose → ModelService → Provider 中立请求 → OpenAI / DeepSeek
+业务 purpose -> ModelService -> Provider 中立请求 -> OpenAI / DeepSeek
 ```
 
 ### 6.5 Context 用 purpose 驱动一个入口
@@ -326,7 +326,7 @@ storage/
 
 ### R1：仓库形态
 
-只做位置与命名：`console/web → frontend`、`runtime/cmd/server → backend/cmd/wia`、`runtime/internal/storyapi → backend/internal/api`。
+只做位置与命名：`console/web -> frontend`、`runtime/cmd/server -> backend/cmd/wia`、`runtime/internal/storyapi -> backend/internal/api`。
 
 前置条件：切断 `runtime/config` 这根交叉依赖——把 `storyapp` 实际使用的部分（模型配置写入）搬入新结构，使叙事链路不再引用旧包。
 
@@ -340,7 +340,7 @@ storage/
 
 ### R3：Context / Agent / Memory / Plot
 
-按 `context` → `agent` → `memory` → `plot` 顺序抽取，每抽一个就删除 `storyapp` 中对应旧实现。**不建兼容包装层**，Git 历史就是归档。
+按 `context` -> `agent` -> `memory` -> `plot` 顺序抽取，每抽一个就删除 `storyapp` 中对应旧实现。**不建兼容包装层**，Git 历史就是归档。
 
 最终 `storyapp` 应当消失。
 
@@ -354,13 +354,13 @@ storage/
 
 删除 `protocol/`、`gateway/`、`tool/`、`task/`、旧 `agent`、旧 `context`、旧 `memory`、旧 `httpapi`，以及 `scenarios/` 中不属于 WIA 的内容；删除旧入口与旧验收测试。
 
-更新公开事实源：`README.md`、`ARCHITECTURE.md`、`docs/`、`AGENTS.md`、CI 与脚本。
+更新公开事实源：`README.md`、`AGENTS.md`、CI 与脚本。
 
 这些包的删除是**被依赖关系证明过安全的**：叙事链路对它们零引用。原始 Game Runtime 已独立保存在 `world-is-agent` 仓库，WIA 的 Git 历史也保留了它们，因此不需要额外打标签。
 
 ### R6：文档重组与空间系统
 
-先把 `docs/` 重组为主题式（本文、`TURN.md`、`DATA_MODEL.md`、`MEMORY_AND_CONTEXT.md`、`DEVELOPMENT.md`），把 `docs/phase12/` 转为历史。
+先把 `docs/` 重组为主题式（本文、`TURN.md`、`DATA_MODEL.md`、`MEMORY_AND_CONTEXT.md`、`DEVELOPMENT.md`）。
 
 **然后再做空间系统**（区域 / 地点 / 当前位置 / 连接）。原因：先把桌子收拾干净，再往上加新的核心领域状态。否则会同时改目录、改位置语义、改数据库 schema，评审无法判断缺陷来自架构迁移还是空间逻辑。
 

@@ -11,7 +11,7 @@ Repository story packs include a guided investigation with conditional endings a
 运行环境：Windows、Go 1.25+；首次从源码构建工作台还需要 Node.js 20+。
 
 ```powershell
-cd D:\data\project\game-agent\world-is-agent
+cd D:\data\project\game-agent\wia
 .\scripts\start-phase12.ps1 -Rebuild
 ```
 
@@ -31,7 +31,6 @@ cd D:\data\project\game-agent\world-is-agent
 go build -o wia-runtime.exe ./runtime/cmd/server
 .\wia-runtime.exe
 ```
-
 通过 `-data-root` 指定数据目录，或使用 `WIA_DATA_ROOT`。默认数据目录是 `%LOCALAPPDATA%\WorldIsAgent`。每个世界位于独立的 SQLite 数据库中；另存会创建新的 world_id，读取后继续写入所选世界。
 
 ## 可体验内容
@@ -51,22 +50,22 @@ go build -o wia-runtime.exe ./runtime/cmd/server
 
 ## 当前验证
 
-Verification evidence: [M1](docs/phase12/records/M1-验收记录.md), [M2](docs/phase12/records/M2-验收记录.md), and [phase status](docs/phase12/开发状态.md). Deterministic tests, browser checks, real-model observations and user acceptance are recorded separately.
+Verification evidence: [M1](docs/phase12/records/M1-验收记录.md), [M2](docs/phase12/records/M2-验收记录.md), [M3](docs/phase12/records/M3-验收记录.md), and [phase status](docs/phase12/开发状态.md). Deterministic tests, browser checks, real-model observations and user acceptance are recorded separately.
 
 Full Go regression, relevant race/vet checks, frontend mechanism tests, type checking and production builds pass. The executable starts with an isolated data root and serves both its homepage and bundled client assets. Real-model tests use disposable worlds; occasional generation failures, latency and semantic deviations remain documented limitations.
 
 已用临时世界完成桌面、平板和手机视口的浏览器交互验证；模型采用测试替身。实体手机软键盘与最终游玩体验仍待验证。
 
-M3 covers action suggestions and the full content workspace. M4 covers server accounts, cross-device operation and release packaging. Both remain unstarted.
+M3 已交付行动建议、主角资料与面向开发者的内容工作台；**面向普通玩家的剧本创作、跨剧本主角模板库与游玩中提升路人已按范围变更移出**，写作、导入与导出保留为开发者工具。地点层级、人物当前位置与由位置推导同场尚未实现。M4 覆盖桌面打包、服务器账户与跨设备。仓库形态与模块职责的重构计划见 [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)，尚未执行。
 
 ## 相关文档
 
-- [系统架构](ARCHITECTURE.md)
-- [公开状态](docs/STATUS.md)
+- [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)
+- [文档入口](docs/README.md)
 - [Phase12 文档入口](docs/phase12/README.md)
 - [Phase12 产品说明](docs/phase12/产品说明.md)
 - [Phase12 总体技术方案](docs/phase12/总体技术方案.md)
-- [Phase12 开发指南](docs/phase12/开发指南.md)
+- [Phase12 开发状态](docs/phase12/开发状态.md)
 
 ## 许可证
 

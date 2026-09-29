@@ -1,52 +1,23 @@
-# Documentation
+# WIA 文档
 
-This directory contains current status documents, architecture notes, ADRs, phase plans, acceptance records, and exploratory design material.
+本目录只保留两类内容：**当前架构**与**Phase12 工作文档**。
 
-## Public Sources Of Truth
+## 当前架构
 
-Start here when you want the current repository state:
+- [WIA 1.0 架构收敛方案](ARCHITECTURE.md)：目标架构、模块职责与依赖规则、执行顺序。**待执行**，不代表任何一步已经完成。
 
-- [Project README](../README.md)
-- [Architecture](../ARCHITECTURE.md)
-- [Status](STATUS.md)
-- [Development Guide](development/guide.md)
-- [Testing Guide](development/testing.md)
+## Phase12 工作文档
 
-The Runtime embeds Stardew Valley and RimWorld Game Profiles. Phase 10.4 selection and switching and the Phase 10.5 repository split have completed automated validation. Official adapters now live in the independent local `world-is-agent-adapters` Git repository. User code review and joint real-game acceptance remain pending.
+从 [Phase12 文档入口](phase12/README.md) 进入，其中保存产品范围、跨阶段技术合同、阶段方案与验证证据。
 
-## Architecture And Decisions
+## 维护规则
 
-- [Runtime Architecture Baseline](<summary/GameAgent Runtime 整体架构设计规范.md>)
-- [Multi-game Compatibility and Agent Binding](<summary/GameAgent 多游戏兼容性与 Agent Binding 决策.md>)
-- [Phase6 Async Action Protocol Strategy ADR](<phase06/GameAgent MVP0 Phase6 Async Action Protocol Strategy ADR.md>)
+- 架构与依赖规则只写入 [ARCHITECTURE.md](ARCHITECTURE.md)。
+- 产品目标只写入[产品说明](phase12/产品说明.md)。
+- 跨阶段不变量只写入[总体技术方案](phase12/总体技术方案.md)。
+- 阶段专属的数据结构、接口、迁移与测试写入对应阶段方案。
+- 实际进度只更新[开发状态](phase12/开发状态.md)；测试证据写入对应阶段验收记录。
 
-These documents preserve detailed architectural reasoning and constraints. Use the public sources above for the current GitHub-facing summary.
+## 已移除的历史文档
 
-## Phase Plans And Acceptance Records
-
-Each phase has its own directory, and sub-phases live inside their parent phase (`Phase5.5` and `Phase5.6` under `phase05`, `Phase6.5` and `Phase6.6` under `phase06`). Phase documents are implementation planning and validation records:
-
-- [Phase1](phase01/)
-- [Phase2](phase02/)
-- [Phase3](phase03/)
-- [Phase4](phase04/)
-- [Phase5](phase05/)
-- [Phase6](phase06/)
-- [Phase7](phase07/)
-- [Phase8](phase08/)
-- [Phase9](phase09/)
-- [Phase10](phase10/)
-
-[docs/STATUS.md](STATUS.md) is the public source of truth for current capability status and known limits. Phase documents can contain internal terminology, temporary implementation plans, and historical acceptance details, including references to documents that no longer exist in the repository; those records are kept as written.
-
-## Exploratory Notes
-
-Exploratory documents may contain older names, open questions, or draft ideas:
-
-- [Context Architecture](<summary/Context/Context架构设计.md>)
-- [Compatibility Discussion](兼容性探讨.md)
-- [Adapter Notes](adapter/)
-- [Archive](archive/)
-- [Project Progress Notes](pro/)
-
-Treat these as design notes unless a public source of truth links to them as a current decision.
+Game-native Agent Runtime 阶段的文档（`phase01`-`phase11`、`summary/`、`archive/`、`pro/`、`adapter/`、`development/`、`superpowers/`）已从本仓库删除。该产品的原始仓库是 `world-is-agent`，其文档与代码完整保留在那里；本仓库的 Git 历史也保留了这批文件。当前仓库只讲 WIA 叙事产品。
