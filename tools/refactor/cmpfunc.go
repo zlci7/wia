@@ -36,8 +36,12 @@ func runCmpFunc(args []string) {
 		fmt.Fprintln(os.Stderr, "right:", err)
 		os.Exit(2)
 	}
-	original = strings.ReplaceAll(original, *name, "NAME")
-	moved = strings.ReplaceAll(moved, *newName, "NAME")
+	// The names are normalized only on the declaration line. Replacing them throughout the
+	// body would rewrite any identifier that merely contains the function name —
+	// BehaviorPolicy inside wiaworld.BehaviorPolicyVersion, for instance — and report a
+	// difference that is not there.
+	original = renameDeclaration(original, *name)
+	moved = renameDeclaration(moved, *newName)
 	original = strings.ReplaceAll(original, *oldQualifier, "")
 	// A rename applied on both sides is not a difference in the code that moved. Naming
 	// the renames keeps the check meaningful: anything else that differs is still shown.
@@ -100,4 +104,14 @@ func body(path, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("func %s has no closing brace", name)
+}
+
+// renameDeclaration replaces the function's own name on its declaration line only.
+func renameDeclaration(text, name string) string {
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 {
+		return text
+	}
+	lines[0] = strings.Replace(lines[0], "func "+name+"(", "func NAME(", 1)
+	return strings.Join(lines, "\n")
 }

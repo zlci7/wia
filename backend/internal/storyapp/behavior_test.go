@@ -61,16 +61,16 @@ func TestBehaviorPoliciesReachOnlyTheirModelCalls(t *testing.T) {
 				t.Fatalf("policy scope %s/%s", target, purpose)
 			}
 		}
-		if purpose != "intent" && !strings.Contains(req, behaviorContract) {
+		if purpose != "intent" && !strings.Contains(req, turn.BehaviorContract) {
 			t.Fatal("fixed priority contract missing")
 		}
-		if purpose == "npc" && strings.Contains(req, DefaultBehaviorPolicies().NPC) {
+		if purpose == "npc" && strings.Contains(req, turn.DefaultBehaviorPolicies().NPC) {
 			t.Fatal("default NPC policy was appended to custom")
 		}
-		if purpose == "coordination" && strings.Contains(req, DefaultBehaviorPolicies().Coordination) {
+		if purpose == "coordination" && strings.Contains(req, turn.DefaultBehaviorPolicies().Coordination) {
 			t.Fatal("default coordination policy was appended")
 		}
-		if purpose == "narration" && (strings.Contains(req, narrativePacingInstruction()) || !strings.Contains(req, "第二人称")) {
+		if purpose == "narration" && (strings.Contains(req, turn.PacingInstruction()) || !strings.Contains(req, "第二人称")) {
 			t.Fatal("policy replacement or explicit option missing")
 		}
 	}
@@ -140,7 +140,7 @@ func TestBehaviorPoliciesPersistIsolateCopyAndRestart(t *testing.T) {
 	if restored.Policies != (wiaworld.BehaviorPolicies{}) {
 		t.Fatal("reset not preserved")
 	}
-	_, revision := behaviorPolicy(restored, "npc")
+	_, revision := turn.BehaviorPolicy(restored, "npc")
 	if revision != wiaworld.BehaviorPolicyVersion+":npc" {
 		t.Fatal(revision)
 	}

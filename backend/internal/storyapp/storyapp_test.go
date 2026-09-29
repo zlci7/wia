@@ -568,7 +568,7 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 		{wiaworld.PlayerElaborationExpressive, "不得自行补出多轮 NPC 对话"},
 	}
 	for _, tc := range elaborationCases {
-		got := playerElaborationInstruction(wiaworld.NarrativeSettings{PlayerElaboration: tc.value})
+		got := turn.PlayerElaborationInstruction(wiaworld.NarrativeSettings{PlayerElaboration: tc.value})
 		if !strings.Contains(got, tc.want) {
 			t.Fatalf("player elaboration %q = %q, want %q", tc.value, got, tc.want)
 		}
@@ -583,7 +583,7 @@ func TestInteractionStyleInstructionsRemainDistinct(t *testing.T) {
 		{wiaworld.NPCInitiativeProactive, "主动提问、试探、打趣"},
 	}
 	for _, tc := range initiativeCases {
-		got := npcInitiativeInstruction(wiaworld.NarrativeSettings{NPCInitiative: tc.value})
+		got := turn.NPCInitiativeInstruction(wiaworld.NarrativeSettings{NPCInitiative: tc.value})
 		if !strings.Contains(got, tc.want) {
 			t.Fatalf("NPC initiative %q = %q, want %q", tc.value, got, tc.want)
 		}

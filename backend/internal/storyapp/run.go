@@ -1112,7 +1112,7 @@ func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, p
 	for _, event := range events {
 		name, role, reference := event.ActorID, "", event.ActorID
 		if event.ActorID == "player" {
-			name, role, reference = playerName, "player_character", narrativeReference(settings, playerName)
+			name, role, reference = playerName, "player_character", turn.NarrativeReference(settings, playerName)
 		}
 		for _, character := range characters {
 			if character.EntityID == event.ActorID {

@@ -219,7 +219,7 @@ func composePlot(snapshot turn.Snapshot, run wiaworld.Run, node plot.Node, outpu
 		snapshot.Characters[i].InScene = slices.Contains(output.SceneCharacters, snapshot.Characters[i].EntityID)
 	}
 	material := turn.Material{
-		System:          behaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
+		System:          turn.BehaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
 		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(wiaworld.PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
 		RequiredSources: turn.EventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
@@ -385,7 +385,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		}
 	}
 	if len(allowed) > 0 {
-		material := turn.Material{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
+		material := turn.Material{System: turn.BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed)), RequiredSources: append(turn.EventIDs(output.Events), turn.EventIDs(extra.Events)...)}
 		material.Required += plotActionSceneContract(*output, allowed)
 		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"

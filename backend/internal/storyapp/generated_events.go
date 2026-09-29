@@ -165,7 +165,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	}
 	state.LastOfferTurn = nextTurn
 	material := turn.Material{
-		System:          behaviorContract + "\n你是开放世界事件协调器。在作者范围内，依据已确认的新情境选择是否发生一个小型外部事件。沿用现有事件优先；没有合适事件时返回空候选。重要NPC的新决定只由本人作出，玩家不自动接受任务。只返回JSON。",
+		System:          turn.BehaviorContract + "\n你是开放世界事件协调器。在作者范围内，依据已确认的新情境选择是否发生一个小型外部事件。沿用现有事件优先；没有合适事件时返回空候选。重要NPC的新决定只由本人作出，玩家不自动接受任务。只返回JSON。",
 		Required:        fmt.Sprintf("世界规则：%s\n作者事实：%s\n生成范围：%s\n地点目录：%s\n机会：%s\n已确认触发结果：%s\n游戏内时间：%s\n在场人物：%s\n接收者场景：%s\n当前已有事件：%s\n作者剧情：%s\n返回candidates数组，0或1项。每项condition(何时可收束)、development(有干预与不参与时的后续可能及结束条件)、after_minutes(1到120)、initial对象。initial字段status必须occurred，content为本次外部事实，source_ids只能引用触发结果ID，projections按接收者给出content及可选scene，decision_requests只含本次确实得到新刺激且需要本人决定的NPC，ending为空。不得新增重要NPC、地图地点、强迫玩家承诺、覆写作者主线、把计划写成已发生事实。后续发展须可通过等待、参与或拒绝自然结算。只向真实目击或有来源获知者投影，不广播作者秘密。参与者上限=%s加player。背景人物可有符合设定的日常反应。所有数组使用[]，不使用null。", snapshot.Definition.Rules, snapshot.Definition.Secret, p.Scope, wire.MarshalJSON(snapshot.Definition.Locations), wire.MarshalJSON(opportunity), wire.MarshalJSON(trigger), output.Clock, wire.MarshalJSON(output.SceneCharacters), wire.MarshalJSON(output.SceneViews), wire.MarshalJSON(state.Active), wire.MarshalJSON(snapshot.Plot), wire.MarshalJSON(p.Participants)),
 		RequiredSources: []string{trigger.EventID}, Optional: plotEvidenceSections(snapshot.Events),
 	}
