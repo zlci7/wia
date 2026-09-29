@@ -96,32 +96,3 @@ func (g *contextGenerator) GenerateText(ctx context.Context, request model.TextR
 	}
 	return response, callErr
 }
-
-func dialogueSections(snapshot turn.Snapshot) []turn.Section {
-	var groups []turn.Section
-	for _, event := range snapshot.Dialogue {
-		if len(groups) == 0 || groups[len(groups)-1].Name != "dialogue:"+event.RunID {
-			groups = append(groups, turn.Section{Name: "dialogue:" + event.RunID})
-		}
-		i := len(groups) - 1
-		part := snapshot
-		part.Dialogue = []wiaworld.Event{event}
-		groups[i].Text += "此前已提交对话：" + dialogueContext(part)
-		groups[i].Sources = append(groups[i].Sources, event.EventID)
-	}
-	return groups
-}
-
-func sceneViewSources(snapshot turn.Snapshot, recipient string) []string {
-	var ids []string
-	for _, view := range snapshot.SceneViews {
-		if recipient == "" || view.Recipient == recipient {
-			for _, id := range view.SourceIDs {
-				if !wiaworld.ContainsID(ids, id) {
-					ids = append(ids, id)
-				}
-			}
-		}
-	}
-	return ids
-}

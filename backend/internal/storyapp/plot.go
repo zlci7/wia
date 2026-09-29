@@ -220,13 +220,13 @@ func composePlot(snapshot turn.Snapshot, run wiaworld.Run, node plot.Node, outpu
 	}
 	material := turn.Material{
 		System:          turn.BehaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
-		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(wiaworld.PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
+		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(wiaworld.PublicCharacterViews(snapshot.Characters)), turn.CoordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
 		RequiredSources: turn.EventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
 	material.Required += "\n接收与唤醒合同：每个 recipient 最多出现一次，只选当前节点 audience 中的ID。decision_requests 只选本次 projections 已提供刺激的重要NPC ID，最多一次；player、背景人物、信使等没有独立Agent的角色不放入 decision_requests。没有符合条件的人物时返回[]。"
 	material.Required += "\n保留场景与已提交节点的来源ID也可以引用，但仅用于这些已提供状态，不据ID猜测未提供的原文。definition引用仅限本次当前节点；其他节点的发生依据使用其event_id，不使用其未来计划。"
-	material.RequiredSources = append(material.RequiredSources, sceneViewSources(snapshot, "")...)
+	material.RequiredSources = append(material.RequiredSources, turn.SceneViewSources(snapshot, "")...)
 	for _, state := range snapshot.PlotProgress.Nodes {
 		if state.EventID != "" {
 			material.RequiredSources = append(material.RequiredSources, state.EventID)
@@ -271,7 +271,7 @@ func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.
 	}
 	// Retained views and node results are provided even when their originating
 	// event body falls outside the optional history window. Metadata is world-local.
-	provided := sceneViewSources(turn.Snapshot{SceneViews: output.SceneViews}, "")
+	provided := turn.SceneViewSources(turn.Snapshot{SceneViews: output.SceneViews}, "")
 	for _, state := range snapshot.PlotProgress.Nodes {
 		provided = append(provided, state.EventID)
 	}

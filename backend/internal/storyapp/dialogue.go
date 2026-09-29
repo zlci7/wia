@@ -3,10 +3,7 @@ package storyapp
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
 
-	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -30,13 +27,3 @@ func loadDialogue(ctx context.Context, db *sql.DB) ([]wiaworld.Event, error) {
 	}
 	return result, rows.Err()
 }
-
-func dialogueContext(snapshot turn.Snapshot) string {
-	var result strings.Builder
-	for _, event := range snapshot.Dialogue {
-		fmt.Fprintf(&result, "[来源=%s；回合=%s；类型=%s；表达者=%s；对象=%s；范围=%s] %s\n", event.EventID, event.RunID, event.EventType, turn.CharacterDisplayName(snapshot.Characters, event.ActorID), event.TargetID, event.SourceType, event.Content)
-	}
-	return result.String()
-}
-
-const intentVisibilityRule = "交谈对象与可听范围分别判断。指定某人、使用引号或试探语气均不单独构成私聊依据。未表达私密意图且没有已成立私密情境时，visibility 为 public。明确耳语、限定听众或有来源的近期私密交谈情境可支持 private；当前明确表达优先。历史发言用于理解省略和指代，不是本轮再次发生的动作。"

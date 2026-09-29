@@ -1137,23 +1137,6 @@ func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, p
 
 // formatBystanders lists passers-by with their stable identity so a coordinated
 // outcome can attribute experience to the one that actually took part.
-func formatBystanders(bystanders []story.Bystander, names []string) string {
-	if len(bystanders) == 0 {
-		if len(names) == 0 {
-			return "（无已记录背景人物）"
-		}
-		return strings.Join(names, "、")
-	}
-	parts := make([]string, 0, len(bystanders))
-	for _, bystander := range bystanders {
-		if bystander.BystanderID != "" {
-			parts = append(parts, fmt.Sprintf("%s（%s）", bystander.Name, bystander.BystanderID))
-			continue
-		}
-		parts = append(parts, bystander.Name)
-	}
-	return strings.Join(parts, "、")
-}
 
 func generateNarrativeText(ctx context.Context, generator model.TextGenerator, system, input string, maxOutputTokens int) (string, int, error) {
 	for attempt := 0; attempt < 2; attempt++ {
@@ -1178,18 +1161,6 @@ func generateNarrativeText(ctx context.Context, generator model.TextGenerator, s
 		return narrative, attempt, nil
 	}
 	return "", 1, ErrGenerationFailed
-}
-
-func coordinationDecisionContext(decisions map[string]turn.NPCDecision, characters []wiaworld.Character) string {
-	var parts []string
-	for _, character := range sceneCharacters(characters) {
-		decision := decisions[character.EntityID]
-		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；action_intent=%q；silent=%t", character.Name, character.Role, character.EntityID, decision.Speech, decision.ActionIntent, decision.Silent))
-	}
-	if len(parts) == 0 {
-		return "（暂无）"
-	}
-	return strings.Join(parts, "\n")
 }
 
 func characterIDs(items []wiaworld.Character) []string {

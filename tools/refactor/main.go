@@ -69,6 +69,8 @@ func main() {
 		runCmpFunc(args)
 	case "strcmp":
 		runStrCmp(args)
+	case "closure":
+		runClosure(args)
 	case "-h", "--help", "help":
 		usage()
 	default:

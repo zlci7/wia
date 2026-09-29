@@ -89,7 +89,19 @@ func body(path, name string) (string, error) {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	start := strings.Index(text, "func "+name+"(")
 	if start < 0 {
+		start = strings.Index(text, "const "+name+" =")
+	}
+	if start < 0 {
 		return "", fmt.Errorf("func %s not found", name)
+	}
+	// A constant has no braces; it ends at the end of its declaration, which may run over
+	// several lines of concatenated strings.
+	if text[start] == 'c' {
+		end := strings.Index(text[start:], "\n\n")
+		if end < 0 {
+			return text[start:], nil
+		}
+		return text[start : start+end], nil
 	}
 	depth := 0
 	for index := start; index < len(text); index++ {
@@ -106,12 +118,13 @@ func body(path, name string) (string, error) {
 	return "", fmt.Errorf("func %s has no closing brace", name)
 }
 
-// renameDeclaration replaces the function's own name on its declaration line only.
+// renameDeclaration replaces a declaration's own name on its first line only.
 func renameDeclaration(text, name string) string {
 	lines := strings.Split(text, "\n")
 	if len(lines) == 0 {
 		return text
 	}
 	lines[0] = strings.Replace(lines[0], "func "+name+"(", "func NAME(", 1)
+	lines[0] = strings.Replace(lines[0], "const "+name+" =", "const NAME =", 1)
 	return strings.Join(lines, "\n")
 }
