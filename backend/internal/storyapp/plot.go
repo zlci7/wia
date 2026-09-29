@@ -72,7 +72,7 @@ func plotActionPresence(current []string, events []wiaworld.Event, outcomes []pl
 		}
 		e, ok := turn.EventByID(events, o.ActionID)
 		if !ok || e.EventType != "npc_action_intent" || seen[e.ActorID] || (o.Status != "succeeded" && o.Status != "partial") {
-			return nil, fmt.Errorf("%w: invalid plot action presence", ErrGenerationFailed)
+			return nil, fmt.Errorf("%w: invalid plot action presence", turn.ErrGenerationFailed)
 		}
 		seen[e.ActorID] = true
 		if *o.ActorInScene && !slices.Contains(ids, e.ActorID) {
@@ -143,7 +143,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
-	if err = generateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
+	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
 		return nil, err
 	}
 	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
@@ -254,16 +254,16 @@ func plotEvidenceSections(events []wiaworld.Event) []turn.Section {
 
 func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.Output, result plotResolution) error {
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
-		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
+		return fmt.Errorf("%w: plot_status", turn.ErrGenerationFailed)
 	}
 	if wire.Clean(result.Content) == "" || len(result.SourceIDs) == 0 || result.Projections == nil || result.DecisionRequests == nil {
-		return fmt.Errorf("%w: plot_required_fields", ErrGenerationFailed)
+		return fmt.Errorf("%w: plot_required_fields", turn.ErrGenerationFailed)
 	}
 	if result.Ending != "" && (!node.Terminal || result.Status == "deferred") {
-		return fmt.Errorf("%w: plot_ending", ErrGenerationFailed)
+		return fmt.Errorf("%w: plot_ending", turn.ErrGenerationFailed)
 	}
 	if result.Status == "deferred" && (len(result.Projections) > 0 || len(result.DecisionRequests) > 0) {
-		return fmt.Errorf("%w: plot_deferred_effects", ErrGenerationFailed)
+		return fmt.Errorf("%w: plot_deferred_effects", turn.ErrGenerationFailed)
 	}
 	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
 	for _, e := range append(append([]wiaworld.Event{}, snapshot.Events...), output.Events...) {
@@ -288,11 +288,11 @@ func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.
 	seen := map[string]bool{}
 	for _, p := range result.Projections {
 		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || wire.Clean(p.Content) == "" {
-			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
+			return fmt.Errorf("%w: plot_projection_audience", turn.ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
 			if _, ok := turn.CharacterByID(story.Definition{Characters: snapshot.Characters}, p.Recipient); !ok {
-				return fmt.Errorf("%w: plot_unknown_character", ErrGenerationFailed)
+				return fmt.Errorf("%w: plot_unknown_character", turn.ErrGenerationFailed)
 			}
 		}
 		seen[p.Recipient] = true
@@ -300,7 +300,7 @@ func validatePlotResolution(snapshot turn.Snapshot, node plot.Node, output turn.
 	wake := map[string]bool{}
 	for _, id := range result.DecisionRequests {
 		if id == "player" || !seen[id] || wake[id] {
-			return fmt.Errorf("%w: plot_decision_recipient", ErrGenerationFailed)
+			return fmt.Errorf("%w: plot_decision_recipient", turn.ErrGenerationFailed)
 		}
 		wake[id] = true
 	}
@@ -395,7 +395,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		err := generateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
+		err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
 		cancel()
 		if err != nil {
 			return nil, err
@@ -421,7 +421,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 					if a.logger != nil {
 						a.logger.Printf("story plot_actions validation failed: run_id=%q boundary=outcome_audience", run.RunID)
 					}
-					return nil, ErrGenerationFailed
+					return nil, turn.ErrGenerationFailed
 				}
 			}
 		}

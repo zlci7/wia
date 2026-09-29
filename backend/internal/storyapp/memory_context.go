@@ -113,22 +113,22 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	}
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	if err := generateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "content", "states"); err != nil {
+	if err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "content", "states"); err != nil {
 		return d, err
 	}
 	if wire.Clean(result.Content) == "" || result.States == nil {
 		a.logMemoryValidation(snapshot.Summary.WorldID, scope, "required_fields")
-		return d, ErrGenerationFailed
+		return d, turn.ErrGenerationFailed
 	}
 	for _, state := range result.States {
 		if !wiaworld.ContainsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || wire.Clean(state.Content) == "" || len(state.Sources) == 0 {
 			a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_fields")
-			return d, ErrGenerationFailed
+			return d, turn.ErrGenerationFailed
 		}
 		for _, id := range state.Sources {
 			if !wiaworld.ContainsID(allowed, id) {
 				a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_source")
-				return d, ErrGenerationFailed
+				return d, turn.ErrGenerationFailed
 			}
 		}
 	}

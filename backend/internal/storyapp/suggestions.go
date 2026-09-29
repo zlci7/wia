@@ -227,7 +227,7 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 		}
 		return nil
 	}
-	_, err := generateJSONCheckedMetrics(ctx, g, material.System, material.Required, &result, 1024, nil, []string{"items"}, check)
+	_, err := turn.GenerateJSONCheckedMetrics(ctx, g, material.System, material.Required, &result, 1024, nil, []string{"items"}, check)
 	w := a.worldRuntimeFor(set.Basis.WorldID)
 	w.mu.Lock()
 	defer w.mu.Unlock()

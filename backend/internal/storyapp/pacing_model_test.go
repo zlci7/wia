@@ -63,7 +63,7 @@ func (p *pacingProbe) GenerateText(ctx context.Context, req model.TextRequest) (
 	line := fmt.Sprintf("stage=%s elapsed_ms=%d success=%t", stage, time.Since(started).Milliseconds(), err == nil)
 	if stage == "npc" && err == nil {
 		var decision turn.NPCDecision
-		if invalid := decodeGeneratedJSON(response.Text, &decision, []string{"speech", "action_intent", "memory"}, []string{"speech", "action_intent", "silent", "memory"}); invalid != nil {
+		if invalid := turn.DecodeGeneratedJSON(response.Text, &decision, []string{"speech", "action_intent", "memory"}, []string{"speech", "action_intent", "silent", "memory"}); invalid != nil {
 			line += fmt.Sprintf(" schema_error=%v", invalid)
 		}
 	}

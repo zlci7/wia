@@ -66,7 +66,7 @@ func applySceneUpdates(snapshot turn.Snapshot, run wiaworld.Run, intent turn.Tur
 	for i, outcome := range host.Outcomes {
 		action, ok := turn.EventByID(output.Events, outcome.ActionID)
 		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
-			return nil, ErrGenerationFailed
+			return nil, turn.ErrGenerationFailed
 		}
 		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)
 		byID[outcome.ActionID] = turn.SceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
@@ -79,7 +79,7 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 	seen := map[string]bool{}
 	for _, update := range updates {
 		if wire.Clean(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
-			return nil, fmt.Errorf("%w: incomplete scene update", ErrGenerationFailed)
+			return nil, fmt.Errorf("%w: incomplete scene update", turn.ErrGenerationFailed)
 		}
 		for _, recipient := range update.Recipients {
 			index := -1
@@ -90,14 +90,14 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 				}
 			}
 			if index < 0 || seen[recipient] {
-				return nil, fmt.Errorf("%w: invalid scene recipient", ErrGenerationFailed)
+				return nil, fmt.Errorf("%w: invalid scene recipient", turn.ErrGenerationFailed)
 			}
 			seen[recipient] = true
 			var canonical []string
 			for _, id := range update.SourceIDs {
 				source, ok := byID[id]
 				if !ok || !containsID(source.Recipients, recipient) {
-					return nil, fmt.Errorf("%w: scene source is unavailable to recipient", ErrGenerationFailed)
+					return nil, fmt.Errorf("%w: scene source is unavailable to recipient", turn.ErrGenerationFailed)
 				}
 				for _, sid := range source.Canonical {
 					if !containsID(canonical, sid) {

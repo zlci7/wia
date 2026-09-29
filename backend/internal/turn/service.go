@@ -67,10 +67,13 @@ type Host interface {
 // of the input those steps read or a helper they use.
 type Service struct {
 	host Host
+	deps Deps
 }
 
-// New builds a turn service on the given host.
-func New(host Host) *Service { return &Service{host: host} }
+// New builds a turn service on the given host. deps carries what a turn needs beyond the
+// host operations: usage metering and a logger. It is not part of Host because neither is
+// an operation a turn performs.
+func New(host Host, deps Deps) *Service { return &Service{host: host, deps: deps} }
 
 // Execute runs one turn and returns what it produced.
 //

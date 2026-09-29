@@ -149,7 +149,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 		return nil, nil
 	}
 	if (opportunity.Kind != "arrival" && opportunity.Kind != "significant_change") || !slices.Contains(p.Locations, opportunity.Location) {
-		return nil, fmt.Errorf("%w: event_opportunity_scope", ErrGenerationFailed)
+		return nil, fmt.Errorf("%w: event_opportunity_scope", turn.ErrGenerationFailed)
 	}
 	var trigger wiaworld.Event
 	for _, e := range output.Events {
@@ -175,18 +175,18 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	var response struct {
 		Candidates []eventCandidate `json:"candidates"`
 	}
-	if err = generateJSON(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, "candidates"); err != nil {
+	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, "candidates"); err != nil {
 		return nil, err
 	}
 	if response.Candidates == nil || len(response.Candidates) > 1 {
-		return nil, fmt.Errorf("%w: event_candidate_count", ErrGenerationFailed)
+		return nil, fmt.Errorf("%w: event_candidate_count", turn.ErrGenerationFailed)
 	}
 	if len(response.Candidates) == 0 {
 		return nil, nil
 	}
 	c := response.Candidates[0]
 	if wire.Clean(c.Condition) == "" || wire.Clean(c.Development) == "" || len([]rune(c.Initial.Content+c.Condition+c.Development)) > 4000 || c.AfterMinutes < 1 || c.AfterMinutes > 120 || c.Initial.Status != "occurred" || c.Initial.Ending != "" || len(c.Initial.SourceIDs) != 1 || c.Initial.SourceIDs[0] != trigger.EventID {
-		return nil, fmt.Errorf("%w: event_candidate_fields", ErrGenerationFailed)
+		return nil, fmt.Errorf("%w: event_candidate_fields", turn.ErrGenerationFailed)
 	}
 	key := run.InputID
 	if key == "" {

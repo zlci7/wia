@@ -11,12 +11,6 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-const (
-	LocalUserID   = "local"
-	GameID        = "lantern-dusk"
-	SchemaVersion = 1
-)
-
 var (
 	ErrUnauthorized        = errors.New("unauthorized")
 	ErrForbidden           = errors.New("forbidden")
@@ -28,7 +22,6 @@ var (
 	ErrVersionConflict     = errors.New("version conflict")
 	ErrIdempotencyConflict = errors.New("idempotency conflict")
 	ErrModelNotConfigured  = errors.New("model not configured")
-	ErrGenerationFailed    = errors.New("generation failed")
 	ErrStorageUnavailable  = errors.New("storage unavailable")
 	ErrSaveFailed          = errors.New("save failed")
 	ErrInvalidRequest      = errors.New("invalid request")
@@ -37,6 +30,12 @@ var (
 	ErrContentNotFound     = errors.New("content not found")
 	ErrContentBusy         = errors.New("content is busy")
 	ErrContentInvalid      = errors.New("content is invalid")
+)
+
+const (
+	LocalUserID   = "local"
+	GameID        = "lantern-dusk"
+	SchemaVersion = 1
 )
 
 type Options struct {

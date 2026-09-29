@@ -445,7 +445,7 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 				return err
 			}
 			if !found {
-				return ErrGenerationFailed
+				return turn.ErrGenerationFailed
 			}
 		}
 		if err := tx.SetMeta(ctx, "updated_at", wire.NowText()); err != nil {

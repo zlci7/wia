@@ -1031,11 +1031,11 @@ func TestCloseDrainsPendingCopyBeforeReleasingDataRoot(t *testing.T) {
 }
 
 func TestStrictJSONRejectsDuplicateKeys(t *testing.T) {
-	if err := validateStrictJSON([]byte(`{"speech":"x","speech":"y"}`)); err == nil {
+	if err := turn.ValidateStrictJSON([]byte(`{"speech":"x","speech":"y"}`)); err == nil {
 		t.Fatal("duplicate key accepted")
 	}
 	var value turn.NPCDecision
-	if err := generateJSON(context.Background(), &scriptedGenerator{fail: true}, "", "", &value, 100); err == nil {
+	if err := turn.GenerateJSON(context.Background(), &scriptedGenerator{fail: true}, "", "", &value, 100); err == nil {
 		t.Fatal("unknown field accepted")
 	}
 	_ = json.Valid
@@ -1060,7 +1060,7 @@ func TestNarrativeUsesPlainTextContract(t *testing.T) {
 		})
 	}
 	for _, text := range []string{"", `{"narrative":`, `{"other":"field"}`} {
-		if _, err := parseNarrativeText(text); !errors.Is(err, ErrGenerationFailed) {
+		if _, err := parseNarrativeText(text); !errors.Is(err, turn.ErrGenerationFailed) {
 			t.Fatalf("invalid narrative %q error = %v", text, err)
 		}
 	}
@@ -1521,7 +1521,7 @@ func TestSemanticIntentIsNotOverwrittenByKeywordHints(t *testing.T) {
 func TestRequiredJSONFieldsRejectEmptyObjects(t *testing.T) {
 	for _, text := range []string{`{}`, `null`, `{"speech":null,"action_intent":null,"silent":null,"memory":null}`} {
 		var decision turn.NPCDecision
-		if err := generateJSON(context.Background(), fixedJSONGenerator{text: text}, "", "", &decision, 100, "speech", "action_intent", "silent", "memory"); err == nil {
+		if err := turn.GenerateJSON(context.Background(), fixedJSONGenerator{text: text}, "", "", &decision, 100, "speech", "action_intent", "silent", "memory"); err == nil {
 			t.Fatalf("empty NPC response accepted: %s", text)
 		}
 	}
@@ -1529,7 +1529,7 @@ func TestRequiredJSONFieldsRejectEmptyObjects(t *testing.T) {
 
 func TestNullableJSONFieldMustExistButMayBeNull(t *testing.T) {
 	var intent turn.TurnIntent
-	err := generateJSONWithNullableFields(
+	err := turn.GenerateJSONWithNullableFields(
 		context.Background(),
 		fixedJSONGenerator{text: `{"intent_type":"observe","addressee_id":null,"visibility":"public"}`},
 		"", "", &intent, 100,
@@ -1539,14 +1539,14 @@ func TestNullableJSONFieldMustExistButMayBeNull(t *testing.T) {
 	if err != nil || intent.AddresseeID != "" {
 		t.Fatalf("nullable addressee = %+v, %v", intent, err)
 	}
-	err = generateJSONWithNullableFields(
+	err = turn.GenerateJSONWithNullableFields(
 		context.Background(),
 		fixedJSONGenerator{text: `{"intent_type":"observe","visibility":"public"}`},
 		"", "", &intent, 100,
 		[]string{"addressee_id"},
 		"intent_type", "addressee_id", "visibility",
 	)
-	if !errors.Is(err, ErrGenerationFailed) || safeTurnErrorCode(err) != "json_required_field_missing" {
+	if !errors.Is(err, turn.ErrGenerationFailed) || safeTurnErrorCode(err) != "json_required_field_missing" {
 		t.Fatalf("missing nullable field error = %v", err)
 	}
 }
@@ -1567,7 +1567,7 @@ func TestGenerateJSONRetriesOnlyInvalidModelOutput(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			generator := &sequenceJSONGenerator{responses: tc.responses, errors: tc.errors}
 			var intent turn.TurnIntent
-			err := generateJSONWithNullableFields(
+			err := turn.GenerateJSONWithNullableFields(
 				context.Background(), generator, "system", "input", &intent, 100,
 				[]string{"addressee_id"},
 				"intent_type", "addressee_id", "visibility",

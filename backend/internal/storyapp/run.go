@@ -28,7 +28,7 @@ func validateSceneCharacters(ids []string, characters []wiaworld.Character) erro
 	for index, id := range ids {
 		id = wire.Clean(id)
 		if id == "" || !available[id] || seen[id] {
-			return fmt.Errorf("%w: invalid scene character %q at index %d", ErrGenerationFailed, id, index)
+			return fmt.Errorf("%w: invalid scene character %q at index %d", turn.ErrGenerationFailed, id, index)
 		}
 		ids[index] = id
 		seen[id] = true
@@ -108,29 +108,29 @@ func classifyTurnFailure(err error) (status, reason, message string) {
 func parseNarrativeText(text string) (string, error) {
 	text = wire.Clean(text)
 	if text == "" {
-		return "", fmt.Errorf("%w: narrative is empty", ErrGenerationFailed)
+		return "", fmt.Errorf("%w: narrative is empty", turn.ErrGenerationFailed)
 	}
 	if strings.HasPrefix(text, "```") {
 		lines := strings.Split(text, "\n")
 		if len(lines) < 3 || !strings.HasPrefix(strings.TrimSpace(lines[len(lines)-1]), "```") {
-			return "", fmt.Errorf("%w: narrative has an incomplete code fence", ErrGenerationFailed)
+			return "", fmt.Errorf("%w: narrative has an incomplete code fence", turn.ErrGenerationFailed)
 		}
 		text = wire.Clean(strings.Join(lines[1:len(lines)-1], "\n"))
 	}
 	if strings.HasPrefix(text, "{") {
-		if err := validateStrictJSON([]byte(text)); err != nil {
-			return "", fmt.Errorf("%w: narrative JSON is invalid: %v", ErrGenerationFailed, err)
+		if err := turn.ValidateStrictJSON([]byte(text)); err != nil {
+			return "", fmt.Errorf("%w: narrative JSON is invalid: %v", turn.ErrGenerationFailed, err)
 		}
 		var legacy narrativeResult
 		decoder := json.NewDecoder(strings.NewReader(text))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&legacy); err != nil {
-			return "", fmt.Errorf("%w: narrative JSON does not match the legacy wrapper", ErrGenerationFailed)
+			return "", fmt.Errorf("%w: narrative JSON does not match the legacy wrapper", turn.ErrGenerationFailed)
 		}
 		text = wire.Clean(legacy.Narrative)
 	}
 	if text == "" {
-		return "", fmt.Errorf("%w: narrative is empty", ErrGenerationFailed)
+		return "", fmt.Errorf("%w: narrative is empty", turn.ErrGenerationFailed)
 	}
 	return text, nil
 }
@@ -565,15 +565,15 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 		}
 		if intent.AddresseeID != "" {
 			if _, ok := findSceneCharacter(participants, intent.AddresseeID); !ok {
-				return &generationJSONError{Code: "json_field_value", Field: "addressee_id", Expected: "listed-in-scene-important-character-or-empty", Cause: ErrGenerationFailed}
+				return &turn.GenerationError{Code: "json_field_value", Field: "addressee_id", Expected: "listed-in-scene-important-character-or-empty", Cause: turn.ErrGenerationFailed}
 			}
 		}
 		if intent.Visibility == "private" && intent.AddresseeID == "" {
-			return &generationJSONError{Code: "json_field_value", Field: "visibility", Expected: "public-when-addressee-is-empty", Cause: ErrGenerationFailed}
+			return &turn.GenerationError{Code: "json_field_value", Field: "visibility", Expected: "public-when-addressee-is-empty", Cause: turn.ErrGenerationFailed}
 		}
 		return nil
 	}
-	repairCount, err := generateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
+	repairCount, err := turn.GenerateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
 	if err != nil {
 		return turn.TurnIntent{}, repairCount, err
 	}
@@ -860,7 +860,7 @@ func appendHostOutcomes(output *turn.Output, run wiaworld.Run, participants []wi
 		}
 	}
 	if len(outcomes) != len(actions) {
-		return nil, fmt.Errorf("%w: outcome count %d does not match action count %d", ErrGenerationFailed, len(outcomes), len(actions))
+		return nil, fmt.Errorf("%w: outcome count %d does not match action count %d", turn.ErrGenerationFailed, len(outcomes), len(actions))
 	}
 	participantIDs := make(map[string]bool, len(participants))
 	for _, character := range participants {
@@ -878,14 +878,14 @@ func appendHostOutcomes(output *turn.Output, run wiaworld.Run, participants []wi
 		outcome.Content = wire.Clean(outcome.Content)
 		action, ok := actions[outcome.ActionID]
 		if !ok || seen[outcome.ActionID] || outcome.Content == "" || (outcome.Status != "succeeded" && outcome.Status != "failed" && outcome.Status != "partial" && outcome.Status != "not_executed") || outcome.Recipients == nil {
-			return nil, fmt.Errorf("%w: invalid outcome at index %d", ErrGenerationFailed, index)
+			return nil, fmt.Errorf("%w: invalid outcome at index %d", turn.ErrGenerationFailed, index)
 		}
 		seen[outcome.ActionID] = true
 		recipients := make(map[string]bool, len(outcome.Recipients)+1)
 		for _, id := range outcome.Recipients {
 			id = wire.Clean(id)
 			if id != "player" && !participantIDs[id] {
-				return nil, fmt.Errorf("%w: outcome %q has unknown recipient %q", ErrGenerationFailed, outcome.ActionID, id)
+				return nil, fmt.Errorf("%w: outcome %q has unknown recipient %q", turn.ErrGenerationFailed, outcome.ActionID, id)
 			}
 			recipients[id] = true
 		}
@@ -914,7 +914,7 @@ func appendHostOutcomes(output *turn.Output, run wiaworld.Run, participants []wi
 				continue
 			}
 			if !definedBystanders[id] {
-				return nil, fmt.Errorf("%w: outcome %q attributes an undefined bystander %q", ErrGenerationFailed, outcome.ActionID, id)
+				return nil, fmt.Errorf("%w: outcome %q attributes an undefined bystander %q", turn.ErrGenerationFailed, outcome.ActionID, id)
 			}
 			involved[id] = true
 			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
@@ -966,10 +966,10 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 			started := time.Now()
 			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
 			defer callCancel()
-			repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+			repairCount, err := turn.GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
 			for recall := 0; err == nil && wire.Clean(decision.RecallQuery) != ""; recall++ {
 				if recall >= 2 || len([]rune(decision.RecallQuery)) > 256 {
-					err = ErrGenerationFailed
+					err = turn.ErrGenerationFailed
 					break
 				}
 				material = turn.WithRecall(material, turn.MemoryProjection{Context: snapshot.LongMemory[character.EntityID]}, decision.RecallQuery)
@@ -977,7 +977,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 				callGenerator = a.contextGenerator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 				decision = turn.NPCDecision{}
 				var repairs int
-				repairs, err = generateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+				repairs, err = turn.GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
 				repairCount += repairs
 			}
 			if err != nil {
@@ -1018,14 +1018,14 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	var result hostResult
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
-	repairCount, err := generateJSONMetrics(callCtx, generator, material.System, input, &result, structuredTurnOutputTokens, "time_minutes", "scene", "scene_characters", "outcomes", "scene_updates")
+	repairCount, err := turn.GenerateJSONMetrics(callCtx, generator, material.System, input, &result, structuredTurnOutputTokens, "time_minutes", "scene", "scene_characters", "outcomes", "scene_updates")
 	if err != nil {
 		return hostResult{}, repairCount, err
 	}
 	result.Scene = wire.Clean(result.Scene)
 	if intent.WaitMinutes > 0 {
 		if result.TimeMinutes > min(intent.WaitMinutes, turn.PlotTimeLimit(snapshot)) {
-			return hostResult{}, repairCount, fmt.Errorf("%w: waiting exceeds requested duration", ErrGenerationFailed)
+			return hostResult{}, repairCount, fmt.Errorf("%w: waiting exceeds requested duration", turn.ErrGenerationFailed)
 		}
 		for _, id := range result.InterruptSources {
 			e, ok := turn.EventByID(events, id)
@@ -1035,21 +1035,21 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 				if a.logger != nil {
 					a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_interruption_source", run.RunID)
 				}
-				return hostResult{}, repairCount, fmt.Errorf("%w: invalid wait interruption source", ErrGenerationFailed)
+				return hostResult{}, repairCount, fmt.Errorf("%w: invalid wait interruption source", turn.ErrGenerationFailed)
 			}
 		}
 		if result.TimeMinutes < min(intent.WaitMinutes, turn.PlotTimeLimit(snapshot)) && len(result.InterruptSources) == 0 {
 			if a.logger != nil {
 				a.logger.Printf("story coordination validation failed: run_id=%q boundary=wait_shortened", run.RunID)
 			}
-			return hostResult{}, repairCount, fmt.Errorf("%w: waiting shortened without interruption evidence", ErrGenerationFailed)
+			return hostResult{}, repairCount, fmt.Errorf("%w: waiting shortened without interruption evidence", turn.ErrGenerationFailed)
 		}
 	}
 	if result.Scene == "" || result.TimeMinutes < 0 || result.TimeMinutes > turn.PlotTimeLimit(snapshot) || result.SceneCharacters == nil || result.Outcomes == nil || result.SceneUpdates == nil {
 		if a.logger != nil {
 			a.logger.Printf("story coordination validation failed: run_id=%q boundary=required_fields time_minutes=%d limit=%d", run.RunID, result.TimeMinutes, turn.PlotTimeLimit(snapshot))
 		}
-		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", ErrGenerationFailed)
+		return hostResult{}, repairCount, fmt.Errorf("%w: invalid scene coordination fields", turn.ErrGenerationFailed)
 	}
 	result.SceneCharacters = turn.NormalizeSceneCharacters(result.SceneCharacters)
 	if err := validateSceneCharacters(result.SceneCharacters, snapshot.Characters); err != nil {
@@ -1109,7 +1109,7 @@ func generateNarrativeText(ctx context.Context, generator model.TextGenerator, s
 		}
 		return narrative, attempt, nil
 	}
-	return "", 1, ErrGenerationFailed
+	return "", 1, turn.ErrGenerationFailed
 }
 
 func characterIDs(items []wiaworld.Character) []string {
@@ -1120,131 +1120,6 @@ func characterIDs(items []wiaworld.Character) []string {
 	return result
 }
 
-func generateJSON(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, requiredFields ...string) error {
-	_, err := generateJSONMetrics(ctx, generator, system, input, target, maxOutput, requiredFields...)
-	return err
-}
-
-func generateJSONWithNullableFields(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields []string, requiredFields ...string) error {
-	_, err := generateJSONWithNullableFieldsMetrics(ctx, generator, system, input, target, maxOutput, nullableFields, requiredFields...)
-	return err
-}
-
-func generateJSONMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, requiredFields ...string) (int, error) {
-	return generateJSONWithNullableFieldsMetrics(ctx, generator, system, input, target, maxOutput, nil, requiredFields...)
-}
-
-func generateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields []string, requiredFields ...string) (int, error) {
-	return generateJSONCheckedMetrics(ctx, generator, system, input, target, maxOutput, nullableFields, requiredFields, nil)
-}
-
-func generateJSONCheckedMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields, requiredFields []string, check func() error) (int, error) {
-	if t := reflect.TypeOf(target); t != nil && t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
-		system += "\n机器可读字段合同（对象只使用以下字段；string表示字符串，[]表示数组，boolean表示布尔值，integer表示整数）：" + generatedFieldContract(t)
-	}
-	var lastValidation error
-	for attempt := 0; attempt < 2; attempt++ {
-		requestSystem := system
-		if attempt > 0 {
-			requestSystem += "\n上一次响应不是可接受的完整 JSON。请重新生成，只输出满足字段要求的单个 JSON 对象。"
-			var detail *generationJSONError
-			if errors.As(lastValidation, &detail) {
-				requestSystem += "\n本地字段校验：" + detail.Error() + "。按本地字段类型生成；只使用输出合同列出的字段。"
-			}
-		}
-		response, err := generator.GenerateText(ctx, model.TextRequest{System: requestSystem, Input: input, MaxInputTokens: 12000, MaxOutputTokens: maxOutput, MaxResponseBytes: 1 << 20})
-		if err != nil {
-			if attempt == 0 && errors.Is(err, model.ErrInvalidTextResponse) {
-				continue
-			}
-			return attempt, err
-		}
-		lastValidation = decodeGeneratedJSON(response.Text, target, nullableFields, requiredFields)
-		if lastValidation == nil && check != nil {
-			lastValidation = check()
-		}
-		if recorder, ok := generator.(interface{ recordJSONValidation(error) }); ok {
-			recorder.recordJSONValidation(lastValidation)
-		}
-		if err := lastValidation; err != nil {
-			if attempt == 0 {
-				continue
-			}
-			return attempt, err
-		}
-		return attempt, nil
-	}
-	return 1, ErrGenerationFailed
-}
-
-func generatedFieldContract(t reflect.Type) string {
-	if t.Kind() == reflect.Pointer {
-		return generatedFieldContract(t.Elem())
-	}
-	switch t.Kind() {
-	case reflect.Struct:
-		fields := []string{}
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			name := strings.Split(f.Tag.Get("json"), ",")[0]
-			if name == "" || name == "-" {
-				continue
-			}
-			fields = append(fields, fmt.Sprintf("%q:%s", name, generatedFieldContract(f.Type)))
-		}
-		return "{" + strings.Join(fields, ",") + "}"
-	case reflect.Slice:
-		return "[" + generatedFieldContract(t.Elem()) + "]"
-	case reflect.String:
-		return "string"
-	case reflect.Bool:
-		return "boolean"
-	default:
-		return "integer"
-	}
-}
-
-func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields []string) error {
-	if err := validateStrictJSON([]byte(text)); err != nil {
-		return &generationJSONError{Code: "json_syntax_invalid", Cause: err}
-	}
-	if len(requiredFields) > 0 {
-		var object map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(text), &object); err != nil || object == nil {
-			return &generationJSONError{Code: "json_object_required", Cause: ErrGenerationFailed}
-		}
-		nullable := make(map[string]bool, len(nullableFields))
-		for _, field := range nullableFields {
-			nullable[field] = true
-		}
-		for _, field := range requiredFields {
-			raw, ok := object[field]
-			if !ok {
-				return &generationJSONError{Code: "json_required_field_missing", Field: field, Cause: ErrGenerationFailed}
-			}
-			if strings.EqualFold(strings.TrimSpace(string(raw)), "null") && !nullable[field] {
-				return &generationJSONError{Code: "json_required_field_null", Field: field, Cause: ErrGenerationFailed}
-			}
-		}
-	}
-	value := reflect.ValueOf(target)
-	if value.Kind() == reflect.Pointer && !value.IsNil() {
-		value.Elem().Set(reflect.Zero(value.Elem().Type()))
-	}
-	decoder := json.NewDecoder(strings.NewReader(text))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return generatedDecodeError(err, target)
-	}
-	if intent, ok := target.(*turn.TurnIntent); ok {
-		return validateTurnIntent(intent)
-	}
-	if validator, ok := target.(interface{ validateGeneratedFields() error }); ok {
-		return validator.validateGeneratedFields()
-	}
-	return nil
-}
-
 // validateTurnIntent checks and normalizes what a model produced for a player's intent.
 //
 // The rules live here rather than on the type because the error they return is part of
@@ -1253,21 +1128,3 @@ func decodeGeneratedJSON(text string, target any, nullableFields, requiredFields
 // The three fields are constrained here and nowhere else, so every decode into a
 // TurnIntent gets the same rules. Normalizing first means a model answering "Speak" is
 // accepted rather than rejected on case.
-func validateTurnIntent(intent *turn.TurnIntent) error {
-	intent.IntentType = strings.ToLower(wire.Clean(intent.IntentType))
-	intent.Visibility = strings.ToLower(wire.Clean(intent.Visibility))
-	intent.AddresseeID = wire.Clean(intent.AddresseeID)
-	field, expected := "", ""
-	switch {
-	case intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act":
-		field, expected = "intent_type", "speak|observe|act"
-	case intent.Visibility != "public" && intent.Visibility != "private":
-		field, expected = "visibility", "public|private"
-	case intent.WaitMinutes < 0 || intent.WaitMinutes > 120:
-		field, expected = "wait_minutes", "integer:0..120"
-	}
-	if field != "" {
-		return &generationJSONError{Code: "json_field_value", Field: field, Expected: expected, Cause: ErrGenerationFailed}
-	}
-	return nil
-}

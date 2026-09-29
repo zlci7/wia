@@ -56,7 +56,10 @@ func TestContextBudgetRequiredOverflowAndUnknownWindow(t *testing.T) {
 type contextCaptureGenerator struct {
 	requests []model.TextRequest
 	response string
+	window   model.WindowLimits
 }
+
+func (g *contextCaptureGenerator) ModelWindow() model.WindowLimits { return g.window }
 
 func (g *contextCaptureGenerator) GenerateText(_ context.Context, req model.TextRequest) (model.TextResponse, error) {
 	g.requests = append(g.requests, req)
@@ -66,11 +69,11 @@ func (g *contextCaptureGenerator) GenerateText(_ context.Context, req model.Text
 func TestRepairIsRecomposedAndCanFailBeforeSecondProviderRequest(t *testing.T) {
 	material := turn.Material{System: "只输出JSON", Required: "玩家本轮原文"}
 	base := turn.FramedContextTokens(model.TextRequest{System: material.System, Input: material.Required})
-	provider := &contextCaptureGenerator{response: "not json"}
+	provider := &contextCaptureGenerator{response: "not json", window: model.WindowLimits{ContextTokens: base + 64, OutputTokens: 64}}
 	logger := &recordingLogger{}
-	g := &contextGenerator{TextGenerator: provider, material: material, logger: logger, composer: turn.ContextComposer{Window: model.WindowLimits{ContextTokens: base + 64, OutputTokens: 64}}}
+	g := turn.NewContextGenerator(turn.Deps{Logger: logger}, LocalUserID, provider, material, turn.Snapshot{}, wiaworld.Run{}, "test_repair", "", 0, "")
 	var result map[string]any
-	_, err := generateJSONMetrics(context.Background(), g, material.System, material.Required, &result, 64, "answer")
+	_, err := turn.GenerateJSONMetrics(context.Background(), g, material.System, material.Required, &result, 64, "answer")
 	if !errors.Is(err, turn.ErrContextCapacity) || len(provider.requests) != 1 {
 		t.Fatalf("calls=%d err=%v", len(provider.requests), err)
 	}

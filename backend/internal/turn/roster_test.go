@@ -62,7 +62,7 @@ func (h *rosterHost) Narrate(context.Context, model.TextGenerator, *Snapshot, wi
 // until after the character stages have run. The opening one has to be kept.
 func TestPlayerExperienceUsesTheOpeningRoster(t *testing.T) {
 	host := &rosterHost{}
-	service := New(host)
+	service := New(host, Deps{})
 	output, err := service.Execute(context.Background(), nil, wiaworld.Run{RunID: "run1", Input: "我说给大家听"}, stubGenerator{})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
