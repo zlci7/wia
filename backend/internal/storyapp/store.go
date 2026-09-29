@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -38,8 +39,8 @@ type worldSnapshot struct {
 	Sources           map[string]sourceMetadata
 	Perceptions       map[string][]wiaworld.Perception
 	Memories          map[string][]wiaworld.Memory
-	Plot              *PlotDefinition
-	PlotProgress      PlotProgress
+	Plot              *plot.Definition
+	PlotProgress      plot.Progress
 	LongMemory        map[string]memoryContext
 }
 
@@ -169,8 +170,8 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 		}
 	}
 	if def.Plot != nil {
-		state := PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}
-		if err := validatePlot(*def.Plot, state); err != nil {
+		state := plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}
+		if err := plot.Validate(*def.Plot, state); err != nil {
 			return err
 		}
 		if err := storage.MetaSetTx(ctx, tx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
@@ -337,7 +338,7 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 // A promoted or authored character can carry its own avatar; the world copy is
 // recorded separately under the world's assets.
 
-func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *plot.Progress, generated ...*generatedEventState) (int64, error) {
 	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err

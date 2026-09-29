@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"image"
@@ -60,7 +61,7 @@ type StoryPack struct {
 	Locations       []PackLocation              `json:"locations"`
 	NPCs            []string                    `json:"npcs"`
 	Bystanders      []PackBystander             `json:"bystanders"`
-	Plot            *PlotDefinition             `json:"plot,omitempty"`
+	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
@@ -241,7 +242,7 @@ func loadPack(root string) (loadedPack, error) {
 	if len([]rune(p.Title)) > 120 || len([]rune(p.Player.Name)) > 80 || len([]rune(p.Player.Profile)) > 2000 {
 		return bad("title/player length")
 	}
-	if _, err := clockMinute(p.Clock); err != nil {
+	if _, err := plot.ClockMinute(p.Clock); err != nil {
 		return bad("clock")
 	}
 	if len(p.Locations) == 0 || len(p.Locations) > 32 {
@@ -324,7 +325,7 @@ func loadPack(root string) (loadedPack, error) {
 		def.Characters = append(def.Characters, wiaworld.Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples, InScene: npc.InitialLocation == p.InitialLocation})
 	}
 	if p.Plot != nil {
-		if err := validatePlot(*p.Plot, PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}); err != nil {
+		if err := plot.ValidateDefinition(*p.Plot); err != nil {
 			return bad("plot nodes/dependencies")
 		}
 		for _, node := range p.Plot.Nodes {

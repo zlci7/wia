@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -33,12 +34,12 @@ type eventOpportunity struct {
 }
 
 type generatedEvent struct {
-	Node      PlotNode      `json:"node"`
-	State     PlotNodeState `json:"state"`
-	StartID   string        `json:"start_id"`
-	TriggerID string        `json:"trigger_id"`
-	Location  string        `json:"location"`
-	Premise   string        `json:"premise"`
+	Node      plot.Node      `json:"node"`
+	State     plot.NodeState `json:"state"`
+	StartID   string         `json:"start_id"`
+	TriggerID string         `json:"trigger_id"`
+	Location  string         `json:"location"`
+	Premise   string         `json:"premise"`
 }
 
 type generatedEventState struct {
@@ -96,7 +97,7 @@ func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def gam
 			return s, ErrStorageUnavailable
 		}
 		seen[e.Node.ID] = true
-		if err := validatePlot(PlotDefinition{Revision: "generated.v1", Nodes: []PlotNode{e.Node}}, PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}); err != nil {
+		if err := plot.ValidateDefinition(plot.Definition{Revision: "generated.v1", Nodes: []plot.Node{e.Node}}); err != nil {
 			return s, err
 		}
 		if e.State.Status != "" && e.State.Status != "deferred" {
@@ -147,7 +148,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	state := snapshot.GeneratedEvents
 	state.Active = append([]generatedEvent{}, state.Active...)
 	output.GeneratedEvents = &state
-	current, err := clockMinute(output.Clock)
+	current, err := plot.ClockMinute(output.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +159,8 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	if index, due, ok := nextGeneratedEvent(snapshot); ok && current >= due {
 		e := state.Active[index]
 		base := snapshot
-		base.Plot = &PlotDefinition{Revision: "generated.v1", Facts: snapshot.Definition.Secret + "\n本事件已成立起点：" + e.Premise, Nodes: []PlotNode{e.Node}}
-		base.PlotProgress = PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{}}
+		base.Plot = &plot.Definition{Revision: "generated.v1", Facts: snapshot.Definition.Secret + "\n本事件已成立起点：" + e.Premise, Nodes: []plot.Node{e.Node}}
+		base.PlotProgress = plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}
 		if e.State.Status != "" {
 			base.PlotProgress.Nodes[e.Node.ID] = e.State
 		}
@@ -232,9 +233,9 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 		key = run.RunID
 	}
 	root := "generated:" + key
-	node := PlotNode{ID: key, AtMinute: current + c.AfterMinutes, After: []string{}, Condition: c.Condition, Development: c.Development, Audience: append([]string{"player"}, p.Participants...)}
+	node := plot.Node{ID: key, AtMinute: current + c.AfterMinutes, After: []string{}, Condition: c.Condition, Development: c.Development, Audience: append([]string{"player"}, p.Participants...)}
 	base := snapshot
-	base.Plot = &PlotDefinition{Revision: "generated.v1"}
+	base.Plot = &plot.Definition{Revision: "generated.v1"}
 	if err = validatePlotResolution(base, node, *output, c.Initial); err != nil {
 		return nil, err
 	}

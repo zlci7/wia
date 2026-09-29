@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -255,13 +256,13 @@ func TestOpenAuthoredLinesAreIndependent(t *testing.T) {
 	a := newTestApp(t, &packGenerator{})
 	w := createPackWorld(t, a, "orbital-repair")
 	s := readContextSnapshot(t, a, w.WorldID)
-	s.PlotProgress.Nodes["inspection_notice"] = PlotNodeState{Status: "deferred", NextCheck: 560}
+	s.PlotProgress.Nodes["inspection_notice"] = plot.NodeState{Status: "deferred", NextCheck: 560}
 	n, due, ok := nextPlotNode(s)
 	if !ok || n.ID != "freight_notice" || due != 550 {
 		t.Fatal("unrelated freight starved", n, due)
 	}
-	s.PlotProgress.Nodes["freight_notice"] = PlotNodeState{Status: "occurred", EventID: "notice"}
-	s.PlotProgress.Nodes["inspection_notice"] = PlotNodeState{Status: "deferred", NextCheck: 600}
+	s.PlotProgress.Nodes["freight_notice"] = plot.NodeState{Status: "occurred", EventID: "notice"}
+	s.PlotProgress.Nodes["inspection_notice"] = plot.NodeState{Status: "deferred", NextCheck: 600}
 	n, _, _ = nextPlotNode(s)
 	if n.ID != "freight_result" {
 		t.Fatal("freight depends on inspection", n)
@@ -273,7 +274,7 @@ func TestDeferredAuthoredEventConsumesWorldRound(t *testing.T) {
 	a := newTestApp(t, g)
 	w := createPackWorld(t, a, "orbital-repair")
 	s := readContextSnapshot(t, a, w.WorldID)
-	out := turnOutput{Clock: "第 1 日 09:05", PlotProgress: &PlotProgress{Version: 1, Nodes: map[string]PlotNodeState{"inspection_notice": {Status: "deferred", NextCheck: 560}}}}
+	out := turnOutput{Clock: "第 1 日 09:05", PlotProgress: &plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{"inspection_notice": {Status: "deferred", NextCheck: 560}}}}
 	_, err := a.advanceGeneratedEvents(context.Background(), g, s, wiaworld.Run{RunID: "deferred"}, &eventOpportunity{Kind: "arrival", Location: "workshop", ActionID: "not-evaluated"}, &out)
 	if err != nil || len(g.requests) != 0 || out.GeneratedEvents.LastOfferTurn != 0 {
 		t.Fatal("authored deferral started a second world-event round", err)

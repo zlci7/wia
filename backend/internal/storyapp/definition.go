@@ -1,6 +1,7 @@
 package storyapp
 
 import (
+	"gameagent/backend/internal/plot"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 )
@@ -25,7 +26,7 @@ type gameDefinition struct {
 	// display names so identity survives the pack boundary.
 	BystanderRefs   []PackBystander
 	Secret          string
-	Plot            *PlotDefinition
+	Plot            *plot.Definition
 	EventGeneration *EventGenerationPolicy
 }
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
@@ -224,7 +225,7 @@ type turnOutput struct {
 	SceneVersion    int64
 	SceneCharacters []string
 	SceneViews      []SceneView
-	PlotProgress    *PlotProgress
+	PlotProgress    *plot.Progress
 	Events          []wiaworld.Event
 	Perceptions     []wiaworld.Perception
 	Memories        []wiaworld.

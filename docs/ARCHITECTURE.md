@@ -122,8 +122,25 @@ storage    不生成剧情
 api        不直接调用 Provider
 content    不进入正常 Turn 主链
 wire       只依赖标准库；不放领域概念
+plot       不 import content：剧情规则是权威，内容包只是调用方
 turn       是唯一同时使用 context / agent / memory / plot / storage 的模块
 ```
+
+**`content` 与 `plot` 的分工**：`content` 负责**内容包是否合法**（JSON 与 schema、字段类型、文件大小、资源路径、剧本包引用的 NPC 与地点是否存在），`plot` 负责**剧情定义本身是否合法**（节点、依赖、时间边界、条件、状态枚举）。依赖方向是 `content → plot` 与 `turn → plot`，**`plot` 永不 import `content`**。
+
+若让 `content` 自己实现依赖与时间校验，运行时的 `plot` 又理解一遍，就会出现"发布时允许、运行时拒绝"或"运行时支持新规则、`content` 忘了同步"——违背"每种能力只能有一套"。
+
+校验按问题拆开，调用方只问它需要的那一个：
+
+```go
+plot.ValidateDefinition(def)          // 发布/加载剧本包：剧情图本身是否合法
+plot.ValidateProgress(def, progress)  // 运行时读档：进度是否与定义一致
+plot.Validate(def, progress)          // 两者都要时
+```
+
+**不要为了校验定义而伪造一个进度对象**——那正是拆分的理由。
+
+`plot` 返回自己的 `ErrInvalidDefinition` / `ErrInvalidProgress`，不返回上层错误。同一个剧情校验失败，在发布入口是"内容非法"、在运行入口是"存档不可读"、在 HTTP 层是某个状态码，**映射属于各入口**。
 
 `world` 是**底层语言，不是总服务**。所有模块都依赖它，它不依赖任何模块。
 

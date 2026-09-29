@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
@@ -26,7 +27,7 @@ type plotTestGenerator struct {
 }
 
 func TestPlotReferencesRetainedViewsOutsideEventWindow(t *testing.T) {
-	s := worldSnapshot{Plot: lanternPlotDefinition(), Sources: map[string]sourceMetadata{"old-result": {ID: "old-result", Kind: "player_action_result"}, "old-plot": {ID: "old-plot", Kind: "plot_result"}}, PlotProgress: PlotProgress{Nodes: map[string]PlotNodeState{"dock_warning": {Status: "occurred", EventID: "old-plot", Content: "铃已响"}}}}
+	s := worldSnapshot{Plot: lanternPlotDefinition(), Sources: map[string]sourceMetadata{"old-result": {ID: "old-result", Kind: "player_action_result"}, "old-plot": {ID: "old-plot", Kind: "plot_result"}}, PlotProgress: plot.Progress{Nodes: map[string]plot.NodeState{"dock_warning": {Status: "occurred", EventID: "old-plot", Content: "铃已响"}}}}
 	out := turnOutput{SceneViews: []SceneView{{Recipient: "player", Content: "信使已安全上船", SourceIDs: []string{"old-result"}, Version: 1}}}
 	r := plotResolution{Status: "occurred", Content: "机会结束", SourceIDs: []string{"old-result", "old-plot"}, Projections: []plotProjection{}, DecisionRequests: []string{}}
 	if err := validatePlotResolution(s, s.Plot.Nodes[2], out, r); err != nil {
@@ -86,7 +87,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		return model.TextResponse{Text: wire.MarshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	}
 	if strings.Contains(req.System, "世界剧情协调器") {
-		var node PlotNode
+		var node plot.Node
 		raw := strings.SplitN(strings.SplitN(req.Input, "当前节点：", 2)[1], "\n", 2)[0]
 		if err := json.Unmarshal([]byte(raw), &node); err != nil {
 			return model.TextResponse{}, err

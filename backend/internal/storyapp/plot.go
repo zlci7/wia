@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
@@ -19,9 +20,9 @@ import (
 // Plot content is frozen with each world. Conditions are narrative material,
 // while dependencies, time boundaries, publication and audience are code contracts.
 type PlotDefinition struct {
-	Revision string     `json:"revision"`
-	Facts    string     `json:"facts"`
-	Nodes    []PlotNode `json:"nodes"`
+	Revision string      `json:"revision"`
+	Facts    string      `json:"facts"`
+	Nodes    []plot.Node `json:"nodes"`
 }
 
 type PlotNode struct {
@@ -43,9 +44,9 @@ type PlotNodeState struct {
 }
 
 type PlotProgress struct {
-	Version int64                    `json:"version"`
-	Nodes   map[string]PlotNodeState `json:"nodes"`
-	Ending  string                   `json:"ending,omitempty"`
+	Version int64                     `json:"version"`
+	Nodes   map[string]plot.NodeState `json:"nodes"`
+	Ending  string                    `json:"ending,omitempty"`
 }
 
 type plotProjection struct {
@@ -92,17 +93,9 @@ type plotResolution struct {
 	Ending           string           `json:"ending"`
 }
 
-func clockMinute(clock string) (int, error) {
-	var day, hour, minute int
-	if n, err := fmt.Sscanf(clock, "第 %d 日 %d:%d", &day, &hour, &minute); err != nil || n != 3 || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-		return 0, fmt.Errorf("%w: invalid world clock", ErrStorageUnavailable)
-	}
-	return (day-1)*1440 + hour*60 + minute, nil
-}
-
-func readPlot(ctx context.Context, store *storage.WorldStore) (*PlotDefinition, PlotProgress, error) {
-	var def PlotDefinition
-	var state PlotProgress
+func readPlot(ctx context.Context, store *storage.WorldStore) (*plot.Definition, plot.Progress, error) {
+	var def plot.Definition
+	var state plot.Progress
 	raw, err := store.MetaGet(ctx, "plot_definition")
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, state, nil
@@ -120,41 +113,17 @@ func readPlot(ctx context.Context, store *storage.WorldStore) (*PlotDefinition, 
 	if err = json.Unmarshal([]byte(raw), &state); err != nil {
 		return nil, state, err
 	}
-	if err = validatePlot(def, state); err != nil {
+	if err = plot.Validate(def, state); err != nil {
 		return nil, state, err
 	}
 	return &def, state, nil
 }
 
-func validatePlot(def PlotDefinition, state PlotProgress) error {
-	if def.Revision == "" || len(def.Nodes) == 0 || len(def.Nodes) > 32 || state.Version < 1 || state.Nodes == nil {
-		return ErrStorageUnavailable
-	}
-	known := map[string]bool{}
-	for _, n := range def.Nodes {
-		if n.ID == "" || known[n.ID] || n.AtMinute < 0 || n.Condition == "" || n.Development == "" || n.Audience == nil {
-			return ErrStorageUnavailable
-		}
-		for _, dep := range n.After {
-			if !known[dep] {
-				return ErrStorageUnavailable
-			}
-		}
-		known[n.ID] = true
-	}
-	for id, n := range state.Nodes {
-		if !known[id] || (n.Status != "occurred" && n.Status != "deferred" && n.Status != "skipped") || (n.Status != "deferred" && n.EventID == "") {
-			return ErrStorageUnavailable
-		}
-	}
-	return nil
-}
-
-func nextPlotNode(snapshot worldSnapshot) (PlotNode, int, bool) {
+func nextPlotNode(snapshot worldSnapshot) (plot.Node, int, bool) {
 	if snapshot.Plot == nil || (snapshot.Summary.Mode == "guided" && snapshot.PlotProgress.Ending != "") {
-		return PlotNode{}, 0, false
+		return plot.Node{}, 0, false
 	}
-	var chosen PlotNode
+	var chosen plot.Node
 	var due int
 	found := false
 	for _, node := range snapshot.Plot.Nodes {
@@ -185,7 +154,7 @@ func plotTimeLimit(snapshot worldSnapshot) int {
 	if !ok {
 		return 120
 	}
-	current, err := clockMinute(snapshot.Summary.Clock)
+	current, err := plot.ClockMinute(snapshot.Summary.Clock)
 	if err != nil {
 		return 0
 	}
@@ -208,12 +177,12 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	if snapshot.Plot == nil {
 		return nil, nil
 	}
-	output.PlotProgress = &PlotProgress{Version: snapshot.PlotProgress.Version, Ending: snapshot.PlotProgress.Ending, Nodes: map[string]PlotNodeState{}}
+	output.PlotProgress = &plot.Progress{Version: snapshot.PlotProgress.Version, Ending: snapshot.PlotProgress.Ending, Nodes: map[string]plot.NodeState{}}
 	for id, state := range snapshot.PlotProgress.Nodes {
 		output.PlotProgress.Nodes[id] = state
 	}
 	node, due, ok := nextPlotNode(snapshot)
-	current, err := clockMinute(output.Clock)
+	current, err := plot.ClockMinute(output.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +203,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 		}
 		return nil, err
 	}
-	state := PlotNodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
+	state := plot.NodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
 	if result.Status != "deferred" {
 		state.EventID = "plot:" + snapshot.Plot.Revision + ":" + node.ID
 	}
@@ -294,7 +263,7 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 	return visible, nil
 }
 
-func composePlot(snapshot worldSnapshot, run wiaworld.Run, node PlotNode, output *turnOutput) contextMaterial {
+func composePlot(snapshot worldSnapshot, run wiaworld.Run, node plot.Node, output *turnOutput) contextMaterial {
 	snapshot.SceneViews = output.SceneViews
 	snapshot.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	for i := range snapshot.Characters {
@@ -334,7 +303,7 @@ func plotEvidenceSections(events []wiaworld.Event) []contextSection {
 	return result
 }
 
-func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOutput, result plotResolution) error {
+func validatePlotResolution(snapshot worldSnapshot, node plot.Node, output turnOutput, result plotResolution) error {
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
 		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"image"
@@ -87,7 +88,7 @@ type ContentDraftPayload struct {
 	Locations       []PackLocation              `json:"locations"`
 	NPCs            []ContentDraftNPC           `json:"npcs"`
 	Bystanders      []PackBystander             `json:"bystanders"`
-	Plot            *PlotDefinition             `json:"plot,omitempty"`
+	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *EventGenerationPolicy      `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
 }
@@ -117,7 +118,7 @@ type ContentDraftPreview struct {
 	AuthorRules       string                    `json:"author_rules,omitempty"`
 	AuthorFacts       string                    `json:"author_facts,omitempty"`
 	AuthorCharacters  []ContentPreviewAuthorNPC `json:"author_characters,omitempty"`
-	AuthorPlot        *PlotDefinition           `json:"author_plot,omitempty"`
+	AuthorPlot        *plot.Definition          `json:"author_plot,omitempty"`
 	AuthorEventPolicy *EventGenerationPolicy    `json:"author_event_generation,omitempty"`
 }
 
