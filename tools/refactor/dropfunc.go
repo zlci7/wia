@@ -1,9 +1,3 @@
-// Command drops whole function declarations by name from a directory of Go files.
-//
-// It finds the declaration with go/ast and removes it, together with the comment block
-// immediately above it, leaving a single blank line. An earlier attempt used a text
-// search for a brace in the first column, which deleted the following function as soon
-// as one ended without a trailing blank line.
 package main
 
 import (
@@ -19,10 +13,10 @@ import (
 	"strings"
 )
 
-func main() {
+func runDropFunc(args []string) {
 	dir := flag.String("dir", "", "package directory")
 	names := flag.String("names", "", "comma-separated function names")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *dir == "" || *names == "" {
 		fmt.Fprintln(os.Stderr, "dropfunc: -dir and -names are required")
 		os.Exit(2)

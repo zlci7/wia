@@ -1,11 +1,3 @@
-// Command imports rewrites one Go file's import block so it holds exactly what the
-// file uses.
-//
-// Hand-maintaining imports during a move fails in the same way every time: the
-// compiler reports one missing package at a time, and each fix is a chance to
-// mistype a file. This derives the set from the file itself instead. Standard
-// library packages are looked up in a known list; module imports are supplied by
-// the operator as path=localname pairs, because only the operator knows them.
 package main
 
 import (
@@ -33,11 +25,11 @@ var stdlib = []string{
 	"testing/fstest", "time", "unicode", "unicode/utf8",
 }
 
-func main() {
+func runImports(args []string) {
 	path := flag.String("file", "", "file to fix")
 	module := flag.String("module", "", "comma-separated path=localname pairs for module imports")
 	keep := flag.String("keep", "", "comma-separated import paths to keep unchanged")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *path == "" {
 		fmt.Fprintln(os.Stderr, "imports: -file is required")
 		os.Exit(2)

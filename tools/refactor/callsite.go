@@ -1,11 +1,3 @@
-// Command callsite lists every call to a named function and prints the receiver and
-// first argument it was given.
-//
-// Converting a free function into a method requires removing one argument at each
-// call, and the owner is not always spelled the same way: store, source, target,
-// w, s. A text replacement would get some of them and silently leave the rest
-// passing a database handle to a function that no longer takes one. This reports
-// them so the edit can be exact.
 package main
 
 import (
@@ -21,10 +13,10 @@ import (
 	"strings"
 )
 
-func main() {
+func runCallsite(args []string) {
 	dir := flag.String("dir", "", "package directory to scan")
 	names := flag.String("names", "", "comma-separated function names to look for")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *dir == "" || *names == "" {
 		fmt.Fprintln(os.Stderr, "callsite: -dir and -names are required")
 		os.Exit(2)

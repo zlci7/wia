@@ -1,11 +1,3 @@
-// Command importfix repairs import blocks that were rebuilt by a tool with a
-// whitelist: it puts the standard library back into its own group, keeps
-// side-effect imports, sorts both groups, and deletes nothing.
-//
-// A whitelist-based rewriter is useful for adding an import and wrong for repairing
-// a file, because it drops what it does not recognise — including registrations such
-// as image/jpeg or a SQL driver, which are never referenced by name and whose
-// absence shows up only at run time. This tool never removes an import.
 package main
 
 import (
@@ -17,9 +9,9 @@ import (
 	"strings"
 )
 
-func main() {
+func runImportFix(args []string) {
 	path := flag.String("file", "", "file whose import block should be repaired")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *path == "" {
 		fmt.Fprintln(os.Stderr, "importfix: -file is required")
 		os.Exit(2)

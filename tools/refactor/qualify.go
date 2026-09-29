@@ -1,15 +1,3 @@
-// Command qualify rewrites references to a set of moved symbols so they point at
-// a different package, and adds the import that makes them resolve.
-//
-// It works on the syntax tree in two passes. The first collects every identifier
-// that must be rewritten; the second rewrites them at their parent, which is the
-// only place a child node can be replaced. Both passes enumerate the positions
-// that can hold an expression.
-//
-// That enumeration is the risky part, so it is written once and used by both
-// passes: an earlier version enumerated positions only while rewriting and missed
-// switch cases, which silently left half the references behind with no error. The
-// comment on childExpressions is the checklist.
 package main
 
 import (
@@ -27,7 +15,7 @@ import (
 	"strings"
 )
 
-func main() {
+func runQualify(args []string) {
 	dir := flag.String("dir", "", "package directory to rewrite")
 	targetPath := flag.String("path", "", "import path of the package that now owns the symbols")
 	alias := flag.String("alias", "", "import alias (defaults to the package name)")
@@ -40,7 +28,7 @@ func main() {
 	only := flag.String("only-dirs", "", "comma-separated directory suffixes; rewrite only these callers")
 	tests := flag.Bool("tests", false, "rewrite test files too")
 	check := flag.Bool("check", false, "report what would change without writing")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	// A bare name can be declared in two packages at once. When only one of them
 	// moves, restricting the callers keeps the other package's own references — and
 	// its own declarations — out of the rewrite.
@@ -205,7 +193,7 @@ func main() {
 // replacement has changed the tree; rewriting second means every replacement
 // happens at the parent that owns the child.
 func qualifyFile(file *ast.File, moved map[string]bool, renamed map[string]string, pkgName string, packageTypes map[string]bool) int {
-	declared, packageLevel := declaredNames(file)
+	declared, packageLevel := fileDeclaredNames(file)
 	protected := protectedFields(file, packageTypes)
 	targets := map[*ast.Ident]string{}
 	collect(file, func(expr ast.Expr) {
@@ -263,7 +251,7 @@ func qualifyFile(file *ast.File, moved map[string]bool, renamed map[string]strin
 // which are never rewritten. The second holds the objects of the package-level
 // declarations, so a use of one of them can be told apart from a local variable
 // that happens to share its spelling.
-func declaredNames(file *ast.File) (map[ast.Node]bool, map[*ast.Object]bool) {
+func fileDeclaredNames(file *ast.File) (map[ast.Node]bool, map[*ast.Object]bool) {
 	nodes := map[ast.Node]bool{}
 	objects := map[*ast.Object]bool{}
 	declare := func(id *ast.Ident) {

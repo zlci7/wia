@@ -1,10 +1,3 @@
-// Command fnbody reports, for each top-level function in a package, whether its own
-// body begins a world transaction and how many transaction-scoped storage calls it
-// makes.
-//
-// A file-level search is not enough: a file with one transaction makes every function
-// in it look like it owns one. Only the body matters, because only the body has to be
-// restructured.
 package main
 
 import (
@@ -21,9 +14,9 @@ import (
 	"strings"
 )
 
-func main() {
+func runTxCensus(args []string) {
 	dir := flag.String("dir", "", "package directory")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	entries, err := os.ReadDir(*dir)
 	if err != nil {
 		panic(err)

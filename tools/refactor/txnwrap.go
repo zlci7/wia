@@ -1,10 +1,3 @@
-// Command txnwrap rewrites one function's transaction from an explicit BeginTx/Commit
-// pair into a storage.InTx closure.
-//
-// It exists because the change is mechanical but not textual: every error return inside
-// the closure loses its value list, while a return inside a nested function literal
-// must keep its own. A plain replace would rewrite those too. So this walks the
-// function body and tracks how deeply it is nested.
 package main
 
 import (
@@ -14,13 +7,13 @@ import (
 	"strings"
 )
 
-func main() {
+func runTxWrap(args []string) {
 	path := flag.String("file", "", "file holding the function")
 	fn := flag.String("func", "", "function name")
 	outer := flag.String("outer", "", "outer return value names, comma separated (may be empty)")
 	decls := flag.String("decls", "", "declarations to hoist before the closure, comma separated")
 	debug := flag.Bool("debug", false, "print depth decisions")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 
 	raw, err := os.ReadFile(*path)
 	if err != nil {

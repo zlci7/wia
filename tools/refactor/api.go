@@ -1,22 +1,3 @@
-// Command api turns a free function that takes a database handle into a method on
-// the store, at both ends.
-//
-// It rewrites a call of the form
-//
-//	pkg.Fn(ctx, owner.Database(), rest...)
-//
-// into
-//
-//	owner.Fn(ctx, rest...)
-//
-// and the declaration `func Fn(ctx context.Context, db *sql.DB, rest...)` into
-// `func (s *WorldStore) Fn(ctx context.Context, rest...)`, with `db` rewritten to
-// `s.db` inside the body.
-//
-// It refuses to touch a call whose handle is not a `.Database()` expression, because
-// that call site does not have a store to hand: converting the declaration anyway
-// would break it. Reporting those is the point — they are the migration debt, not
-// something to force through.
 package main
 
 import (
@@ -33,12 +14,12 @@ import (
 	"strings"
 )
 
-func main() {
+func runAPI(args []string) {
 	target := flag.String("target", "", "package directory holding the declarations")
 	callers := flag.String("callers", "", "directory with the call sites")
 	names := flag.String("names", "", "comma-separated function names")
 	receiver := flag.String("receiver", "WorldStore", "receiver type")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *target == "" || *callers == "" || *names == "" {
 		fmt.Fprintln(os.Stderr, "api: -target, -callers and -names are required")
 		os.Exit(2)

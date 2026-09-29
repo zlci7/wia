@@ -1,11 +1,3 @@
-// Command move takes named top-level declarations out of one Go file and appends
-// them to another, verbatim.
-//
-// Transcribing declarations by hand is how a migration acquires silent mistakes: a
-// copied schema string that looks right but is not. This program copies the exact
-// source bytes of each declaration, so a moved function is the same function. The
-// destination file's package clause and imports are the operator's responsibility;
-// goimports and the compiler settle the rest.
 package main
 
 import (
@@ -21,12 +13,12 @@ import (
 	"strings"
 )
 
-func main() {
+func runMove(args []string) {
 	from := flag.String("from", "", "file to take the declarations from")
 	to := flag.String("to", "", "file to append them to")
 	names := flag.String("names", "", "comma-separated declaration names")
 	rename := flag.String("rename", "", "comma-separated old=new pairs applied inside the moved text")
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 	if *from == "" || *to == "" || *names == "" {
 		fmt.Fprintln(os.Stderr, "move: -from, -to and -names are required")
 		os.Exit(2)
