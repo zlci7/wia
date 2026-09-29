@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"gameagent/runtime/internal/agent"
+	"gameagent/runtime/internal/atomicfile"
 	"gameagent/runtime/internal/definition"
 )
 
@@ -196,7 +197,7 @@ func (p *PreparedGame) stageGame(configDir, gameID string, profileOverride []byt
 		if err := os.MkdirAll(filepath.Dir(stagePath), 0o755); err != nil {
 			return err
 		}
-		return os.WriteFile(stagePath, data, FileMode)
+		return os.WriteFile(stagePath, data, atomicfile.Mode)
 	}); err != nil {
 		return &Error{Code: CodeStorageUnavailable, Path: sourceRoot, Err: err}
 	}
@@ -221,7 +222,7 @@ func (p *PreparedGame) stageGame(configDir, gameID string, profileOverride []byt
 		if err := os.MkdirAll(filepath.Dir(stagePath), 0755); err != nil {
 			return &Error{Code: CodeStorageUnavailable, Path: stagePath, Err: err}
 		}
-		if err := os.WriteFile(stagePath, data, FileMode); err != nil {
+		if err := os.WriteFile(stagePath, data, atomicfile.Mode); err != nil {
 			return &Error{Code: CodeStorageUnavailable, Path: stagePath, Err: err}
 		}
 	}
@@ -371,7 +372,7 @@ func (p *PreparedGame) CommitAssets() error {
 			_ = os.Remove(temporary)
 			return &Error{Code: CodeStorageUnavailable, Path: asset.target, Err: closeErr}
 		}
-		if err := os.Chmod(temporary, FileMode); err != nil {
+		if err := os.Chmod(temporary, atomicfile.Mode); err != nil {
 			_ = os.Remove(temporary)
 			return &Error{Code: CodeStorageUnavailable, Path: asset.target, Err: err}
 		}

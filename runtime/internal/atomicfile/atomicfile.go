@@ -1,4 +1,9 @@
-package config
+// Package atomicfile replaces a file's contents without a reader ever observing a
+// partial write.
+//
+// Callers update configuration and metadata while the application is running, so
+// the new content is written beside the destination and renamed over it.
+package atomicfile
 
 import (
 	"fmt"
@@ -6,17 +11,13 @@ import (
 	"path/filepath"
 )
 
-// FileMode is the permission of the configuration files the Runtime writes. They
-// are not credentials, so they stay readable; the credential itself is written by
-// the secret package, which has a stricter guarantee to keep.
-const FileMode = 0o644
+// Mode is the permission of the files written here. They are not credentials, so
+// they stay readable; credentials are written by the secret package, which keeps a
+// stricter guarantee.
+const Mode = 0o644
 
-// WriteFile replaces a configuration file atomically.
-//
-// Callers write configuration while the Runtime is running, so a reader must
-// never observe half of it: the new content is written beside the destination and
-// renamed over it.
-func WriteFile(path string, data []byte) error {
+// Write replaces a file atomically, creating its directory when needed.
+func Write(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
@@ -40,7 +41,7 @@ func WriteFile(path string, data []byte) error {
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("close %s: %w", temporary, err)
 	}
-	if err := os.Chmod(temporary, FileMode); err != nil {
+	if err := os.Chmod(temporary, Mode); err != nil {
 		return fmt.Errorf("set permissions on %s: %w", temporary, err)
 	}
 	if err := os.Rename(temporary, path); err != nil {

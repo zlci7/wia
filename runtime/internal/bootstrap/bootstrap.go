@@ -16,6 +16,7 @@ import (
 	protocolv1alpha2 "gameagent/protocol/gen/go/gameagent/protocol/v1alpha2"
 	"gameagent/runtime/config"
 	"gameagent/runtime/internal/agent"
+	"gameagent/runtime/internal/atomicfile"
 	"gameagent/runtime/internal/dataroot"
 	"gameagent/runtime/internal/definition"
 	"gameagent/runtime/internal/gateway"
@@ -428,7 +429,7 @@ func (r *Runtime) SelectGame(id string) error {
 	data, _ := json.Marshal(struct {
 		GameID string `json:"game_id"`
 	}{id})
-	commit := func() error { return config.WriteFile(r.layout.ConfigPath("active-game.json"), append(data, '\n')) }
+	commit := func() error { return atomicfile.Write(r.layout.ConfigPath("active-game.json"), append(data, '\n')) }
 	r.mu.RLock()
 	installed := r.bundle != nil
 	r.mu.RUnlock()
@@ -541,7 +542,7 @@ func (r *Runtime) ApplyModelConfiguration(setup ModelSetup) error {
 	}
 	stagePath := r.modelPath + "." + idgen.New("candidate")
 	defer os.Remove(stagePath)
-	if err := config.WriteFile(stagePath, append(document, '\n')); err != nil {
+	if err := atomicfile.Write(stagePath, append(document, '\n')); err != nil {
 		return err
 	}
 	provider, _, err := llm.NewProviderFromConfigFile(stagePath)
@@ -554,7 +555,7 @@ func (r *Runtime) ApplyModelConfiguration(setup ModelSetup) error {
 	}
 	next := Snapshot{ConfiguredGame: game, AgentConfigPath: path, Model: &summary}
 	err = r.replaceLocked(cfg, catalog, provider, next, func() error {
-		if err := config.WriteFile(r.modelPath, append(document, '\n')); err != nil {
+		if err := atomicfile.Write(r.modelPath, append(document, '\n')); err != nil {
 			return err
 		}
 		committed = true

@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	runtimeconfig "gameagent/runtime/config"
+	"gameagent/runtime/internal/atomicfile"
 	"gameagent/runtime/internal/llm"
 	"gameagent/runtime/internal/model"
 	"gameagent/runtime/internal/secret"
 )
 
-var writeModelConfig = runtimeconfig.WriteFile
+var writeModelConfig = atomicfile.Write
 
 func Open(ctx context.Context, options Options) (*App, error) {
 	if ctx == nil {
