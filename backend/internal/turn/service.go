@@ -90,6 +90,11 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	// The player's own words travel with the intent, because every later stage that
 	// records what the player did needs them and the run is not passed that far down.
 	intent.Input = run.Input
+	// Who was present when the player acted is decided here and kept, because recording
+	// what the player did must answer that question, not "who is here at the end". A
+	// character who left during the turn still perceived the input, and one who arrived
+	// afterwards did not; the closing roster would get both of those wrong.
+	openingParticipants := CharacterIDs(InScene(snapshot.Characters))
 	if err := s.host.RunCharacters(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNPC, err)
 	}
@@ -100,7 +105,7 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err := s.host.Narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNarration, err)
 	}
-	recordPlayerExperience(&snapshot, &output, intent, output.SceneCharacters, output.PlayerEventID)
+	recordPlayerExperience(&snapshot, &output, intent, openingParticipants, output.PlayerEventID)
 	return output, nil
 }
 

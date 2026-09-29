@@ -63,14 +63,28 @@ func playerExperienceMemory(intent TurnIntent, characterID string, snapshot *Sna
 
 // describeRecipient names the addressee as the character list knows them, so a memory
 // reads as a sentence about a person rather than about an identifier.
+// describeRecipient names the addressee as the character list knows them, role included,
+// so a memory reads as a sentence about a person rather than about an identifier.
+//
+// An address that names nobody is described as such rather than echoed back: a memory
+// saying "玩家和未明确指定具体人物低声交谈" tells the character something true, while one
+// built from the raw identifier would put an internal id into their recollection.
 func describeRecipient(snapshot *Snapshot, recipient string) string {
-	for _, character := range snapshot.Characters {
-		if character.EntityID == recipient {
-			return character.Name
+	if recipient == "" {
+		return "未明确指定具体人物"
+	}
+	if character, ok := characterByID(snapshot.Characters, recipient); ok {
+		return character.Name + "（" + character.Role + "）"
+	}
+	return "未明确指定具体人物"
+}
+
+// characterByID finds a character in the roster the turn runs against.
+func characterByID(characters []wiaworld.Character, id string) (wiaworld.Character, bool) {
+	for _, character := range characters {
+		if character.EntityID == id {
+			return character, true
 		}
 	}
-	if recipient == "player" {
-		return "玩家"
-	}
-	return recipient
+	return wiaworld.Character{}, false
 }

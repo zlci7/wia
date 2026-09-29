@@ -61,6 +61,8 @@ func main() {
 		runVocab(args)
 	case "cutlines":
 		runCutLines(args)
+	case "importers":
+		runImporters(args)
 	case "-h", "--help", "help":
 		usage()
 	default:

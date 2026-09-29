@@ -99,7 +99,7 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 	}
 	for _, character := range participants {
 		if private && character.EntityID != recipient {
-			output.PerceptText[character.EntityID] = "你看见玩家与" + CharacterDisplayName(snapshot.Characters, recipient) + "低声交谈，但听不清内容。不要猜测原话内容。"
+			output.PerceptText[character.EntityID] = "你看见玩家与" + CharacterDisplayName(snapshot.Characters, recipient) + "低声交谈，但听不清内容。不要猜测耳语原文。"
 		} else {
 			output.PerceptText[character.EntityID] = run.Input
 		}

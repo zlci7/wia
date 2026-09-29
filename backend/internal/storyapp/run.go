@@ -637,34 +637,6 @@ func (a *App) resolveIntentStage(ctx context.Context, generator model.TextGenera
 	return intent, nil
 }
 
-// newTurnOutput builds the turn output skeleton: it freezes the definition this
-// turn speaks through, records the player's own attempt and derives the
-// stage-one perception inputs.
-func newTurnOutput(snapshot *turn.Snapshot, intent turn.TurnIntent, run wiaworld.Run, recipient string, private bool, participants []wiaworld.Character) (turn.Output, map[string]string, map[string]turn.StageInput, string) {
-	def := turnDefinition(snapshot)
-
-	now := time.Now().UTC()
-	playerEventID := run.RunID + ":input"
-	output := turn.Output{
-		Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
-		SceneCharacters: characterIDs(participants),
-		Events:          []wiaworld.Event{{EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient, Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion, SourceType: "player_" + intent.Visibility, CreatedAt: now}},
-		Memories:        []wiaworld.Memory{}, Perceptions: []wiaworld.Perception{},
-	}
-	perceptText := make(map[string]string)
-	stageOneInputs := make(map[string]turn.StageInput)
-	for _, character := range participants {
-		if private && character.EntityID != recipient {
-			perceptText[character.EntityID] = fmt.Sprintf("你看见玩家与%s低声交谈，但听不清内容。不要猜测耳语原文。", describeRecipient(def, recipient))
-		} else {
-			perceptText[character.EntityID] = run.Input
-		}
-		output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: playerEventID, SourceType: turn.SourceTypeFor(private, character.EntityID, recipient, intent.IntentType), Content: perceptText[character.EntityID], Stage: 1, SceneVersion: snapshot.SceneVersion, CreatedAt: now})
-		stageOneInputs[character.EntityID] = turn.StageInput{PlayerPerception: perceptText[character.EntityID], SourceEventIDs: []string{playerEventID}}
-	}
-	return output, perceptText, stageOneInputs, playerEventID
-}
-
 // runCharacterStages runs the two character decision stages and keeps the public
 // reply log and the merged decisions on the output for the coordination stage.
 func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]turn.StageInput, output *turn.Output) error {
@@ -713,14 +685,6 @@ func (a *App) runCharacterStages(ctx context.Context, generator model.TextGenera
 	output.PublicReplies = publicReplyLog
 	output.Decisions = decisions
 	return nil
-}
-
-// notePlayerAction records the player's own attempt as an action the coordinator
-// has to resolve when the turn can produce an outcome for it.
-func (a *App) notePlayerAction(output *turn.Output, run wiaworld.Run, intent turn.TurnIntent, recipient string) {
-	if intent.IntentType != "speak" || recipient == "" {
-		output.Events = append(output.Events, wiaworld.Event{EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion, SourceType: "player_attempt", CreatedAt: time.Now().UTC()})
-	}
 }
 
 // coordinateStage resolves the scene: time, roster, action outcomes and the
@@ -827,17 +791,6 @@ func (a *App) narrateStage(ctx context.Context, generator model.TextGenerator, s
 	}
 	output.Events = append(output.Events, wiaworld.Event{EventID: run.RunID + ":outcome", EventType: "turn_settled", ActorID: "scene", Content: playerProjection, RunID: run.RunID, Stage: settledStage, SceneVersion: output.SceneVersion, SourceType: "scene", CreatedAt: time.Now().UTC()})
 	return nil
-}
-
-// recordPlayerExperience writes what each participant experienced from the
-// player's own attempt in this turn.
-func (a *App) recordPlayerExperience(snapshot *turn.Snapshot, output *turn.Output, run wiaworld.Run, intent turn.TurnIntent, playerEventID string, participantIDs []string, recipient string, private bool) {
-	def := turnDefinition(snapshot)
-
-	for _, characterID := range participantIDs {
-		kind, memory := playerExperienceMemory(intent.IntentType, private, characterID, recipient, run.Input, def)
-		output.Memories = append(output.Memories, wiaworld.Memory{RecipientID: characterID, Kind: kind, Content: memory, SourceEventID: playerEventID, CreatedAt: time.Now().UTC()})
-	}
 }
 
 // includeNewCharactersInSceneViews gives every character present in the world a view
