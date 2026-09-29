@@ -36,18 +36,6 @@ func (h *turnHost) LoadInput(ctx context.Context, store *storage.WorldStore, run
 	return h.app.loadTurn(ctx, store, run, generator, limit)
 }
 
-func (h *turnHost) ResolveIntent(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run) (turn.TurnIntent, turn.Output, error) {
-	intent, err := h.app.resolveIntentStage(ctx, generator, *snapshot, run)
-	if err != nil {
-		return turn.TurnIntent{}, turn.Output{}, err
-	}
-	return intent, turn.OpenOutput(snapshot, intent, run), nil
-}
-
-func (h *turnHost) RunCharacters(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	return h.app.runCharacterStages(ctx, generator, snapshot, run, intent, turn.InScene(snapshot.Characters), output.PerceptText, output.StageOneInputs, output)
-}
-
 func (h *turnHost) Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
 	participants := turn.InScene(snapshot.Characters)
 	host, visibleEvents, err := h.app.coordinateStage(ctx, generator, snapshot, run, intent, participants, intent.AddresseeID, intent.Private(), output)
@@ -56,8 +44,4 @@ func (h *turnHost) Coordinate(ctx context.Context, generator model.TextGenerator
 	}
 	output.VisibleEvents = append(output.VisibleEvents, visibleEvents...)
 	return h.app.resolveSceneResult(ctx, generator, snapshot, run, intent, host, participants, output)
-}
-
-func (h *turnHost) Narrate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	return h.app.narrateStage(ctx, generator, snapshot, run, intent, intent.AddresseeID, intent.Private(), output)
 }

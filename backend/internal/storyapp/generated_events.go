@@ -175,7 +175,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	var response struct {
 		Candidates []eventCandidate `json:"candidates"`
 	}
-	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, "candidates"); err != nil {
+	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &response, turn.StructuredTurnOutputTokens, "candidates"); err != nil {
 		return nil, err
 	}
 	if response.Candidates == nil || len(response.Candidates) > 1 {

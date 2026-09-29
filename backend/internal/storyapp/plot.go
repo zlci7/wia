@@ -143,7 +143,7 @@ func (a *App) advancePlot(ctx context.Context, generator model.TextGenerator, sn
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
-	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
+	if err = turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, turn.StructuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
 		return nil, err
 	}
 	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
@@ -343,7 +343,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		base.Characters[i].InScene = inputs[base.Characters[i].EntityID].NewStimulus != ""
 	}
 	decisions := map[string]turn.NPCDecision{}
-	if err := a.decideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
+	if err := a.turnService().DecideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
 		return nil, err
 	}
 	extra := turn.Output{SceneVersion: output.SceneVersion}
@@ -366,7 +366,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			audience = append([]string{"player"}, wiaworld.CharacterIDs(observers)...)
 		}
 		start := len(extra.Events)
-		appendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)
+		turn.AppendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)
 		if !slices.Contains(audience, "player") {
 			for i := start; i < len(extra.Events); i++ {
 				if extra.Events[i].EventType == "npc_dialogue" {
@@ -395,7 +395,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
+		err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &resolved, turn.StructuredTurnOutputTokens, "outcomes", "scene_updates")
 		cancel()
 		if err != nil {
 			return nil, err

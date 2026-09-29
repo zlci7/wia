@@ -16,5 +16,5 @@ func (a *App) contextGenerator(generator model.TextGenerator, material turn.Mate
 
 // turnDeps is what a turn asks the application for beyond its host operations.
 func (a *App) turnDeps() turn.Deps {
-	return turn.Deps{Logger: a.logger, Meter: a.meteredText}
+	return turn.Deps{Logger: a.logger, Meter: a.meteredText, Owner: a.userID}
 }

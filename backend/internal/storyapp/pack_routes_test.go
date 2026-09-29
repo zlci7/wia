@@ -212,7 +212,7 @@ func TestM2RealWaitIntent(t *testing.T) {
 		s.Characters[i].InScene = s.Characters[i].EntityID == "npc:innkeeper"
 	}
 	for i := 0; i < 2; i++ {
-		_, _, err := a.resolveTurnIntent(context.Background(), a.generator, s, wiaworld.Run{RunID: fmt.Sprint("wait-probe", i), Input: "我在安全位置等待半小时，不参加维修，也不替任何人签字。"})
+		_, _, err := a.turnService().ResolveTurnIntent(context.Background(), a.generator, s, wiaworld.Run{RunID: fmt.Sprint("wait-probe", i), Input: "我在安全位置等待半小时，不参加维修，也不替任何人签字。"})
 		if err != nil {
 			t.Error(err)
 		}

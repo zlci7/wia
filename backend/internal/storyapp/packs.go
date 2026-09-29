@@ -548,20 +548,6 @@ func (a *App) setPack(id string, pack loadedPack) {
 	a.packs[id] = pack
 }
 
-// characterSpeakingExamples reads the samples a frozen definition recorded for one
-// character, so the running turn uses the world's own version.
-func characterSpeakingExamples(characters []wiaworld.Character, entityID string) ([]string, bool) {
-	for _, character := range characters {
-		if character.EntityID == entityID {
-			if len(character.SpeakingExamples) == 0 {
-				return nil, false
-			}
-			return character.SpeakingExamples, true
-		}
-	}
-	return nil, false
-}
-
 func (a *App) pack(id string) (loadedPack, bool) {
 	a.packsMu.RLock()
 	defer a.packsMu.RUnlock()

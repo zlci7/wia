@@ -181,7 +181,7 @@ func TestPacingCommittedTeaReplay(t *testing.T) {
 			if err != nil {
 				t.Fatal("coordination replay failed")
 			}
-			narrative, _, err := app.narrateVisible(context.Background(), probe, snapshot, run, lanternDefinition(), "npc:innkeeper", "speak", events, false, snapshot.Summary.Clock, host.Scene, host.SceneCharacters)
+			narrative, _, err := app.turnService().NarrateVisible(context.Background(), probe, snapshot, run, lanternDefinition(), "npc:innkeeper", "speak", events, false, snapshot.Summary.Clock, host.Scene, host.SceneCharacters)
 			if err != nil {
 				t.Fatal("narration replay failed")
 			}

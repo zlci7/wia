@@ -113,7 +113,7 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	}
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	if err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "content", "states"); err != nil {
+	if err := turn.GenerateJSON(callCtx, call, material.System, material.Required, &result, turn.StructuredTurnOutputTokens, "content", "states"); err != nil {
 		return d, err
 	}
 	if wire.Clean(result.Content) == "" || result.States == nil {

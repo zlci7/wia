@@ -164,7 +164,7 @@ func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
 	frozen := def.Characters
 	def.Characters = snapshot.Characters
 	for index := range def.Characters {
-		if samples, ok := characterSpeakingExamples(frozen, def.Characters[index].EntityID); ok {
+		if samples, ok := turn.CharacterSpeakingExamples(frozen, def.Characters[index].EntityID); ok {
 			def.Characters[index].SpeakingExamples = samples
 		}
 	}
@@ -204,7 +204,7 @@ func TestSpeakingExamplesReachTheNPCPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	samples, ok := characterSpeakingExamples(after.Definition.Characters, after.Characters[0].EntityID)
+	samples, ok := turn.CharacterSpeakingExamples(after.Definition.Characters, after.Characters[0].EntityID)
 	if !ok || len(samples) != 2 || samples[0] != "灯要按时点。" {
 		t.Fatalf("a newer revision changed an existing world's samples: %+v", samples)
 	}

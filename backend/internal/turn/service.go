@@ -17,25 +17,15 @@ import (
 // compiles, because a wide Host is just the application hidden behind an interface.
 //
 // The rule for adding a method: it must name an operation a turn performs, not a
-// capability of the application. `ResolveIntent` is a turn operation that happens to
-// still live elsewhere; `GetStore` or `AppConfig` would be the application leaking in.
+// capability of the application. Observing a turn and reading its frozen input are the
+// two that legitimately stay; `GetStore` or `AppConfig` would be the application leaking
+// in.
 type Host interface {
 	// LogStage records one stage of a turn: what it was for, which model version it used,
 	// which events it read, who it resolved to, how many repairs it needed and how long
 	// it took. It is the one member that may stay — observing a turn is the application's
 	// business, not the turn's.
 	LogStage(worldID string, run wiaworld.Run, stage Stage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration)
-
-	// ResolveIntent reads the player's input into an intent and opens the turn's output,
-	// because both are decided at the same moment: the intent says who was addressed and
-	// how, and the output's first event is the player's own attempt. It goes when context
-	// assembly and the generated-JSON helpers move, because deciding what the player
-	// meant is a model call over composed context.
-	ResolveIntent(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run) (TurnIntent, Output, error)
-
-	// RunCharacters has each character in the scene decide what to do. It goes with the
-	// same move as ResolveIntent: it is the character stage of the context/agent split.
-	RunCharacters(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
 
 	// Coordinate resolves what actually happened: time, roster, action outcomes, the
 	// scene views, and the world's own progress for this turn — the plot advancing and
@@ -47,10 +37,6 @@ type Host interface {
 	// splitting them into separate host calls would have narration run before the events
 	// it renders existed.
 	Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
-
-	// Narrate writes the player-visible text. It goes when the narration material and
-	// its narrative-reference contract move.
-	Narrate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
 
 	// LoadInput reads the turn's frozen input: the world snapshot, the long-memory
 	// material and the coordination evidence, all taken at one moment so every later
@@ -86,7 +72,7 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err != nil {
 		return Output{}, err
 	}
-	intent, output, err := s.host.ResolveIntent(ctx, generator, &snapshot, run)
+	intent, output, err := s.resolveIntent(ctx, generator, snapshot, run)
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)
 	}
@@ -98,14 +84,14 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	// character who left during the turn still perceived the input, and one who arrived
 	// afterwards did not; the closing roster would get both of those wrong.
 	openingParticipants := CharacterIDs(InScene(snapshot.Characters))
-	if err := s.host.RunCharacters(ctx, generator, &snapshot, run, intent, &output); err != nil {
+	if err := s.runCharacters(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNPC, err)
 	}
 	notePlayerAction(&output, run, intent)
 	if err := s.host.Coordinate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageCoordination, err)
 	}
-	if err := s.host.Narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
+	if err := s.narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageNarration, err)
 	}
 	recordPlayerExperience(&snapshot, &output, intent, openingParticipants, output.PlayerEventID)

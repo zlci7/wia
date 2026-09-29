@@ -703,7 +703,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeAppError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "storage_unavailable"
 	switch {
-	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings):
+	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings), errors.Is(err, turn.ErrInvalidRequest):
 		status = 400
 		code = "invalid_request"
 	case errors.Is(err, storyapp.ErrUnauthorized):
@@ -739,7 +739,7 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrIdempotencyConflict):
 		status = 409
 		code = "idempotency_conflict"
-	case errors.Is(err, storyapp.ErrModelNotConfigured):
+	case errors.Is(err, storyapp.ErrModelNotConfigured), errors.Is(err, turn.ErrModelNotConfigured):
 		status = 409
 		code = "model_not_configured"
 	case strings.HasPrefix(err.Error(), "model_not_configured:"):

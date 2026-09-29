@@ -1,11 +1,8 @@
 package storyapp
 
 import (
-	"strings"
-
 	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/story"
-	wiaworld "gameagent/backend/internal/world"
 )
 
 // storyLocations normalizes the pack's place entries into the running definition's
@@ -29,13 +26,4 @@ func storyBystanders(items []content.PackBystander) []story.Bystander {
 		out = append(out, story.Bystander{BystanderID: item.BystanderID, Name: item.Name, Description: item.Description, InitialLocation: item.InitialLocation, Avatar: item.Avatar})
 	}
 	return out
-}
-
-func findSceneCharacter(characters []wiaworld.Character, id string) (wiaworld.Character, bool) {
-	for _, character := range characters {
-		if character.InScene && character.EntityID == strings.TrimSpace(id) {
-			return character, true
-		}
-	}
-	return wiaworld.Character{}, false
 }

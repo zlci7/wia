@@ -58,7 +58,7 @@ func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
 	var out turn.Output
 	run := wiaworld.Run{RunID: "autonomy"}
 	actor := lanternDefinition().Characters[0]
-	appendNPCDecisionOutput(&out, run, actor, turn.NPCDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
+	turn.AppendNPCDecisionOutput(&out, run, actor, turn.NPCDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
 	var actions int
 	for _, e := range out.Events {
 		if e.EventType == "npc_dialogue" {

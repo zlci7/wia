@@ -435,11 +435,11 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 		}
 	}
 	for _, input := range []string{"保持观察", "观察异常", "继续等待。", "提高警惕", "维持原位"} {
-		if got := normalizeNPCActionIntent(input); got != "" {
+		if got := turn.NormalizeNPCActionIntent(input); got != "" {
 			t.Fatalf("normalizeNPCActionIntent(%q) = %q, want empty", input, got)
 		}
 	}
-	if got := normalizeNPCActionIntent("走到门边关上门"); got != "走到门边关上门" {
+	if got := turn.NormalizeNPCActionIntent("走到门边关上门"); got != "走到门边关上门" {
 		t.Fatalf("state-changing action was dropped: %q", got)
 	}
 }
@@ -673,9 +673,6 @@ func TestPrivatePlayerTextIsAvailableToNarratorEvents(t *testing.T) {
 func TestObserveIntentUsesActionPerceptionAndMemoryTypes(t *testing.T) {
 	if got := turn.SourceTypeFor(true, "npc:innkeeper", "npc:innkeeper", "observe"); got != "observed_player_action" {
 		t.Fatalf("private observe source type = %q", got)
-	}
-	if kind, memory := playerExperienceMemory("observe", true, "npc:innkeeper", "npc:innkeeper", "查看柜台下方", lanternDefinition()); kind != "observed_player_action" || !strings.Contains(memory, "尝试观察") {
-		t.Fatalf("private observe memory = %q/%q", kind, memory)
 	}
 	generator := intentResultGenerator{base: &scriptedGenerator{}, intent: `{"intent_type":"observe","addressee_id":"","visibility":"public"}`}
 	app := newTestApp(t, generator)
@@ -1039,31 +1036,6 @@ func TestStrictJSONRejectsDuplicateKeys(t *testing.T) {
 		t.Fatal("unknown field accepted")
 	}
 	_ = json.Valid
-}
-
-func TestNarrativeUsesPlainTextContract(t *testing.T) {
-	plain := "雨声沿着窗棂滑下，客栈里的人都抬起头。"
-	for _, tc := range []struct {
-		name string
-		text string
-		want string
-	}{
-		{"plain text", plain, plain},
-		{"legacy wrapper", `{"narrative":"旧格式正文"}`, "旧格式正文"},
-		{"markdown fence", "```text\n" + plain + "\n```", plain},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := parseNarrativeText(tc.text)
-			if err != nil || got != tc.want {
-				t.Fatalf("parseNarrativeText(%q) = %q, %v", tc.text, got, err)
-			}
-		})
-	}
-	for _, text := range []string{"", `{"narrative":`, `{"other":"field"}`} {
-		if _, err := parseNarrativeText(text); !errors.Is(err, turn.ErrGenerationFailed) {
-			t.Fatalf("invalid narrative %q error = %v", text, err)
-		}
-	}
 }
 
 func TestRunFailureRecordsStageReasonAndSafeDiagnostic(t *testing.T) {

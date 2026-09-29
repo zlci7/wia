@@ -418,9 +418,11 @@ type Logger interface {
 type MeteredText func(ctx context.Context, generator model.TextGenerator, request model.TextRequest, scope ContextScope, report ContextBuildReport) (model.TextResponse, error)
 
 // Deps is what a turn still needs from the application that hosts it, beyond the Host
-// operations it asks for by name. Both members are optional: without a meter the call
-// goes straight to the wrapped generator, and without a logger nothing is written.
+// operations it asks for by name. Logger and Meter are optional: without a meter the call
+// goes straight to the wrapped generator, and without a logger nothing is written. Owner
+// is the account the world belongs to and is recorded in every composed scope.
 type Deps struct {
 	Logger Logger
 	Meter  MeteredText
+	Owner  string
 }

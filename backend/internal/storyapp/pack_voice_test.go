@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/turn"
 	"strings"
 	"testing"
 )
@@ -50,7 +51,7 @@ func TestBuiltInPacksAuthorACharacterVoice(t *testing.T) {
 		// The turn merges the live roster with the frozen samples, so what the prompt
 		// sees is the world's own version.
 		for _, character := range snapshot.Characters {
-			samples, ok := characterSpeakingExamples(snapshot.Definition.Characters, character.EntityID)
+			samples, ok := turn.CharacterSpeakingExamples(snapshot.Definition.Characters, character.EntityID)
 			if !ok || len(samples) == 0 {
 				t.Errorf("%s: %s has no samples for the running turn", gameID, character.Name)
 			}

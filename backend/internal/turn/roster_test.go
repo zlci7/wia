@@ -2,6 +2,7 @@ package turn
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,8 +12,7 @@ import (
 )
 
 // rosterHost is a host whose opening roster and closing roster differ: A and B are
-// present when the player acts, and by the end B has left while C has arrived. It
-// records which characters the turn asked it to write memories for.
+// present when the player acts, and by the end B has left while C has arrived.
 type rosterHost struct {
 	memoryRecipients []string
 }
@@ -31,23 +31,25 @@ func (h *rosterHost) LoadInput(context.Context, *storage.WorldStore, wiaworld.Ru
 	}, nil
 }
 
-func (h *rosterHost) ResolveIntent(_ context.Context, _ model.TextGenerator, snapshot *Snapshot, run wiaworld.Run) (TurnIntent, Output, error) {
-	intent := TurnIntent{IntentType: "speak", AddresseeID: "npc:a", Visibility: "public"}
-	return intent, OpenOutput(snapshot, intent, run), nil
-}
-
-func (h *rosterHost) RunCharacters(context.Context, model.TextGenerator, *Snapshot, wiaworld.Run, TurnIntent, *Output) error {
-	return nil
-}
-
 // Coordinate ends the turn with a different roster than it started with.
 func (h *rosterHost) Coordinate(_ context.Context, _ model.TextGenerator, _ *Snapshot, _ wiaworld.Run, _ TurnIntent, output *Output) error {
 	output.SceneCharacters = []string{"npc:a", "npc:c"}
 	return nil
 }
 
-func (h *rosterHost) Narrate(context.Context, model.TextGenerator, *Snapshot, wiaworld.Run, TurnIntent, *Output) error {
-	return nil
+// stageGenerator answers each stage of a turn with the smallest valid response, so a test
+// can run the real pipeline — intent, character decisions, narration — without a model.
+type stageGenerator struct{}
+
+func (stageGenerator) GenerateText(_ context.Context, req model.TextRequest) (model.TextResponse, error) {
+	switch {
+	case strings.Contains(req.System, "结构化回合意图"):
+		return model.TextResponse{Text: `{"intent_type":"speak","addressee_id":"","visibility":"public"}`}, nil
+	case strings.Contains(req.System, "你是一个重要 NPC"):
+		return model.TextResponse{Text: `{"speech":"","action_intent":"","silent":true,"memory":""}`}, nil
+	default:
+		return model.TextResponse{Text: "旅人把话说给众人听。"}, nil
+	}
 }
 
 // TestPlayerExperienceUsesTheOpeningRoster pins a regression no compiler could catch.
@@ -58,12 +60,12 @@ func (h *rosterHost) Narrate(context.Context, model.TextGenerator, *Snapshot, wi
 // the closing roster gives both of them the wrong answer, and does it silently — the
 // memories are still written, just attributed to the wrong people.
 //
-// The scene moves during the turn in the adapter, so the closing roster is not available
-// until after the character stages have run. The opening one has to be kept.
+// The scene moves during coordination, so the closing roster is not available until after
+// the character stages have run. The opening one has to be kept.
 func TestPlayerExperienceUsesTheOpeningRoster(t *testing.T) {
 	host := &rosterHost{}
 	service := New(host, Deps{})
-	output, err := service.Execute(context.Background(), nil, wiaworld.Run{RunID: "run1", Input: "我说给大家听"}, stubGenerator{})
+	output, err := service.Execute(context.Background(), nil, wiaworld.Run{RunID: "run1", Input: "我说给大家听"}, stageGenerator{})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -80,10 +82,4 @@ func TestPlayerExperienceUsesTheOpeningRoster(t *testing.T) {
 	if len(output.SceneCharacters) != 2 || output.SceneCharacters[1] != "npc:c" {
 		t.Fatalf("the fixture did not change the roster: %v", output.SceneCharacters)
 	}
-}
-
-type stubGenerator struct{}
-
-func (stubGenerator) GenerateText(context.Context, model.TextRequest) (model.TextResponse, error) {
-	return model.TextResponse{}, nil
 }

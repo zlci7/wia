@@ -241,22 +241,6 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 	}
 }
 
-func TestNarrativeEventsPreservePublicNPCSpeechScope(t *testing.T) {
-	events := turn.NarrativeEvents([]wiaworld.Event{{EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: "公开回答"}}, lanternDefinition().Characters, "旅人", wiaworld.NarrativeSettings{})
-	if len(events) != 1 || events[0].SpeechScope != "public_current_scene" {
-		t.Fatalf("%+v", events)
-	}
-}
-
-func TestNarrativeEventsPreservePlayerAudibility(t *testing.T) {
-	for _, test := range []struct{ source, scope string }{{"player_public", "public_current_scene"}, {"player_private", "private_recipient"}} {
-		events := turn.NarrativeEvents([]wiaworld.Event{{EventType: "player_attempt", ActorID: "player", SourceType: test.source, Content: "你明白的"}}, nil, "旅人", wiaworld.NarrativeSettings{})
-		if len(events) != 1 || events[0].SpeechScope != test.scope {
-			t.Fatalf("%+v", events)
-		}
-	}
-}
-
 func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
 	s := contextFixture()
 	events := []wiaworld.Event{
