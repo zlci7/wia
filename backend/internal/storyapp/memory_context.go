@@ -150,34 +150,34 @@ func (a *App) logMemoryValidation(world, scope, boundary string) {
 	}
 }
 
+// publishDigest records one scope's standing summary, but only if the world still
+// matches what the caller read.
+//
+// The precondition check and the insert are one transaction inside storage, because
+// separating them would let another turn commit in between and leave the digest
+// describing a source stream that no longer exists in that form. Whether a mismatch
+// means a conflict is decided here, not there.
 func publishDigest(ctx context.Context, store *storage.WorldStore, d memorymodel.MemoryDigest, previous, epoch int64) error {
-	tx, err := store.Database().BeginTx(ctx, nil)
+	conflict, err := store.CompareAndInsertMemoryDigest(ctx, storage.MemoryDigestWrite{
+		Scope:            d.Scope,
+		Revision:         d.Revision,
+		Epoch:            d.Epoch,
+		Through:          d.Through,
+		ExpectedHead:     d.Head,
+		ExpectedEpoch:    epoch,
+		ExpectedRevision: previous,
+		Content:          d.Content,
+		States:           wire.MarshalJSON(d.States),
+		Sources:          wire.MarshalJSON(d.Sources),
+		CreatedAt:        wire.NowText(),
+	})
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	actual, err := storage.MetaGetTx(ctx, tx, "context_epoch")
-	if err != nil {
-		return err
-	}
-	if actual != fmt.Sprint(epoch) {
+	if conflict.Epoch || conflict.Revision != previous || conflict.Head != d.Head {
 		return ErrVersionConflict
 	}
-	var revision, head int64
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM memory_digests WHERE scope=?`, d.Scope).Scan(&revision); err != nil {
-		return err
-	}
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq),0) FROM memory_sources WHERE scope=?`, d.Scope).Scan(&head); err != nil {
-		return err
-	}
-	if revision != previous || head != d.Head || head < d.Through {
-		return ErrVersionConflict
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO memory_digests(scope,revision,epoch,through_seq,source_head,content,states,sources,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, d.Scope, d.Revision, d.Epoch, d.Through, head, d.Content, wire.MarshalJSON(d.States), wire.MarshalJSON(d.Sources), time.Now().UTC().Format(time.RFC3339Nano))
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 // inputBudgetTokens is how many input tokens a request may use with this generator. It

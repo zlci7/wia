@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // The record types below are what this package can see: rows. They carry the column
@@ -159,3 +160,75 @@ func (s *WorldStore) LoadMemorySources(ctx context.Context, scope string, after 
 	}
 	return out, rows.Err()
 }
+
+// MemoryDigestWrite is one standing summary to insert, with the preconditions the
+// caller read before deciding to write it.
+//
+// The preconditions are values, not rules. This package checks that the world has not
+// moved since the caller looked — the epoch, the scope's current revision, and its
+// source head — and inserts only then. Whether a mismatch should be reported to a
+// reader as a conflict, a retry or nothing at all is the caller's decision.
+type MemoryDigestWrite struct {
+	Scope            string
+	Revision         int64
+	Epoch            int64
+	Through          int64
+	ExpectedHead     int64
+	ExpectedEpoch    int64
+	ExpectedRevision int64
+	Content          string
+	States           string
+	Sources          string
+	CreatedAt        string
+}
+
+// MemoryDigestConflict reports why a conditional insert did not happen, and what the
+// world actually held when it was checked.
+type MemoryDigestConflict struct {
+	// Epoch is the context epoch that was required but not found.
+	Epoch bool
+	// Revision and Head are the values found where the caller expected others.
+	Revision int64
+	Head     int64
+}
+
+// CompareAndInsertMemoryDigest inserts one digest only if the world still matches what
+// the caller read.
+//
+// It is a single transaction because the check and the write must not be separated:
+// between them another turn could commit and the digest would describe a source stream
+// that no longer exists in that form.
+func (s *WorldStore) CompareAndInsertMemoryDigest(ctx context.Context, write MemoryDigestWrite) (MemoryDigestConflict, error) {
+	var conflict MemoryDigestConflict
+	err := s.InTx(ctx, func(tx *WorldTx) error {
+		epoch, err := tx.GetMeta(ctx, "context_epoch")
+		if err != nil {
+			return err
+		}
+		if epoch != fmt.Sprint(write.ExpectedEpoch) {
+			conflict.Epoch = true
+			return errDigestConflict
+		}
+		if err := tx.tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM memory_digests WHERE scope=?`, write.Scope).Scan(&conflict.Revision); err != nil {
+			return err
+		}
+		if err := tx.tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq),0) FROM memory_sources WHERE scope=?`, write.Scope).Scan(&conflict.Head); err != nil {
+			return err
+		}
+		if conflict.Revision != write.ExpectedRevision || conflict.Head != write.ExpectedHead || conflict.Head < write.Through {
+			return errDigestConflict
+		}
+		_, err = tx.tx.ExecContext(ctx, `INSERT INTO memory_digests(scope,revision,epoch,through_seq,source_head,content,states,sources,created_at) VALUES(?,?,?,?,?,?,?,?,?)`,
+			write.Scope, write.Revision, write.Epoch, write.Through, conflict.Head, write.Content, write.States, write.Sources, write.CreatedAt)
+		return err
+	})
+	if errors.Is(err, errDigestConflict) {
+		return conflict, nil
+	}
+	return conflict, err
+}
+
+// errDigestConflict rolls back a conditional insert without escaping this package: the
+// caller learns about the conflict from the returned struct, not from an error whose
+// meaning it would have to interpret.
+var errDigestConflict = errors.New("memory digest precondition not met")

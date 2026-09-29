@@ -90,13 +90,13 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		err = loadLongMemory(ctx, store, &snapshot)
 	}
 	if err != nil {
-		failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		failMemoryJob(ctx, store, job.Epoch, err)
 		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
 	if job.Completed >= len(job.Scopes) {
-		_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
+		err = store.UpdateMemoryJob(ctx, storage.MemoryJobUpdate{Epoch: job.Epoch, Status: "completed", Completed: job.Completed, UpdatedAt: wire.NowText()})
 		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
@@ -109,12 +109,12 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		eventRuns, err = correctionEventRuns(ctx, store, corrections)
 	}
 	if err != nil {
-		failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		failMemoryJob(ctx, store, job.Epoch, err)
 		store.Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
-	_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
+	err = store.UpdateMemoryJob(ctx, storage.MemoryJobUpdate{Epoch: job.Epoch, Status: "running", Completed: job.Completed, UpdatedAt: wire.NowText()})
 	store.Close()
 	worldRT.mu.Unlock()
 	if err != nil {
@@ -199,11 +199,11 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		return true, ctx.Err()
 	}
 	if err != nil {
-		saveErr := failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		saveErr := failMemoryJob(ctx, store, job.Epoch, err)
 		return true, saveErr
 	}
 	if err = publishDigest(ctx, store, d, previous.Revision, job.Epoch); err != nil {
-		failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		failMemoryJob(ctx, store, job.Epoch, err)
 		return true, err
 	}
 	doneScope := len(prefix) == 0 || len(memoryGroups(afterMemory(m.Archive, d.Through))) <= 4
@@ -215,15 +215,15 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if completed == len(job.Scopes) {
 		status = "completed"
 	}
-	_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status=?,completed=?,updated_at=? WHERE epoch=?`, status, completed, wire.NowText(), job.Epoch)
+	err = store.UpdateMemoryJob(ctx, storage.MemoryJobUpdate{Epoch: job.Epoch, Status: status, Completed: completed, UpdatedAt: wire.NowText()})
 	return status == "completed", err
 }
 
-func failMemoryJob(ctx context.Context, db *sql.DB, epoch int64, cause error) error {
+func failMemoryJob(ctx context.Context, store *storage.WorldStore, epoch int64, cause error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	_, err := db.ExecContext(ctx, `UPDATE memory_jobs SET status='failed',error=?,updated_at=? WHERE epoch=? AND status IN ('queued','running')`, safeTurnErrorCode(cause), wire.NowText(), epoch)
+	err := store.FailMemoryJobIfOpen(ctx, epoch, safeTurnErrorCode(cause), wire.NowText())
 	return err
 }
 
@@ -308,7 +308,7 @@ func (a *App) RetryMemory(ctx context.Context, worldID string, epoch int64) erro
 	if current != epoch {
 		return ErrVersionConflict
 	}
-	if _, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='queued',error='' WHERE epoch=? AND status='failed'`, epoch); err != nil {
+	if err = store.RequeueMemoryJobIfFailed(ctx, epoch); err != nil {
 		return err
 	}
 	schedule = true
