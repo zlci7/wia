@@ -284,7 +284,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if worldRT.savePending {
 		return wiaworld.Run{}, ErrWorldBusy
 	}
-	if err := memoryReady(ctx, store.Database()); err != nil {
+	if err := memoryReady(ctx, store); err != nil {
 		return wiaworld.Run{}, err
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)

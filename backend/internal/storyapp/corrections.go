@@ -26,44 +26,6 @@ CREATE TABLE IF NOT EXISTS memory_jobs (
  scopes TEXT NOT NULL, error TEXT NOT NULL, updated_at TEXT NOT NULL
 );`
 
-func readCorrections(ctx context.Context, db *sql.DB) ([]memorymodel.Correction, error) {
-	rows, err := db.QueryContext(ctx, `SELECT epoch,kind,scope,target_id,original,replacement,created_at,scene_version FROM corrections ORDER BY epoch`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	result := []memorymodel.Correction{}
-	for rows.Next() {
-		var c memorymodel.Correction
-		if err = rows.Scan(&c.Epoch, &c.Kind, &c.Scope, &c.TargetID, &c.Original, &c.Replacement, &c.CreatedAt, &c.SceneVersion); err != nil {
-			return nil, err
-		}
-		result = append(result, c)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	for i := range result {
-		if err = expandCorrection(ctx, db, &result[i]); err != nil {
-			return nil, err
-		}
-	}
-	return result, nil
-}
-
-func memoryReady(ctx context.Context, db *sql.DB) error {
-	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM memory_jobs WHERE status NOT IN ('completed','superseded')`).Scan(&count); err != nil {
-		return err
-	}
-	if count > 0 {
-		return ErrMemoryRebuilding
-	}
-	return nil
-}
-
 func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.CorrectionRequest) (memorymodel.Correction, error) {
 	schedule := false
 	defer func() {
@@ -103,7 +65,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 		if hash != oldHash {
 			return memorymodel.Correction{}, ErrIdempotencyConflict
 		}
-		list, e := readCorrections(ctx, store.Database())
+		list, e := readCorrections(ctx, store)
 		if e != nil {
 			return memorymodel.Correction{}, e
 		}
@@ -141,7 +103,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 	}
 	c := memorymodel.Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: wire.Clean(request.Replacement), CreatedAt: wire.NowText()}
 	c.SceneVersion = snapshot.SceneVersion
-	if err = expandCorrection(ctx, store.Database(), &c); err != nil {
+	if err = expandCorrection(ctx, store, &c); err != nil {
 		return c, err
 	}
 	var eventRun string
@@ -222,7 +184,7 @@ func correctionOriginal(ctx context.Context, store *storage.WorldStore, s worldS
 		if err != nil {
 			return "", err
 		}
-		list, err := readCorrections(ctx, store.Database())
+		list, err := readCorrections(ctx, store)
 		if err != nil {
 			return "", err
 		}
@@ -279,23 +241,8 @@ func correctedSource(s memorymodel.MemorySource, corrections []memorymodel.Corre
 
 // correctionNotices reports the stream entries a correction writes for each scope.
 
-func correctionEventRuns(ctx context.Context, db *sql.DB, list []memorymodel.Correction) (map[string]string, error) {
-	runs := map[string]string{}
-	for _, c := range list {
-		if c.Kind != "event" {
-			continue
-		}
-		var run string
-		if err := db.QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&run); err != nil {
-			return nil, err
-		}
-		runs[c.TargetID] = run
-	}
-	return runs, nil
-}
-
 func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s *worldSnapshot) error {
-	list, err := readCorrections(ctx, store.Database())
+	list, err := readCorrections(ctx, store)
 	if err != nil {
 		return err
 	}

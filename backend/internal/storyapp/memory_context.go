@@ -2,9 +2,6 @@ package storyapp
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -24,34 +21,17 @@ type memoryContext struct {
 	Archive []memorymodel.MemorySource
 }
 
-func readDigest(ctx context.Context, db *sql.DB, scope string) (memorymodel.MemoryDigest, error) {
-	d := memorymodel.MemoryDigest{Scope: scope, States: []memorymodel.SubjectiveState{}, Sources: []string{}}
-	var states, sources string
-	err := db.QueryRowContext(ctx, `SELECT revision,epoch,through_seq,source_head,content,states,sources FROM memory_digests WHERE scope=? ORDER BY revision DESC LIMIT 1`, scope).Scan(&d.Revision, &d.Epoch, &d.Through, &d.Head, &d.Content, &states, &sources)
-	if errors.Is(err, sql.ErrNoRows) {
-		return d, nil
-	}
-	if err != nil {
-		return d, err
-	}
-	if err = json.Unmarshal([]byte(states), &d.States); err != nil {
-		return d, err
-	}
-	err = json.Unmarshal([]byte(sources), &d.Sources)
-	return d, err
-}
-
 func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot) error {
 	if err := indexMemorySources(ctx, store); err != nil {
 		return err
 	}
 	snapshot.LongMemory = map[string]memoryContext{}
 	for _, scope := range memoryScopeIDs(*snapshot) {
-		archive, err := readMemorySources(ctx, store.Database(), scope, 0)
+		archive, err := readMemorySources(ctx, store, scope, 0)
 		if err != nil {
 			return err
 		}
-		d, err := readDigest(ctx, store.Database(), scope)
+		d, err := readDigest(ctx, store, scope)
 		if err != nil {
 			return err
 		}

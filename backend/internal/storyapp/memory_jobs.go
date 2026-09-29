@@ -103,10 +103,10 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	}
 	scope := job.Scopes[job.Completed]
 	m := snapshot.LongMemory[scope]
-	corrections, err := readCorrections(ctx, store.Database())
+	corrections, err := readCorrections(ctx, store)
 	var eventRuns map[string]string
 	if err == nil {
-		eventRuns, err = correctionEventRuns(ctx, store.Database(), corrections)
+		eventRuns, err = correctionEventRuns(ctx, store, corrections)
 	}
 	if err != nil {
 		failMemoryJob(ctx, store.Database(), job.Epoch, err)

@@ -2,7 +2,6 @@ package storyapp
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -79,39 +78,6 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 		}
 	}
 	return tx.Commit()
-}
-
-func readMemorySources(ctx context.Context, db *sql.DB, scope string, after int64) ([]memorymodel.MemorySource, error) {
-	rows, err := db.QueryContext(ctx, `SELECT scope,seq,source_id,event_id,run_id,actor,kind,content,created_at FROM memory_sources WHERE scope=? AND seq>? ORDER BY seq`, scope, after)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []memorymodel.MemorySource{}
-	for rows.Next() {
-		var s memorymodel.MemorySource
-		if err = rows.Scan(&s.Scope, &s.Seq, &s.ID, &s.EventID, &s.RunID, &s.Actor, &s.Kind, &s.Content, &s.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, s)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	corrections, err := readCorrections(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	runs, err := correctionEventRuns(ctx, db, corrections)
-	if err != nil {
-		return nil, err
-	}
-	for i := range items {
-		items[i] = correctedSource(items[i], corrections, runs)
-	}
-	return items, nil
 }
 
 func memoryGroups(items []memorymodel.MemorySource) [][]memorymodel.MemorySource {

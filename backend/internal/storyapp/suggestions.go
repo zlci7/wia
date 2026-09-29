@@ -165,7 +165,7 @@ func (a *App) RequestSuggestions(ctx context.Context, worldID string, req Sugges
 	if set.Status != "empty" {
 		return set, nil
 	}
-	if err := memoryReady(ctx, store.Database()); err != nil {
+	if err := memoryReady(ctx, store); err != nil {
 		return set, err
 	}
 	// An uncommitted input never becomes the basis for auxiliary generation.
@@ -258,7 +258,7 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 	if count, countErr := store.CountActiveRuns(ctx); countErr != nil || count > 0 {
 		return
 	}
-	if memoryReady(ctx, store.Database()) != nil {
+	if memoryReady(ctx, store) != nil {
 		return
 	}
 	set.Status = "ready"

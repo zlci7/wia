@@ -181,7 +181,7 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 	}
 	checkStore, checkErr := storage.OpenWorldDB(sourcePath)
 	if checkErr == nil {
-		checkErr = memoryReady(ctx, checkStore.Database())
+		checkErr = memoryReady(ctx, checkStore)
 		checkStore.Close()
 	}
 	if checkErr != nil {
@@ -335,7 +335,7 @@ func (a *App) clearSavePending(worldID, operationID string) {
 }
 
 func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, source *storage.WorldStore) error {
-	if err := memoryReady(ctx, source.Database()); err != nil {
+	if err := memoryReady(ctx, source); err != nil {
 		return err
 	}
 	targetPath, _, err := a.worldRecord(ctx, operation.TargetWorldID)

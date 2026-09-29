@@ -41,7 +41,7 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 		return wiaworld.WorldSummary{}, err
 	}
 	defer store.Close()
-	if err := memoryReady(ctx, store.Database()); err != nil {
+	if err := memoryReady(ctx, store); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
 	if count, err := store.CountActiveRuns(ctx); err != nil {

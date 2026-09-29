@@ -59,7 +59,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 		return out, err
 	}
 	out.Epoch = snapshot.Summary.ContextEpoch
-	corrections, err := readCorrections(ctx, store.Database())
+	corrections, err := readCorrections(ctx, store)
 	if err != nil {
 		return out, err
 	}
@@ -103,7 +103,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 		if e != nil {
 			return out, e
 		}
-		list, e := readCorrections(ctx, store.Database())
+		list, e := readCorrections(ctx, store)
 		if e != nil {
 			return out, e
 		}
@@ -181,7 +181,7 @@ func (a *App) Corrections(ctx context.Context, worldID string) ([]memorymodel.Co
 		return nil, memorymodel.MemoryJob{}, err
 	}
 	defer store.Close()
-	items, err := readCorrections(ctx, store.Database())
+	items, err := readCorrections(ctx, store)
 	if err != nil {
 		return nil, memorymodel.MemoryJob{}, err
 	}

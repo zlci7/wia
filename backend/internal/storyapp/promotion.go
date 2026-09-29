@@ -140,7 +140,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return wiaworld.Character{}, err
 	}
 	defer store.Close()
-	if err := memoryReady(ctx, store.Database()); err != nil {
+	if err := memoryReady(ctx, store); err != nil {
 		return wiaworld.Character{}, err
 	}
 	if count, err := store.CountActiveRuns(ctx); err != nil {

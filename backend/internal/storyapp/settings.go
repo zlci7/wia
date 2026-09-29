@@ -84,7 +84,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	defer store.Close()
-	if err := memoryReady(ctx, store.Database()); err != nil {
+	if err := memoryReady(ctx, store); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if request.Policies != nil {

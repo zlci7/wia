@@ -136,7 +136,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	if err = indexMemorySources(ctx, store); err != nil {
 		t.Fatal(err)
 	}
-	items, _ := readMemorySources(ctx, store.Database(), "npc:innkeeper", 0)
+	items, _ := readMemorySources(ctx, store, "npc:innkeeper", 0)
 	if len(items) != 12 {
 		t.Fatal("index not idempotent")
 	}
