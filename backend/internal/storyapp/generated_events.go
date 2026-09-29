@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type EventGenerationPolicy struct {
@@ -55,7 +56,7 @@ func validateEventPolicy(p *EventGenerationPolicy, def gameDefinition) error {
 	if p == nil {
 		return nil
 	}
-	if def.Summary.Mode != "open" || cleanText(p.Scope) == "" || p.MaxActive < 1 || p.MaxActive > 3 || p.CooldownTurns < 2 || p.CooldownTurns > 20 || len(p.Locations) == 0 {
+	if def.Summary.Mode != "open" || wire.Clean(p.Scope) == "" || p.MaxActive < 1 || p.MaxActive > 3 || p.CooldownTurns < 2 || p.CooldownTurns > 20 || len(p.Locations) == 0 {
 		return fmt.Errorf("story.json: invalid event_generation policy")
 	}
 	seen := map[string]bool{}
@@ -133,7 +134,7 @@ func eventOpportunityContract(s worldSnapshot) string {
 	if p == nil {
 		return ""
 	}
-	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + marshalJSON(p.Locations)
+	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
 }
 
 func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run, opportunity *eventOpportunity, output *turnOutput) ([]Event, error) {
@@ -202,7 +203,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	state.LastOfferTurn = turn
 	material := contextMaterial{
 		System:          behaviorContract + "\n你是开放世界事件协调器。在作者范围内，依据已确认的新情境选择是否发生一个小型外部事件。沿用现有事件优先；没有合适事件时返回空候选。重要NPC的新决定只由本人作出，玩家不自动接受任务。只返回JSON。",
-		Required:        fmt.Sprintf("世界规则：%s\n作者事实：%s\n生成范围：%s\n地点目录：%s\n机会：%s\n已确认触发结果：%s\n游戏内时间：%s\n在场人物：%s\n接收者场景：%s\n当前已有事件：%s\n作者剧情：%s\n返回candidates数组，0或1项。每项condition(何时可收束)、development(有干预与不参与时的后续可能及结束条件)、after_minutes(1到120)、initial对象。initial字段status必须occurred，content为本次外部事实，source_ids只能引用触发结果ID，projections按接收者给出content及可选scene，decision_requests只含本次确实得到新刺激且需要本人决定的NPC，ending为空。不得新增重要NPC、地图地点、强迫玩家承诺、覆写作者主线、把计划写成已发生事实。后续发展须可通过等待、参与或拒绝自然结算。只向真实目击或有来源获知者投影，不广播作者秘密。参与者上限=%s加player。背景人物可有符合设定的日常反应。所有数组使用[]，不使用null。", snapshot.Definition.Rules, snapshot.Definition.Secret, p.Scope, marshalJSON(snapshot.Definition.Locations), marshalJSON(opportunity), marshalJSON(trigger), output.Clock, marshalJSON(output.SceneCharacters), marshalJSON(output.SceneViews), marshalJSON(state.Active), marshalJSON(snapshot.Plot), marshalJSON(p.Participants)),
+		Required:        fmt.Sprintf("世界规则：%s\n作者事实：%s\n生成范围：%s\n地点目录：%s\n机会：%s\n已确认触发结果：%s\n游戏内时间：%s\n在场人物：%s\n接收者场景：%s\n当前已有事件：%s\n作者剧情：%s\n返回candidates数组，0或1项。每项condition(何时可收束)、development(有干预与不参与时的后续可能及结束条件)、after_minutes(1到120)、initial对象。initial字段status必须occurred，content为本次外部事实，source_ids只能引用触发结果ID，projections按接收者给出content及可选scene，decision_requests只含本次确实得到新刺激且需要本人决定的NPC，ending为空。不得新增重要NPC、地图地点、强迫玩家承诺、覆写作者主线、把计划写成已发生事实。后续发展须可通过等待、参与或拒绝自然结算。只向真实目击或有来源获知者投影，不广播作者秘密。参与者上限=%s加player。背景人物可有符合设定的日常反应。所有数组使用[]，不使用null。", snapshot.Definition.Rules, snapshot.Definition.Secret, p.Scope, wire.MarshalJSON(snapshot.Definition.Locations), wire.MarshalJSON(opportunity), wire.MarshalJSON(trigger), output.Clock, wire.MarshalJSON(output.SceneCharacters), wire.MarshalJSON(output.SceneViews), wire.MarshalJSON(state.Active), wire.MarshalJSON(snapshot.Plot), wire.MarshalJSON(p.Participants)),
 		RequiredSources: []string{trigger.EventID}, Optional: plotEvidenceSections(snapshot.Events),
 	}
 	call := a.contextGenerator(generator, material, snapshot, run, "event_generation", "coordinator", 4, "story.events.v1")
@@ -221,7 +222,7 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 		return nil, nil
 	}
 	c := response.Candidates[0]
-	if cleanText(c.Condition) == "" || cleanText(c.Development) == "" || len([]rune(c.Initial.Content+c.Condition+c.Development)) > 4000 || c.AfterMinutes < 1 || c.AfterMinutes > 120 || c.Initial.Status != "occurred" || c.Initial.Ending != "" || len(c.Initial.SourceIDs) != 1 || c.Initial.SourceIDs[0] != trigger.EventID {
+	if wire.Clean(c.Condition) == "" || wire.Clean(c.Development) == "" || len([]rune(c.Initial.Content+c.Condition+c.Development)) > 4000 || c.AfterMinutes < 1 || c.AfterMinutes > 120 || c.Initial.Status != "occurred" || c.Initial.Ending != "" || len(c.Initial.SourceIDs) != 1 || c.Initial.SourceIDs[0] != trigger.EventID {
 		return nil, fmt.Errorf("%w: event_candidate_fields", ErrGenerationFailed)
 	}
 	key := run.InputID
@@ -246,6 +247,6 @@ func (a *App) advanceGeneratedEvents(ctx context.Context, generator model.TextGe
 	}
 	state.Active = append(state.Active, generatedEvent{Node: node, StartID: root, TriggerID: trigger.EventID, Location: opportunity.Location, Premise: c.Initial.Content})
 	// The author plan is archived with the same transaction, never projected as facts.
-	output.Events = append(output.Events, Event{EventID: root + ":plan", EventType: "generated_event_plan", ActorID: "world", Content: marshalJSON(state.Active[len(state.Active)-1]), RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "author_plan", ProjectionParentID: root, CreatedAt: time.Now().UTC()})
+	output.Events = append(output.Events, Event{EventID: root + ":plan", EventType: "generated_event_plan", ActorID: "world", Content: wire.MarshalJSON(state.Active[len(state.Active)-1]), RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "author_plan", ProjectionParentID: root, CreatedAt: time.Now().UTC()})
 	return visible, nil
 }

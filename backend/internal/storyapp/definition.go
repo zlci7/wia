@@ -53,7 +53,3 @@ func findSceneCharacter(characters []Character, id string) (Character, bool) {
 	}
 	return Character{}, false
 }
-
-func cleanText(value string) string {
-	return strings.TrimSpace(strings.ReplaceAll(value, "\x00", ""))
-}

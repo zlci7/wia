@@ -2,7 +2,7 @@ package storyapp
 
 import (
 	"context"
-	"crypto/rand"
+
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -18,6 +18,7 @@ import (
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
+	"gameagent/backend/internal/wire"
 )
 
 var writeModelConfig = atomicfile.Write
@@ -55,7 +56,7 @@ func Open(ctx context.Context, options Options) (*App, error) {
 		return nil, err
 	}
 	copyCtx, copyCancel := context.WithCancel(context.Background())
-	app := &App{root: appRoot, dataRoot: root, appDB: db, processLock: processLock, userID: userID, worlds: make(map[string]*worldRuntime), runs: make(map[string]*runRuntime), copyCtx: copyCtx, copyCancel: copyCancel, logger: options.Logger, closed: make(chan struct{}), worldPlayerName: cleanText(options.WorldPlayerName)}
+	app := &App{root: appRoot, dataRoot: root, appDB: db, processLock: processLock, userID: userID, worlds: make(map[string]*worldRuntime), runs: make(map[string]*runRuntime), copyCtx: copyCtx, copyCancel: copyCancel, logger: options.Logger, closed: make(chan struct{}), worldPlayerName: wire.Clean(options.WorldPlayerName)}
 	if options.ModelConfigPath != "" {
 		app.modelPath = options.ModelConfigPath
 	} else if value := strings.TrimSpace(os.Getenv("WIA_MODEL_CONFIG")); value != "" {
@@ -324,7 +325,7 @@ func (a *App) worldPathFor(gameID, worldID string) string {
 }
 
 func (a *App) touchWorld(ctx context.Context, worldID string) error {
-	_, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, worldID)
+	_, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET updated_at=? WHERE user_id=? AND world_id=?`, wire.NowText(), a.userID, worldID)
 	return err
 }
 
@@ -379,10 +380,10 @@ func (a *App) markInterruptedCopies(ctx context.Context) error {
 		if recordErr == nil {
 			_ = os.RemoveAll(filepath.Dir(path))
 		}
-		if _, err := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, "另存任务在运行时重启，原存档保持不变", nowText(), a.userID, ref.operationID); err != nil {
+		if _, err := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, "另存任务在运行时重启，原存档保持不变", wire.NowText(), a.userID, ref.operationID); err != nil {
 			return err
 		}
-		if _, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, ref.worldID); err != nil {
+		if _, err := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, wire.NowText(), a.userID, ref.worldID); err != nil {
 			return err
 		}
 	}
@@ -410,13 +411,6 @@ func (a *App) hashRun(req RunRequest) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
-func newID(prefix string) string {
-	var data [12]byte
-	if _, err := rand.Read(data[:]); err != nil {
-		panic(err)
-	}
-	return prefix + "_" + hex.EncodeToString(data[:])
-}
 
 // ConfigureModel verifies a real provider before publishing its configuration.
 // Credentials are kept in the runtime secrets directory and never returned to the client.
@@ -440,11 +434,11 @@ func (a *App) ConfigureModel(ctx context.Context, request ModelConfigRequest) (S
 		return Status{}, err
 	}
 	secretDir := filepath.Clean(filepath.Join(configDir, "..", "secrets"))
-	tmpKey := filepath.Join(secretDir, "model.pending."+newID("cfg")+".key")
+	tmpKey := filepath.Join(secretDir, "model.pending."+wire.NewID("cfg")+".key")
 	if err := secret.Write(tmpKey, request.APIKey); err != nil {
 		return Status{}, err
 	}
-	tmpConfig := filepath.Join(configDir, "model.pending."+newID("cfg")+".json")
+	tmpConfig := filepath.Join(configDir, "model.pending."+wire.NewID("cfg")+".json")
 	window := llm.DefaultWindowLimits(provider, request.Model)
 	config := llm.Config{Provider: provider, Model: strings.TrimSpace(request.Model), BaseURL: strings.TrimRight(strings.TrimSpace(request.BaseURL), "/"), APIKey: "file:../secrets/" + filepath.Base(tmpKey), WindowLimits: window}
 	data, _ := json.Marshal(config)
@@ -489,7 +483,7 @@ func (a *App) ConfigureModel(ctx context.Context, request ModelConfigRequest) (S
 }
 
 func publishModelConfig(configPath, secretDir, apiKey string, modelConfig llm.Config) (llm.Config, error) {
-	keyName := "model." + newID("cfg") + ".key"
+	keyName := "model." + wire.NewID("cfg") + ".key"
 	keyPath := filepath.Join(secretDir, keyName)
 	if err := secret.Write(keyPath, apiKey); err != nil {
 		return llm.Config{}, err

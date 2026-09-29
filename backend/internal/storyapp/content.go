@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"image"
 	"os"
 	"path/filepath"
@@ -186,7 +187,7 @@ func (a *App) PreviewContentDraft(ctx context.Context, draftID string, author bo
 // packages and other projects of the same account cannot be taken over. An author who
 // only supplies a title gets an identifier derived from it, fixed at creation.
 func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (ContentProject, error) {
-	gameID, title = cleanText(gameID), cleanText(title)
+	gameID, title = wire.Clean(gameID), wire.Clean(title)
 	if title == "" || len([]rune(title)) > 120 {
 		return ContentProject{}, ErrInvalidRequest
 	}
@@ -210,8 +211,8 @@ func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (C
 	if existing > 0 {
 		return ContentProject{}, ErrContentBusy
 	}
-	now := nowText()
-	project := ContentProject{ProjectID: newID("project"), GameID: gameID, Title: title, Version: 1, CreatedAt: now, UpdatedAt: now}
+	now := wire.NowText()
+	project := ContentProject{ProjectID: wire.NewID("project"), GameID: gameID, Title: title, Version: 1, CreatedAt: now, UpdatedAt: now}
 	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO content_projects(user_id,project_id,game_id,title,current_revision,version,deleted_at,created_at,updated_at) VALUES(?,?,?,?,'',1,'',?,?)`,
 		a.userID, project.ProjectID, project.GameID, project.Title, now, now); err != nil {
 		return ContentProject{}, err
@@ -271,7 +272,7 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 	if err != nil {
 		return ContentDraft{}, err
 	}
-	baseRevision = cleanText(baseRevision)
+	baseRevision = wire.Clean(baseRevision)
 	payload := ContentDraftPayload{
 		SchemaVersion: packSchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
 		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
@@ -279,7 +280,7 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 		Player: PlayerDefaults{Editable: true},
 	}
 	status := draftStatusEditing
-	draftID := newID("draft")
+	draftID := wire.NewID("draft")
 	var inherited map[string][]byte
 	if baseRevision != "" {
 		copied, err := a.draftPayloadFromRevision(baseRevision, project.GameID)
@@ -298,7 +299,7 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 	if err != nil {
 		return ContentDraft{}, err
 	}
-	draft := ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: draftID, ProjectID: project.ProjectID, BaseRevision: baseRevision, Version: 1, Status: status, UpdatedAt: nowText()}, Payload: payload}
+	draft := ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: draftID, ProjectID: project.ProjectID, BaseRevision: baseRevision, Version: 1, Status: status, UpdatedAt: wire.NowText()}, Payload: payload}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_drafts(user_id,draft_id,project_id,base_revision,version,status,payload_json,source_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'',?,?)`,
 		a.userID, draft.DraftID, draft.ProjectID, draft.BaseRevision, draft.Version, draft.Status, string(body), draft.UpdatedAt, draft.UpdatedAt); err != nil {
 		return ContentDraft{}, err
@@ -349,7 +350,7 @@ func (a *App) SaveContentDraft(ctx context.Context, draftID string, payload Cont
 		return ContentDraft{}, fmt.Errorf("%w: %s", ErrContentInvalid, payloadTooLarge)
 	}
 	result, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET payload_json=?,version=version+1,updated_at=? WHERE user_id=? AND draft_id=? AND version=? AND status IN (?,?)`,
-		string(body), nowText(), a.userID, strings.TrimSpace(draftID), expectedVersion, draftStatusEditing, draftStatusPreview)
+		string(body), wire.NowText(), a.userID, strings.TrimSpace(draftID), expectedVersion, draftStatusEditing, draftStatusPreview)
 	if err != nil {
 		return ContentDraft{}, err
 	}
@@ -447,7 +448,7 @@ func normalizeDraftIdentities(payload *ContentDraftPayload) error {
 	usedLocations := map[string]bool{}
 	for index := range payload.Locations {
 		location := &payload.Locations[index]
-		location.Name = cleanText(location.Name)
+		location.Name = wire.Clean(location.Name)
 		if location.Name == "" {
 			return fmt.Errorf("%w: location %d has no name", ErrContentInvalid, index+1)
 		}
@@ -463,7 +464,7 @@ func normalizeDraftIdentities(payload *ContentDraftPayload) error {
 	usedEntities := map[string]bool{}
 	for index := range payload.NPCs {
 		npc := &payload.NPCs[index]
-		npc.Name, npc.Role = cleanText(npc.Name), cleanText(npc.Role)
+		npc.Name, npc.Role = wire.Clean(npc.Name), wire.Clean(npc.Role)
 		if npc.Name == "" {
 			return fmt.Errorf("%w: character %d has no name", ErrContentInvalid, index+1)
 		}
@@ -483,7 +484,7 @@ func normalizeDraftIdentities(payload *ContentDraftPayload) error {
 	}
 	for index := range payload.Bystanders {
 		bystander := &payload.Bystanders[index]
-		bystander.Name, bystander.Description = cleanText(bystander.Name), cleanText(bystander.Description)
+		bystander.Name, bystander.Description = wire.Clean(bystander.Name), wire.Clean(bystander.Description)
 		if bystander.Name == "" {
 			return fmt.Errorf("%w: passer-by %d has no name", ErrContentInvalid, index+1)
 		}
@@ -602,7 +603,7 @@ func (a *App) availableGameID(ctx context.Context, title string) (string, error)
 // publishedPack resolves one immutable revision by identity. Official packages are
 // already loaded; user revisions resolve through the registered content path.
 func (a *App) publishedPack(revision string) (loadedPack, error) {
-	revision = cleanText(revision)
+	revision = wire.Clean(revision)
 	for _, pack := range a.packs {
 		if pack.Definition.Revision == revision {
 			return pack, nil
@@ -707,7 +708,7 @@ func (a *App) copyPackAssets(ctx context.Context, draftID string, assets map[str
 			mediaType = "image/jpeg"
 		}
 		asset := ContentDraftAsset{
-			AssetID: newID("asset"), RelativeName: name, MediaType: mediaType,
+			AssetID: wire.NewID("asset"), RelativeName: name, MediaType: mediaType,
 			ByteSize: int64(len(body)), Width: config.Width, Height: config.Height,
 		}
 		staged := filepath.Join(dir, asset.AssetID)
@@ -716,7 +717,7 @@ func (a *App) copyPackAssets(ctx context.Context, draftID string, assets map[str
 		}
 		if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
 			VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,draft_id,asset_id) DO UPDATE SET relative_name=excluded.relative_name,digest=excluded.digest,staged_path=excluded.staged_path`,
-			a.userID, draftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, nowText()); err != nil {
+			a.userID, draftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, wire.NowText()); err != nil {
 			_ = os.Remove(staged)
 			return err
 		}

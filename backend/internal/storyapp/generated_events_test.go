@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type generatedTestGenerator struct {
@@ -74,7 +75,7 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 		}
 		c := eventCandidate{Condition: "五分钟后核对窗口结束", Development: "有核对则登记结果，没有则暂存待查；不替玩家接受任务。", AfterMinutes: 5,
 			Initial: plotResolution{Status: "occurred", Content: "一个配送标签待核对，编号为蓝三。", SourceIDs: []string{trigger.EventID}, Projections: []plotProjection{{Recipient: "player", Content: "值班员请你核对一张配送标签。", Scene: "你在设备检修间，看见待核对的标签。"}}, DecisionRequests: []string{}}}
-		return model.TextResponse{Text: marshalJSON(map[string]any{"candidates": []eventCandidate{c}})}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(map[string]any{"candidates": []eventCandidate{c}})}, nil
 	}
 	if strings.Contains(req.System, "世界剧情协调器") {
 		return (&plotTestGenerator{}).GenerateText(ctx, req)
@@ -97,7 +98,7 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 			host.Outcomes[0].Content = "你抵达设备检修间。"
 			host.SceneUpdates = []sceneUpdate{{Content: "你在设备检修间。", SourceIDs: []string{host.Outcomes[0].ActionID}, Recipients: []string{"player"}}}
 		}
-		return model.TextResponse{Text: marshalJSON(host)}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(host)}, nil
 	}
 	if strings.Contains(req.System, "玩家正文 Agent") && fail {
 		return model.TextResponse{}, errors.New("injected narration failure")
@@ -230,7 +231,7 @@ func TestGeneratedEventSettlementFailureIsAtomic(t *testing.T) {
 	g.mu.Unlock()
 	failed := generatedTurn(t, a, w, "finish-failed")
 	after := readContextSnapshot(t, a, w.WorldID)
-	if failed.Status != "failed" || marshalJSON(before.GeneratedEvents) != marshalJSON(after.GeneratedEvents) || before.Summary.Clock != after.Summary.Clock || before.Summary.EventHead != after.Summary.EventHead {
+	if failed.Status != "failed" || wire.MarshalJSON(before.GeneratedEvents) != wire.MarshalJSON(after.GeneratedEvents) || before.Summary.Clock != after.Summary.Clock || before.Summary.EventHead != after.Summary.EventHead {
 		t.Fatal("failed settlement changed committed story", failed.Status)
 	}
 	g.mu.Lock()
@@ -292,7 +293,7 @@ func TestGeneratedEventsCopyRestartCorrectionAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy := readContextSnapshot(t, a, op.TargetWorldID)
-	if marshalJSON(copy.GeneratedEvents) != marshalJSON(s.GeneratedEvents) {
+	if wire.MarshalJSON(copy.GeneratedEvents) != wire.MarshalJSON(s.GeneratedEvents) {
 		t.Fatal("copy omitted event state")
 	}
 	for i := 0; i < 3; i++ {

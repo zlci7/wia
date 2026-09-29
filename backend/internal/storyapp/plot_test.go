@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type plotTestGenerator struct {
@@ -79,7 +80,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 			}
 			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: status, Content: content, Recipients: []string{"player"}})
 		}
-		return model.TextResponse{Text: marshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	}
 	if strings.Contains(req.System, "世界剧情协调器") {
 		var node PlotNode
@@ -121,7 +122,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 			result.Projections = append(result.Projections, plotProjection{Recipient: "npc:mercenary", Content: "你所在位置能听见铃声。"})
 			result.DecisionRequests = []string{"npc:mercenary"}
 		}
-		return model.TextResponse{Text: marshalJSON(result)}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(result)}, nil
 	}
 	if strings.Contains(req.System, "世界剧情行动协调器") {
 		var records []Event
@@ -139,7 +140,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		for _, o := range outcomes {
 			updates = append(updates, sceneUpdate{Content: o.Content, SourceIDs: []string{o.ActionID}, Recipients: o.Recipients})
 		}
-		return model.TextResponse{Text: marshalJSON(map[string]any{"outcomes": outcomes, "scene_updates": updates})}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(map[string]any{"outcomes": outcomes, "scene_updates": updates})}, nil
 	}
 	if strings.Contains(req.System, "玩家正文 Agent") {
 		if g.failNarration {

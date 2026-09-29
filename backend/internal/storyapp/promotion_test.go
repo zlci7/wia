@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,17 +29,17 @@ func seedBystanderExperience(t *testing.T, a *App, worldID, bystanderID string, 
 		t.Fatal(err)
 	}
 	if _, err = store.db.Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,3,1,'action_succeeded',?)`,
-		seq, eventID, "player_action_result", "player", "", content, "run-bystander-"+strconv.Itoa(index), nowText()); err != nil {
+		seq, eventID, "player_action_result", "player", "", content, "run-bystander-"+strconv.Itoa(index), wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'action_succeeded',?,3,1,?)`,
-		bystanderID, eventID, content, nowText()); err != nil {
+		bystanderID, eventID, content, wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	// Only when the player received the same result is it player-visible.
 	if playerWitnessed {
 		if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('player',?,'action_succeeded',?,3,1,?)`,
-			eventID, content, nowText()); err != nil {
+			eventID, content, wire.NowText()); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type SuggestionBasis struct {
@@ -185,9 +186,9 @@ func (a *App) RequestSuggestions(ctx context.Context, worldID string, req Sugges
 		return set, ErrWorldBusy
 	}
 	w.cancelSuggestions()
-	set.ID = newID("suggestions")
+	set.ID = wire.NewID("suggestions")
 	set.Status = "generating"
-	if _, err := store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('suggestion_set',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, marshalJSON(set)); err != nil {
+	if _, err := store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('suggestion_set',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, wire.MarshalJSON(set)); err != nil {
 		return set, err
 	}
 	jobCtx, cancel := context.WithTimeout(a.copyCtx, 20*time.Second)
@@ -220,7 +221,7 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 		}
 		seen := map[string]bool{}
 		for i, item := range result.Items {
-			item = cleanText(item)
+			item = wire.Clean(item)
 			if item == "" || len([]rune(item)) > 120 || seen[item] {
 				return ErrInvalidRequest
 			}
@@ -263,7 +264,7 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 		set.Status = "failed"
 		set.Items = []string{}
 	}
-	_, _ = store.db.ExecContext(ctx, `UPDATE meta SET value=? WHERE key='suggestion_set'`, marshalJSON(set))
+	_, _ = store.db.ExecContext(ctx, `UPDATE meta SET value=? WHERE key='suggestion_set'`, wire.MarshalJSON(set))
 }
 
 // Called while the world's mutation gate is held; late responses lose publishing rights.

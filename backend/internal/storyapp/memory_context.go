@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type SubjectiveState struct {
@@ -146,7 +147,7 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 		}
 	}
 	material := contextMaterial{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + digestContext(previous) + "\n新增连续经历：\n" + memoryRecordsText(prefix), RequiredSources: allowed}
-	material.Required += "\nsource_ids 的完整合法记录ID列表：" + marshalJSON(allowed) + "\n本次列表仅含保留状态的必要来源与新增记录，完整历史覆盖仍由存档维护。每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
+	material.Required += "\nsource_ids 的完整合法记录ID列表：" + wire.MarshalJSON(allowed) + "\n本次列表仅含保留状态的必要来源与新增记录，完整历史覆盖仍由存档维护。每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
 	material.System += memoryCorrectionRule
 	call := a.contextGenerator(g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v3")
 	var result struct {
@@ -158,12 +159,12 @@ func (a *App) summarizeMemory(ctx context.Context, g model.TextGenerator, snapsh
 	if err := generateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "content", "states"); err != nil {
 		return d, err
 	}
-	if cleanText(result.Content) == "" || result.States == nil {
+	if wire.Clean(result.Content) == "" || result.States == nil {
 		a.logMemoryValidation(snapshot.Summary.WorldID, scope, "required_fields")
 		return d, ErrGenerationFailed
 	}
 	for _, state := range result.States {
-		if !containsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || cleanText(state.Content) == "" || len(state.Sources) == 0 {
+		if !containsID([]string{"belief", "relationship", "concern", "commitment"}, state.Kind) || wire.Clean(state.Content) == "" || len(state.Sources) == 0 {
 			a.logMemoryValidation(snapshot.Summary.WorldID, scope, "state_fields")
 			return d, ErrGenerationFailed
 		}
@@ -206,7 +207,7 @@ func publishDigest(ctx context.Context, store *worldStore, d MemoryDigest, previ
 	if revision != previous || head != d.Head || head < d.Through {
 		return ErrVersionConflict
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO memory_digests(scope,revision,epoch,through_seq,source_head,content,states,sources,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, d.Scope, d.Revision, d.Epoch, d.Through, head, d.Content, marshalJSON(d.States), marshalJSON(d.Sources), time.Now().UTC().Format(time.RFC3339Nano))
+	_, err = tx.ExecContext(ctx, `INSERT INTO memory_digests(scope,revision,epoch,through_seq,source_head,content,states,sources,created_at) VALUES(?,?,?,?,?,?,?,?,?)`, d.Scope, d.Revision, d.Epoch, d.Through, head, d.Content, wire.MarshalJSON(d.States), wire.MarshalJSON(d.Sources), time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return err
 	}
@@ -482,7 +483,7 @@ func flattenGroups(groups [][]MemorySource) []MemorySource {
 const memoryCorrectionRule = "\n记录类型 correction:* 是对本人资料已经生效的纠正，优先于此前关于同一内容的解释、回忆或自己的旧对白。保留曾经说过旧话这一历史，但后续判断使用纠正后的内容；纠正本身不是故事里新发生的对话，也不授予其他人物这些知识。"
 
 func digestContext(d MemoryDigest) string {
-	return marshalJSON(struct {
+	return wire.MarshalJSON(struct {
 		Scope   string            `json:"scope"`
 		Through int64             `json:"through_seq"`
 		Content string            `json:"content"`

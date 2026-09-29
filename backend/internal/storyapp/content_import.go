@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"io"
 	"os"
 	"path"
@@ -95,7 +96,7 @@ func (a *App) PreviewContentImport(ctx context.Context, projectID, fileName stri
 	}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_drafts(user_id,draft_id,project_id,base_revision,version,status,payload_json,source_json,created_at,updated_at)
 		VALUES(?,?,?,'',1,?,?,?,?,?)`,
-		a.userID, draft.DraftID, project.ProjectID, draftStatusPreview, string(payload), string(source), nowText(), nowText()); err != nil {
+		a.userID, draft.DraftID, project.ProjectID, draftStatusPreview, string(payload), string(source), wire.NowText(), wire.NowText()); err != nil {
 		return ImportPreview{}, err
 	}
 	return ImportPreview{DraftID: draft.DraftID, Version: 1, Project: project.ProjectID, Report: report}, nil
@@ -137,7 +138,7 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey stri
 		}
 	}
 	result, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET status=?,version=version+1,confirmation_key=?,updated_at=? WHERE user_id=? AND draft_id=? AND status=? AND version=?`,
-		draftStatusEditing, requestKey, nowText(), a.userID, draft.DraftID, draftStatusPreview, draft.Version)
+		draftStatusEditing, requestKey, wire.NowText(), a.userID, draft.DraftID, draftStatusPreview, draft.Version)
 	if err != nil {
 		return ContentDraft{}, err
 	}
@@ -226,7 +227,7 @@ func (a *App) importPlainText(project ContentProject, fileName string, body []by
 		Unsupported:  []string{"HTML、脚本、远程图片与链接命令不会被执行"},
 		NeedsConfirm: []string{"背景之外的内容只作候选，需要作者确认"},
 	}
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: wire.NewID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: wire.NowText()}, Payload: payload}, report, nil, nil
 }
 
 // ---- WIA package -------------------------------------------------------------
@@ -284,7 +285,7 @@ func (a *App) importWIAPackage(ctx context.Context, project ContentProject, body
 		report.Mappings = append(report.Mappings, ImportMapping{Field: "bystanders", Source: "story.json", Target: "路人稳定身份", Confidence: "high"})
 	}
 	_ = ctx
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, pack.Assets, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: wire.NewID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: wire.NowText()}, Payload: payload}, report, pack.Assets, nil
 }
 
 // readPackageZip reads a package archive with hard limits and no path escapes.
@@ -438,7 +439,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	if unsupported := unsupportedMacros(map[string]string{"{{char}}": card.Data.Name, "{{user}}": payload.Player.Name}, []byte(strings.Join(append([]string{profile, npc.Knowledge}, npc.SpeakingExamples...), "\n"))); len(unsupported) > 0 {
 		report.Unsupported = append(report.Unsupported, "未支持的宏保持原文："+strings.Join(unsupported, ", "))
 	}
-	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: newID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: nowText()}, Payload: payload}, report, nil, nil
+	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: wire.NewID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: wire.NowText()}, Payload: payload}, report, nil, nil
 }
 
 // ---- export ------------------------------------------------------------------

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 	"os"
 	"strings"
 	"sync"
@@ -121,7 +122,7 @@ func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := readContextSnapshot(t, a, w.WorldID)
-	if marshalJSON(before.Messages) != marshalJSON(after.Messages) {
+	if wire.MarshalJSON(before.Messages) != wire.MarshalJSON(after.Messages) {
 		t.Fatal("rewrote original narration")
 	}
 	own, err := a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", true, 0)
@@ -132,10 +133,10 @@ func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(marshalJSON(other), "青鹭") || strings.Contains(marshalJSON(other), "白鹭") {
+	if strings.Contains(wire.MarshalJSON(other), "青鹭") || strings.Contains(wire.MarshalJSON(other), "白鹭") {
 		t.Fatal("event correction leaked private text")
 	}
-	if !strings.Contains(marshalJSON(own), "青鹭") {
+	if !strings.Contains(wire.MarshalJSON(own), "青鹭") {
 		t.Fatal("authorized full projection did not update")
 	}
 	if _, err = a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", false, 0); !errors.Is(err, ErrInvalidRequest) {
@@ -149,7 +150,7 @@ func TestCorrectionVersionScopeAndImmutableHistory(t *testing.T) {
 	}
 	waitMemory(t, a, w.WorldID)
 	own, err = a.ReadMemory(ctx, w.WorldID, "npc:innkeeper", true, 0)
-	if err != nil || !strings.Contains(marshalJSON(own), "玄鹭") {
+	if err != nil || !strings.Contains(wire.MarshalJSON(own), "玄鹭") {
 		t.Fatal("second revision failed", err)
 	}
 }
@@ -226,7 +227,7 @@ func TestCorrectionNoticesStayScopedAndRecent(t *testing.T) {
 		t.Fatal(v, err)
 	}
 	v, err = a.ReadMemory(ctx, w.WorldID, "npc:mercenary", true, 0)
-	if err != nil || strings.Contains(marshalJSON(v), "柜台归还") {
+	if err != nil || strings.Contains(wire.MarshalJSON(v), "柜台归还") {
 		t.Fatal("personal correction leaked", err)
 	}
 }

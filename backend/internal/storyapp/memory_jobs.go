@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 )
 
 func readMemoryJob(ctx context.Context, db *sql.DB) (MemoryJob, error) {
@@ -91,7 +92,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		return true, err
 	}
 	if job.Completed >= len(job.Scopes) {
-		_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, nowText(), job.Epoch)
+		_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
 		store.db.Close()
 		world.mu.Unlock()
 		return true, err
@@ -109,7 +110,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		world.mu.Unlock()
 		return true, err
 	}
-	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, nowText(), job.Epoch)
+	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
 	store.db.Close()
 	world.mu.Unlock()
 	if err != nil {
@@ -210,7 +211,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if completed == len(job.Scopes) {
 		status = "completed"
 	}
-	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status=?,completed=?,updated_at=? WHERE epoch=?`, status, completed, nowText(), job.Epoch)
+	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status=?,completed=?,updated_at=? WHERE epoch=?`, status, completed, wire.NowText(), job.Epoch)
 	return status == "completed", err
 }
 
@@ -218,7 +219,7 @@ func failMemoryJob(ctx context.Context, db *sql.DB, epoch int64, cause error) er
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	_, err := db.ExecContext(ctx, `UPDATE memory_jobs SET status='failed',error=?,updated_at=? WHERE epoch=? AND status IN ('queued','running')`, safeTurnErrorCode(cause), nowText(), epoch)
+	_, err := db.ExecContext(ctx, `UPDATE memory_jobs SET status='failed',error=?,updated_at=? WHERE epoch=? AND status IN ('queued','running')`, safeTurnErrorCode(cause), wire.NowText(), epoch)
 	return err
 }
 

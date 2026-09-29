@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type waitResultGenerator struct{ host hostResult }
 
 func (g waitResultGenerator) GenerateText(context.Context, model.TextRequest) (model.TextResponse, error) {
-	return model.TextResponse{Text: marshalJSON(g.host)}, nil
+	return model.TextResponse{Text: wire.MarshalJSON(g.host)}, nil
 }
 
 type overflowingWaitGenerator struct{ base actionConsistencyGenerator }
@@ -31,7 +32,7 @@ func (g overflowingWaitGenerator) GenerateText(ctx context.Context, req model.Te
 			return model.TextResponse{}, err
 		}
 		host.TimeMinutes = 30
-		return model.TextResponse{Text: marshalJSON(host)}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(host)}, nil
 	}
 	return g.base.GenerateText(ctx, req)
 }
@@ -53,7 +54,7 @@ func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 		t.Fatal(done)
 	}
 	after := readContextSnapshot(t, app, w.WorldID)
-	if before.Summary.Clock != after.Summary.Clock || before.Summary.EventHead != after.Summary.EventHead || marshalJSON(before.Messages) != marshalJSON(after.Messages) {
+	if before.Summary.Clock != after.Summary.Clock || before.Summary.EventHead != after.Summary.EventHead || wire.MarshalJSON(before.Messages) != wire.MarshalJSON(after.Messages) {
 		t.Fatal("failed wait partially committed")
 	}
 }

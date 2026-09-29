@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"gameagent/backend/internal/wire"
 	_ "modernc.org/sqlite"
 )
 
@@ -296,8 +297,6 @@ func ensureWorldSchema(db *sql.DB) error {
 	return nil
 }
 
-func nowText() string { return time.Now().UTC().Format(time.RFC3339Nano) }
-
 func metaGet(ctx context.Context, db *sql.DB, key string) (string, error) {
 	var value string
 	err := db.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, key).Scan(&value)
@@ -331,7 +330,7 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 	if mode != "open" && mode != "guided" {
 		return ErrInvalidRequest
 	}
-	now := nowText()
+	now := wire.NowText()
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -343,7 +342,7 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		"turn_seq": "0", "message_head": "1", "event_head": "0", "context_epoch": "1",
 		"scene_version": "1", "scene": def.Scene, "scene_location": def.InitialLocation, "clock": def.Clock,
 		"player_name": playerName, "player_profile": playerProfile, "status": "ready",
-		"generation": "1", "plot_status": "active", "bystanders": marshalJSON(def.Bystanders),
+		"generation": "1", "plot_status": "active", "bystanders": wire.MarshalJSON(def.Bystanders),
 		"narrative_perspective": PerspectiveSecondPerson, "narrative_length": NarrativeLengthStandard,
 		"narrative_detail": NarrativeDetailBalanced, "narrative_custom_instruction": "",
 		"player_elaboration": PlayerElaborationNatural, "npc_initiative": NPCInitiativeContextual,
@@ -354,10 +353,10 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 	}
 	values["narrative_perspective"], values["narrative_length"], values["narrative_detail"] = settings.Perspective, settings.Length, settings.Detail
 	values["player_elaboration"], values["npc_initiative"] = settings.PlayerElaboration, settings.NPCInitiative
-	values["behavior_policies"] = marshalJSON(settings.Policies)
+	values["behavior_policies"] = wire.MarshalJSON(settings.Policies)
 	values["narrative_custom_instruction"] = settings.CustomInstruction
 	values["settings_origin"] = def.SettingsSource
-	values["definition_snapshot"] = marshalJSON(def)
+	values["definition_snapshot"] = wire.MarshalJSON(def)
 	for key, value := range values {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, key, value); err != nil {
 			return err
@@ -368,10 +367,10 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		if err := validatePlot(*def.Plot, state); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "plot_definition", marshalJSON(def.Plot)); err != nil {
+		if err := metaSetTx(ctx, tx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "plot_progress", marshalJSON(state)); err != nil {
+		if err := metaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(state)); err != nil {
 			return err
 		}
 	}
@@ -385,7 +384,7 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		if err := metaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`, c.EntityID, c.DefinitionID, c.Name, c.Role, c.Profile, c.Knowledge, boolInt(c.InScene)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`, c.EntityID, c.DefinitionID, c.Name, c.Role, c.Profile, c.Knowledge, wire.BoolInt(c.InScene)); err != nil {
 			return err
 		}
 	}
@@ -399,13 +398,6 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		return err
 	}
 	return tx.Commit()
-}
-
-func boolInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
 }
 
 func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (worldSnapshot, error) {
@@ -700,7 +692,7 @@ func readRunByRequest(ctx context.Context, db *sql.DB, key string) (Run, bool, e
 }
 
 func updateRunStatus(ctx context.Context, db *sql.DB, runID, status, reason, errorText string) error {
-	_, err := db.ExecContext(ctx, `UPDATE runs SET status=?,reason=?,error=?,updated_at=? WHERE run_id=?`, status, reason, errorText, nowText(), runID)
+	_, err := db.ExecContext(ctx, `UPDATE runs SET status=?,reason=?,error=?,updated_at=? WHERE run_id=?`, status, reason, errorText, wire.NowText(), runID)
 	return err
 }
 
@@ -777,12 +769,12 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 	}
 	messageHead++
 	inputID := run.RunID + ":input"
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, inputID, "player", run.Input, run.RunID, nowText()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, inputID, "player", run.Input, run.RunID, wire.NowText()); err != nil {
 		return 0, err
 	}
 	messageHead++
 	messageID := run.RunID + ":narrative"
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, messageID, "narrative", narrative, run.RunID, nowText()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, messageID, "narrative", narrative, run.RunID, wire.NowText()); err != nil {
 		return 0, err
 	}
 	turnSeq++
@@ -799,12 +791,12 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 		return 0, err
 	}
 	if plotState != nil {
-		if err := metaSetTx(ctx, tx, "plot_progress", marshalJSON(plotState)); err != nil {
+		if err := metaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
 			return 0, err
 		}
 	}
 	if len(generated) > 0 && generated[0] != nil {
-		if err := metaSetTx(ctx, tx, "generated_events", marshalJSON(generated[0])); err != nil {
+		if err := metaSetTx(ctx, tx, "generated_events", wire.MarshalJSON(generated[0])); err != nil {
 			return 0, err
 		}
 	}
@@ -844,10 +836,10 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 			return 0, ErrGenerationFailed
 		}
 	}
-	if err := metaSetTx(ctx, tx, "updated_at", nowText()); err != nil {
+	if err := metaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
 		return 0, err
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE runs SET status='completed',reason='',error='',message_seq=?,updated_at=? WHERE run_id=? AND status='running' AND cancel_requested=0`, messageHead, nowText(), run.RunID)
+	result, err := tx.ExecContext(ctx, `UPDATE runs SET status='completed',reason='',error='',message_seq=?,updated_at=? WHERE run_id=? AND status='running' AND cancel_requested=0`, messageHead, wire.NowText(), run.RunID)
 	if err != nil {
 		return 0, err
 	}
@@ -864,7 +856,7 @@ func commitTurn(ctx context.Context, store *worldStore, run Run, narrative strin
 }
 
 func markRunInterrupted(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `UPDATE runs SET status='interrupted',reason='process_restarted',error='the previous process stopped before completion',updated_at=? WHERE status IN ('accepted','running')`, nowText())
+	_, err := db.ExecContext(ctx, `UPDATE runs SET status='interrupted',reason='process_restarted',error='the previous process stopped before completion',updated_at=? WHERE status IN ('accepted','running')`, wire.NowText())
 	return err
 }
 
@@ -902,5 +894,3 @@ func cloneWorld(ctx context.Context, source *worldStore, targetPath, targetWorld
 	}
 	return nil
 }
-
-func marshalJSON(value any) string { data, _ := json.Marshal(value); return string(data) }

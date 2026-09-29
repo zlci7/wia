@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"sort"
@@ -62,7 +63,7 @@ type publishPlan struct {
 // conflicts; the same key while the original request is still running returns that
 // live operation instead of treating it as a crash to recover.
 func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (ContentOperation, error) {
-	if cleanText(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedDraftVersion < 1 {
+	if wire.Clean(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedDraftVersion < 1 {
 		return ContentOperation{}, ErrInvalidRequest
 	}
 	if live, ok := a.liveOperation(request.RequestKey); ok {
@@ -154,13 +155,13 @@ func (a *App) startPublish(ctx context.Context, request PublishRequest, draft Co
 	if existing, found, err := a.existingRevision(ctx, revision); err != nil {
 		return ContentOperation{}, err
 	} else if found {
-		operation := ContentOperation{OperationID: newID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishReady, Status: "succeeded"}
+		operation := ContentOperation{OperationID: wire.NewID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishReady, Status: "succeeded"}
 		if err = a.registerRevision(ctx, request.RequestKey, hash, operation, project, existing.Revision, existing.Digest, existing.Path); err != nil {
 			return ContentOperation{}, err
 		}
 		return operation, nil
 	}
-	operation := ContentOperation{OperationID: newID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishPrepared, Status: "running"}
+	operation := ContentOperation{OperationID: wire.NewID("publish"), Kind: "publish", TargetID: draft.DraftID, Stage: publishPrepared, Status: "running"}
 	plan := publishPlan{
 		GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version,
 		Revision: revision, FinalPath: filepath.Join(a.contentRoot(), project.GameID, revision),
@@ -269,11 +270,11 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO content_revisions(user_id,game_id,revision,digest,path,status,created_at) VALUES(?,?,?,?,?,?,?)
 		ON CONFLICT(user_id,game_id,revision) DO UPDATE SET digest=excluded.digest,path=excluded.path,status=excluded.status`,
-		a.userID, project.GameID, revision, digest, path, publishReady, nowText()); err != nil {
+		a.userID, project.GameID, revision, digest, path, publishReady, wire.NowText()); err != nil {
 		return ContentOperation{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE content_projects SET current_revision=?,version=version+1,updated_at=? WHERE user_id=? AND project_id=?`,
-		revision, nowText(), a.userID, project.ProjectID); err != nil {
+		revision, wire.NowText(), a.userID, project.ProjectID); err != nil {
 		return ContentOperation{}, err
 	}
 	operation.Stage, operation.Status = publishReady, "succeeded"
@@ -285,11 +286,11 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 	// updates the row that recorded it. Inserting under an empty request key would leave
 	// the original key stuck in `running` and make a retry look like a conflict.
 	if _, err = tx.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,result_json=?,safe_error='',updated_at=? WHERE user_id=? AND operation_id=?`,
-		operation.Stage, operation.Status, string(body), nowText(), a.userID, operation.OperationID); err != nil {
+		operation.Stage, operation.Status, string(body), wire.NowText(), a.userID, operation.OperationID); err != nil {
 		return ContentOperation{}, err
 	}
 	if requestKey != "" {
-		if _, err = tx.ExecContext(ctx, `UPDATE content_operations SET request_hash=?,updated_at=? WHERE user_id=? AND request_key=?`, hash, nowText(), a.userID, requestKey); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE content_operations SET request_hash=?,updated_at=? WHERE user_id=? AND request_key=?`, hash, wire.NowText(), a.userID, requestKey); err != nil {
 			return ContentOperation{}, err
 		}
 	}
@@ -373,7 +374,7 @@ func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (Co
 // writeContentOperationPlanDigest updates only the frozen plan, keeping the operation's
 // recorded request identity untouched.
 func (a *App) writeContentOperationPlanDigest(ctx context.Context, operationID, plan string) error {
-	_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET plan_json=?,updated_at=? WHERE user_id=? AND operation_id=?`, plan, nowText(), a.userID, operationID)
+	_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET plan_json=?,updated_at=? WHERE user_id=? AND operation_id=?`, plan, wire.NowText(), a.userID, operationID)
 	return err
 }
 
@@ -542,7 +543,7 @@ func newContentRevision(story StoryPack, npcs map[string]PackNPC, assets map[str
 		return "", err
 	}
 	sum := sha256.Sum256(canonical)
-	revision := "r-" + nowText()[:10] + "-" + hex.EncodeToString(sum[:])[:8]
+	revision := "r-" + wire.NowText()[:10] + "-" + hex.EncodeToString(sum[:])[:8]
 	if !packID.MatchString(revision) {
 		return "", fmt.Errorf("%w: revision identity", ErrContentInvalid)
 	}
@@ -554,7 +555,7 @@ func referencedAssets(payload ContentDraftPayload) []string {
 	seen := map[string]bool{}
 	out := []string{}
 	add := func(path string) {
-		path = cleanText(path)
+		path = wire.Clean(path)
 		if path == "" || seen[path] {
 			return
 		}
@@ -621,19 +622,19 @@ func (a *App) readContentOperation(ctx context.Context, requestKey string) (Cont
 func (a *App) writeContentOperation(ctx context.Context, requestKey, hash string, operation ContentOperation, safeError string) error {
 	if requestKey == "" {
 		_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,safe_error=?,updated_at=? WHERE user_id=? AND operation_id=?`,
-			operation.Stage, operation.Status, safeError, nowText(), a.userID, operation.OperationID)
+			operation.Stage, operation.Status, safeError, wire.NowText(), a.userID, operation.OperationID)
 		return err
 	}
 	_, err := a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,created_at,updated_at)
 		VALUES(?,?,?,?,?,?,?,?,'',?,?,?) ON CONFLICT(user_id,request_key) DO UPDATE SET stage=excluded.stage,status=excluded.status,safe_error=excluded.safe_error,updated_at=excluded.updated_at`,
-		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, safeError, nowText(), nowText())
+		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, safeError, wire.NowText(), wire.NowText())
 	if err != nil {
 		return err
 	}
 	// An operation can also be addressed by its own id, which is how recovery
 	// finishes bookkeeping without the original request key.
 	_, err = a.appDB.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,safe_error=?,updated_at=? WHERE user_id=? AND operation_id=?`,
-		operation.Stage, operation.Status, safeError, nowText(), a.userID, operation.OperationID)
+		operation.Stage, operation.Status, safeError, wire.NowText(), a.userID, operation.OperationID)
 	return err
 }
 
@@ -642,7 +643,7 @@ func (a *App) writeContentOperation(ctx context.Context, requestKey, hash string
 func (a *App) writeContentOperationPlan(ctx context.Context, requestKey, hash string, operation ContentOperation, plan string) error {
 	_, err := a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,plan_json,created_at,updated_at)
 		VALUES(?,?,?,?,?,?,?,?,'','',?,?,?) ON CONFLICT(user_id,request_key) DO UPDATE SET stage=excluded.stage,status=excluded.status,plan_json=excluded.plan_json,updated_at=excluded.updated_at`,
-		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, plan, nowText(), nowText())
+		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, plan, wire.NowText(), wire.NowText())
 	return err
 }
 

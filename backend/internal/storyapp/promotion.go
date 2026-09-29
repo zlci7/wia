@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
 )
@@ -109,8 +110,8 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 // PromoteCharacter turns one passers-by into an important character in a single world
 // transaction: identity, chosen experience, scene membership and epoch move together.
 func (a *App) PromoteCharacter(ctx context.Context, worldID string, request PromotionRequest) (Character, error) {
-	request.BystanderID = cleanText(request.BystanderID)
-	if cleanText(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedContextEpoch < 1 || request.BystanderID == "" {
+	request.BystanderID = wire.Clean(request.BystanderID)
+	if wire.Clean(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedContextEpoch < 1 || request.BystanderID == "" {
 		return Character{}, ErrInvalidRequest
 	}
 	draft, err := validatePromotionDraft(request.Draft)
@@ -224,19 +225,19 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`,
-		entityID, definitionID, bystander.Name, draft.Role, draft.Profile, draft.Knowledge, boolInt(bystanderInScene(snapshot, bystander))); err != nil {
+		entityID, definitionID, bystander.Name, draft.Role, draft.Profile, draft.Knowledge, wire.BoolInt(bystanderInScene(snapshot, bystander))); err != nil {
 		return Character{}, err
 	}
 	// The origin record states what the character came from and which of the person's
 	// own experiences were carried over.
 	for _, origin := range selected {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
-			entityID, "bystander_experience", origin, nowText()); err != nil {
+			entityID, "bystander_experience", origin, wire.NowText()); err != nil {
 			return Character{}, err
 		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO character_origins(entity_id,source_kind,source_id,created_at) VALUES(?,?,?,?)`,
-		entityID, "bystander", bystander.BystanderID, nowText()); err != nil {
+		entityID, "bystander", bystander.BystanderID, wire.NowText()); err != nil {
 		return Character{}, err
 	}
 	for key, value := range map[string]string{
@@ -280,13 +281,13 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		nextSceneVersion++
 		views = append(views, SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
 	}
-	if err = metaSetTx(ctx, tx, "scene_views", marshalJSON(views)); err != nil {
+	if err = metaSetTx(ctx, tx, "scene_views", wire.MarshalJSON(views)); err != nil {
 		return Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(nextSceneVersion, 10)); err != nil {
 		return Character{}, err
 	}
-	remarks := marshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
+	remarks := wire.MarshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "promotion:"+entityID, remarks); err != nil {
 		return Character{}, err
 	}
@@ -300,16 +301,16 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		remaining = append(remaining, item)
 		names = append(names, item.Name)
 	}
-	if err = metaSetTx(ctx, tx, "bystander_refs", marshalJSON(remaining)); err != nil {
+	if err = metaSetTx(ctx, tx, "bystander_refs", wire.MarshalJSON(remaining)); err != nil {
 		return Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "bystanders", marshalJSON(names)); err != nil {
+	if err = metaSetTx(ctx, tx, "bystanders", wire.MarshalJSON(names)); err != nil {
 		return Character{}, err
 	}
 	if err = metaSetTx(ctx, tx, "context_epoch", strconv.FormatInt(currentEpoch+1, 10)); err != nil {
 		return Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "updated_at", nowText()); err != nil {
+	if err = metaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
 		return Character{}, err
 	}
 	// Derived optional material built on the previous roster is no longer a basis.
@@ -323,11 +324,11 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 }
 
 func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
-	draft.Role = cleanText(draft.Role)
-	draft.Appearance = cleanText(draft.Appearance)
-	draft.Profile = cleanText(draft.Profile)
-	draft.Knowledge = cleanText(draft.Knowledge)
-	draft.InitialConcerns = cleanText(draft.InitialConcerns)
+	draft.Role = wire.Clean(draft.Role)
+	draft.Appearance = wire.Clean(draft.Appearance)
+	draft.Profile = wire.Clean(draft.Profile)
+	draft.Knowledge = wire.Clean(draft.Knowledge)
+	draft.InitialConcerns = wire.Clean(draft.InitialConcerns)
 	if draft.Role == "" {
 		draft.Role = "背景人物"
 	}
@@ -339,7 +340,7 @@ func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
 	}
 	examples := []string{}
 	for _, line := range draft.SpeakingExamples {
-		line = cleanText(line)
+		line = wire.Clean(line)
 		if line == "" {
 			continue
 		}
@@ -412,7 +413,7 @@ func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSna
 func normalizedSourceIDs(ids []string) []string {
 	out := []string{}
 	for _, id := range ids {
-		if trimmed := cleanText(id); trimmed != "" {
+		if trimmed := wire.Clean(id); trimmed != "" {
 			out = append(out, trimmed)
 		}
 	}
@@ -463,7 +464,7 @@ func readCharacterOrigins(ctx context.Context, db *sql.DB, entityID string) ([]P
 }
 
 func bystanderByID(items []PackBystander, id string) (PackBystander, bool) {
-	id = cleanText(id)
+	id = wire.Clean(id)
 	for _, item := range items {
 		if item.BystanderID == id {
 			return item, true
@@ -536,7 +537,7 @@ func locationIDFor(definition gameDefinition, scene string) string {
 // A passer-by id may contain revision punctuation, so the result is reduced to the
 // identifier shape the rest of the runtime accepts.
 func promotionIdentity(bystander PackBystander, definition gameDefinition) (string, string) {
-	source := cleanText(bystander.BystanderID)
+	source := wire.Clean(bystander.BystanderID)
 	if source == "" {
 		source = bystander.Name
 	}

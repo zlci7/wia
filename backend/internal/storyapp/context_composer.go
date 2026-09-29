@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/tokenestimate"
+	"gameagent/backend/internal/wire"
 )
 
 type contextSection struct {
@@ -269,7 +270,7 @@ func dialogueSections(snapshot worldSnapshot) []contextSection {
 func narrativeSections(messages []Message) []contextSection {
 	var sections []contextSection
 	for _, message := range messages {
-		if message.Kind == "narrative" && cleanText(message.Content) != "" {
+		if message.Kind == "narrative" && wire.Clean(message.Content) != "" {
 			sections = append(sections, contextSection{Name: "player_history", Text: "玩家可见历史正文（表现参考，不是本轮事实）：" + message.Content, Sources: []string{message.MessageID}})
 		}
 	}

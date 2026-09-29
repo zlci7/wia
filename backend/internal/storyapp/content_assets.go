@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -46,7 +47,7 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 	if err != nil {
 		return ContentDraftAsset{}, err
 	}
-	relativeName = cleanText(relativeName)
+	relativeName = wire.Clean(relativeName)
 	if !strings.HasPrefix(relativeName, "assets/") || strings.Contains(relativeName, "\\") || strings.Contains(relativeName, "..") || len(relativeName) > 240 {
 		return ContentDraftAsset{}, fmt.Errorf("%w: asset path", ErrContentInvalid)
 	}
@@ -80,7 +81,7 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return ContentDraftAsset{}, err
 	}
-	asset := ContentDraftAsset{AssetID: newID("asset"), RelativeName: relativeName, MediaType: mediaType, ByteSize: int64(len(body)), Width: config.Width, Height: config.Height}
+	asset := ContentDraftAsset{AssetID: wire.NewID("asset"), RelativeName: relativeName, MediaType: mediaType, ByteSize: int64(len(body)), Width: config.Width, Height: config.Height}
 	if previousID != "" {
 		asset.AssetID = previousID
 	}
@@ -90,7 +91,7 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 	}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
 		VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,draft_id,asset_id) DO UPDATE SET relative_name=excluded.relative_name,media_type=excluded.media_type,byte_size=excluded.byte_size,width=excluded.width,height=excluded.height,digest=excluded.digest,staged_path=excluded.staged_path`,
-		a.userID, draft.DraftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, nowText()); err != nil {
+		a.userID, draft.DraftID, asset.AssetID, asset.RelativeName, asset.MediaType, asset.ByteSize, asset.Width, asset.Height, assetDigest(body), staged, wire.NowText()); err != nil {
 		_ = os.Remove(staged)
 		return ContentDraftAsset{}, err
 	}

@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		text := marshalJSON(m)
+		text := wire.MarshalJSON(m)
 		if m.Digest.Content == "旧铃声回顾" {
 			t.Fatal("covered digest not invalidated")
 		}
@@ -72,7 +73,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 			t.Fatal("effective projection survived", e)
 		}
 	}
-	if marshalJSON(before.Messages) != marshalJSON(after.Messages) {
+	if wire.MarshalJSON(before.Messages) != wire.MarshalJSON(after.Messages) {
 		t.Fatal("history rewritten")
 	}
 	store, err = openWorldDB(path)
@@ -118,7 +119,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 			t.Fatal("copy/restart lost scene correction")
 		}
 		m, err := reopened.ReadMemory(ctx, id, "npc:mercenary", true, 0)
-		if err != nil || strings.Contains(marshalJSON(m), "你所在位置能听见铃声") {
+		if err != nil || strings.Contains(wire.MarshalJSON(m), "你所在位置能听见铃声") {
 			t.Fatal("copy/restart lost projection correction", err)
 		}
 	}

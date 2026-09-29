@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,7 @@ func (a *App) ActivateWorld(ctx context.Context, worldID string, expectedRevisio
 	a.activationMu.Lock()
 	defer a.activationMu.Unlock()
 	if requestKey == "" {
-		requestKey = newID("activate")
+		requestKey = wire.NewID("activate")
 	}
 	requestHash := a.activationHash(worldID, expectedRevision)
 	var existingHash, existingStatus string
@@ -41,15 +42,15 @@ func (a *App) ActivateWorld(ctx context.Context, worldID string, expectedRevisio
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return Status{}, err
 	}
-	now := nowText()
-	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO activation_operations(operation_id,request_key,user_id,game_id,target_world_id,expected_revision,request_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, newID("activation"), requestKey, a.userID, gameID, worldID, expectedRevision, requestHash, "accepted", now, now); err != nil {
+	now := wire.NowText()
+	if _, err := a.appDB.ExecContext(ctx, `INSERT INTO activation_operations(operation_id,request_key,user_id,game_id,target_world_id,expected_revision,request_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`, wire.NewID("activation"), requestKey, a.userID, gameID, worldID, expectedRevision, requestHash, "accepted", now, now); err != nil {
 		return Status{}, err
 	}
 	if err := a.activate(ctx, worldID, expectedRevision); err != nil {
 		_, _ = a.appDB.ExecContext(ctx, `DELETE FROM activation_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey)
 		return Status{}, err
 	}
-	if _, err := a.appDB.ExecContext(ctx, `UPDATE activation_operations SET status='completed',updated_at=? WHERE user_id=? AND request_key=?`, nowText(), a.userID, requestKey); err != nil {
+	if _, err := a.appDB.ExecContext(ctx, `UPDATE activation_operations SET status='completed',updated_at=? WHERE user_id=? AND request_key=?`, wire.NowText(), a.userID, requestKey); err != nil {
 		return Status{}, err
 	}
 	return a.Status(ctx)
@@ -98,7 +99,7 @@ func (a *App) cancelWorldRuns(ctx context.Context, worldID string) {
 	path, _, err := a.worldRecord(ctx, worldID)
 	if err == nil {
 		if store, e := openWorldDB(path); e == nil {
-			_, _ = store.db.ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE status IN ('accepted','running')`, nowText())
+			_, _ = store.db.ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE status IN ('accepted','running')`, wire.NowText())
 			_ = store.db.Close()
 		}
 	}
@@ -122,7 +123,7 @@ func (a *App) cancelWorldRuns(ctx context.Context, worldID string) {
 }
 
 func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string, expectedRevision int64) (SaveOperation, error) {
-	name = cleanText(name)
+	name = wire.Clean(name)
 	if name == "" {
 		name = "故事分支"
 	}
@@ -184,8 +185,8 @@ func (a *App) SaveAs(ctx context.Context, sourceWorldID, name, requestKey string
 		world.mu.Unlock()
 		return SaveOperation{}, checkErr
 	}
-	targetID := newID("world")
-	operation = SaveOperation{OperationID: newID("copy"), RequestKey: requestKey, SourceWorldID: sourceWorldID, TargetWorldID: targetID, TargetName: name, Status: "copying", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	targetID := wire.NewID("world")
+	operation = SaveOperation{OperationID: wire.NewID("copy"), RequestKey: requestKey, SourceWorldID: sourceWorldID, TargetWorldID: targetID, TargetName: name, Status: "copying", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	gameID, err := a.worldGame(ctx, sourceWorldID)
 	if err != nil {
 		world.mu.Unlock()
@@ -344,7 +345,7 @@ func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, so
 	if err := copyWorldCover(source.path, targetPath); err != nil {
 		return err
 	}
-	now := nowText()
+	now := wire.NowText()
 	tx, err := a.appDB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -375,10 +376,10 @@ func (a *App) performCopyLocked(ctx context.Context, operation SaveOperation, so
 
 func (a *App) failCopy(ctx context.Context, operation SaveOperation, err error) (SaveOperation, error) {
 	message := err.Error()
-	if _, e := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, message, nowText(), a.userID, operation.OperationID); e != nil {
+	if _, e := a.appDB.ExecContext(ctx, `UPDATE copy_operations SET status='failed',error=?,updated_at=? WHERE user_id=? AND operation_id=?`, message, wire.NowText(), a.userID, operation.OperationID); e != nil {
 		return SaveOperation{}, e
 	}
-	if _, e := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, nowText(), a.userID, operation.TargetWorldID); e != nil {
+	if _, e := a.appDB.ExecContext(ctx, `UPDATE worlds SET status='failed',updated_at=? WHERE user_id=? AND world_id=?`, wire.NowText(), a.userID, operation.TargetWorldID); e != nil {
 		return SaveOperation{}, e
 	}
 	operation.Status = "failed"
@@ -458,7 +459,7 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 		return err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE worlds SET status='deleting',updated_at=? WHERE user_id=? AND world_id=? AND status='ready'`, nowText(), a.userID, worldID)
+	result, err := tx.ExecContext(ctx, `UPDATE worlds SET status='deleting',updated_at=? WHERE user_id=? AND world_id=? AND status='ready'`, wire.NowText(), a.userID, worldID)
 	if err != nil {
 		return err
 	}
@@ -486,7 +487,7 @@ func (a *App) DeleteWorld(ctx context.Context, worldID string, expectedRevision 
 
 	world.cancelSuggestions()
 	if err := os.RemoveAll(filepath.Dir(path)); err != nil {
-		_, _ = a.appDB.ExecContext(context.Background(), `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND world_id=? AND status='deleting'`, nowText(), a.userID, worldID)
+		_, _ = a.appDB.ExecContext(context.Background(), `UPDATE worlds SET status='ready',updated_at=? WHERE user_id=? AND world_id=? AND status='deleting'`, wire.NowText(), a.userID, worldID)
 		return err
 	}
 	if _, err := a.appDB.ExecContext(ctx, `DELETE FROM worlds WHERE user_id=? AND world_id=? AND status='deleting'`, a.userID, worldID); err != nil {

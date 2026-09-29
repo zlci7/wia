@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,16 +72,16 @@ func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerPro
 	if mode != "" && mode != p.Definition.Summary.Mode {
 		return WorldSummary{}, ErrInvalidRequest
 	}
-	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: newID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
+	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
 }
 
 func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request CreateWorldRequest, hash string) (WorldSummary, error) {
 	def := pack.Definition
-	name := cleanText(request.Name)
+	name := wire.Clean(request.Name)
 	if name == "" {
 		name = def.Summary.Title + " · 新存档"
 	}
-	playerName, playerProfile := cleanText(request.PlayerName), cleanText(request.PlayerProfile)
+	playerName, playerProfile := wire.Clean(request.PlayerName), wire.Clean(request.PlayerProfile)
 	if playerName == "" {
 		playerName = def.Summary.Player.Name
 	}
@@ -103,7 +104,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	if !def.Summary.Player.Editable && (playerName != def.Summary.Player.Name || playerProfile != def.Summary.Player.Profile) {
 		return WorldSummary{}, ErrInvalidRequest
 	}
-	worldID := newID("world")
+	worldID := wire.NewID("world")
 	path := a.worldPathFor(def.Summary.ID, worldID)
 	store, err := openWorldDB(path)
 	if err != nil {
@@ -138,7 +139,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 			return WorldSummary{}, err
 		}
 	}
-	if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, nowText()); err != nil {
+	if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, wire.NowText()); err != nil {
 		return WorldSummary{}, err
 	}
 	if err = store.db.Close(); err != nil {
@@ -149,7 +150,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 		return WorldSummary{}, err
 	}
 	defer tx.Rollback()
-	now := nowText()
+	now := wire.NowText()
 	if _, err = tx.ExecContext(ctx, `INSERT INTO worlds(user_id,game_id,world_id,name,path,status,created_at,updated_at) VALUES(?,?,?,?,?,'ready',?,?)`, a.userID, def.Summary.ID, worldID, name, path, now, now); err != nil {
 		return WorldSummary{}, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"strings"
 )
 
@@ -46,7 +47,7 @@ func (a *App) CreatePersona(ctx context.Context, request PersonaRequest) (Person
 	if err != nil {
 		return Persona{}, err
 	}
-	persona := Persona{PersonaID: newID("persona"), Name: name, Profile: profile, Version: 1, CreatedAt: nowText(), UpdatedAt: nowText()}
+	persona := Persona{PersonaID: wire.NewID("persona"), Name: name, Profile: profile, Version: 1, CreatedAt: wire.NowText(), UpdatedAt: wire.NowText()}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO personas(user_id,persona_id,name,profile,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`,
 		a.userID, persona.PersonaID, persona.Name, persona.Profile, persona.Version, persona.CreatedAt, persona.UpdatedAt); err != nil {
 		return Persona{}, err
@@ -76,7 +77,7 @@ func (a *App) UpdatePersona(ctx context.Context, personaID string, request Perso
 		return Persona{}, ErrInvalidRequest
 	}
 	result, err := a.appDB.ExecContext(ctx, `UPDATE personas SET name=?,profile=?,version=version+1,updated_at=? WHERE user_id=? AND persona_id=? AND version=?`,
-		name, profile, nowText(), a.userID, strings.TrimSpace(personaID), request.ExpectedVersion)
+		name, profile, wire.NowText(), a.userID, strings.TrimSpace(personaID), request.ExpectedVersion)
 	if err != nil {
 		return Persona{}, err
 	}
@@ -113,8 +114,8 @@ func (a *App) DeletePersona(ctx context.Context, personaID string) error {
 }
 
 func validatePersona(request PersonaRequest) (string, string, error) {
-	name := cleanText(request.Name)
-	profile := cleanText(request.Profile)
+	name := wire.Clean(request.Name)
+	profile := wire.Clean(request.Profile)
 	if name == "" || len([]rune(name)) > 80 || len([]rune(profile)) > 2000 {
 		return "", "", ErrInvalidRequest
 	}

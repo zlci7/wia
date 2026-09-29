@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type npcDecision struct {
@@ -30,9 +31,9 @@ type turnIntent struct {
 }
 
 func (intent *turnIntent) validateGeneratedFields() error {
-	intent.IntentType = strings.ToLower(cleanText(intent.IntentType))
-	intent.Visibility = strings.ToLower(cleanText(intent.Visibility))
-	intent.AddresseeID = cleanText(intent.AddresseeID)
+	intent.IntentType = strings.ToLower(wire.Clean(intent.IntentType))
+	intent.Visibility = strings.ToLower(wire.Clean(intent.Visibility))
+	intent.AddresseeID = wire.Clean(intent.AddresseeID)
 	field, expected := "", ""
 	switch {
 	case intent.IntentType != "speak" && intent.IntentType != "observe" && intent.IntentType != "act":
@@ -205,9 +206,9 @@ type turnOutput struct {
 }
 
 func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest) (Run, error) {
-	request.Input = cleanText(request.Input)
+	request.Input = wire.Clean(request.Input)
 	request.RequestKey = strings.TrimSpace(request.RequestKey)
-	request.AddresseeID = cleanText(request.AddresseeID)
+	request.AddresseeID = wire.Clean(request.AddresseeID)
 	if request.RequestKey == "" || request.Input == "" || len([]rune(request.Input)) > 4000 {
 		return Run{}, ErrInvalidRequest
 	}
@@ -292,7 +293,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 		return Run{}, err
 	}
 	defer tx.Rollback()
-	inputID := cleanText(request.inputID)
+	inputID := wire.Clean(request.inputID)
 	inputSeq := request.inputSeq
 	if inputSeq > 0 {
 		if inputID == "" {
@@ -322,14 +323,14 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 			return Run{}, err
 		}
 		inputSeq++
-		inputID = newID("input")
+		inputID = wire.NewID("input")
 		if err := metaSetTx(ctx, tx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
 			return Run{}, err
 		}
 	}
 	run := Run{
-		RunID: newID("run"), RequestKey: request.RequestKey, RequestHash: a.hashRun(request),
-		Input: request.Input, AddresseeID: cleanText(request.AddresseeID), Attempt: attempt,
+		RunID: wire.NewID("run"), RequestKey: request.RequestKey, RequestHash: a.hashRun(request),
+		Input: request.Input, AddresseeID: wire.Clean(request.AddresseeID), Attempt: attempt,
 		Status: "accepted", CreatedAt: now, UpdatedAt: now,
 		InputID: inputID, InputSeq: inputSeq,
 		BaseTurnSeq: snapshot.Summary.TurnSeq, BaseMessageHead: snapshot.Summary.MessageHead,
@@ -511,7 +512,7 @@ func (a *App) CancelRun(ctx context.Context, worldID, runID string) error {
 		return err
 	}
 	defer store.db.Close()
-	if _, err := store.db.ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE run_id=? AND status IN ('accepted','running')`, nowText(), runID); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE run_id=? AND status IN ('accepted','running')`, wire.NowText(), runID); err != nil {
 		return err
 	}
 	a.runsMu.Lock()
@@ -547,7 +548,7 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 		return Run{}, ErrVersionConflict
 	}
 	if strings.TrimSpace(requestKey) == "" {
-		requestKey = newID("retry")
+		requestKey = wire.NewID("retry")
 	}
 	return a.SubmitRun(ctx, worldID, RunRequest{
 		RequestKey: requestKey, Input: run.Input, AddresseeID: run.AddresseeID, attempt: run.Attempt + 1,
@@ -560,7 +561,7 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 
 func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run Run) (turnIntent, int, error) {
 	participants := sceneCharacters(snapshot.Characters)
-	explicitRecipient := cleanText(run.AddresseeID)
+	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
 		if _, ok := findSceneCharacter(participants, explicitRecipient); !ok {
 			return turnIntent{}, 0, ErrInvalidRequest
@@ -935,7 +936,7 @@ func appendNPCDecisionOutput(output *turnOutput, run Run, character Character, d
 		reply = fmt.Sprintf("%s（%s）说：%s", character.Name, character.Role, decision.Speech)
 	}
 	if decision.Memory != "" {
-		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: "character_judgment", Content: cleanText(decision.Memory), SourceEventID: sourceEventID, CreatedAt: time.Now().UTC()})
+		output.Memories = append(output.Memories, Memory{RecipientID: character.EntityID, Kind: "character_judgment", Content: wire.Clean(decision.Memory), SourceEventID: sourceEventID, CreatedAt: time.Now().UTC()})
 	}
 	return reply
 }
@@ -961,9 +962,9 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 	seen := make(map[string]bool, len(outcomes))
 	var visible []Event
 	for index, outcome := range outcomes {
-		outcome.ActionID = cleanText(outcome.ActionID)
-		outcome.Status = strings.ToLower(cleanText(outcome.Status))
-		outcome.Content = cleanText(outcome.Content)
+		outcome.ActionID = wire.Clean(outcome.ActionID)
+		outcome.Status = strings.ToLower(wire.Clean(outcome.Status))
+		outcome.Content = wire.Clean(outcome.Content)
 		action, ok := actions[outcome.ActionID]
 		if !ok || seen[outcome.ActionID] || outcome.Content == "" || (outcome.Status != "succeeded" && outcome.Status != "failed" && outcome.Status != "partial" && outcome.Status != "not_executed") || outcome.Recipients == nil {
 			return nil, fmt.Errorf("%w: invalid outcome at index %d", ErrGenerationFailed, index)
@@ -971,7 +972,7 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 		seen[outcome.ActionID] = true
 		recipients := make(map[string]bool, len(outcome.Recipients)+1)
 		for _, id := range outcome.Recipients {
-			id = cleanText(id)
+			id = wire.Clean(id)
 			if id != "player" && !participantIDs[id] {
 				return nil, fmt.Errorf("%w: outcome %q has unknown recipient %q", ErrGenerationFailed, outcome.ActionID, id)
 			}
@@ -997,7 +998,7 @@ func appendHostOutcomes(output *turnOutput, run Run, participants []Character, b
 		// experience; being in the room still grants nothing.
 		involved := make(map[string]bool, len(outcome.Bystanders))
 		for _, id := range outcome.Bystanders {
-			id = cleanText(id)
+			id = wire.Clean(id)
 			if id == "" || involved[id] {
 				continue
 			}
@@ -1017,7 +1018,7 @@ func renderVisibleProjection(events []Event, characters []Character) string {
 		if event.EventType == "player_attempt" {
 			continue
 		}
-		content := cleanText(event.Content)
+		content := wire.Clean(event.Content)
 		if content == "" {
 			continue
 		}
@@ -1173,7 +1174,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
 			defer callCancel()
 			repairCount, err := generateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
-			for recall := 0; err == nil && cleanText(decision.RecallQuery) != ""; recall++ {
+			for recall := 0; err == nil && wire.Clean(decision.RecallQuery) != ""; recall++ {
 				if recall >= 2 || len([]rune(decision.RecallQuery)) > 256 {
 					err = ErrGenerationFailed
 					break
@@ -1195,9 +1196,9 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 				errMu.Unlock()
 				return
 			}
-			decision.Speech = cleanText(decision.Speech)
+			decision.Speech = wire.Clean(decision.Speech)
 			decision.ActionIntent = normalizeNPCActionIntent(decision.ActionIntent)
-			decision.Memory = cleanText(decision.Memory)
+			decision.Memory = wire.Clean(decision.Memory)
 			if decision.Speech == "" {
 				decision.Silent = true
 			}
@@ -1215,7 +1216,7 @@ func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, sna
 }
 
 func normalizeNPCActionIntent(value string) string {
-	action := cleanText(value)
+	action := wire.Clean(value)
 	if action == "" {
 		return ""
 	}
@@ -1271,7 +1272,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	if err != nil {
 		return hostResult{}, repairCount, err
 	}
-	result.Scene = cleanText(result.Scene)
+	result.Scene = wire.Clean(result.Scene)
 	if intent.WaitMinutes > 0 {
 		if result.TimeMinutes > min(intent.WaitMinutes, plotTimeLimit(snapshot)) {
 			return hostResult{}, repairCount, fmt.Errorf("%w: waiting exceeds requested duration", ErrGenerationFailed)
@@ -1426,7 +1427,7 @@ func generateNarrativeText(ctx context.Context, generator model.TextGenerator, s
 }
 
 func parseNarrativeText(text string) (string, error) {
-	text = cleanText(text)
+	text = wire.Clean(text)
 	if text == "" {
 		return "", fmt.Errorf("%w: narrative is empty", ErrGenerationFailed)
 	}
@@ -1435,7 +1436,7 @@ func parseNarrativeText(text string) (string, error) {
 		if len(lines) < 3 || !strings.HasPrefix(strings.TrimSpace(lines[len(lines)-1]), "```") {
 			return "", fmt.Errorf("%w: narrative has an incomplete code fence", ErrGenerationFailed)
 		}
-		text = cleanText(strings.Join(lines[1:len(lines)-1], "\n"))
+		text = wire.Clean(strings.Join(lines[1:len(lines)-1], "\n"))
 	}
 	if strings.HasPrefix(text, "{") {
 		if err := validateStrictJSON([]byte(text)); err != nil {
@@ -1447,7 +1448,7 @@ func parseNarrativeText(text string) (string, error) {
 		if err := decoder.Decode(&legacy); err != nil {
 			return "", fmt.Errorf("%w: narrative JSON does not match the legacy wrapper", ErrGenerationFailed)
 		}
-		text = cleanText(legacy.Narrative)
+		text = wire.Clean(legacy.Narrative)
 	}
 	if text == "" {
 		return "", fmt.Errorf("%w: narrative is empty", ErrGenerationFailed)
@@ -1504,7 +1505,7 @@ func validateSceneCharacters(ids []string, characters []Character) error {
 	}
 	seen := make(map[string]bool, len(ids))
 	for index, id := range ids {
-		id = cleanText(id)
+		id = wire.Clean(id)
 		if id == "" || !available[id] || seen[id] {
 			return fmt.Errorf("%w: invalid scene character %q at index %d", ErrGenerationFailed, id, index)
 		}
@@ -1517,7 +1518,7 @@ func validateSceneCharacters(ids []string, characters []Character) error {
 func normalizeSceneCharacters(ids []string) []string {
 	result := make([]string, 0, len(ids))
 	for _, id := range ids {
-		id = cleanText(id)
+		id = wire.Clean(id)
 		if id != "player" {
 			result = append(result, id)
 		}

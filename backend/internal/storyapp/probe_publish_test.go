@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,10 +37,10 @@ func TestProbeInterruptedAfterRenameFinishesOnRecovery(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	plan := marshalJSON(publishPlan{GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version, Revision: revision, FinalPath: final})
+	plan := wire.MarshalJSON(publishPlan{GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version, Revision: revision, FinalPath: final})
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,plan_json,created_at,updated_at)
 		VALUES(?,'rename-then-crash','hash','publish_renamed_crash','publish',?,'renamed','running','','',?,?,?)`,
-		a.userID, draft.DraftID, plan, nowText(), nowText()); err != nil {
+		a.userID, draft.DraftID, plan, wire.NowText(), wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	if err = a.recoverContentOperations(ctx); err != nil {

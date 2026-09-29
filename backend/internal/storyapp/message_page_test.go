@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"os"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {
 		}
 		defer tx.Rollback()
 		for seq := start; seq <= end; seq++ {
-			if _, err := tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative',?,'',?)`, seq, fmt.Sprintf("message-%d", seq), fmt.Sprintf("故事 %d", seq), nowText()); err != nil {
+			if _, err := tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative',?,'',?)`, seq, fmt.Sprintf("message-%d", seq), fmt.Sprintf("故事 %d", seq), wire.NowText()); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -167,7 +168,7 @@ func TestMessagePagesConcurrentAppendAndDelete(t *testing.T) {
 	written := make(chan error, 1)
 	go func() {
 		for seq := 2; seq <= 51; seq++ {
-			_, err := store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative','故事','',?)`, seq, fmt.Sprintf("parallel-%d", seq), nowText())
+			_, err := store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative','故事','',?)`, seq, fmt.Sprintf("parallel-%d", seq), wire.NowText())
 			if err != nil {
 				written <- err
 				return

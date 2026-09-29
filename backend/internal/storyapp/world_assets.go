@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -101,7 +102,7 @@ func (a *App) WorldCharacterAsset(ctx context.Context, worldID, entityID string)
 		return nil, "", err
 	}
 	defer store.db.Close()
-	name, err := metaGet(ctx, store.db, "avatar:"+cleanText(entityID))
+	name, err := metaGet(ctx, store.db, "avatar:"+wire.Clean(entityID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, "", ErrContentNotFound

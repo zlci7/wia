@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 func packFixture(t *testing.T, id string) string {
@@ -274,7 +275,7 @@ func TestPackRequestsUseFrozenDefinitionAndScopedKnowledge(t *testing.T) {
 			t.Fatal(e)
 		}
 		for i := 0; i < 2; i++ {
-			run, e := app.SubmitRun(ctx, w.WorldID, RunRequest{Input: "你好，介绍一下这里吧。", RequestKey: newID("test")})
+			run, e := app.SubmitRun(ctx, w.WorldID, RunRequest{Input: "你好，介绍一下这里吧。", RequestKey: wire.NewID("test")})
 			if e != nil {
 				t.Fatal(e)
 			}

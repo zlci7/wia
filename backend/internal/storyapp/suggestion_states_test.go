@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 // Reading suggestions never calls the model, and each state is reported without
@@ -43,10 +44,10 @@ func TestSuggestionStatesWithoutModelCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 2, "narrative-1", "narrative", "雨声敲着窗沿。", "", nowText()); err != nil {
+	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 2, "narrative-1", "narrative", "雨声敲着窗沿。", "", wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 3, "pending-input", "player", "我在等待天亮。", "", nowText()); err != nil {
+	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 3, "pending-input", "player", "我在等待天亮。", "", wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = store.db.Exec(`UPDATE meta SET value='3' WHERE key='message_head'`); err != nil {
@@ -142,7 +143,7 @@ func TestSuggestionRequiresConfiguredModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'narrative-1','narrative','雨声敲着窗沿。','',?)`, nowText()); err != nil {
+	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'narrative-1','narrative','雨声敲着窗沿。','',?)`, wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = store.db.Exec(`UPDATE meta SET value='2' WHERE key='message_head'`); err != nil {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 func contextFixture() worldSnapshot {
@@ -108,7 +109,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	}
 	defer store.db.Close()
 	for i := 0; i < 45; i++ {
-		_, err = store.db.Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) SELECT COALESCE(MAX(seq),0)+1,?,'noise','','','noise','fixture',1,1,'fixture',? FROM events`, fmt.Sprintf("noise:%d", i), nowText())
+		_, err = store.db.Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) SELECT COALESCE(MAX(seq),0)+1,?,'noise','','','noise','fixture',1,1,'fixture',? FROM events`, fmt.Sprintf("noise:%d", i), wire.NowText())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,7 +216,7 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('npc:mercenary','missing','observed','交谈迹象',1,1,?)`, nowText())
+	_, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('npc:mercenary','missing','observed','交谈迹象',1,1,?)`, wire.NowText())
 	store.db.Close()
 	if err != nil {
 		t.Fatal(err)

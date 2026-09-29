@@ -1,10 +1,13 @@
 package storyapp
 
-import "context"
+import (
+	"context"
+	"gameagent/backend/internal/wire"
+	// lanternFixtureDefinition is the definition a fixture world starts from. It is derived
+	// from the real package whenever one is loaded, so the fixture cannot drift away from
+	// what the shipped story actually says.
+)
 
-// lanternFixtureDefinition is the definition a fixture world starts from. It is derived
-// from the real package whenever one is loaded, so the fixture cannot drift away from
-// what the shipped story actually says.
 func lanternFixtureDefinition(pack loadedPack) gameDefinition {
 	def := pack.Definition
 	def.Plot = lanternPlotDefinition()
@@ -24,7 +27,7 @@ func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, pl
 		return WorldSummary{}, ErrInvalidRequest
 	}
 	p.Definition.Summary.Mode = mode
-	request := CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: newID("fixture"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate}
+	request := CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("fixture"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate}
 	return a.createWorldFromPack(ctx, p, request, request.RequestKey)
 }
 

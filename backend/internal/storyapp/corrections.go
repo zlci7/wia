@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
 )
@@ -94,7 +95,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 			a.startMemoryRebuild(worldID)
 		}
 	}()
-	if cleanText(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedEpoch < 1 || cleanText(request.Replacement) == "" || len([]rune(request.Replacement)) > 8000 {
+	if wire.Clean(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedEpoch < 1 || wire.Clean(request.Replacement) == "" || len([]rune(request.Replacement)) > 8000 {
 		return Correction{}, ErrInvalidRequest
 	}
 	path, status, err := a.worldRecord(ctx, worldID)
@@ -119,7 +120,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 		return Correction{}, err
 	}
 	defer store.db.Close()
-	hash := marshalJSON(request)
+	hash := wire.MarshalJSON(request)
 	var oldHash string
 	err = store.db.QueryRowContext(ctx, `SELECT request_hash FROM corrections WHERE request_key=?`, request.RequestKey).Scan(&oldHash)
 	if err == nil {
@@ -162,7 +163,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if err != nil {
 		return Correction{}, err
 	}
-	c := Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: cleanText(request.Replacement), CreatedAt: nowText()}
+	c := Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: wire.Clean(request.Replacement), CreatedAt: wire.NowText()}
 	c.SceneVersion = snapshot.SceneVersion
 	if err = expandCorrection(ctx, store.db, &c); err != nil {
 		return c, err
@@ -198,7 +199,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 			return c, err
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO memory_jobs VALUES(?,'queued',0,?,'',?)`, c.Epoch, marshalJSON(scopes), c.CreatedAt); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO memory_jobs VALUES(?,'queued',0,?,'',?)`, c.Epoch, wire.MarshalJSON(scopes), c.CreatedAt); err != nil {
 		return c, err
 	}
 	if err = tx.Commit(); err != nil {

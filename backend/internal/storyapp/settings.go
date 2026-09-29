@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
 )
@@ -69,7 +70,7 @@ func validateNarrativeSettings(settings NarrativeSettings) (NarrativeSettings, e
 	settings.Detail = strings.TrimSpace(settings.Detail)
 	settings.PlayerElaboration = strings.TrimSpace(settings.PlayerElaboration)
 	settings.NPCInitiative = strings.TrimSpace(settings.NPCInitiative)
-	settings.CustomInstruction = cleanText(settings.CustomInstruction)
+	settings.CustomInstruction = wire.Clean(settings.CustomInstruction)
 	if settings.Perspective != PerspectiveFirstPerson && settings.Perspective != PerspectiveSecondPerson && settings.Perspective != PerspectiveThirdPerson {
 		return NarrativeSettings{}, ErrInvalidRequest
 	}
@@ -199,7 +200,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		return NarrativeSettings{}, WorldSummary{}, ErrVersionConflict
 	}
 	values := map[string]string{
-		"behavior_policies":            marshalJSON(settings.Policies),
+		"behavior_policies":            wire.MarshalJSON(settings.Policies),
 		"narrative_perspective":        settings.Perspective,
 		"narrative_length":             settings.Length,
 		"narrative_detail":             settings.Detail,
@@ -207,7 +208,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		"npc_initiative":               settings.NPCInitiative,
 		"narrative_custom_instruction": settings.CustomInstruction,
 		"context_epoch":                strconv.FormatInt(currentEpoch+1, 10),
-		"updated_at":                   nowText(),
+		"updated_at":                   wire.NowText(),
 	}
 	for key, value := range values {
 		if err := metaSetTx(ctx, tx, key, value); err != nil {

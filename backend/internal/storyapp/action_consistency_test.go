@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ func (g *plotPresenceGenerator) GenerateText(ctx context.Context, req model.Text
 		p := g.present
 		result.Outcomes[i].ActorInScene = &p
 	}
-	r.Text = marshalJSON(result)
+	r.Text = wire.MarshalJSON(result)
 	return r, nil
 }
 
@@ -169,7 +170,7 @@ func (g actionConsistencyGenerator) GenerateText(ctx context.Context, req model.
 		for _, e := range candidates {
 			outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: g.status, Content: "已裁定的设备检查结果", Recipients: []string{"player", "npc:innkeeper"}})
 		}
-		return model.TextResponse{Text: marshalJSON(hostResult{TimeMinutes: 1, Scene: "值班室", SceneCharacters: []string{"npc:innkeeper", "npc:mercenary"}, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
+		return model.TextResponse{Text: wire.MarshalJSON(hostResult{TimeMinutes: 1, Scene: "值班室", SceneCharacters: []string{"npc:innkeeper", "npc:mercenary"}, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	default:
 		return model.TextResponse{Text: "你检查了面板。"}, nil
 	}

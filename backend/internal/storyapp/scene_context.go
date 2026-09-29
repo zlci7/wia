@@ -3,6 +3,7 @@ package storyapp
 import (
 	"encoding/json"
 	"fmt"
+	"gameagent/backend/internal/wire"
 	"strings"
 )
 
@@ -130,7 +131,7 @@ func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]scen
 	views := append([]SceneView{}, previous...)
 	seen := map[string]bool{}
 	for _, update := range updates {
-		if cleanText(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
+		if wire.Clean(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
 			return nil, fmt.Errorf("%w: incomplete scene update", ErrGenerationFailed)
 		}
 		for _, recipient := range update.Recipients {
@@ -157,7 +158,7 @@ func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]scen
 					}
 				}
 			}
-			views[index] = SceneView{Recipient: recipient, Content: cleanText(update.Content), SourceIDs: canonical, Version: version}
+			views[index] = SceneView{Recipient: recipient, Content: wire.Clean(update.Content), SourceIDs: canonical, Version: version}
 		}
 	}
 	return views, nil
@@ -222,7 +223,7 @@ func validateSceneViews(snapshot worldSnapshot) error {
 	}
 	seen := map[string]bool{}
 	for _, view := range snapshot.SceneViews {
-		if !valid[view.Recipient] || seen[view.Recipient] || cleanText(view.Content) == "" || view.Version > snapshot.SceneVersion || view.Version < 1 {
+		if !valid[view.Recipient] || seen[view.Recipient] || wire.Clean(view.Content) == "" || view.Version > snapshot.SceneVersion || view.Version < 1 {
 			return fmt.Errorf("%w: invalid stored scene view", ErrContextSourceMissing)
 		}
 		seen[view.Recipient] = true

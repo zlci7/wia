@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
 )
@@ -119,7 +120,7 @@ func TestPackSchemaV2LoadsWithBystanderIdentity(t *testing.T) {
 	if len(pack.Definition.Bystanders) != 1 || pack.Definition.Bystanders[0] != "搬运工" {
 		t.Fatalf("display names: %+v", pack.Definition.Bystanders)
 	}
-	if body := marshalJSON(pack.Definition); !strings.Contains(body, "bystander:dockhand") {
+	if body := wire.MarshalJSON(pack.Definition); !strings.Contains(body, "bystander:dockhand") {
 		t.Fatalf("snapshot dropped bystander identity: %s", body)
 	}
 }

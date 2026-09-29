@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 // Plot content is frozen with each world. Conditions are narrative material,
@@ -193,9 +194,9 @@ func plotContext(snapshot worldSnapshot) string {
 		return ""
 	}
 	if snapshot.Plot == nil {
-		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", plotTimeLimit(snapshot), marshalJSON(snapshot.GeneratedEvents.Active))
+		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", plotTimeLimit(snapshot), wire.MarshalJSON(snapshot.GeneratedEvents.Active))
 	}
-	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", plotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, marshalJSON(snapshot.PlotProgress))
+	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", plotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, wire.MarshalJSON(snapshot.PlotProgress))
 }
 
 // A single node is settled per turn. The clock stops at that node; a subsequent
@@ -270,7 +271,7 @@ func (a *App) publishPlotResolution(ctx context.Context, generator model.TextGen
 	updates := []sceneUpdate{}
 	for i, p := range result.Projections {
 		id := fmt.Sprintf("%s:projection:%d", rootID, i)
-		if cleanText(p.Scene) != "" {
+		if wire.Clean(p.Scene) != "" {
 			updates = append(updates, sceneUpdate{Content: p.Scene, SourceIDs: []string{"view:" + p.Recipient, id}, Recipients: []string{p.Recipient}})
 		}
 	}
@@ -298,7 +299,7 @@ func composePlot(snapshot worldSnapshot, run Run, node PlotNode, output *turnOut
 	}
 	material := contextMaterial{
 		System:          behaviorContract + "\n你是世界剧情协调器。按当前世界时间、已发生的结果和作者剧情约束处理一个节点。玩家表达是尝试，NPC对白是声称，文学补写不属于事实。不得替重要NPC产生新决定，需要本人决定时在 decision_requests 列出其ID，并先给该人物一个真实且获准的新刺激。先公布外部情境，不提前写成该人物已经选择或完成行动。只返回JSON。",
-		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, marshalJSON(node), marshalJSON(snapshot.PlotProgress), marshalJSON(PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), marshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
+		Required:        fmt.Sprintf("模式：%s\n游戏内时间：%s\n固定事实：%s\n当前节点：%s\n已提交进度：%s\n人物在场情况：%s\n分接收者场景：%s\n本轮已确认记录：%s\n输出字段：status(occurred/deferred/skipped)、content(作者层真实结果)、source_ids(证据ID数组)、projections(对象数组，每项recipient/content)、decision_requests(字符串数组)、ending(字符串)。证据只能来自提供的事件或 definition:%s:%s；至少一条。条件不足时 deferred、projections=[]、decision_requests=[]、ending=空字符串；skipped 记录确实被干预阻止的发展。projections 仅包含当前节点允许的 audience 中实际观察或经明确来源获知的人物，隐情不随公共迹象广播；场外人物不自动听到场内对白，玩家不自动知道场外结局。ending仅在terminal节点且条件实际成立时填写，拒绝或不参与可以产生相应结果，不伪造玩家同意。无内容的数组使用[]，不得null。", snapshot.Summary.Mode, output.Clock, snapshot.Plot.Facts, wire.MarshalJSON(node), wire.MarshalJSON(snapshot.PlotProgress), wire.MarshalJSON(PublicCharacterViews(snapshot.Characters)), coordinationScene(snapshot), wire.MarshalJSON(output.Events), snapshot.Plot.Revision, node.ID),
 		RequiredSources: eventIDs(output.Events), Optional: plotEvidenceSections(snapshot.Events),
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
@@ -324,7 +325,7 @@ func plotEvidenceSections(events []Event) []contextSection {
 			result = append(result, contextSection{Name: name})
 		}
 		group := &result[len(result)-1]
-		group.Text += marshalJSON(e) + "\n"
+		group.Text += wire.MarshalJSON(e) + "\n"
 		group.Sources = append(group.Sources, e.EventID)
 	}
 	return result
@@ -334,7 +335,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	if result.Status != "occurred" && result.Status != "deferred" && result.Status != "skipped" {
 		return fmt.Errorf("%w: plot_status", ErrGenerationFailed)
 	}
-	if cleanText(result.Content) == "" || len(result.SourceIDs) == 0 || result.Projections == nil || result.DecisionRequests == nil {
+	if wire.Clean(result.Content) == "" || len(result.SourceIDs) == 0 || result.Projections == nil || result.DecisionRequests == nil {
 		return fmt.Errorf("%w: plot_required_fields", ErrGenerationFailed)
 	}
 	if result.Ending != "" && (!node.Terminal || result.Status == "deferred") {
@@ -365,7 +366,7 @@ func validatePlotResolution(snapshot worldSnapshot, node PlotNode, output turnOu
 	}
 	seen := map[string]bool{}
 	for _, p := range result.Projections {
-		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || cleanText(p.Content) == "" {
+		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || wire.Clean(p.Content) == "" {
 			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
@@ -464,9 +465,9 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 	}
 	if len(allowed) > 0 {
 		material := contextMaterial{System: behaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", marshalJSON(resolution), marshalJSON(output.Events), marshalJSON(extra.Events), marshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
+			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed)), RequiredSources: append(eventIDs(output.Events), eventIDs(extra.Events)...)}
 		material.Required += plotActionSceneContract(*output, allowed)
-		material.Required += "\n当前实际在场人物：" + marshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
+		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 		call := a.contextGenerator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v4")
 		var resolved struct {
 			Outcomes     []plotActionResult `json:"outcomes"`
@@ -553,5 +554,5 @@ func plotActionSceneContract(output turnOutput, allowed map[string][]string) str
 		id := "view:" + v.Recipient
 		sources[id] = sceneSource{ID: id, Content: v.Content, Recipients: []string{v.Recipient}}
 	}
-	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + marshalJSON(sources) + "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）：" + marshalJSON(allowed)
+	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + wire.MarshalJSON(sources) + "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）：" + wire.MarshalJSON(allowed)
 }

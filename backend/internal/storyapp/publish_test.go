@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/wire"
 	"image"
 	"image/color"
 	"image/png"
@@ -195,7 +196,7 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,created_at,updated_at)
-		VALUES(?,'interrupted','hash','publish_stale','publish',?,'files_written','running','','',?,?)`, a.userID, draft.DraftID, nowText(), nowText()); err != nil {
+		VALUES(?,'interrupted','hash','publish_stale','publish',?,'files_written','running','','',?,?)`, a.userID, draft.DraftID, wire.NowText(), wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	if err = a.recoverContentOperations(ctx); err != nil {
@@ -257,7 +258,7 @@ func TestPublishCarriesReferencedAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?)`, a.userID, saved.DraftID, "asset_cover", "assets/cover.png", "image/png", len(body), 1, 1, "digest", staged, nowText()); err != nil {
+		VALUES(?,?,?,?,?,?,?,?,?,?,?)`, a.userID, saved.DraftID, "asset_cover", "assets/cover.png", "image/png", len(body), 1, 1, "digest", staged, wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	operation, err := a.PublishContentDraft(ctx, PublishRequest{RequestKey: "with-asset", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version})
@@ -306,7 +307,7 @@ func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err = a.appDB.ExecContext(ctx, `INSERT INTO content_draft_assets(user_id,draft_id,asset_id,relative_name,media_type,byte_size,width,height,digest,staged_path,created_at)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?)`, a.userID, saved.DraftID, id, asset.name, "image/png", len(asset.body), 1, 1, "digest", staged, nowText()); err != nil {
+			VALUES(?,?,?,?,?,?,?,?,?,?,?)`, a.userID, saved.DraftID, id, asset.name, "image/png", len(asset.body), 1, 1, "digest", staged, wire.NowText()); err != nil {
 			t.Fatal(err)
 		}
 	}

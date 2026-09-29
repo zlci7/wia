@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/wire"
 	"strconv"
 )
 
@@ -15,7 +16,7 @@ type UpdatePlayerProfileRequest struct {
 }
 
 func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request UpdatePlayerProfileRequest) (WorldSummary, error) {
-	playerName, playerProfile := cleanText(request.PlayerName), cleanText(request.PlayerProfile)
+	playerName, playerProfile := wire.Clean(request.PlayerName), wire.Clean(request.PlayerProfile)
 	if playerName == "" || len([]rune(playerName)) > 80 || len([]rune(playerProfile)) > 2000 || request.ExpectedContextEpoch < 1 {
 		return WorldSummary{}, ErrInvalidRequest
 	}
@@ -79,7 +80,7 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 		"player_name":    playerName,
 		"player_profile": playerProfile,
 		"context_epoch":  strconv.FormatInt(currentEpoch+1, 10),
-		"updated_at":     nowText(),
+		"updated_at":     wire.NowText(),
 	} {
 		if err := metaSetTx(ctx, tx, key, value); err != nil {
 			return WorldSummary{}, err

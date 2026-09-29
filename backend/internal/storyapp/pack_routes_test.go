@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
 )
 
 type packPlotGenerator struct {
@@ -50,7 +51,7 @@ func (g closeoutModelProbe) GenerateText(ctx context.Context, req model.TextRequ
 	if err == nil && strings.Contains(req.System, "场景协调 Agent") {
 		var result hostResult
 		if json.Unmarshal([]byte(r.Text), &result) == nil {
-			g.t.Logf("coordination minutes=%d roster=%v scene_updates=%s", result.TimeMinutes, result.SceneCharacters, marshalJSON(result.SceneUpdates))
+			g.t.Logf("coordination minutes=%d roster=%v scene_updates=%s", result.TimeMinutes, result.SceneCharacters, wire.MarshalJSON(result.SceneUpdates))
 		}
 	}
 	return r, err

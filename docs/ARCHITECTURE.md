@@ -50,6 +50,7 @@ wia/
 │       ├── plot/         世界事件与时间如何向前发展
 │       ├── model/        模型调用统一入口与 Provider
 │       ├── storage/      全部持久化
+│       ├── wire/         无领域含义的基础原语（文本规范、时间戳、JSON、标识生成）
 │       └── content/      开发者内容工具（剧本包、草稿、发布、导入导出）
 ├── frontend/             Vue 前端（原 console/web）
 ├── stories/              随发布交付的示例剧本包
@@ -75,6 +76,7 @@ wia/
 | `turn` | 编排：加载、意图、人物阶段、协调、世界推进、叙述、提交 | 不放具体实现细节 |
 | `model` | 统一调用入口、用途标记、用量与超时、Provider | 不理解剧情，不知道这是 NPC 还是记忆 |
 | `storage` | 持久化、事务、迁移、存档复制 | 不生成剧情、不做业务判断 |
+| `wire` | 无领域含义的基础原语：文本规范、时间戳、JSON 编码、标识生成 | 不放领域概念、不做业务判断、不依赖任何业务包 |
 | `api` | HTTP 合同、请求校验、错误映射 | 不直接调用 Provider、不写业务规则 |
 | `content` | 开发者内容工具：项目、草稿、校验、发布、导入导出 | 不进入正常 Turn 主链 |
 
@@ -119,10 +121,13 @@ model      不理解剧情
 storage    不生成剧情
 api        不直接调用 Provider
 content    不进入正常 Turn 主链
+wire       只依赖标准库；不放领域概念
 turn       是唯一同时使用 context / agent / memory / plot / storage 的模块
 ```
 
 `world` 是**底层语言，不是总服务**。所有模块都依赖它，它不依赖任何模块。
+
+`wire` 是**命名了领域概念之后剩下的东西**。分界：领域概念（`Character`、`Event`、`GameTime`）与读它们的纯规则进 `world`；文本清洗、时间戳、JSON 编码、标识生成这类没有领域含义的原语进 `wire`。把 `cleanText` 放进 `world` 会让只想清洗字符串的包必须依赖领域类型所在的包。
 
 **`world` 只放领域概念，不放"恰好都被用到"的结构体。** 适合：`WorldID`、`EntityID`、`LocationID`、`Character`、`Player`、`Scene`、`Event`、`Perception`、`GameTime`、`Location`。不适合：HTTP 请求/响应结构（属 `api`）、数据库行结构（属 `storage`）、模型输出结构（属 `agent`/`content`）。
 
