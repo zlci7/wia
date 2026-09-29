@@ -3,10 +3,11 @@ package storyapp
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
-	"strings"
 )
 
 // Scene views are recipient-specific, committed state, not narrator prose.

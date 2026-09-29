@@ -3,9 +3,10 @@ package storyapp
 import (
 	"context"
 	"errors"
-	"gameagent/backend/internal/content"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/story"
 )
 
 func TestPersonaCRUDAndVersionConflicts(t *testing.T) {
@@ -100,11 +101,11 @@ func TestPersonaRejectedWhenPlayerIsFixed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixed := gameDefinition{Summary: content.GameSummary{Player: content.PlayerDefaults{Name: "固定主角", Profile: "固定简介", Editable: false}}}
+	fixed := story.Definition{Summary: story.Summary{Player: story.Player{Name: "固定主角", Profile: "固定简介", Editable: false}}}
 	if _, _, err := a.personaDefaults(ctx, persona.PersonaID, fixed); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("fixed player accepted a template: %v", err)
 	}
-	editable := gameDefinition{Summary: content.GameSummary{Player: content.PlayerDefaults{Editable: true}}}
+	editable := story.Definition{Summary: story.Summary{Player: story.Player{Editable: true}}}
 	name, profile, err := a.personaDefaults(ctx, persona.PersonaID, editable)
 	if err != nil || name != "陆舟" || profile != "夜行客" {
 		t.Fatalf("editable player: %q %q %v", name, profile, err)

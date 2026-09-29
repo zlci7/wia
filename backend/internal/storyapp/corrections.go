@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
-	"strconv"
-	"strings"
 )
 
 var ErrMemoryRebuilding = errors.New("memory rebuilding")

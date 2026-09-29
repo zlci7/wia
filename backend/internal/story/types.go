@@ -39,16 +39,21 @@ type Bystander struct {
 
 // Summary is the running world's view of what this story is. It carries only what a
 // turn needs to read; the catalog the content tooling and the API display is a
-// separate, wider shape that belongs to them.
+// separate, wider shape that belongs to them — a cover URL, for instance, is a route
+// the API serves, not part of the definition.
 type Summary struct {
-	GameID   string
-	Revision string
-	Title    string
-	Mode     string
-	Gameplay string
+	ID          string
+	GameID      string
+	Revision    string
+	Title       string
+	Mode        string
+	Gameplay    string
+	Description string
+	Player      Player
 }
 
-// Player is the fixed player character a story may prescribe.
+// Player is the fixed player character a story may prescribe. Editable false means
+// the story requires this character and a world may not replace it.
 type Player struct {
 	Name     string
 	Profile  string
@@ -56,7 +61,8 @@ type Player struct {
 }
 
 // Definition is everything a world needs to initialize and run its story: the
-// author's material as the engine consumes it, not as the pack stores it.
+// author's material as the engine consumes it, not as the pack stores it. Its
+// locations and bystanders are the normalized shapes, never the pack's own.
 type Definition struct {
 	Revision         string
 	Background       string
@@ -66,13 +72,18 @@ type Definition struct {
 	Settings         wiaworld.NarrativeSettings
 	SettingsSource   string
 	Summary          Summary
-	Player           Player
 	Opening          string
-	InitialLocation  string
-	Clock            string
-	Characters       []wiaworld.Character
-	Bystanders       []Bystander
-	Secret           string
-	Plot             *plot.Definition
-	EventGeneration  *plot.EventGenerationPolicy
+	// Scene is the authored opening scene description, kept beside Opening.
+	Scene string
+	// InitialLocation is the identifier of the scene the story starts in.
+	InitialLocation string
+	Clock           string
+	Characters      []wiaworld.Character
+	// Bystanders are the display names; BystanderRefs carries the normalized
+	// definitions next to them so identity survives the pack boundary.
+	Bystanders      []string
+	BystanderRefs   []Bystander
+	Secret          string
+	Plot            *plot.Definition
+	EventGeneration *plot.EventGenerationPolicy
 }

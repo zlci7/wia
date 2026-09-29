@@ -12,6 +12,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -342,7 +343,7 @@ func validatePlotResolution(snapshot worldSnapshot, node plot.Node, output turnO
 			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
-			if _, ok := characterByID(gameDefinition{Characters: snapshot.Characters}, p.Recipient); !ok {
+			if _, ok := characterByID(story.Definition{Characters: snapshot.Characters}, p.Recipient); !ok {
 				return fmt.Errorf("%w: plot_unknown_character", ErrGenerationFailed)
 			}
 		}
@@ -394,7 +395,7 @@ func (a *App) respondToPlot(ctx context.Context, generator model.TextGenerator, 
 		base.Characters[i].InScene = inputs[base.Characters[i].EntityID].NewStimulus != ""
 	}
 	decisions := map[string]turn.NPCDecision{}
-	if err := a.decideNPCs(ctx, generator, base, gameDefinition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
+	if err := a.decideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
 		return nil, err
 	}
 	extra := turnOutput{SceneVersion: output.SceneVersion}

@@ -6,11 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"gameagent/backend/internal/plot"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/plot"
 )
 
 func importProject(t *testing.T, a *App, gameID string) ContentProject {

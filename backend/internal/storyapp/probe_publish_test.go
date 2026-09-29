@@ -3,11 +3,12 @@ package storyapp
 import (
 	"context"
 	"errors"
-	"gameagent/backend/internal/wire"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/wire"
 )
 
 // R03, first half: a publication interrupted after the rename but before the

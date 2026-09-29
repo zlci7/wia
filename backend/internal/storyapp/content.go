@@ -7,15 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/wire"
-	wiaworld "gameagent/backend/internal/world"
 	"image"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // M3 content workspace: an author edits a draft of a story package and publishes
@@ -642,14 +643,18 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 // the product supports.
 func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
 	definition := pack.Definition
+	// The draft is the pack's own view, read from the pack's JSON rather than
+	// re-serialised from the running definition, so editing a package cannot quietly
+	// drop a field the runtime does not use.
+	story := pack.Story
 	payload := ContentDraftPayload{
-		SchemaVersion: content.SchemaV2, GameID: gameID, Mode: definition.Summary.Mode, Title: definition.Summary.Title,
-		Description: definition.Summary.Description, Gameplay: definition.Summary.Gameplay, Background: definition.Background,
-		Rules: definition.Rules, AuthorFacts: definition.Secret, Player: definition.Summary.Player, Opening: definition.Opening,
-		Cover: pack.Story.Cover, CoverAlt: pack.Story.CoverAlt, EventGeneration: pack.Story.EventGeneration,
-		InitialLocation: definition.InitialLocation,
-		Clock:           definition.Clock, Locations: definition.Locations, Plot: definition.Plot, Bystanders: definition.BystanderRefs,
-		NPCs: []ContentDraftNPC{}, Defaults: &definition.Settings,
+		SchemaVersion: content.SchemaV2, GameID: gameID, Mode: story.Mode, Title: story.Title,
+		Description: story.Description, Gameplay: story.Gameplay, Background: story.Background,
+		Rules: story.Rules, AuthorFacts: story.AuthorFacts, Player: story.Player, Opening: story.Opening,
+		Cover: story.Cover, CoverAlt: story.CoverAlt, EventGeneration: story.EventGeneration,
+		InitialLocation: story.InitialLocation,
+		Clock:           story.Clock, Locations: story.Locations, Plot: story.Plot, Bystanders: story.Bystanders,
+		NPCs: []ContentDraftNPC{}, Defaults: story.Defaults,
 	}
 	// Each character's own file travels with the package under its recorded path, so
 	// the editor gets the real avatar and examples whatever the file is called.

@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -667,7 +667,7 @@ func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wi
 // when it started, never from the currently installed story. A later revision must
 // not change how an existing save's characters speak, and a world started before
 // samples existed keeps none rather than silently adopting a newer template.
-func turnDefinition(snapshot *worldSnapshot) gameDefinition {
+func turnDefinition(snapshot *worldSnapshot) story.Definition {
 	def := snapshot.Definition
 	frozen := def.Characters
 	def.Characters = snapshot.Characters
@@ -974,7 +974,7 @@ func appendNPCDecisionOutput(output *turnOutput, run wiaworld.Run, character wia
 	return reply
 }
 
-func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []content.PackBystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
+func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wiaworld.Character, bystanders []story.Bystander, outcomes []hostActionResult) ([]wiaworld.Event, error) {
 	actions := make(map[string]wiaworld.Event)
 	for _, event := range output.Events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
@@ -1045,7 +1045,7 @@ func appendHostOutcomes(output *turnOutput, run wiaworld.Run, participants []wia
 	return visible, nil
 }
 
-func playerExperienceMemory(intentType string, private bool, characterID, recipient, input string, def gameDefinition) (string, string) {
+func playerExperienceMemory(intentType string, private bool, characterID, recipient, input string, def story.Definition) (string, string) {
 	if private && characterID != recipient {
 		return "observed", "我看见玩家和" + describeRecipient(def, recipient) + "低声交谈，但没有听清内容。"
 	}
@@ -1062,7 +1062,7 @@ func playerExperienceMemory(intentType string, private bool, characterID, recipi
 	}
 }
 
-func describeRecipient(def gameDefinition, recipient string) string {
+func describeRecipient(def story.Definition, recipient string) string {
 	if recipient == "" {
 		return "未明确指定具体人物"
 	}
@@ -1072,7 +1072,7 @@ func describeRecipient(def gameDefinition, recipient string) string {
 	return "未明确指定具体人物"
 }
 
-func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, def gameDefinition, run wiaworld.Run, recipient, intentType string, inputs map[string]turn.StageInput, priorTurn map[string]string, decisions map[string]turn.NPCDecision, stage int) error {
+func (a *App) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]turn.StageInput, priorTurn map[string]string, decisions map[string]turn.NPCDecision, stage int) error {
 	if generator == nil {
 		return ErrModelNotConfigured
 	}
@@ -1193,7 +1193,7 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	return result, repairCount, nil
 }
 
-func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, def gameDefinition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
+func (a *App) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot worldSnapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}
@@ -1246,7 +1246,7 @@ func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, p
 
 // formatBystanders lists passers-by with their stable identity so a coordinated
 // outcome can attribute experience to the one that actually took part.
-func formatBystanders(bystanders []content.PackBystander, names []string) string {
+func formatBystanders(bystanders []story.Bystander, names []string) string {
 	if len(bystanders) == 0 {
 		if len(names) == 0 {
 			return "（无已记录背景人物）"

@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"gameagent/backend/internal/wire"
 	"strings"
+
+	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
 )
 
 // Personas are reusable lead-character templates owned by one account. A template
@@ -124,7 +126,7 @@ func validatePersona(request PersonaRequest) (string, string, error) {
 
 // personaDefaults resolves the template selected for a new world. The pack's own
 // defaults stay in use when no template is chosen.
-func (a *App) personaDefaults(ctx context.Context, personaID string, def gameDefinition) (string, string, error) {
+func (a *App) personaDefaults(ctx context.Context, personaID string, def story.Definition) (string, string, error) {
 	if strings.TrimSpace(personaID) == "" {
 		return "", "", nil
 	}

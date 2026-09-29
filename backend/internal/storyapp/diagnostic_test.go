@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/turn"
-	wiaworld "gameagent/backend/internal/world"
 	"os"
 	"strings"
 	"sync"
 	"testing"
+
+	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func TestDiagnosticClassificationAndPrivateFailure(t *testing.T) {

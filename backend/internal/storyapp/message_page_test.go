@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"os"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 )
 
 func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {

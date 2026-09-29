@@ -3,10 +3,10 @@ package storyapp
 import (
 	"context"
 	"errors"
+	"gameagent/backend/internal/story"
 	"strings"
 	"testing"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 )
 
@@ -78,7 +78,7 @@ func TestUpdatePlayerProfileRejectsFixedPlayer(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
 	pack := a.packs[GameID]
 	definition := pack.Definition
-	definition.Summary.Player = content.PlayerDefaults{Name: "固定主角", Profile: "固定简介", Editable: false}
+	definition.Summary.Player = story.Player{Name: "固定主角", Profile: "固定简介", Editable: false}
 	world, err := a.createWorldFromPack(ctx, loadedPack{Definition: definition}, CreateWorldRequest{
 		GameID: GameID, ExpectedRevision: definition.Revision, RequestKey: "fixed-player", Name: "固定主角存档", Activate: true,
 	}, "fixed-player-hash")

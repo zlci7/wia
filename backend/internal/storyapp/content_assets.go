@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/wire"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -16,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gameagent/backend/internal/wire"
 )
 
 func assetDigest(body []byte) string {

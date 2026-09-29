@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/memorymodel"
-	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 )
 
 type blockingDigestGenerator struct {

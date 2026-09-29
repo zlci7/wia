@@ -3,10 +3,12 @@ package storyapp
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
-	"strings"
 )
 
 func composeIntent(snapshot worldSnapshot, run wiaworld.Run) contextMaterial {
@@ -55,7 +57,7 @@ func composeCoordination(snapshot worldSnapshot, run wiaworld.Run, intent turnIn
 	return contextMaterial{PolicyRevision: revision, System: behaviorContract + "\n你是场景协调 Agent。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。清单外的输入、公开对白和此前已提交结果不另建 outcome，不编造行动 ID。", RequiredSources: append(turn.EventIDs(events), sceneViewSources(snapshot, "")...), Required: input, Optional: coordinationSections(snapshot.Events)}
 }
 
-func composeNarration(snapshot worldSnapshot, run wiaworld.Run, def gameDefinition, recipient, intentType string, visibleEvents []wiaworld.Event, clock string, sceneCharacters []string) (contextMaterial, int, error) {
+func composeNarration(snapshot worldSnapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, clock string, sceneCharacters []string) (contextMaterial, int, error) {
 	playerInput := run.Input
 	projectedEvents, err := json.Marshal(narrativeEvents(visibleEvents, snapshot.Characters, snapshot.PlayerName, snapshot.Narrative))
 	if err != nil {
@@ -78,7 +80,7 @@ func composeNarration(snapshot worldSnapshot, run wiaworld.Run, def gameDefiniti
 	return material, maxOutputTokens, nil
 }
 
-func composeNPC(snapshot worldSnapshot, def gameDefinition, character wiaworld.Character, recipient, intentType string, stageInput turn.StageInput, priorTurn string, stage int) contextMaterial {
+func composeNPC(snapshot worldSnapshot, def story.Definition, character wiaworld.Character, recipient, intentType string, stageInput turn.StageInput, priorTurn string, stage int) contextMaterial {
 	_, revision := behaviorPolicy(snapshot.Narrative, "npc")
 	base := snapshot
 	base.Perceptions = nil
@@ -106,7 +108,7 @@ func coordinationScene(snapshot worldSnapshot) string {
 	return string(data)
 }
 
-func buildNPCPrompt(snapshot worldSnapshot, def gameDefinition, character wiaworld.Character, recipient, intentType string, stageInput turn.StageInput, priorTurn string, stage int) string {
+func buildNPCPrompt(snapshot worldSnapshot, def story.Definition, character wiaworld.Character, recipient, intentType string, stageInput turn.StageInput, priorTurn string, stage int) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "公开世界背景：%s\n世界规则：%s\n", snapshot.Definition.Background, snapshot.Definition.Rules)
 	policy, _ := behaviorPolicy(snapshot.Narrative, "npc")

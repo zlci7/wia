@@ -2,12 +2,11 @@ package storyapp
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
 	"testing"
-
-	"crypto/sha256"
 )
 
 // C01: a database written by the previous release holds first-algorithm digests. An

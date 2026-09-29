@@ -2,7 +2,6 @@ package storyapp
 
 import (
 	"context"
-
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"

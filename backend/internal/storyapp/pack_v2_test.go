@@ -3,11 +3,12 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"testing"
+
 	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
-	"strings"
-	"testing"
 )
 
 func packLocationSet(ids ...string) map[string]content.PackLocation {

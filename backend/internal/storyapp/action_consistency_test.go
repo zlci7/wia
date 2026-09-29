@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/wire"
-	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type plotPresenceGenerator struct {

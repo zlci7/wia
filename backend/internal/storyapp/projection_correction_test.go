@@ -2,11 +2,12 @@ package storyapp
 
 import (
 	"context"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 )
 
 func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {

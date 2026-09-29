@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -13,6 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 )
 
 // Worlds keep the images they started with. Creation copies every referenced cover

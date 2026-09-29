@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"gameagent/backend/internal/model"
-	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/model"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 type overlappingActionGenerator struct{ scriptedGenerator }

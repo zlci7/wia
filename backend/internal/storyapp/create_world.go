@@ -7,13 +7,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 type CreateWorldRequest struct {
@@ -211,7 +212,18 @@ func (a *App) WorldGame(ctx context.Context, id string) (content.GameSummary, er
 	if err != nil {
 		return content.GameSummary{}, err
 	}
-	g := s.Definition.Summary
+	g, gameErr := a.Game(s.Definition.Summary.GameID)
+	if gameErr != nil {
+		// The catalog entry normally comes from the pack, which is where the fields a
+		// world never uses live. A world whose pack is no longer installed still answers
+		// with what its own definition recorded.
+		g = content.GameSummary{
+			ID: s.Definition.Summary.ID, Title: s.Definition.Summary.Title, Revision: s.Definition.Summary.Revision,
+			Mode: s.Definition.Summary.Mode, Modes: []string{s.Definition.Summary.Mode}, DefaultMode: s.Definition.Summary.Mode,
+			Gameplay: s.Definition.Summary.Gameplay, Description: s.Definition.Summary.Description, Background: s.Definition.Background,
+			Player: content.PlayerDefaults{Name: s.Definition.Summary.Player.Name, Profile: s.Definition.Summary.Player.Profile, Editable: s.Definition.Summary.Player.Editable},
+		}
+	}
 	if g.CoverURL != "" {
 		g.CoverURL = "/api/v1/worlds/" + id + "/cover"
 	}

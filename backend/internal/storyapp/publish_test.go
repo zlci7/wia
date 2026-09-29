@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"image"
 	"image/color"
 	"image/png"
@@ -15,6 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 )
 
 // pngBytes renders a real image so package asset validation exercises decoding.

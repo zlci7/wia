@@ -3,10 +3,11 @@ package storyapp
 import (
 	"context"
 	"fmt"
-	"gameagent/backend/internal/memorymodel"
-	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/memorymodel"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func TestRecallBudgetPreservesRequiredAndCausalGroups(t *testing.T) {

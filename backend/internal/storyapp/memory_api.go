@@ -3,10 +3,11 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
-	"strings"
 )
 
 type MemoryRecord struct {

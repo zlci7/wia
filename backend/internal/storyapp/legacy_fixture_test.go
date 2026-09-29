@@ -2,16 +2,14 @@ package storyapp
 
 import (
 	"context"
-	"gameagent/backend/internal/content"
+
 	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
-	// lanternFixtureDefinition is the definition a fixture world starts from. It is derived
-	// from the real package whenever one is loaded, so the fixture cannot drift away from
-	// what the shipped story actually says.
 )
 
-func lanternFixtureDefinition(pack loadedPack) gameDefinition {
+func lanternFixtureDefinition(pack loadedPack) story.Definition {
 	def := pack.Definition
 	def.Plot = lanternPlotDefinition()
 	return def
@@ -36,16 +34,14 @@ func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, pl
 
 // lanternDefinition builds the same definition without an application, for tests that
 // only need prompt material.
-func lanternDefinition() gameDefinition {
+func lanternDefinition() story.Definition {
 	return lanternFixtureDefinition(loadedPack{
-		Definition: gameDefinition{
+		Definition: story.Definition{
 			Revision: "lantern-dusk.pack.v2",
-			Summary: content.GameSummary{
+			Summary: story.Summary{
 				ID:          GameID,
 				Title:       "暮灯镇的失踪信使",
 				Description: "一场小型调查冒险：雨夜的旧渡口客栈里，失踪的信使留下了一封没有寄出的信。",
-				Modes:       []string{"open", "guided"},
-				DefaultMode: "guided",
 				Mode:        "guided",
 			},
 			Opening: "雨水顺着旧渡口客栈的屋檐落下。壁炉旁的老板沈岚擦拭着一只空酒杯，佣兵铁杉坐在窗边，目光落在黑沉沉的河面。门口还挤着十来个避雨的客人。就在你推门时，柜台下传来一声短促的金属碰撞。",

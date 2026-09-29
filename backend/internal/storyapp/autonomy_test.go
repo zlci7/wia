@@ -3,11 +3,12 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"testing"
+
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
-	"strings"
-	"testing"
 )
 
 func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {

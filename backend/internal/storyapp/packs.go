@@ -10,10 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/storage"
-	wiaworld "gameagent/backend/internal/world"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -23,6 +19,12 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 //go:embed packs
@@ -68,11 +70,20 @@ type PackNPC struct {
 	SpeakingExamples []string `json:"speaking_examples,omitempty"`
 }
 
+// Catalog is the entry the content routes serve for this pack. It is wider than the
+// running definition on purpose: modes, cover route and alternative text are things
+// the catalog and the editor display, built from the pack itself so the definition a
+// world runs from carries none of them.
 type loadedPack struct {
-	Definition gameDefinition
-	Cover      []byte
-	CoverType  string
-	Digest     string
+	Definition story.Definition
+	// Catalog is the entry the content routes serve for this pack. It is wider than
+	// the running definition on purpose: modes, the cover route and alternative text
+	// are things the catalog and the editor display, and they are built from the pack
+	// itself so the definition a world runs from carries none of them.
+	Catalog   content.GameSummary
+	Cover     []byte
+	CoverType string
+	Digest    string
 	// LegacyDigest is the digest the previous algorithm produces for this same package.
 	// It exists only so an older database's record is recognised during migration.
 	LegacyDigest string
@@ -278,12 +289,19 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return bad("defaults")
 	}
-	def := gameDefinition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: p.Locations, InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: bystanders}
+	def := story.Definition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: storyLocations(p.Locations), InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: storyBystanders(bystanders)}
 	result.CoverRelative = p.Cover
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
 	}
-	def.Summary = content.GameSummary{ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision, Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay, Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt}
+	// The running definition takes only what a turn reads. The catalog the API serves
+	// is wider — cover URL, description, modes — and is built at the route from the
+	// pack, so a route path never becomes part of a world's definition.
+	def.Summary = story.Summary{
+		ID: p.GameID, GameID: p.GameID, Revision: p.Revision, Title: p.Title,
+		Mode: p.Mode, Gameplay: p.Gameplay, Description: p.Description,
+		Player: story.Player{Name: p.Player.Name, Profile: p.Player.Profile, Editable: p.Player.Editable},
+	}
 	seen, definitions := map[string]bool{}, map[string]bool{}
 	npcBodies := make([]json.RawMessage, 0, len(p.NPCs))
 	for _, file := range p.NPCs {
@@ -336,13 +354,20 @@ func loadPack(root string) (loadedPack, error) {
 			return bad("cover (PNG/JPEG, maximum 4096 pixels)")
 		}
 		result.CoverType = "image/" + format
-		def.Summary.CoverURL = "/api/v1/games/" + p.GameID + "/cover?revision=" + p.Revision
 	}
 	if err := validateEventPolicy(p.EventGeneration, def); err != nil {
 		return result, err
 	}
 	def.EventGeneration = p.EventGeneration
 	result.Definition = def
+	result.Catalog = content.GameSummary{
+		ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision,
+		Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay,
+		Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt,
+	}
+	if p.Cover != "" {
+		result.Catalog.CoverURL = "/api/v1/games/" + p.GameID + "/cover?revision=" + p.Revision
+	}
 	result.Story = p
 	result.NPCFiles = map[string][]byte{}
 	for index, file := range p.NPCs {
@@ -557,7 +582,7 @@ func (a *App) Games() []content.GameSummary {
 	packs := a.packList()
 	result := make([]content.GameSummary, 0, len(packs))
 	for _, p := range packs {
-		result = append(result, p.Definition.Summary)
+		result = append(result, p.Catalog)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
@@ -572,7 +597,7 @@ func (a *App) Game(id string) (content.GameSummary, error) {
 	if !ok {
 		return content.GameSummary{}, ErrWorldNotFound
 	}
-	return p.Definition.Summary, nil
+	return p.Catalog, nil
 }
 func (a *App) GameCover(id, revision string) ([]byte, string, error) {
 	p, ok := a.pack(id)
@@ -582,10 +607,10 @@ func (a *App) GameCover(id, revision string) ([]byte, string, error) {
 	return p.Cover, p.CoverType, nil
 }
 
-func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldSnapshot) (gameDefinition, error) {
+func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldSnapshot) (story.Definition, error) {
 	raw, err := store.MetaGet(ctx, "definition_snapshot")
 	if err == nil {
-		var d gameDefinition
+		var d story.Definition
 		if json.Unmarshal([]byte(raw), &d) != nil || d.Summary.ID != s.Summary.GameID || d.Revision == "" {
 			return d, ErrStorageUnavailable
 		}
@@ -593,7 +618,7 @@ func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldS
 		// authority once it exists. Legacy worlds keep display names only until the
 		// next world starts from the same content.
 		if stored, e := store.MetaGet(ctx, "bystander_refs"); e == nil {
-			var refs []content.PackBystander
+			var refs []story.Bystander
 			if json.Unmarshal([]byte(stored), &refs) == nil {
 				d.BystanderRefs = refs
 			}
@@ -603,10 +628,10 @@ func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldS
 		return d, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return gameDefinition{}, err
+		return story.Definition{}, err
 	}
 	// Legacy worlds use only their persisted facts, never a newer installed pack.
-	d := gameDefinition{Summary: content.GameSummary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
+	d := story.Definition{Summary: story.Summary{ID: s.Summary.GameID, GameID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
 	d.Revision, _ = store.MetaGet(ctx, "game_revision")
 	d.Summary.Revision = d.Revision
 	if d.Summary.ID == GameID {

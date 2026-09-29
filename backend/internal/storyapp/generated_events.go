@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -48,7 +48,7 @@ type eventCandidate struct {
 	Initial      plotResolution `json:"initial"`
 }
 
-func validateEventPolicy(p *plot.EventGenerationPolicy, def gameDefinition) error {
+func validateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) error {
 	if p == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func validateEventPolicy(p *plot.EventGenerationPolicy, def gameDefinition) erro
 	}
 	seen := map[string]bool{}
 	for _, id := range p.Locations {
-		if seen[id] || !slices.ContainsFunc(def.Locations, func(l content.PackLocation) bool { return l.ID == id }) {
+		if seen[id] || !slices.ContainsFunc(def.Locations, func(l story.Location) bool { return l.ID == id }) {
 			return fmt.Errorf("story.json: invalid event_generation location")
 		}
 		seen[id] = true
@@ -72,7 +72,7 @@ func validateEventPolicy(p *plot.EventGenerationPolicy, def gameDefinition) erro
 	return nil
 }
 
-func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def gameDefinition) (generatedEventState, error) {
+func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def story.Definition) (generatedEventState, error) {
 	s := generatedEventState{Active: []generatedEvent{}}
 	raw, err := store.MetaGet(ctx, "generated_events")
 	if errors.Is(err, sql.ErrNoRows) {

@@ -3,11 +3,13 @@ package storyapp
 import (
 	"context"
 	"errors"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
 )
 
 // seedBystanderExperience records one committed result attributed to a passer-by,
@@ -150,7 +152,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	}
 	// The live roster is the world's authority: the promoted person is in it while the
 	// frozen definition keeps its original template.
-	if _, found := characterByID(gameDefinition{Characters: after.Characters}, promoted.EntityID); !found {
+	if _, found := characterByID(story.Definition{Characters: after.Characters}, promoted.EntityID); !found {
 		t.Fatalf("promoted character is missing from the world roster: %+v", after.Characters)
 	}
 	if len(after.Characters) == 0 {

@@ -3,11 +3,12 @@ package storyapp
 import (
 	"context"
 	"fmt"
-	"gameagent/backend/internal/llm"
-	"gameagent/backend/internal/model"
 	"os"
 	"testing"
 	"time"
+
+	"gameagent/backend/internal/llm"
+	"gameagent/backend/internal/model"
 )
 
 // Uses isolated worlds and reads, but never modifies, the supplied model config.

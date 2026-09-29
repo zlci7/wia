@@ -12,6 +12,7 @@ import (
 
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	_ "modernc.org/sqlite"
@@ -19,7 +20,7 @@ import (
 
 type worldSnapshot struct {
 	GeneratedEvents generatedEventState
-	Definition      gameDefinition
+	Definition      story.Definition
 	Summary         wiaworld.WorldSummary
 	SceneLocation   string
 	// InputBudgetTokens is how many input tokens this world's requests may use; the long
@@ -133,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_perceptions_recipient_seq ON perceptions(recipien
 CREATE INDEX IF NOT EXISTS idx_memories_recipient_seq ON memories(recipient_id, seq);
 `
 
-func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, worldID string, def gameDefinition, mode, playerName, playerProfile string) error {
+func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, worldID string, def story.Definition, mode, playerName, playerProfile string) error {
 	if mode != "open" && mode != "guided" {
 		return ErrInvalidRequest
 	}

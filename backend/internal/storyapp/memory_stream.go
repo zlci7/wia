@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storage"
-	"strings"
 )
 
 const memorySchema = `

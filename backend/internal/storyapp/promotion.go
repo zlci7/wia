@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/storage"
-	"gameagent/backend/internal/wire"
-	wiaworld "gameagent/backend/internal/world"
 	"strconv"
 	"strings"
+
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // A passers-by with a stable identity can be promoted to an important character.
@@ -295,7 +296,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		return wiaworld.Character{}, err
 	}
 	// The person leaves the passer-by list; their position does not change.
-	remaining := []content.PackBystander{}
+	remaining := []story.Bystander{}
 	names := []string{}
 	for _, item := range snapshot.Definition.BystanderRefs {
 		if item.BystanderID == bystander.BystanderID {
@@ -434,7 +435,7 @@ func promotionRequestHash(request PromotionRequest, selected []string) string {
 // promotionSceneContent seeds the promoted person's own view. It states where they
 // are and what they themselves lived through, and never borrows another character's
 // private material to fill the gap.
-func promotionSceneContent(bystander content.PackBystander, draft PromotionDraft, snapshot worldSnapshot) string {
+func promotionSceneContent(bystander story.Bystander, draft PromotionDraft, snapshot worldSnapshot) string {
 	parts := []string{}
 	location := bystanderLocation(snapshot, bystander)
 	if location != "" {
@@ -466,19 +467,19 @@ func readCharacterOrigins(ctx context.Context, db *sql.DB, entityID string) ([]P
 	return out, rows.Err()
 }
 
-func bystanderByID(items []content.PackBystander, id string) (content.PackBystander, bool) {
+func bystanderByID(items []story.Bystander, id string) (story.Bystander, bool) {
 	id = wire.Clean(id)
 	for _, item := range items {
 		if item.BystanderID == id {
 			return item, true
 		}
 	}
-	return content.PackBystander{}, false
+	return story.Bystander{}, false
 }
 
 // bystanderLocation reports where the person currently is. Promotion never falls
 // back to the definition's starting location for someone already in a scene.
-func bystanderLocation(snapshot worldSnapshot, bystander content.PackBystander) string {
+func bystanderLocation(snapshot worldSnapshot, bystander story.Bystander) string {
 	if bystanderInScene(snapshot, bystander) {
 		return snapshot.Summary.Scene
 	}
@@ -486,14 +487,14 @@ func bystanderLocation(snapshot worldSnapshot, bystander content.PackBystander) 
 }
 
 // bystanderStartingLocation is the place the person was defined to be in.
-func bystanderStartingLocation(snapshot worldSnapshot, bystander content.PackBystander) string {
+func bystanderStartingLocation(snapshot worldSnapshot, bystander story.Bystander) string {
 	if initial := snapshot.Definition.InitialLocations[bystander.BystanderID]; initial != "" {
 		return initial
 	}
 	return bystander.InitialLocation
 }
 
-func bystanderInScene(snapshot worldSnapshot, bystander content.PackBystander) bool {
+func bystanderInScene(snapshot worldSnapshot, bystander story.Bystander) bool {
 	initial := bystanderStartingLocation(snapshot, bystander)
 	if initial == "" {
 		return true
@@ -517,7 +518,7 @@ func sceneIDFor(snapshot worldSnapshot) string {
 
 // locationIDFor finds the location a scene text belongs to. A scene description may
 // be rewritten with extra detail, so an exact match is not enough.
-func locationIDFor(definition gameDefinition, scene string) string {
+func locationIDFor(definition story.Definition, scene string) string {
 	scene = strings.TrimSpace(scene)
 	if scene == "" {
 		return ""
@@ -539,7 +540,7 @@ func locationIDFor(definition gameDefinition, scene string) string {
 // passer-by id so the same person cannot be promoted twice under different names.
 // A passer-by id may contain revision punctuation, so the result is reduced to the
 // identifier shape the rest of the runtime accepts.
-func promotionIdentity(bystander content.PackBystander, definition gameDefinition) (string, string) {
+func promotionIdentity(bystander story.Bystander, definition story.Definition) (string, string) {
 	source := wire.Clean(bystander.BystanderID)
 	if source == "" {
 		source = bystander.Name

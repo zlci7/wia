@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"gameagent/backend/internal/content"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/content"
 )
 
 func TestContentProjectAndDraftLifecycle(t *testing.T) {

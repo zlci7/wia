@@ -8,14 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/wire"
-	wiaworld "gameagent/backend/internal/world"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // Imports are previews first: a detected format is mapped onto a draft, the author

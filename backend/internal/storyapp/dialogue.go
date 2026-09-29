@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+
 	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
-	"strings"
 )
 
 // Dialogue is sourced from committed events, never UI messages or failed inputs.

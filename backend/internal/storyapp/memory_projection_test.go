@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gameagent/backend/internal/memorymodel"
-	"gameagent/backend/internal/storage"
-	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 func historyRecords(groups, perGroup int, content func(group, index int) string) []memorymodel.MemorySource {
@@ -65,7 +67,7 @@ func TestUnderWindowHistoryKeepsBacklogRetrievable(t *testing.T) {
 	})
 	snapshot := worldSnapshot{
 		PlayerName: "旅人",
-		Definition: gameDefinition{Background: "旧渡口客栈的雨夜"},
+		Definition: story.Definition{Background: "旧渡口客栈的雨夜"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_projection", GameID: GameID, Clock: "第 1 日 19:00"},
 		Messages:   []wiaworld.Message{{MessageID: "msg:1", Kind: "narrative", Content: "雨声敲着窗沿。"}},
 		LongMemory: map[string]memoryContext{"player": {Archive: archive, Tail: archive}},
@@ -136,7 +138,7 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	})
 	snapshot := worldSnapshot{
 		PlayerName: "旅人",
-		Definition: gameDefinition{Background: "背景"},
+		Definition: story.Definition{Background: "背景"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_window", Clock: "第 1 日 19:00"},
 		LongMemory: map[string]memoryContext{"player": {Archive: tail, Tail: tail}},
 	}
@@ -154,7 +156,7 @@ func TestWindowGroupsExitWholeBeforeCapacityFailure(t *testing.T) {
 	}
 	oversized := worldSnapshot{
 		PlayerName: "旅人",
-		Definition: gameDefinition{Background: "背景"},
+		Definition: story.Definition{Background: "背景"},
 		Summary:    wiaworld.WorldSummary{WorldID: "world_oversized", Clock: "第 1 日 19:00"},
 		LongMemory: map[string]memoryContext{"player": {
 			Archive: []memorymodel.MemorySource{{ID: "only", Seq: 1, RunID: "run:1", Content: strings.Repeat("单组超长经历", 20000)}},
