@@ -63,37 +63,31 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 		}
 		return a.worldSummary(ctx, worldID)
 	}
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return wiaworld.WorldSummary{}, err
-	}
-	defer tx.Rollback()
-	currentEpochText, err := storage.MetaGetTx(ctx, tx, "context_epoch")
-	if err != nil {
-		return wiaworld.WorldSummary{}, err
-	}
-	currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
-	if err != nil {
-		return wiaworld.WorldSummary{}, err
-	}
-	if request.ExpectedContextEpoch != currentEpoch {
-		return wiaworld.WorldSummary{}, ErrVersionConflict
-	}
-	for key, value := range map[string]string{
-		"player_name":    playerName,
-		"player_profile": playerProfile,
-		"context_epoch":  strconv.FormatInt(currentEpoch+1, 10),
-		"updated_at":     wire.NowText(),
-	} {
-		if err := storage.MetaSetTx(ctx, tx, key, value); err != nil {
-			return wiaworld.WorldSummary{}, err
+	if err := store.InTx(ctx, func(tx *storage.WorldTx) error {
+		currentEpochText, err := tx.GetMeta(ctx, "context_epoch")
+		if err != nil {
+			return err
 		}
-	}
-	// The old material is no longer a valid basis for derived optional content.
-	if _, err := tx.ExecContext(ctx, `DELETE FROM meta WHERE key='suggestion_set'`); err != nil {
-		return wiaworld.WorldSummary{}, err
-	}
-	if err := tx.Commit(); err != nil {
+		currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
+		if err != nil {
+			return err
+		}
+		if request.ExpectedContextEpoch != currentEpoch {
+			return ErrVersionConflict
+		}
+		for key, value := range map[string]string{
+			"player_name":    playerName,
+			"player_profile": playerProfile,
+			"context_epoch":  strconv.FormatInt(currentEpoch+1, 10),
+			"updated_at":     wire.NowText(),
+		} {
+			if err := tx.SetMeta(ctx, key, value); err != nil {
+				return err
+			}
+		}
+		// The old material is no longer a valid basis for derived optional content.
+		return tx.DeleteMeta(ctx, "suggestion_set")
+	}); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
 	return a.worldSummary(ctx, worldID)

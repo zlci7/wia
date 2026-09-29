@@ -18,7 +18,7 @@ import (
 // allowed to fall and must never rise — a new call is new coupling in the direction
 // the refactor is removing, and nothing else in the build would notice.
 const (
-	databaseProductionBaseline = 33
+	databaseProductionBaseline = 24
 	databaseTestBaseline       = 104
 )
 

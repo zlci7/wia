@@ -142,18 +142,12 @@ func (a *App) RequestSuggestions(ctx context.Context, worldID string, req Sugges
 			return set, nil
 		}
 		w.cancelSuggestions()
-		tx, err := store.Database().BeginTx(ctx, nil)
-		if err != nil {
-			return set, err
-		}
-		defer tx.Rollback()
-		if err = storage.MetaSetTx(ctx, tx, "suggestions_enabled", fmt.Sprint(*req.Enabled)); err != nil {
-			return set, err
-		}
-		if _, err = tx.ExecContext(ctx, `DELETE FROM meta WHERE key='suggestion_set'`); err != nil {
-			return set, err
-		}
-		if err = tx.Commit(); err != nil {
+		if err := store.InTx(ctx, func(tx *storage.WorldTx) error {
+			if err := tx.SetMeta(ctx, "suggestions_enabled", fmt.Sprint(*req.Enabled)); err != nil {
+				return err
+			}
+			return tx.DeleteMeta(ctx, "suggestion_set")
+		}); err != nil {
 			return set, err
 		}
 		set = SuggestionSet{Enabled: *req.Enabled, Status: "empty", Basis: req.Basis, Items: []string{}}

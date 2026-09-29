@@ -321,64 +321,8 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if attempt < 1 {
 		attempt = 1
 	}
-	tx, err := store.Database().BeginTx(ctx, nil)
+	run, err := a.submitRunTx(ctx, store, snapshot, request, attempt, now)
 	if err != nil {
-		return wiaworld.Run{}, err
-	}
-	defer tx.Rollback()
-	inputID := wire.Clean(request.inputID)
-	inputSeq := request.inputSeq
-	if inputSeq > 0 {
-		if inputID == "" {
-			return wiaworld.Run{}, ErrVersionConflict
-		}
-		var latestInputSeq int64
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(input_seq),0) FROM runs`).Scan(&latestInputSeq); err != nil {
-			return wiaworld.Run{}, err
-		}
-		if latestInputSeq != inputSeq {
-			return wiaworld.Run{}, ErrVersionConflict
-		}
-		var completed int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM runs WHERE input_id=? AND status='completed'`, inputID).Scan(&completed); err != nil {
-			return wiaworld.Run{}, err
-		}
-		if completed > 0 {
-			return wiaworld.Run{}, ErrVersionConflict
-		}
-	} else {
-		value, err := storage.MetaGetTx(ctx, tx, "input_seq")
-		if err != nil {
-			return wiaworld.Run{}, err
-		}
-		inputSeq, err = strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return wiaworld.Run{}, err
-		}
-		inputSeq++
-		inputID = wire.NewID("input")
-		if err := storage.MetaSetTx(ctx, tx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
-			return wiaworld.Run{}, err
-		}
-	}
-	run := wiaworld.Run{
-		RunID: wire.NewID("run"), RequestKey: request.RequestKey, RequestHash: a.hashRun(request),
-		Input: request.Input, AddresseeID: wire.Clean(request.AddresseeID), Attempt: attempt,
-		Status: "accepted", CreatedAt: now, UpdatedAt: now,
-		InputID: inputID, InputSeq: inputSeq,
-		BaseTurnSeq: snapshot.Summary.TurnSeq, BaseMessageHead: snapshot.Summary.MessageHead,
-		BaseEventHead: snapshot.Summary.EventHead, BaseContextEpoch: snapshot.Summary.ContextEpoch,
-		BaseSceneVersion: snapshot.SceneVersion,
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO runs(
-		run_id,request_key,request_hash,input,addressee_id,attempt,status,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at
-	) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, run.RunID, run.RequestKey, run.RequestHash, run.Input,
-		run.AddresseeID, run.Attempt, run.Status, run.InputID, run.InputSeq, run.BaseTurnSeq, run.BaseMessageHead, run.BaseEventHead,
-		run.BaseContextEpoch, run.BaseSceneVersion, run.CreatedAt.Format(time.RFC3339Nano), run.UpdatedAt.Format(time.RFC3339Nano))
-	if err != nil {
-		return wiaworld.Run{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return wiaworld.Run{}, err
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -389,6 +333,78 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	a.runsMu.Unlock()
 	go a.runWorker(runCtx, runtime, run)
 	return run, nil
+}
+
+// submitRunTx accepts one run: it confirms the caller's input position, takes the next
+// sequence if this is a new input, and records the run.
+//
+// The whole thing is one transaction because an accepted run and the input sequence it
+// consumed must agree; a reader that saw the run without the sequence, or the reverse,
+// would have the wrong idea of what the world has already taken in.
+func (a *App) submitRunTx(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, request RunRequest, attempt int, now time.Time) (wiaworld.Run, error) {
+	var accepted wiaworld.Run
+	err := store.InTx(ctx, func(tx *storage.WorldTx) error {
+		inputID := wire.Clean(request.inputID)
+		inputSeq := request.inputSeq
+		if inputSeq > 0 {
+			if inputID == "" {
+				return ErrVersionConflict
+			}
+			latest, err := tx.MaxRunInputSequence(ctx)
+			if err != nil {
+				return err
+			}
+			if latest != inputSeq {
+				return ErrVersionConflict
+			}
+			completed, err := tx.CountCompletedRunsWithInput(ctx, inputID)
+			if err != nil {
+				return err
+			}
+			if completed > 0 {
+				return ErrVersionConflict
+			}
+		} else {
+			value, err := tx.GetMeta(ctx, "input_seq")
+			if err != nil {
+				return err
+			}
+			inputSeq, err = strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			inputSeq++
+			inputID = wire.NewID("input")
+			if err := tx.SetMeta(ctx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
+				return err
+			}
+		}
+		run := wiaworld.Run{
+			RunID: wire.NewID("run"), RequestKey: request.RequestKey, RequestHash: a.hashRun(request),
+			Input: request.Input, AddresseeID: wire.Clean(request.AddresseeID), Attempt: attempt,
+			Status: "accepted", CreatedAt: now, UpdatedAt: now,
+			InputID: inputID, InputSeq: inputSeq,
+			BaseTurnSeq: snapshot.Summary.TurnSeq, BaseMessageHead: snapshot.Summary.MessageHead,
+			BaseEventHead: snapshot.Summary.EventHead, BaseContextEpoch: snapshot.Summary.ContextEpoch,
+			BaseSceneVersion: snapshot.SceneVersion,
+		}
+		if err := tx.InsertRun(ctx, storage.RunWrite{
+			RunID: run.RunID, RequestKey: run.RequestKey, RequestHash: run.RequestHash, Input: run.Input,
+			AddresseeID: run.AddresseeID, Attempt: run.Attempt, Status: run.Status,
+			InputID: run.InputID, InputSeq: run.InputSeq,
+			BaseTurnSeq: run.BaseTurnSeq, BaseMessageHead: run.BaseMessageHead, BaseEventHead: run.BaseEventHead,
+			BaseContextEpoch: run.BaseContextEpoch, BaseSceneVersion: run.BaseSceneVersion,
+			CreatedAt: run.CreatedAt.Format(time.RFC3339Nano), UpdatedAt: run.UpdatedAt.Format(time.RFC3339Nano),
+		}); err != nil {
+			return err
+		}
+		accepted = run
+		return nil
+	})
+	if err != nil {
+		return wiaworld.Run{}, err
+	}
+	return accepted, nil
 }
 
 func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.Run) {

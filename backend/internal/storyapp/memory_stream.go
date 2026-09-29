@@ -26,58 +26,41 @@ CREATE TABLE IF NOT EXISTS memory_digests (
 
 // This index copies only already-authorized projections. Joining an event grants
 // speaker/time metadata, never its body, except the speaker's own public speech.
+//
+// The precondition checks, the candidate read and the appends share one transaction so
+// the rows that were judged eligible are the rows written: a commit in between could
+// add a perception pointing at an event that arrived after the check.
 func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	var missing int
-	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM perceptions p LEFT JOIN events e ON e.event_id=p.source_event_id WHERE e.event_id IS NULL`).Scan(&missing); err != nil {
-		return err
-	}
-	if missing > 0 {
-		return ErrContextSourceMissing
-	}
-	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM memories m LEFT JOIN events e ON e.event_id=m.source_event_id WHERE e.event_id IS NULL`).Scan(&missing); err != nil {
-		return err
-	}
-	if missing > 0 {
-		return ErrContextSourceMissing
-	}
-	rows, err := tx.QueryContext(ctx, `SELECT scope,id,event_id,run_id,actor,kind,content,created_at FROM (
- SELECT p.recipient_id scope,'perception:'||p.seq id,e.event_id,e.run_id,e.actor_id actor,'perception:'||p.source_type kind,p.content,p.created_at,e.seq ordering,0 priority,p.seq tie_seq FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
- UNION ALL
- SELECT m.recipient_id,'memory:'||m.seq,e.event_id,e.run_id,m.recipient_id,'subjective:'||m.kind,m.content,m.created_at,e.seq,1,m.seq FROM memories m JOIN events e ON e.event_id=m.source_event_id WHERE e.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
- UNION ALL
- SELECT e.actor_id,'speech:'||e.event_id,e.event_id,e.run_id,e.actor_id,'own_speech',e.content,e.created_at,e.seq,2,e.seq FROM events e WHERE e.event_type='npc_dialogue' AND EXISTS(SELECT 1 FROM characters c WHERE c.entity_id=e.actor_id) AND EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')
- UNION ALL
- SELECT 'player','message:'||m.message_id,'',m.run_id,CASE WHEN m.kind='player' THEN 'player' ELSE 'narrator' END,'message:'||m.kind,m.content,m.created_at,0,3,m.seq FROM messages m WHERE m.message_id='opening' OR m.run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=m.run_id AND r.status='completed')
-) ORDER BY ordering,priority,tie_seq,id`)
-	if err != nil {
-		return err
-	}
-	var records []memorymodel.MemorySource
-	for rows.Next() {
-		var r memorymodel.MemorySource
-		if err = rows.Scan(&r.Scope, &r.ID, &r.EventID, &r.RunID, &r.Actor, &r.Kind, &r.Content, &r.CreatedAt); err != nil {
-			rows.Close()
-			return err
+	return store.InTx(ctx, func(tx *storage.WorldTx) error {
+		for _, table := range []string{"perceptions", "memories"} {
+			missing, err := tx.CountMissingEventSources(ctx, table)
+			if err != nil {
+				return err
+			}
+			if missing > 0 {
+				return ErrContextSourceMissing
+			}
 		}
-		records = append(records, r)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	for _, r := range records {
-		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_sources(scope,seq,source_id,event_id,run_id,actor,kind,content,created_at) SELECT ?,COALESCE(MAX(seq),0)+1,?,?,?,?,?,?,? FROM memory_sources WHERE scope=?`, r.Scope, r.ID, r.EventID, r.RunID, r.Actor, r.Kind, r.Content, r.CreatedAt, r.Scope)
+		records, err := tx.MemoryProjectionCandidates(ctx)
 		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		for _, record := range records {
+			if err := tx.AppendMemorySourceIfAbsent(ctx, storage.MemorySourceWrite{
+				Scope:     record.Scope,
+				ID:        record.ID,
+				EventID:   record.EventID,
+				RunID:     record.RunID,
+				Actor:     record.Actor,
+				Kind:      record.Kind,
+				Content:   record.Content,
+				CreatedAt: record.CreatedAt,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func memoryGroups(items []memorymodel.MemorySource) [][]memorymodel.MemorySource {

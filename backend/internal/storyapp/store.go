@@ -139,11 +139,6 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 		return ErrInvalidRequest
 	}
 	now := wire.NowText()
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	values := map[string]string{
 		"schema_version": strconv.Itoa(SchemaVersion), "user_id": userID, "game_id": def.Summary.ID,
 		"world_id": worldID, "game_revision": def.Revision, "mode": mode,
@@ -165,47 +160,54 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 	values["narrative_custom_instruction"] = settings.CustomInstruction
 	values["settings_origin"] = def.SettingsSource
 	values["definition_snapshot"] = wire.MarshalJSON(def)
-	for key, value := range values {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, key, value); err != nil {
+	// A world is either created whole or not at all: the headers, the characters, the
+	// opening message and the opening event together are what "this world exists" means.
+	return store.InTx(ctx, func(tx *storage.WorldTx) error {
+		for key, value := range values {
+			if err := tx.SetMeta(ctx, key, value); err != nil {
+				return err
+			}
+		}
+		if def.Plot != nil {
+			state := plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}
+			if err := plot.Validate(*def.Plot, state); err != nil {
+				return err
+			}
+			if err := tx.SetMeta(ctx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
+				return err
+			}
+			if err := tx.SetMeta(ctx, "plot_progress", wire.MarshalJSON(state)); err != nil {
+				return err
+			}
+		}
+		for _, c := range def.Characters {
+			if err := tx.SetMeta(ctx, "appearance:"+c.EntityID, c.Appearance); err != nil {
+				return err
+			}
+			if err := tx.SetMeta(ctx, "definition_revision:"+c.EntityID, c.DefinitionRevision); err != nil {
+				return err
+			}
+			if err := tx.SetMeta(ctx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
+				return err
+			}
+			if err := tx.InsertCharacter(ctx, storage.CharacterWrite{
+				EntityID: c.EntityID, DefinitionID: c.DefinitionID, Name: c.Name, Role: c.Role,
+				Profile: c.Profile, Knowledge: c.Knowledge, InScene: c.InScene,
+			}); err != nil {
+				return err
+			}
+		}
+		if err := tx.InsertMessage(ctx, 1, "opening", "narrative", def.Opening, "system", now); err != nil {
 			return err
 		}
-	}
-	if def.Plot != nil {
-		state := plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}
-		if err := plot.Validate(*def.Plot, state); err != nil {
+		if err := tx.InsertEvent(ctx, storage.EventWrite{
+			Seq: 1, EventID: "opening", EventType: "scene_opened", ActorID: "system",
+			Content: def.Opening, RunID: "system", SceneVersion: 1, SourceType: "definition", CreatedAt: now,
+		}); err != nil {
 			return err
 		}
-		if err := storage.MetaSetTx(ctx, tx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
-			return err
-		}
-		if err := storage.MetaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(state)); err != nil {
-			return err
-		}
-	}
-	for _, c := range def.Characters {
-		if err := storage.MetaSetTx(ctx, tx, "appearance:"+c.EntityID, c.Appearance); err != nil {
-			return err
-		}
-		if err := storage.MetaSetTx(ctx, tx, "definition_revision:"+c.EntityID, c.DefinitionRevision); err != nil {
-			return err
-		}
-		if err := storage.MetaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`, c.EntityID, c.DefinitionID, c.Name, c.Role, c.Profile, c.Knowledge, wire.BoolInt(c.InScene)); err != nil {
-			return err
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(1,?,?,?,?,?)`, "opening", "narrative", def.Opening, "system", now); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, 1, "opening", "scene_opened", "system", "", def.Opening, "system", 0, 1, "definition", now); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE meta SET value='1' WHERE key='event_head'`); err != nil {
-		return err
-	}
-	return tx.Commit()
+		return tx.SetMeta(ctx, "event_head", "1")
+	})
 }
 
 func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
@@ -340,147 +342,146 @@ func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 // recorded separately under the world's assets.
 
 func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *plot.Progress, generated ...*generatedEventState) (int64, error) {
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	var status string
-	if err := tx.QueryRowContext(ctx, `SELECT status FROM runs WHERE run_id=?`, run.RunID).Scan(&status); err != nil {
-		return 0, err
-	}
-	if status != "running" {
-		return 0, ErrWorldBusy
-	}
-	var cancelled int
-	if err := tx.QueryRowContext(ctx, `SELECT cancel_requested FROM runs WHERE run_id=?`, run.RunID).Scan(&cancelled); err != nil {
-		return 0, err
-	}
-	if cancelled != 0 {
-		return 0, context.Canceled
-	}
-	var messageHead, eventHead, turnSeq, currentSceneVersion, contextEpoch int64
-	for key, target := range map[string]*int64{"message_head": &messageHead, "event_head": &eventHead, "turn_seq": &turnSeq, "scene_version": &currentSceneVersion, "context_epoch": &contextEpoch} {
-		value, err := storage.MetaGetTx(ctx, tx, key)
+	var messageHead int64
+	var eventHead int64
+	var turnSeq int64
+	var currentSceneVersion int64
+	var contextEpoch int64
+	if err := store.InTx(ctx, func(tx *storage.WorldTx) error {
+		status, cancelled, err := tx.RunStatus(ctx, run.RunID)
 		if err != nil {
-			return 0, err
+			return err
 		}
-		*target, err = strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return 0, err
+		if status != "running" {
+			return ErrWorldBusy
 		}
-	}
-	if run.InputSeq > 0 && (run.BaseTurnSeq != turnSeq || run.BaseMessageHead != messageHead || run.BaseEventHead != eventHead || run.BaseContextEpoch != contextEpoch || run.BaseSceneVersion != currentSceneVersion) {
-		return 0, ErrVersionConflict
-	}
-	if sceneVersion < currentSceneVersion {
-		return 0, ErrVersionConflict
-	}
-	for _, e := range events {
-		eventHead++
-		e.Seq = eventHead
-		if _, err := tx.ExecContext(ctx, `INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, e.Seq, e.EventID, e.EventType, e.ActorID, e.TargetID, e.Content, e.RunID, e.Stage, e.SceneVersion, e.SourceType, e.CreatedAt.Format(time.RFC3339Nano)); err != nil {
-			return 0, err
+		if cancelled {
+			return context.Canceled
 		}
-		if e.ProjectionParentID != "" {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO event_dependencies(child_id,parent_id) VALUES(?,?)`, e.EventID, e.ProjectionParentID); err != nil {
-				return 0, err
-			}
-		}
-	}
-	for _, p := range perceptions {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,?,?,?,?,?)`, p.RecipientID, p.SourceEventID, p.SourceType, p.Content, p.Stage, p.SceneVersion, p.CreatedAt.Format(time.RFC3339Nano)); err != nil {
-			return 0, err
-		}
-	}
-	for _, m := range memories {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO memories(recipient_id,kind,content,source_event_id,created_at) VALUES(?,?,?,?,?)`, m.RecipientID, m.Kind, m.Content, m.SourceEventID, m.CreatedAt.Format(time.RFC3339Nano)); err != nil {
-			return 0, err
-		}
-	}
-	messageHead++
-	inputID := run.RunID + ":input"
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, inputID, "player", run.Input, run.RunID, wire.NowText()); err != nil {
-		return 0, err
-	}
-	messageHead++
-	messageID := run.RunID + ":narrative"
-	if _, err := tx.ExecContext(ctx, `INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, messageHead, messageID, "narrative", narrative, run.RunID, wire.NowText()); err != nil {
-		return 0, err
-	}
-	turnSeq++
-	if err := storage.MetaSetTx(ctx, tx, "message_head", strconv.FormatInt(messageHead, 10)); err != nil {
-		return 0, err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "event_head", strconv.FormatInt(eventHead, 10)); err != nil {
-		return 0, err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "turn_seq", strconv.FormatInt(turnSeq, 10)); err != nil {
-		return 0, err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "clock", clock); err != nil {
-		return 0, err
-	}
-	if plotState != nil {
-		if err := storage.MetaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
-			return 0, err
-		}
-	}
-	if len(generated) > 0 && generated[0] != nil {
-		if err := storage.MetaSetTx(ctx, tx, "generated_events", wire.MarshalJSON(generated[0])); err != nil {
-			return 0, err
-		}
-	}
-	if scene == "" {
-		scene, _ = storage.MetaGetTx(ctx, tx, "scene")
-	}
-	viewsJSON, err := json.Marshal(sceneViews)
-	if err != nil {
-		return 0, err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "scene_views", string(viewsJSON)); err != nil {
-		return 0, err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "scene", scene); err != nil {
-		return 0, err
-	}
-	if sceneLocation != "" {
-		if err := storage.MetaSetTx(ctx, tx, "scene_location", sceneLocation); err != nil {
-			return 0, err
-		}
-	}
-	if err := storage.MetaSetTx(ctx, tx, "scene_version", strconv.FormatInt(sceneVersion, 10)); err != nil {
-		return 0, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE characters SET in_scene=0`); err != nil {
-		return 0, err
-	}
-	for _, entityID := range sceneCharacters {
-		result, err := tx.ExecContext(ctx, `UPDATE characters SET in_scene=1 WHERE entity_id=?`, entityID)
-		if err != nil {
-			return 0, err
-		}
-		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		for key, target := range map[string]*int64{"message_head": &messageHead, "event_head": &eventHead, "turn_seq": &turnSeq, "scene_version": &currentSceneVersion, "context_epoch": &contextEpoch} {
+			value, err := tx.GetMeta(ctx, key)
 			if err != nil {
-				return 0, err
+				return err
 			}
-			return 0, ErrGenerationFailed
+			*target, err = strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	if err := storage.MetaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
-		return 0, err
-	}
-	result, err := tx.ExecContext(ctx, `UPDATE runs SET status='completed',reason='',error='',message_seq=?,updated_at=? WHERE run_id=? AND status='running' AND cancel_requested=0`, messageHead, wire.NowText(), run.RunID)
-	if err != nil {
-		return 0, err
-	}
-	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		if run.InputSeq > 0 && (run.BaseTurnSeq != turnSeq || run.BaseMessageHead != messageHead || run.BaseEventHead != eventHead || run.BaseContextEpoch != contextEpoch || run.BaseSceneVersion != currentSceneVersion) {
+			return ErrVersionConflict
+		}
+		if sceneVersion < currentSceneVersion {
+			return ErrVersionConflict
+		}
+		for _, e := range events {
+			eventHead++
+			e.Seq = eventHead
+			if err := tx.InsertEvent(ctx, storage.EventWrite{
+				Seq: eventHead, EventID: e.EventID, EventType: e.EventType, ActorID: e.ActorID,
+				TargetID: e.TargetID, Content: e.Content, RunID: e.RunID, Stage: e.Stage,
+				SceneVersion: e.SceneVersion, SourceType: e.SourceType, CreatedAt: e.CreatedAt.Format(time.RFC3339Nano),
+			}); err != nil {
+				return err
+			}
+			if e.ProjectionParentID != "" {
+				if err := tx.InsertEventDependency(ctx, e.EventID, e.ProjectionParentID); err != nil {
+					return err
+				}
+			}
+		}
+		for _, p := range perceptions {
+			if err := tx.InsertPerceptionIfAbsent(ctx, storage.PerceptionWrite{
+				RecipientID: p.RecipientID, SourceEventID: p.SourceEventID, SourceType: p.SourceType,
+				Content: p.Content, Stage: p.Stage, SceneVersion: p.SceneVersion, CreatedAt: p.CreatedAt.Format(time.RFC3339Nano),
+			}); err != nil {
+				return err
+			}
+		}
+		for _, m := range memories {
+			if err := tx.InsertMemoryIfAbsent(ctx, storage.MemoryWrite{
+				RecipientID: m.RecipientID, Kind: m.Kind, Content: m.Content,
+				SourceEventID: m.SourceEventID, CreatedAt: m.CreatedAt.Format(time.RFC3339Nano),
+			}); err != nil {
+				return err
+			}
+		}
+		messageHead++
+		if err := tx.InsertMessage(ctx, messageHead, run.RunID+":input", "player", run.Input, run.RunID, wire.NowText()); err != nil {
+			return err
+		}
+		messageHead++
+		if err := tx.InsertMessage(ctx, messageHead, run.RunID+":narrative", "narrative", narrative, run.RunID, wire.NowText()); err != nil {
+			return err
+		}
+		turnSeq++
+		if err := tx.SetMeta(ctx, "message_head", strconv.FormatInt(messageHead, 10)); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "event_head", strconv.FormatInt(eventHead, 10)); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "turn_seq", strconv.FormatInt(turnSeq, 10)); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "clock", clock); err != nil {
+			return err
+		}
+		if plotState != nil {
+			if err := tx.SetMeta(ctx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
+				return err
+			}
+		}
+		if len(generated) > 0 && generated[0] != nil {
+			if err := tx.SetMeta(ctx, "generated_events", wire.MarshalJSON(generated[0])); err != nil {
+				return err
+			}
+		}
+		if scene == "" {
+			scene, _ = tx.GetMeta(ctx, "scene")
+		}
+		viewsJSON, err := json.Marshal(sceneViews)
 		if err != nil {
-			return 0, err
+			return err
 		}
-		return 0, ErrWorldBusy
-	}
-	if err := tx.Commit(); err != nil {
+		if err := tx.SetMeta(ctx, "scene_views", string(viewsJSON)); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "scene", scene); err != nil {
+			return err
+		}
+		if sceneLocation != "" {
+			if err := tx.SetMeta(ctx, "scene_location", sceneLocation); err != nil {
+				return err
+			}
+		}
+		if err := tx.SetMeta(ctx, "scene_version", strconv.FormatInt(sceneVersion, 10)); err != nil {
+			return err
+		}
+		if err := tx.ClearScenePresence(ctx); err != nil {
+			return err
+		}
+		for _, entityID := range sceneCharacters {
+			found, err := tx.SetScenePresence(ctx, entityID)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return ErrGenerationFailed
+			}
+		}
+		if err := tx.SetMeta(ctx, "updated_at", wire.NowText()); err != nil {
+			return err
+		}
+		completed, err := tx.CompleteRun(ctx, run.RunID, messageHead, wire.NowText())
+		if err != nil {
+			return err
+		}
+		if !completed {
+			return ErrWorldBusy
+		}
+		return nil
+	}); err != nil {
 		return 0, err
 	}
 	return messageHead, nil
@@ -501,22 +502,13 @@ func cloneWorld(ctx context.Context, source *storage.WorldStore, targetPath, tar
 		return err
 	}
 	defer target.Close()
-	tx, err := target.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := storage.MetaSetTx(ctx, tx, "world_id", targetWorldID); err != nil {
-		return err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "name", targetName); err != nil {
-		return err
-	}
-	if err := storage.MetaSetTx(ctx, tx, "generation", "1"); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	return nil
+	return target.InTx(ctx, func(tx *storage.WorldTx) error {
+		if err := tx.SetMeta(ctx, "world_id", targetWorldID); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "name", targetName); err != nil {
+			return err
+		}
+		return tx.SetMeta(ctx, "generation", "1")
+	})
 }

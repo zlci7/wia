@@ -110,39 +110,36 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	} else if count > 0 {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy
 	}
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
-	}
-	defer tx.Rollback()
-	currentEpochText, err := storage.MetaGetTx(ctx, tx, "context_epoch")
-	if err != nil {
-		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
-	}
-	currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
-	if err != nil {
-		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
-	}
-	if request.ExpectedContextEpoch > 0 && request.ExpectedContextEpoch != currentEpoch {
-		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, ErrVersionConflict
-	}
-	values := map[string]string{
-		"behavior_policies":            wire.MarshalJSON(settings.Policies),
-		"narrative_perspective":        settings.Perspective,
-		"narrative_length":             settings.Length,
-		"narrative_detail":             settings.Detail,
-		"player_elaboration":           settings.PlayerElaboration,
-		"npc_initiative":               settings.NPCInitiative,
-		"narrative_custom_instruction": settings.CustomInstruction,
-		"context_epoch":                strconv.FormatInt(currentEpoch+1, 10),
-		"updated_at":                   wire.NowText(),
-	}
-	for key, value := range values {
-		if err := storage.MetaSetTx(ctx, tx, key, value); err != nil {
-			return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
+	if err := store.InTx(ctx, func(tx *storage.WorldTx) error {
+		currentEpochText, err := tx.GetMeta(ctx, "context_epoch")
+		if err != nil {
+			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
+		currentEpoch, err := strconv.ParseInt(currentEpochText, 10, 64)
+		if err != nil {
+			return err
+		}
+		if request.ExpectedContextEpoch > 0 && request.ExpectedContextEpoch != currentEpoch {
+			return ErrVersionConflict
+		}
+		values := map[string]string{
+			"behavior_policies":            wire.MarshalJSON(settings.Policies),
+			"narrative_perspective":        settings.Perspective,
+			"narrative_length":             settings.Length,
+			"narrative_detail":             settings.Detail,
+			"player_elaboration":           settings.PlayerElaboration,
+			"npc_initiative":               settings.NPCInitiative,
+			"narrative_custom_instruction": settings.CustomInstruction,
+			"context_epoch":                strconv.FormatInt(currentEpoch+1, 10),
+			"updated_at":                   wire.NowText(),
+		}
+		for key, value := range values {
+			if err := tx.SetMeta(ctx, key, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if err := a.touchWorld(ctx, worldID); err != nil {

@@ -112,35 +112,43 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 			return c, err
 		}
 	}
-	tx, err := store.Database().BeginTx(ctx, nil)
-	if err != nil {
-		return c, err
-	}
-	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT INTO corrections VALUES(?,?,?,?,?,?,?,?,?,?)`, c.Epoch, request.RequestKey, hash, c.Kind, c.Scope, c.TargetID, c.Original, c.Replacement, c.CreatedAt, c.SceneVersion)
-	if err != nil {
-		return c, err
-	}
-	if err = storage.MetaSetTx(ctx, tx, "context_epoch", fmt.Sprint(c.Epoch)); err != nil {
-		return c, err
-	}
-	if err = storage.MetaSetTx(ctx, tx, "updated_at", c.CreatedAt); err != nil {
-		return c, err
-	}
-	if _, err = tx.ExecContext(ctx, `UPDATE memory_jobs SET status='superseded' WHERE status!='completed'`); err != nil {
-		return c, err
-	}
-	scopes := memoryScopeIDs(snapshot)
-	for scope, content := range correctionNotices(snapshot, c, eventRun) {
-		_, err = tx.ExecContext(ctx, `INSERT INTO memory_sources SELECT ?,COALESCE(MAX(seq),0)+1,?,'',?,'author',?,?,? FROM memory_sources WHERE scope=?`, scope, fmt.Sprintf("correction:%d", c.Epoch), fmt.Sprintf("correction:%d", c.Epoch), "correction:"+c.Kind, content, c.CreatedAt, scope)
-		if err != nil {
-			return c, err
+	// This is a business transaction, not a persistence primitive: a correction, the
+	// epoch it advances, the rebuilds it invalidates, the notices it writes into each
+	// scope's stream, and the new rebuild job it queues all have to land together or
+	// the world would believe something was corrected without agreeing on which.
+	if err = store.InTx(ctx, func(tx *storage.WorldTx) error {
+		if err := tx.InsertCorrection(ctx, storage.CorrectionWrite{
+			Epoch: c.Epoch, RequestKey: request.RequestKey, RequestHash: hash, Kind: c.Kind,
+			Scope: c.Scope, TargetID: c.TargetID, Original: c.Original, Replacement: c.Replacement,
+			CreatedAt: c.CreatedAt, SceneVersion: c.SceneVersion,
+		}); err != nil {
+			return err
 		}
-	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO memory_jobs VALUES(?,'queued',0,?,'',?)`, c.Epoch, wire.MarshalJSON(scopes), c.CreatedAt); err != nil {
-		return c, err
-	}
-	if err = tx.Commit(); err != nil {
+		if err := tx.SetMeta(ctx, "context_epoch", fmt.Sprint(c.Epoch)); err != nil {
+			return err
+		}
+		if err := tx.SetMeta(ctx, "updated_at", c.CreatedAt); err != nil {
+			return err
+		}
+		if err := tx.SupersedeOpenMemoryJobs(ctx); err != nil {
+			return err
+		}
+		for scope, content := range correctionNotices(snapshot, c, eventRun) {
+			if err := tx.AppendMemorySourceIfAbsent(ctx, storage.MemorySourceWrite{
+				Scope:     scope,
+				ID:        fmt.Sprintf("correction:%d", c.Epoch),
+				Actor:     "author",
+				Kind:      "correction:" + c.Kind,
+				Content:   content,
+				CreatedAt: c.CreatedAt,
+			}); err != nil {
+				return err
+			}
+		}
+		return tx.InsertMemoryJob(ctx, storage.MemoryJobWrite{
+			Epoch: c.Epoch, Scopes: wire.MarshalJSON(memoryScopeIDs(snapshot)), CreatedAt: c.CreatedAt,
+		})
+	}); err != nil {
 		return c, err
 	}
 	schedule = true
