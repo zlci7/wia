@@ -12,6 +12,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -79,7 +80,7 @@ func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T)
 	s := contextFixture()
 	s.Memories["npc:innkeeper"] = []wiaworld.Memory{{SourceEventID: "secret", Content: "SECRET_MEMORY"}}
 	s.SceneViews[1].Content = "PRIVATE_SCENE"
-	material := composeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", npcStageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
+	material := composeNPC(s, lanternDefinition(), s.Characters[1], "npc:innkeeper", "speak", turn.StageInput{PlayerPerception: "看见交谈，但未听清"}, "", 1)
 	req, _, err := (ContextComposer{}).Build(material, material.System, 1024)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +125,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 	if !strings.Contains(text, "沈岚（客栈老板）") {
 		t.Fatalf("speaker lost: %s", text)
 	}
-	if _, ok := eventByID(s.Events, r.RunID+":input"); ok {
+	if _, ok := turn.EventByID(s.Events, r.RunID+":input"); ok {
 		t.Fatal("fixture did not push event outside window")
 	}
 	s.Perceptions["npc:mercenary"] = append(s.Perceptions["npc:mercenary"], wiaworld.Perception{SourceEventID: "missing"})

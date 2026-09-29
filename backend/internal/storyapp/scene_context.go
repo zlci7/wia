@@ -3,6 +3,7 @@ package storyapp
 import (
 	"encoding/json"
 	"fmt"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
@@ -118,7 +119,7 @@ func applySceneUpdates(snapshot worldSnapshot, run wiaworld.Run, intent turnInte
 		byID[source.ID] = source
 	}
 	for i, outcome := range host.Outcomes {
-		action, ok := eventByID(output.Events, outcome.ActionID)
+		action, ok := turn.EventByID(output.Events, outcome.ActionID)
 		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
 			return nil, ErrGenerationFailed
 		}

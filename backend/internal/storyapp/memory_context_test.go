@@ -9,6 +9,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -44,9 +45,9 @@ func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
 	}
 	s.Perceptions["npc:innkeeper"] = []wiaworld.Perception{{SourceEventID: "current-done", Content: "此前已完成添茶，不是新提案。", SourceType: "action_result"}}
 	s.Sources["current-done"] = sourceMetadata{ID: "current-done", Actor: "npc:innkeeper", Kind: "npc_action_result"}
-	input := map[string]npcStageInput{"npc:innkeeper": {NewStimulus: "新的铃声"}}
+	input := map[string]turn.StageInput{"npc:innkeeper": {NewStimulus: "新的铃声"}}
 	g := &recallProbe{}
-	decisions := map[string]npcDecision{}
+	decisions := map[string]turn.NPCDecision{}
 	if err = a.decideNPCs(ctx, g, s, lanternDefinition(), wiaworld.Run{RunID: "probe", BaseContextEpoch: w.ContextEpoch}, "npc:innkeeper", "speak", input, nil, decisions, 5); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,7 @@ func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
 		t.Fatal("stage five lost current results")
 	}
 	g = &recallProbe{always: true}
-	if err = a.decideNPCs(ctx, g, s, lanternDefinition(), wiaworld.Run{RunID: "bounded", BaseContextEpoch: w.ContextEpoch}, "npc:innkeeper", "speak", input, nil, map[string]npcDecision{}, 5); err == nil || len(g.requests) != 3 {
+	if err = a.decideNPCs(ctx, g, s, lanternDefinition(), wiaworld.Run{RunID: "bounded", BaseContextEpoch: w.ContextEpoch}, "npc:innkeeper", "speak", input, nil, map[string]turn.NPCDecision{}, 5); err == nil || len(g.requests) != 3 {
 		t.Fatal("unbounded recall", err, len(g.requests))
 	}
 }

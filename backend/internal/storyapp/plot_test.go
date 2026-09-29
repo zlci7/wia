@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -173,7 +174,7 @@ func TestPlotInterventionUsesResolvedPlayerEvidence(t *testing.T) {
 	if n.Status != "skipped" || len(n.Evidence) != 1 {
 		t.Fatalf("intervention=%+v", n)
 	}
-	e, ok := eventByID(s.Events, n.Evidence[0])
+	e, ok := turn.EventByID(s.Events, n.Evidence[0])
 	if !ok || e.EventType != "player_action_result" || e.SourceType != "action_succeeded" {
 		t.Fatal("node used attempt instead of resolved result")
 	}

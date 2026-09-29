@@ -86,16 +86,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	var out bytes.Buffer
-	out.Write(target)
-	if !bytes.HasSuffix(target, []byte("\n")) {
-		out.WriteString("\n")
+	// The declarations go after the import block, not at the end of the file:
+	// appending to the raw bytes puts them before the package clause when the target
+	// is a fresh file, which is not valid Go. An earlier version did exactly that.
+	targetFile, err := parser.ParseFile(fset, *to, target, parser.ParseComments)
+	if err != nil {
+		panic(err)
 	}
+	splice := 0
+	for _, decl := range targetFile.Decls {
+		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.IMPORT && gen.End() > token.Pos(splice) {
+			splice = fset.Position(gen.End()).Offset
+		}
+	}
+	if splice == 0 {
+		splice = fset.Position(targetFile.Name.End()).Offset
+	}
+	var body bytes.Buffer
 	for _, text := range moved {
-		out.WriteString("\n")
-		out.WriteString(text)
-		out.WriteString("\n")
+		body.WriteString("\n\n")
+		body.WriteString(text)
 	}
+	var out bytes.Buffer
+	out.Write(target[:splice])
+	out.Write(body.Bytes())
+	out.Write(target[splice:])
 	// go/printer is not used here on purpose: the text is copied byte for byte.
 	if err := os.WriteFile(*to, out.Bytes(), 0o644); err != nil {
 		panic(err)

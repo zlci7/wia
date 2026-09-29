@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 	"os"
 	"strings"
@@ -19,7 +20,7 @@ func TestDiagnosticClassificationAndPrivateFailure(t *testing.T) {
 		{"empty_response", "model_empty_response"}, {"output_incomplete", "model_output_incomplete"},
 		{"invalid_response", "model_invalid_response"}, {"timeout", "generation_timeout"},
 	} {
-		err := atTurnStage(turnStageNarration, &model.TextCallError{Diagnostic: model.TextDiagnostic{Code: tc.code, HTTPStatus: 503}, Cause: errors.New("PRIVATE_PROMPT_AND_KEY")})
+		err := turn.AtStage(turn.StageNarration, &model.TextCallError{Diagnostic: model.TextDiagnostic{Code: tc.code, HTTPStatus: 503}, Cause: errors.New("PRIVATE_PROMPT_AND_KEY")})
 		_, reason, message := classifyTurnFailure(err)
 		if reason != tc.reason || strings.Contains(message, "PRIVATE") {
 			t.Fatalf("%s %s", reason, message)

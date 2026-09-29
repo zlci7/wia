@@ -16,6 +16,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -421,7 +422,7 @@ func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *test
 		Memories:     map[string][]wiaworld.Memory{},
 		SceneVersion: 1,
 	}
-	prompt := buildNPCPrompt(snapshot, def, character, "", "act", npcStageInput{PlayerPerception: "走进大门看看"}, "", 1)
+	prompt := buildNPCPrompt(snapshot, def, character, "", "act", turn.StageInput{PlayerPerception: "走进大门看看"}, "", 1)
 	for _, want := range []string{
 		"按情境主动",
 		"可以沉默，也可以在规则允许时主动介入",
@@ -670,7 +671,7 @@ func TestPrivatePlayerTextIsAvailableToNarratorEvents(t *testing.T) {
 }
 
 func TestObserveIntentUsesActionPerceptionAndMemoryTypes(t *testing.T) {
-	if got := sourceTypeFor(true, "npc:innkeeper", "npc:innkeeper", "observe"); got != "observed_player_action" {
+	if got := turn.SourceTypeFor(true, "npc:innkeeper", "npc:innkeeper", "observe"); got != "observed_player_action" {
 		t.Fatalf("private observe source type = %q", got)
 	}
 	if kind, memory := playerExperienceMemory("observe", true, "npc:innkeeper", "npc:innkeeper", "查看柜台下方", lanternDefinition()); kind != "observed_player_action" || !strings.Contains(memory, "尝试观察") {
@@ -1033,7 +1034,7 @@ func TestStrictJSONRejectsDuplicateKeys(t *testing.T) {
 	if err := validateStrictJSON([]byte(`{"speech":"x","speech":"y"}`)); err == nil {
 		t.Fatal("duplicate key accepted")
 	}
-	var value npcDecision
+	var value turn.NPCDecision
 	if err := generateJSON(context.Background(), &scriptedGenerator{fail: true}, "", "", &value, 100); err == nil {
 		t.Fatal("unknown field accepted")
 	}
@@ -1241,7 +1242,7 @@ func TestSceneHostProposalAndSceneVersionAreCommitted(t *testing.T) {
 
 func TestSceneRosterTreatsPlayerAsImplicit(t *testing.T) {
 	characters := lanternDefinition().Characters
-	ids := normalizeSceneCharacters([]string{"player", "npc:innkeeper", "npc:mercenary"})
+	ids := turn.NormalizeSceneCharacters([]string{"player", "npc:innkeeper", "npc:mercenary"})
 	if err := validateSceneCharacters(ids, characters); err != nil {
 		t.Fatal(err)
 	}
@@ -1519,7 +1520,7 @@ func TestSemanticIntentIsNotOverwrittenByKeywordHints(t *testing.T) {
 
 func TestRequiredJSONFieldsRejectEmptyObjects(t *testing.T) {
 	for _, text := range []string{`{}`, `null`, `{"speech":null,"action_intent":null,"silent":null,"memory":null}`} {
-		var decision npcDecision
+		var decision turn.NPCDecision
 		if err := generateJSON(context.Background(), fixedJSONGenerator{text: text}, "", "", &decision, 100, "speech", "action_intent", "silent", "memory"); err == nil {
 			t.Fatalf("empty NPC response accepted: %s", text)
 		}

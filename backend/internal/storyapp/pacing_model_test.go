@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -61,7 +62,7 @@ func (p *pacingProbe) GenerateText(ctx context.Context, req model.TextRequest) (
 	defer p.mu.Unlock()
 	line := fmt.Sprintf("stage=%s elapsed_ms=%d success=%t", stage, time.Since(started).Milliseconds(), err == nil)
 	if stage == "npc" && err == nil {
-		var decision npcDecision
+		var decision turn.NPCDecision
 		if invalid := decodeGeneratedJSON(response.Text, &decision, []string{"speech", "action_intent", "memory"}, []string{"speech", "action_intent", "silent", "memory"}); invalid != nil {
 			line += fmt.Sprintf(" schema_error=%v", invalid)
 		}
@@ -167,7 +168,7 @@ func TestPacingCommittedTeaReplay(t *testing.T) {
 	}
 	run := wiaworld.Run{RunID: "replay", Input: "我走进去跟老板打了声招呼，观测起四周"}
 	speech := "晚上好，茶刚沏好，趁热。"
-	decisions := map[string]npcDecision{"npc:innkeeper": {Speech: speech}, "npc:mercenary": {Silent: true}}
+	decisions := map[string]turn.NPCDecision{"npc:innkeeper": {Speech: speech}, "npc:mercenary": {Silent: true}}
 	events := []wiaworld.Event{{EventID: "current-greeting", RunID: "replay", Stage: 1, EventType: "npc_dialogue", ActorID: "npc:innkeeper", Content: speech}, {EventID: "current-input", RunID: "replay", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: run.Input}}
 	for _, baseline := range []bool{true, false} {
 		name := "current"

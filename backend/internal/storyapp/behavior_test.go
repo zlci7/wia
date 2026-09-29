@@ -9,6 +9,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -206,7 +207,7 @@ func TestBehaviorPoliciesLimitsBusyAndCapacity(t *testing.T) {
 	s := contextFixture()
 	s.Narrative = wiaworld.DefaultNarrativeSettings()
 	s.Narrative.Policies.NPC = strings.Repeat("策略", 2000)
-	m := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", npcStageInput{PlayerPerception: "我沉默"}, "", 1)
+	m := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
 	c := ContextComposer{Window: model.WindowLimits{ContextTokens: 1024, OutputTokens: 512}}
 	if _, _, err = c.Build(m, m.System, 512); !errors.Is(err, ErrContextCapacity) {
 		t.Fatal("required policy was truncated", err)

@@ -37,9 +37,30 @@ func main() {
 	drop := flag.String("drop", "", "comma-separated type names to delete from -file")
 	file := flag.String("file", "", "single file to edit with -drop")
 	from := flag.String("from", "", "rewrite selectors of this import path instead of bare identifiers")
+	only := flag.String("only-dirs", "", "comma-separated directory suffixes; rewrite only these callers")
 	tests := flag.Bool("tests", false, "rewrite test files too")
 	check := flag.Bool("check", false, "report what would change without writing")
 	flag.Parse()
+	// A bare name can be declared in two packages at once. When only one of them
+	// moves, restricting the callers keeps the other package's own references — and
+	// its own declarations — out of the rewrite.
+	onlyDirs := []string{}
+	for _, item := range strings.Split(*only, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			onlyDirs = append(onlyDirs, item)
+		}
+	}
+	allowed := func(path string) bool {
+		if len(onlyDirs) == 0 {
+			return true
+		}
+		for _, suffix := range onlyDirs {
+			if strings.HasSuffix(filepath.ToSlash(path), suffix) {
+				return true
+			}
+		}
+		return false
+	}
 
 	if *drop != "" {
 		if *dir == "" {
@@ -122,6 +143,9 @@ func main() {
 			continue
 		}
 		if strings.HasSuffix(name, "_test.go") != *tests {
+			continue
+		}
+		if !allowed(*dir) {
 			continue
 		}
 		path := filepath.Join(*dir, name)

@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
@@ -59,7 +60,7 @@ func TestNarrativeLengthPreferencesPreserveOutputBudgets(t *testing.T) {
 }
 
 func TestCoordinationContinuityUsesCompletedResultsNotIntentOrPrivateMemory(t *testing.T) {
-	text := coordinationContinuity([]wiaworld.Event{
+	text := turn.CoordinationContinuity([]wiaworld.Event{
 		{EventType: "npc_action_intent", Content: "想藏起茶碗"},
 		{EventType: "npc_action_result", Content: "茶已放在桌角，沈岚在桌边。"},
 		{EventType: "player_private_speech", Content: "不公开的密语"},

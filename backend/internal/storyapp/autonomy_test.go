@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
@@ -30,8 +31,8 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 		}
 	}
 	s.Characters[0].InitialConcerns = "ONLY_FIRST_CHARACTER_CONCERN"
-	own := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", npcStageInput{PlayerPerception: "我沉默"}, "", 1)
-	other := composeNPC(s, lanternDefinition(), s.Characters[1], "", "act", npcStageInput{PlayerPerception: "我沉默"}, "", 1)
+	own := composeNPC(s, lanternDefinition(), s.Characters[0], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
+	other := composeNPC(s, lanternDefinition(), s.Characters[1], "", "act", turn.StageInput{PlayerPerception: "我沉默"}, "", 1)
 	if !strings.Contains(own.Required, "ONLY_FIRST_CHARACTER_CONCERN") || strings.Contains(other.Required, "ONLY_FIRST_CHARACTER_CONCERN") {
 		t.Fatal("concern scope")
 	}
@@ -56,7 +57,7 @@ func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
 	var out turnOutput
 	run := wiaworld.Run{RunID: "autonomy"}
 	actor := lanternDefinition().Characters[0]
-	appendNPCDecisionOutput(&out, run, actor, npcDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
+	appendNPCDecisionOutput(&out, run, actor, turn.NPCDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
 	var actions int
 	for _, e := range out.Events {
 		if e.EventType == "npc_dialogue" {
@@ -70,7 +71,7 @@ func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
 		t.Fatalf("actions=%d", actions)
 	}
 	s := contextFixture()
-	m := composeNPC(s, lanternDefinition(), actor, "", "act", npcStageInput{PlayerPerception: "我沉默片刻，不回复"}, "", 1)
+	m := composeNPC(s, lanternDefinition(), actor, "", "act", turn.StageInput{PlayerPerception: "我沉默片刻，不回复"}, "", 1)
 	if strings.Contains(m.Required, "基于玩家本轮输入作出一次自然决定") || !strings.Contains(m.Required, "处理自己的事务") {
 		t.Fatal("reactive-only task")
 	}

@@ -11,6 +11,7 @@ import (
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/tokenestimate"
+	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -362,7 +363,7 @@ func coordinationSections(events []wiaworld.Event) []contextSection {
 	}
 	var result []contextSection
 	for _, group := range groups {
-		result = append(result, contextSection{Name: "committed_results", Text: coordinationContinuity(group), Sources: eventIDs(group)})
+		result = append(result, contextSection{Name: "committed_results", Text: turn.CoordinationContinuity(group), Sources: turn.EventIDs(group)})
 	}
 	return result
 }
