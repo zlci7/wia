@@ -15,6 +15,7 @@ import (
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -535,15 +536,15 @@ func TestNarrativeSettingsUseDefaultsWhenExistingWorldLacksInteractionMeta(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.Exec(`DELETE FROM meta WHERE key IN ('player_elaboration','npc_initiative')`); err != nil {
-		_ = store.db.Close()
+	if _, err := store.Database().Exec(`DELETE FROM meta WHERE key IN ('player_elaboration','npc_initiative')`); err != nil {
+		_ = store.Database().Close()
 		t.Fatal(err)
 	}
-	if err := store.db.Close(); err != nil {
+	if err := store.Database().Close(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1174,14 +1175,14 @@ func TestOffSceneCharactersDoNotParticipate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(app.worldPath(world.WorldID))
+	store, err := storage.OpenWorldDB(app.worldPath(world.WorldID))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.Exec(`UPDATE characters SET in_scene=0 WHERE entity_id='npc:mercenary'`); err != nil {
+	if _, err := store.Database().Exec(`UPDATE characters SET in_scene=0 WHERE entity_id='npc:mercenary'`); err != nil {
 		t.Fatal(err)
 	}
-	_ = store.db.Close()
+	_ = store.Database().Close()
 	run, err := app.SubmitRun(context.Background(), world.WorldID, RunRequest{RequestKey: "scene-filter-1", Input: "跟老板打声招呼。"})
 	if err != nil {
 		t.Fatal(err)
@@ -1318,14 +1319,14 @@ func TestLegacyRunWithoutInputSequenceCannotRetry(t *testing.T) {
 	if result := waitRun(t, app, world.WorldID, run.RunID); result.Status != "failed" {
 		t.Fatalf("run = %+v", result)
 	}
-	store, err := openWorldDB(app.worldPath(world.WorldID))
+	store, err := storage.OpenWorldDB(app.worldPath(world.WorldID))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.Exec(`UPDATE runs SET input_id='',input_seq=0 WHERE run_id=?`, run.RunID); err != nil {
+	if _, err := store.Database().Exec(`UPDATE runs SET input_id='',input_seq=0 WHERE run_id=?`, run.RunID); err != nil {
 		t.Fatal(err)
 	}
-	_ = store.db.Close()
+	_ = store.Database().Close()
 	if _, err := app.RetryRun(context.Background(), world.WorldID, run.RunID, "legacy-retry-attempt"); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("legacy retry error = %v", err)
 	}

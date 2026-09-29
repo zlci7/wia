@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"strings"
 )
 
@@ -84,11 +85,11 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot worldSnapshot)
 	return result, nil
 }
 
-func loadTurnSnapshot(ctx context.Context, store *worldStore, limit int) (worldSnapshot, error) {
+func loadTurnSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
 	snapshot, err := loadWorldSnapshot(ctx, store, limit)
 	if err != nil {
 		return snapshot, err
 	}
-	snapshot.Sources, err = loadSourceMetadata(ctx, store.db, snapshot)
+	snapshot.Sources, err = loadSourceMetadata(ctx, store.Database(), snapshot)
 	return snapshot, err
 }

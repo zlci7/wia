@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -79,7 +80,7 @@ func validateEventPolicy(p *EventGenerationPolicy, def gameDefinition) error {
 
 func readGeneratedEvents(ctx context.Context, db *sql.DB, def gameDefinition) (generatedEventState, error) {
 	s := generatedEventState{Active: []generatedEvent{}}
-	raw, err := metaGet(ctx, db, "generated_events")
+	raw, err := storage.MetaGet(ctx, db, "generated_events")
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, nil
 	}

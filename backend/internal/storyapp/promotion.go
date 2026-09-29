@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"strconv"
@@ -67,11 +68,11 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 	if status != "ready" {
 		return PromotionPreview{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return PromotionPreview{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
 		return PromotionPreview{}, err
@@ -93,7 +94,7 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 			Profile: bystander.Description,
 		},
 	}
-	experiences, err := readBystanderExperiences(ctx, store.db, bystander.BystanderID)
+	experiences, err := readBystanderExperiences(ctx, store.Database(), bystander.BystanderID)
 	if err != nil {
 		return PromotionPreview{}, err
 	}
@@ -132,15 +133,15 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	if worldRT.savePending {
 		return wiaworld.Character{}, ErrWorldBusy
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
-	defer store.db.Close()
-	if err := memoryReady(ctx, store.db); err != nil {
+	defer store.Database().Close()
+	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if count, err := countActiveRuns(ctx, store.db); err != nil {
+	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
 		return wiaworld.Character{}, err
 	} else if count > 0 {
 		return wiaworld.Character{}, ErrWorldBusy
@@ -163,7 +164,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	if !ok {
 		return wiaworld.Character{}, ErrContentNotFound
 	}
-	experiences, err := readBystanderExperiences(ctx, store.db, bystander.BystanderID)
+	experiences, err := readBystanderExperiences(ctx, store.Database(), bystander.BystanderID)
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
@@ -180,12 +181,12 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	// The authoritative hash uses the validated selection, so a repeat whose source list
 	// only differs by blanks or order still matches the recorded promotion.
 	requestHash := promotionRequestHash(request, selected)
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
 	defer tx.Rollback()
-	currentEpochText, err := metaGetTx(ctx, tx, "context_epoch")
+	currentEpochText, err := storage.MetaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
 		return wiaworld.Character{}, err
 	}
@@ -247,7 +248,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		"definition_revision:" + entityID: definitionID,
 		"promoted_from:" + entityID:       bystander.BystanderID,
 	} {
-		if err = metaSetTx(ctx, tx, key, value); err != nil {
+		if err = storage.MetaSetTx(ctx, tx, key, value); err != nil {
 			return wiaworld.Character{}, err
 		}
 	}
@@ -282,10 +283,10 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		nextSceneVersion++
 		views = append(views, SceneView{Recipient: entityID, Content: promotionSceneContent(bystander, draft, snapshot), SourceIDs: selected, Version: nextSceneVersion})
 	}
-	if err = metaSetTx(ctx, tx, "scene_views", wire.MarshalJSON(views)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "scene_views", wire.MarshalJSON(views)); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(nextSceneVersion, 10)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "scene_version", strconv.FormatInt(nextSceneVersion, 10)); err != nil {
 		return wiaworld.Character{}, err
 	}
 	remarks := wire.MarshalJSON(map[string]any{"bystander_id": bystander.BystanderID, "sources": selected, "role": draft.Role, "request_key": request.RequestKey, "request_hash": requestHash})
@@ -302,16 +303,16 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 		remaining = append(remaining, item)
 		names = append(names, item.Name)
 	}
-	if err = metaSetTx(ctx, tx, "bystander_refs", wire.MarshalJSON(remaining)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "bystander_refs", wire.MarshalJSON(remaining)); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "bystanders", wire.MarshalJSON(names)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "bystanders", wire.MarshalJSON(names)); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "context_epoch", strconv.FormatInt(currentEpoch+1, 10)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "context_epoch", strconv.FormatInt(currentEpoch+1, 10)); err != nil {
 		return wiaworld.Character{}, err
 	}
-	if err = metaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
 		return wiaworld.Character{}, err
 	}
 	// Derived optional material built on the previous roster is no longer a basis.
@@ -384,9 +385,9 @@ func readBystanderExperiences(ctx context.Context, db *sql.DB, bystanderID strin
 // promotedCharacter finds the character a previous promotion created for one
 // passer-by. The same request key returns that character; a different key for the
 // same person is a conflict instead of a second promotion.
-func promotedCharacter(ctx context.Context, store *worldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
+func promotedCharacter(ctx context.Context, store *storage.WorldStore, snapshot worldSnapshot, bystanderID, requestKey, requestHash string) (wiaworld.Character, bool, error) {
 	for _, character := range snapshot.Characters {
-		raw, err := metaGet(ctx, store.db, "promotion:"+character.EntityID)
+		raw, err := storage.MetaGet(ctx, store.Database(), "promotion:"+character.EntityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}

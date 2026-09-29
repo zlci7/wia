@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"os"
 	"strings"
@@ -76,13 +77,13 @@ func TestFindRunByRequestIsWorldScopedAndBeyondRecentWindow(t *testing.T) {
 	}
 	waitRun(t, a, w.WorldID, r.RunID)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.db.Close()
+	defer s.Database().Close()
 	for i := 0; i < 55; i++ {
-		_, err = s.db.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,'hash','test','',1,'failed','2099-01-01T00:00:00Z','2099-01-01T00:00:00Z')`, fmt.Sprint(i), fmt.Sprint(i))
+		_, err = s.Database().Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,'hash','test','',1,'failed','2099-01-01T00:00:00Z','2099-01-01T00:00:00Z')`, fmt.Sprint(i), fmt.Sprint(i))
 		if err != nil {
 			t.Fatal(err)
 		}

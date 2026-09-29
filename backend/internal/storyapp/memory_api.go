@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 )
@@ -43,11 +44,11 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	if status != "ready" {
 		return out, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return out, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 100)
 	if err != nil {
 		return out, err
@@ -56,7 +57,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 		return out, err
 	}
 	out.Epoch = snapshot.Summary.ContextEpoch
-	corrections, err := readCorrections(ctx, store.db)
+	corrections, err := readCorrections(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
@@ -66,7 +67,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 			out.Corrections = append(out.Corrections, c)
 		}
 	}
-	out.Job, err = readMemoryJob(ctx, store.db)
+	out.Job, err = readMemoryJob(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
@@ -82,7 +83,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 	}
 	if scope == "author" {
 		// Author records explicitly expose world facts, never through the player API.
-		rows, e := store.db.QueryContext(ctx, `SELECT seq,event_id,actor_id,event_type,content,run_id,created_at FROM events e WHERE (?=0 OR seq<?) AND (event_id='opening' OR run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')) ORDER BY seq DESC LIMIT 101`, before, before)
+		rows, e := store.Database().QueryContext(ctx, `SELECT seq,event_id,actor_id,event_type,content,run_id,created_at FROM events e WHERE (?=0 OR seq<?) AND (event_id='opening' OR run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed')) ORDER BY seq DESC LIMIT 101`, before, before)
 		if e != nil {
 			return out, e
 		}
@@ -100,7 +101,7 @@ func (a *App) ReadMemory(ctx context.Context, worldID, scope string, author bool
 		if e != nil {
 			return out, e
 		}
-		list, e := readCorrections(ctx, store.db)
+		list, e := readCorrections(ctx, store.Database())
 		if e != nil {
 			return out, e
 		}
@@ -173,15 +174,15 @@ func (a *App) Corrections(ctx context.Context, worldID string) ([]Correction, Me
 	if status != "ready" {
 		return nil, MemoryJob{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return nil, MemoryJob{}, err
 	}
-	defer store.db.Close()
-	items, err := readCorrections(ctx, store.db)
+	defer store.Database().Close()
+	items, err := readCorrections(ctx, store.Database())
 	if err != nil {
 		return nil, MemoryJob{}, err
 	}
-	job, err := readMemoryJob(ctx, store.db)
+	job, err := readMemoryJob(ctx, store.Database())
 	return items, job, err
 }

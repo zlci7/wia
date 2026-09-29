@@ -10,6 +10,7 @@ import (
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -19,12 +20,12 @@ func seedMemoryHistory(t *testing.T, a *App, id string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.db.Close()
-	tx, err := s.db.Begin()
+	defer s.Database().Close()
+	tx, err := s.Database().Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,7 @@ func seedMemoryHistory(t *testing.T, a *App, id string) {
 		}
 	}
 	for k, v := range map[string]string{"event_head": "11", "message_head": "21"} {
-		if err = metaSetTx(context.Background(), tx, k, v); err != nil {
+		if err = storage.MetaSetTx(context.Background(), tx, k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -80,12 +81,12 @@ func TestDigestEditSurvivesOtherScopeAndCopy(t *testing.T) {
 	}
 	seedMemoryHistory(t, a, w.WorldID)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, _ := openWorldDB(path)
+	s, _ := storage.OpenWorldDB(path)
 	snapshot, err := loadWorldSnapshot(ctx, s, 40)
 	if err == nil {
 		err = a.prepareLongMemory(ctx, s, &snapshot, wiaworld.Run{BaseContextEpoch: w.ContextEpoch}, &digestGenerator{})
 	}
-	s.db.Close()
+	s.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

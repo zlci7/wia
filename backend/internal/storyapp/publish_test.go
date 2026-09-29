@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"image"
 	"image/color"
@@ -332,19 +333,19 @@ func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
 			t.Fatalf("world is missing its own copy of %s: %v", name, err)
 		}
 	}
-	store, err := openWorldDB(worldPath)
+	store, err := storage.OpenWorldDB(worldPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	coverAsset, err := metaGet(ctx, store.db, "cover_asset")
+	coverAsset, err := storage.MetaGet(ctx, store.Database(), "cover_asset")
 	if err != nil || coverAsset != "cover.png" {
 		t.Fatalf("cover record: %q %v", coverAsset, err)
 	}
-	keeperAvatar, err := metaGet(ctx, store.db, "avatar:npc:keeper")
+	keeperAvatar, err := storage.MetaGet(ctx, store.Database(), "avatar:npc:keeper")
 	if err != nil || keeperAvatar != "keeper.png" {
 		t.Fatalf("avatar record: %q %v", keeperAvatar, err)
 	}
-	store.db.Close()
+	store.Database().Close()
 
 	// Removing the published revision does not affect the world's own copies.
 	if err = os.RemoveAll(revisionPath); err != nil {

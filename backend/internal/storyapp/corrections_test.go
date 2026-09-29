@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"os"
 	"strings"
@@ -38,14 +39,14 @@ func TestRebuildBlocksGenerationAndCopyButAllowsDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, _ := openWorldDB(path)
+	store, _ := storage.OpenWorldDB(path)
 	for i := 1; i <= 12; i++ {
-		_, err = store.db.Exec(`INSERT INTO memory_sources VALUES('player',?,?,'',?,'player','message:player','已提交约定','now')`, i, fmt.Sprint(i), fmt.Sprint(i))
+		_, err = store.Database().Exec(`INSERT INTO memory_sources VALUES('player',?,?,'',?,'player','message:player','已提交约定','now')`, i, fmt.Sprint(i), fmt.Sprint(i))
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	store.db.Close()
+	store.Database().Close()
 	if _, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "block", ExpectedEpoch: w.ContextEpoch, Kind: "character", Scope: "npc:innkeeper", TargetID: "profile", Replacement: "谨慎的老板"}); err != nil {
 		t.Fatal(err)
 	}
@@ -172,11 +173,11 @@ func TestCorrectionTargetsAndRestart(t *testing.T) {
 		t.Fatal(s.Characters)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, _ := openWorldDB(path)
-	if _, err = store.db.Exec(`UPDATE memory_jobs SET status='running',completed=0`); err != nil {
+	store, _ := storage.OpenWorldDB(path)
+	if _, err = store.Database().Exec(`UPDATE memory_jobs SET status='running',completed=0`); err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	root := a.dataRoot
 	if err = a.Close(); err != nil {
 		t.Fatal(err)

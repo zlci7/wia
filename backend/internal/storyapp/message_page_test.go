@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"os"
 	"testing"
@@ -17,14 +18,14 @@ func TestMessagePagesRemainOrderedAndIsolated(t *testing.T) {
 	if err != nil || world.Name == "" {
 		t.Fatalf("default world: %+v, %v", world, err)
 	}
-	store, err := openWorldDB(app.worldPath(world.WorldID))
+	store, err := storage.OpenWorldDB(app.worldPath(world.WorldID))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	appendMessages := func(start, end int) {
 		t.Helper()
-		tx, err := store.db.Begin()
+		tx, err := store.Database().Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,15 +161,15 @@ func TestMessagePagesConcurrentAppendAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(app.worldPath(world.WorldID))
+	store, err := storage.OpenWorldDB(app.worldPath(world.WorldID))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	written := make(chan error, 1)
 	go func() {
 		for seq := 2; seq <= 51; seq++ {
-			_, err := store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative','故事','',?)`, seq, fmt.Sprintf("parallel-%d", seq), wire.NowText())
+			_, err := store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative','故事','',?)`, seq, fmt.Sprintf("parallel-%d", seq), wire.NowText())
 			if err != nil {
 				written <- err
 				return
@@ -206,7 +207,7 @@ func TestMessagePagesConcurrentAppendAndDelete(t *testing.T) {
 	if err := <-written; err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	status, err := app.Status(ctx)
 	if err != nil {
 		t.Fatal(err)

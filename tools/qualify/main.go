@@ -42,10 +42,10 @@ func main() {
 	flag.Parse()
 
 	if *drop != "" {
-		if *file == "" {
-			fail("-drop needs -file")
+		if *dir == "" {
+			fail("-drop needs -dir")
 		}
-		dropDeclarations(*file, *drop)
+		dropDeclarations(*dir, *drop, *file, *tests)
 		return
 	}
 	if *dir == "" {
@@ -540,48 +540,75 @@ func renameLocals(dir, pairs string, tests, check bool) {
 	fmt.Printf("%d uses renamed\n", total)
 }
 
-// dropDeclarations deletes named declarations from one file, so a type that moved
-// cannot stay behind as a second definition of the same concept.
-func dropDeclarations(path, names string) {
+// dropDeclarations deletes named declarations, so a function that moved cannot
+// stay behind as a second definition of the same concept.
+//
+// A function whose name also got exported in its new package is named here by its
+// new name: that is what it is called in the file after the references were
+// qualified.
+func dropDeclarations(dir, names, onlyFile string, tests bool) {
 	wanted := map[string]bool{}
 	for _, name := range strings.Split(names, ",") {
 		wanted[strings.TrimSpace(name)] = true
 	}
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		panic(err)
 	}
-	kept := make([]ast.Decl, 0, len(file.Decls))
-	for _, decl := range file.Decls {
-		gen, ok := decl.(*ast.GenDecl)
-		if !ok {
-			kept = append(kept, decl)
+	fset := token.NewFileSet()
+	removed := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		specs := make([]ast.Spec, 0, len(gen.Specs))
-		for _, spec := range gen.Specs {
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if ok && typeSpec.Name != nil && wanted[typeSpec.Name.Name] {
-				fmt.Printf("  removed type %s (line %d)\n", typeSpec.Name.Name, fset.Position(typeSpec.Pos()).Line)
+		if onlyFile != "" && name != onlyFile {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			panic(err)
+		}
+		kept := make([]ast.Decl, 0, len(file.Decls))
+		for _, decl := range file.Decls {
+			fn, isFunc := decl.(*ast.FuncDecl)
+			if isFunc && wanted[fn.Name.Name] {
+				fmt.Printf("  removed func %s (%s:%d)\n", fn.Name.Name, name, fset.Position(fn.Pos()).Line)
+				removed++
 				continue
 			}
-			specs = append(specs, spec)
+			if gen, isGen := decl.(*ast.GenDecl); isGen {
+				specs := make([]ast.Spec, 0, len(gen.Specs))
+				for _, spec := range gen.Specs {
+					typeSpec, isType := spec.(*ast.TypeSpec)
+					if isType && typeSpec.Name != nil && wanted[typeSpec.Name.Name] {
+						fmt.Printf("  removed type %s (%s:%d)\n", typeSpec.Name.Name, name, fset.Position(typeSpec.Pos()).Line)
+						removed++
+						continue
+					}
+					specs = append(specs, spec)
+				}
+				if len(specs) == 0 {
+					continue
+				}
+				gen.Specs = specs
+			}
+			kept = append(kept, decl)
 		}
-		if len(specs) == 0 {
+		if len(kept) == len(file.Decls) {
 			continue
 		}
-		gen.Specs = specs
-		kept = append(kept, gen)
+		file.Decls = kept
+		var buf bytes.Buffer
+		if err := printer.Fprint(&buf, fset, file); err != nil {
+			panic(err)
+		}
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+			panic(err)
+		}
 	}
-	file.Decls = kept
-	var buf bytes.Buffer
-	if err := printer.Fprint(&buf, fset, file); err != nil {
-		panic(err)
-	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		panic(err)
-	}
+	fmt.Printf("%d declarations removed\n", removed)
 }
 
 // addImport adds the target package to the file's import block.

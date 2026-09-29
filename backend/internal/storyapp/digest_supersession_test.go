@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"testing"
 	"time"
 )
@@ -16,19 +17,19 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 1; i <= 12; i++ {
-		if _, err = store.db.Exec(`INSERT INTO memory_sources VALUES('player',?,?,'',?,'player','message:player','已提交约定','now')`, i, fmt.Sprint(i), fmt.Sprint(i)); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO memory_sources VALUES('player',?,?,'',?,'player','message:player','已提交约定','now')`, i, fmt.Sprint(i), fmt.Sprint(i)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err = store.db.Exec(`INSERT INTO memory_digests VALUES('npc:mercenary',1,1,0,0,'旧回顾','[]','[]','now')`); err != nil {
+	if _, err = store.Database().Exec(`INSERT INTO memory_digests VALUES('npc:mercenary',1,1,0,0,'旧回顾','[]','[]','now')`); err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	c, err := a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "first", ExpectedEpoch: w.ContextEpoch, Kind: "digest", Scope: "npc:mercenary", TargetID: "1", Replacement: "人工确认的回顾"})
 	if err != nil {
 		t.Fatal(err)
@@ -58,13 +59,13 @@ func TestPendingDigestEditSurvivesSupersedingJob(t *testing.T) {
 	if s.Characters[0].Profile != "另一人物的新设定" {
 		t.Fatal("second edit lost")
 	}
-	store, err = openWorldDB(path)
+	store, err = storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	var count int
-	if err = store.db.QueryRow(`SELECT COUNT(*) FROM memory_digests WHERE epoch=?`, c.Epoch).Scan(&count); err != nil || count != 0 {
+	if err = store.Database().QueryRow(`SELECT COUNT(*) FROM memory_digests WHERE epoch=?`, c.Epoch).Scan(&count); err != nil || count != 0 {
 		t.Fatal("superseded worker published", count, err)
 	}
 }

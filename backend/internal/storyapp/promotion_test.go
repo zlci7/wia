@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"errors"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
@@ -18,34 +19,34 @@ func seedBystanderExperience(t *testing.T, a *App, worldID, bystanderID string, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	eventID := "event-bystander-" + strconv.Itoa(index)
 	var seq int64
-	if err = store.db.QueryRow(`SELECT COALESCE(MAX(seq),0)+1 FROM events`).Scan(&seq); err != nil {
+	if err = store.Database().QueryRow(`SELECT COALESCE(MAX(seq),0)+1 FROM events`).Scan(&seq); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,3,1,'action_succeeded',?)`,
+	if _, err = store.Database().Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) VALUES(?,?,?,?,?,?,?,3,1,'action_succeeded',?)`,
 		seq, eventID, "player_action_result", "player", "", content, "run-bystander-"+strconv.Itoa(index), wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'action_succeeded',?,3,1,?)`,
+	if _, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'action_succeeded',?,3,1,?)`,
 		bystanderID, eventID, content, wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
 	// Only when the player received the same result is it player-visible.
 	if playerWitnessed {
-		if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('player',?,'action_succeeded',?,3,1,?)`,
+		if _, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('player',?,'action_succeeded',?,3,1,?)`,
 			eventID, content, wire.NowText()); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// The world's event head follows the seeded result so later turns continue the
 	// sequence instead of colliding with it.
-	if _, err = store.db.Exec(`UPDATE meta SET value=? WHERE key='event_head'`, strconv.FormatInt(seq, 10)); err != nil {
+	if _, err = store.Database().Exec(`UPDATE meta SET value=? WHERE key='event_head'`, strconv.FormatInt(seq, 10)); err != nil {
 		t.Fatal(err)
 	}
 	return eventID
@@ -156,14 +157,14 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 		t.Fatalf("roster empty after promotion")
 	}
 	// The chosen experience now belongs to the promoted identity and nothing else moved.
-	experiences, err := readBystanderExperiences(ctx, openWorldForTest(t, a, w.WorldID).db, promoted.EntityID)
+	experiences, err := readBystanderExperiences(ctx, openWorldForTest(t, a, w.WorldID).Database(), promoted.EntityID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(experiences) != 2 || experiences[0].SourceID != mine || experiences[1].SourceID != secret {
 		t.Fatalf("promoted identity lost its experience: %+v", experiences)
 	}
-	remaining, err := readBystanderExperiences(ctx, openWorldForTest(t, a, w.WorldID).db, other.BystanderID)
+	remaining, err := readBystanderExperiences(ctx, openWorldForTest(t, a, w.WorldID).Database(), other.BystanderID)
 	if err != nil || len(remaining) != 1 {
 		t.Fatalf("other passer-by experience moved: %+v %v", remaining, err)
 	}
@@ -189,7 +190,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, spaced); err != nil {
 		t.Fatalf("a whitespace-only difference was treated as a conflict: %v", err)
 	}
-	origins, err := readCharacterOrigins(ctx, openWorldForTest(t, a, w.WorldID).db, promoted.EntityID)
+	origins, err := readCharacterOrigins(ctx, openWorldForTest(t, a, w.WorldID).Database(), promoted.EntityID)
 	if err != nil || len(origins) != 3 {
 		t.Fatalf("promotion origin record: %+v %v", origins, err)
 	}
@@ -232,11 +233,11 @@ func TestPromotionGuardsAndEmptyExperience(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := openWorldForTest(t, a, w.WorldID)
-	experiences, err := readBystanderExperiences(ctx, store.db, promoted.EntityID)
+	experiences, err := readBystanderExperiences(ctx, store.Database(), promoted.EntityID)
 	if err != nil || len(experiences) != 0 {
 		t.Fatalf("promotion invented experience: %+v %v", experiences, err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	// Deleting the world means a late promotion cannot revive anything.
 	status, err := a.Status(ctx)
 	if err != nil {
@@ -275,15 +276,15 @@ func TestBystanderStaysInSceneWhenTheSceneTextIsRewritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`UPDATE meta SET value=value || '，灯光昏黄，玩家坐在门边。' WHERE key='scene'`); err != nil {
-		store.db.Close()
+	if _, err = store.Database().Exec(`UPDATE meta SET value=value || '，灯光昏黄，玩家坐在门边。' WHERE key='scene'`); err != nil {
+		store.Database().Close()
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	after, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
 	if err != nil {
 		t.Fatal(err)
@@ -292,15 +293,15 @@ func TestBystanderStaysInSceneWhenTheSceneTextIsRewritten(t *testing.T) {
 		t.Fatalf("a rewritten scene description moved the person out of the room: %+v", after)
 	}
 	// A description that names no known place must not clear the recorded location.
-	store, err = openWorldDB(path)
+	store, err = storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`UPDATE meta SET value='光线昏暗，看不清哪里。' WHERE key='scene'`); err != nil {
-		store.db.Close()
+	if _, err = store.Database().Exec(`UPDATE meta SET value='光线昏暗，看不清哪里。' WHERE key='scene'`); err != nil {
+		store.Database().Close()
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	unknown, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
 	if err != nil {
 		t.Fatal(err)
@@ -310,16 +311,16 @@ func TestBystanderStaysInSceneWhenTheSceneTextIsRewritten(t *testing.T) {
 	}
 }
 
-func openWorldForTest(t *testing.T, a *App, worldID string) *worldStore {
+func openWorldForTest(t *testing.T, a *App, worldID string) *storage.WorldStore {
 	t.Helper()
 	path, _, err := a.worldRecord(context.Background(), worldID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { store.db.Close() })
+	t.Cleanup(func() { store.Database().Close() })
 	return store
 }

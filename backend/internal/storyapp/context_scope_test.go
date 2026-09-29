@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -27,11 +28,11 @@ func readContextSnapshot(t *testing.T, a *App, id string) worldSnapshot {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	s, err := loadTurnSnapshot(context.Background(), store, 40)
 	if err != nil {
 		t.Fatal(err)
@@ -104,13 +105,13 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 		t.Fatalf("%+v", done)
 	}
 	path, _, _ := a.worldRecord(context.Background(), w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	for i := 0; i < 45; i++ {
-		_, err = store.db.Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) SELECT COALESCE(MAX(seq),0)+1,?,'noise','','','noise','fixture',1,1,'fixture',? FROM events`, fmt.Sprintf("noise:%d", i), wire.NowText())
+		_, err = store.Database().Exec(`INSERT INTO events(seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at) SELECT COALESCE(MAX(seq),0)+1,?,'noise','','','noise','fixture',1,1,'fixture',? FROM events`, fmt.Sprintf("noise:%d", i), wire.NowText())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,7 +128,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 		t.Fatal("fixture did not push event outside window")
 	}
 	s.Perceptions["npc:mercenary"] = append(s.Perceptions["npc:mercenary"], wiaworld.Perception{SourceEventID: "missing"})
-	if _, err := loadSourceMetadata(context.Background(), store.db, s); !errors.Is(err, ErrContextSourceMissing) {
+	if _, err := loadSourceMetadata(context.Background(), store.Database(), s); !errors.Is(err, ErrContextSourceMissing) {
 		t.Fatalf("missing=%v", err)
 	}
 }
@@ -213,12 +214,12 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(context.Background(), w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('npc:mercenary','missing','observed','交谈迹象',1,1,?)`, wire.NowText())
-	store.db.Close()
+	_, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES('npc:mercenary','missing','observed','交谈迹象',1,1,?)`, wire.NowText())
+	store.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -101,7 +102,7 @@ func clockMinute(clock string) (int, error) {
 func readPlot(ctx context.Context, db *sql.DB) (*PlotDefinition, PlotProgress, error) {
 	var def PlotDefinition
 	var state PlotProgress
-	raw, err := metaGet(ctx, db, "plot_definition")
+	raw, err := storage.MetaGet(ctx, db, "plot_definition")
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, state, nil
 	}
@@ -111,7 +112,7 @@ func readPlot(ctx context.Context, db *sql.DB) (*PlotDefinition, PlotProgress, e
 	if err = json.Unmarshal([]byte(raw), &def); err != nil {
 		return nil, state, err
 	}
-	raw, err = metaGet(ctx, db, "plot_progress")
+	raw, err = storage.MetaGet(ctx, db, "plot_progress")
 	if err != nil {
 		return nil, state, err
 	}

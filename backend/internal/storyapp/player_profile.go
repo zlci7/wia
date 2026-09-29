@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"strconv"
@@ -34,15 +35,15 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 	if worldRT.savePending {
 		return wiaworld.WorldSummary{}, ErrWorldBusy
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.db.Close()
-	if err := memoryReady(ctx, store.db); err != nil {
+	defer store.Database().Close()
+	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	if count, err := countActiveRuns(ctx, store.db); err != nil {
+	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
 		return wiaworld.WorldSummary{}, err
 	} else if count > 0 {
 		return wiaworld.WorldSummary{}, ErrWorldBusy
@@ -61,12 +62,12 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 		}
 		return a.worldSummary(ctx, worldID)
 	}
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
 	defer tx.Rollback()
-	currentEpochText, err := metaGetTx(ctx, tx, "context_epoch")
+	currentEpochText, err := storage.MetaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
@@ -83,7 +84,7 @@ func (a *App) UpdatePlayerProfile(ctx context.Context, worldID string, request U
 		"context_epoch":  strconv.FormatInt(currentEpoch+1, 10),
 		"updated_at":     wire.NowText(),
 	} {
-		if err := metaSetTx(ctx, tx, key, value); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, key, value); err != nil {
 			return wiaworld.WorldSummary{}, err
 		}
 	}

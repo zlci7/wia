@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 )
 
@@ -40,20 +41,20 @@ func TestSuggestionStatesWithoutModelCalls(t *testing.T) {
 	// A committed narrative followed by an uncommitted input is not a basis for
 	// auxiliary generation: the request stays waiting until the turn commits.
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 2, "narrative-1", "narrative", "雨声敲着窗沿。", "", wire.NowText()); err != nil {
+	if _, err = store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 2, "narrative-1", "narrative", "雨声敲着窗沿。", "", wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 3, "pending-input", "player", "我在等待天亮。", "", wire.NowText()); err != nil {
+	if _, err = store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,?,?,?,?)`, 3, "pending-input", "player", "我在等待天亮。", "", wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`UPDATE meta SET value='3' WHERE key='message_head'`); err != nil {
+	if _, err = store.Database().Exec(`UPDATE meta SET value='3' WHERE key='message_head'`); err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	refreshed, err := a.ReadWorld(ctx, w.WorldID, 20)
 	if err != nil {
 		t.Fatal(err)
@@ -139,17 +140,17 @@ func TestSuggestionRequiresConfiguredModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'narrative-1','narrative','雨声敲着窗沿。','',?)`, wire.NowText()); err != nil {
+	if _, err = store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'narrative-1','narrative','雨声敲着窗沿。','',?)`, wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`UPDATE meta SET value='2' WHERE key='message_head'`); err != nil {
+	if _, err = store.Database().Exec(`UPDATE meta SET value='2' WHERE key='message_head'`); err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	snapshot, err := a.ReadWorld(ctx, w.WorldID, 20)
 	if err != nil {
 		t.Fatal(err)

@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 	before := readContextSnapshot(t, a, w.WorldID)
 	root := "plot:" + before.Plot.Revision + ":" + before.Plot.Nodes[0].ID
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,15 +36,15 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 	for _, scope := range []string{"player", "npc:mercenary"} {
 		m := before.LongMemory[scope]
 		head := m.Archive[len(m.Archive)-1].Seq
-		if _, err = store.db.Exec(`INSERT INTO memory_digests VALUES(?,1,1,?,?, '旧铃声回顾','[]','[]','now')`, scope, head, head); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO memory_digests VALUES(?,1,1,?,?, '旧铃声回顾','[]','[]','now')`, scope, head, head); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Emulate a pre-upgrade save: reconstruct only validated legacy links.
-	if _, err = store.db.Exec(`DELETE FROM event_dependencies; DELETE FROM meta WHERE key='projection_dependencies_v1'`); err != nil {
+	if _, err = store.Database().Exec(`DELETE FROM event_dependencies; DELETE FROM meta WHERE key='projection_dependencies_v1'`); err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	_, err = a.Correct(ctx, w.WorldID, CorrectionRequest{RequestKey: "root", ExpectedEpoch: before.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: root, Replacement: "作者秘密：铃声并未发生"})
 	if err != nil {
 		t.Fatal(err)
@@ -76,19 +77,19 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 	if wire.MarshalJSON(before.Messages) != wire.MarshalJSON(after.Messages) {
 		t.Fatal("history rewritten")
 	}
-	store, err = openWorldDB(path)
+	store, err = storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	var original string
-	if err = store.db.QueryRow(`SELECT content FROM events WHERE event_id=?`, root).Scan(&original); err != nil {
+	if err = store.Database().QueryRow(`SELECT content FROM events WHERE event_id=?`, root).Scan(&original); err != nil {
 		t.Fatal(err)
 	}
 	if original != "作者隐藏事实：信使去向" {
 		t.Fatal("raw event overwritten")
 	}
-	store.db.Close()
+	store.Database().Close()
 	status, _ := a.Status(ctx)
 	op, err := a.SaveAs(ctx, w.WorldID, "纠正副本", "copy-root", status.ActiveRevision)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -33,13 +34,13 @@ func loadNarrativeSettings(ctx context.Context, db *sql.DB) (wiaworld.NarrativeS
 		"npc_initiative":               &settings.NPCInitiative,
 		"narrative_custom_instruction": &settings.CustomInstruction,
 	} {
-		if value, err := metaGet(ctx, db, key); err == nil {
+		if value, err := storage.MetaGet(ctx, db, key); err == nil {
 			*target = value
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return wiaworld.NarrativeSettings{}, err
 		}
 	}
-	if value, err := metaGet(ctx, db, "behavior_policies"); err == nil {
+	if value, err := storage.MetaGet(ctx, db, "behavior_policies"); err == nil {
 		if err := json.Unmarshal([]byte(value), &settings.Policies); err != nil {
 			return wiaworld.NarrativeSettings{}, fmt.Errorf("invalid stored behavior policies: %w", err)
 		}
@@ -78,18 +79,18 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	if worldRT.savePending {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
-	defer store.db.Close()
-	if err := memoryReady(ctx, store.db); err != nil {
+	defer store.Database().Close()
+	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	if request.Policies != nil {
 		settings.Policies = *request.Policies
 	} else {
-		current, err := loadNarrativeSettings(ctx, store.db)
+		current, err := loadNarrativeSettings(ctx, store.Database())
 		if err != nil {
 			return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 		}
@@ -104,17 +105,17 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
-	if count, err := countActiveRuns(ctx, store.db); err != nil {
+	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	} else if count > 0 {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, ErrWorldBusy
 	}
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
 	defer tx.Rollback()
-	currentEpochText, err := metaGetTx(ctx, tx, "context_epoch")
+	currentEpochText, err := storage.MetaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
 		return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 	}
@@ -137,7 +138,7 @@ func (a *App) UpdateNarrativeSettings(ctx context.Context, worldID string, reque
 		"updated_at":                   wire.NowText(),
 	}
 	for key, value := range values {
-		if err := metaSetTx(ctx, tx, key, value); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, key, value); err != nil {
 			return wiaworld.NarrativeSettings{}, wiaworld.WorldSummary{}, err
 		}
 	}

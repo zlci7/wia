@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -149,15 +150,15 @@ func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
 	w, _ := a.createFixtureWorld(ctx, "旧设置", "guided", "旅人", "", true)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
-	if _, err = store.db.Exec("UPDATE meta SET value=? WHERE key='narrative_custom_instruction'", "旧写作偏好"); err != nil {
+	defer store.Database().Close()
+	if _, err = store.Database().Exec("UPDATE meta SET value=? WHERE key='narrative_custom_instruction'", "旧写作偏好"); err != nil {
 		t.Fatal(err)
 	}
-	s, err := loadNarrativeSettings(ctx, store.db)
+	s, err := loadNarrativeSettings(ctx, store.Database())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,14 +169,14 @@ func TestBehaviorLegacyPreferenceAndCorruption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	legacy, _ := metaGet(ctx, store.db, "narrative_custom_instruction")
+	legacy, _ := storage.MetaGet(ctx, store.Database(), "narrative_custom_instruction")
 	if legacy != "" {
 		t.Fatal("two writing policy sources")
 	}
-	if _, err = store.db.Exec("UPDATE meta SET value='invalid-json' WHERE key='behavior_policies'"); err != nil {
+	if _, err = store.Database().Exec("UPDATE meta SET value='invalid-json' WHERE key='behavior_policies'"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = loadNarrativeSettings(ctx, store.db); err == nil {
+	if _, err = loadNarrativeSettings(ctx, store.Database()); err == nil {
 		t.Fatal("corrupt policy silently replaced with defaults")
 	}
 }

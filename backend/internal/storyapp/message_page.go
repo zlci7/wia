@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"time"
 )
@@ -36,11 +37,11 @@ func (a *App) ReadMessagePage(ctx context.Context, worldID string, request Messa
 	if status != "ready" {
 		return MessagePage{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return MessagePage{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	query := `SELECT seq,message_id,kind,content,run_id,created_at FROM messages`
 	args := []any{}
 	if request.BeforeSeq != nil {
@@ -57,7 +58,7 @@ func (a *App) ReadMessagePage(ctx context.Context, worldID string, request Messa
 		query += ` ORDER BY seq DESC LIMIT ?`
 	}
 	args = append(args, request.Limit+1)
-	rows, err := store.db.QueryContext(ctx, query, args...)
+	rows, err := store.Database().QueryContext(ctx, query, args...)
 	if err != nil {
 		return MessagePage{}, err
 	}

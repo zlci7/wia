@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"image"
 	_ "image/jpeg"
@@ -97,12 +98,12 @@ func (a *App) WorldCharacterAsset(ctx context.Context, worldID, entityID string)
 	if status != "ready" {
 		return nil, "", ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return nil, "", err
 	}
-	defer store.db.Close()
-	name, err := metaGet(ctx, store.db, "avatar:"+wire.Clean(entityID))
+	defer store.Database().Close()
+	name, err := storage.MetaGet(ctx, store.Database(), "avatar:"+wire.Clean(entityID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, "", ErrContentNotFound

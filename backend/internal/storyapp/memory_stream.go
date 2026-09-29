@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"strings"
 )
 
@@ -36,8 +37,8 @@ type MemorySource struct {
 
 // This index copies only already-authorized projections. Joining an event grants
 // speaker/time metadata, never its body, except the speaker's own public speech.
-func indexMemorySources(ctx context.Context, store *worldStore) error {
-	tx, err := store.db.BeginTx(ctx, nil)
+func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	_ "modernc.org/sqlite"
@@ -50,128 +48,10 @@ type worldStore struct {
 	db   *sql.DB
 }
 
-func openAppDB(path string) (*sql.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, fmt.Errorf("create app database directory: %w", err)
-	}
-	db, err := sql.Open("sqlite", sqliteDSN(path))
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	if _, err := db.Exec(`PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(`PRAGMA journal_mode = WAL;`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(appSchema + usageSchema + contentSchema); err != nil {
-		db.Close()
-		return nil, err
-	}
-	// Columns added after a release are applied to existing databases here, so an
-	// author's workspace keeps working without a migration step.
-	for _, column := range []struct{ table, name, definition string }{
-		{"content_drafts", "confirmation_key", "TEXT NOT NULL DEFAULT ''"},
-		{"content_operations", "plan_json", "TEXT NOT NULL DEFAULT ''"},
-		{"pack_revisions", "digest_version", "INTEGER NOT NULL DEFAULT 1"},
-	} {
-		if err := ensureColumn(db, column.table, column.name, column.definition); err != nil {
-			db.Close()
-			return nil, err
-		}
-	}
-	return db, nil
-}
+// Columns added after a release are applied to existing databases here, so an
+// author's workspace keeps working without a migration step.
 
 // ensureColumn adds a column when an older database does not have it yet.
-func ensureColumn(db *sql.DB, table, column, definition string) error {
-	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
-	if err != nil {
-		return err
-	}
-	exists := false
-	for rows.Next() {
-		var cid int
-		var name, kind string
-		var notNull, primaryKey int
-		var fallback any
-		if err = rows.Scan(&cid, &name, &kind, &notNull, &fallback, &primaryKey); err != nil {
-			rows.Close()
-			return err
-		}
-		if name == column {
-			exists = true
-		}
-	}
-	rows.Close()
-	if err = rows.Err(); err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-	_, err = db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + definition)
-	return err
-}
-
-func openWorldDB(path string) (*worldStore, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, fmt.Errorf("create world database directory: %w", err)
-	}
-	db, err := sql.Open("sqlite", sqliteDSN(path))
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	if _, err := db.Exec(`PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(`PRAGMA journal_mode = WAL;`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(worldSchema); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(memorySchema); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(correctionSchema); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if err := ensureWorldSchema(db); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if err := ensureEventDependencies(db); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return &worldStore{path: path, db: db}, nil
-}
-
-func sqliteDSN(path string) string {
-	p := filepath.ToSlash(path)
-	if !strings.HasPrefix(p, "/") {
-		p = "/" + p
-	}
-	return (&url.URL{Scheme: "file", Path: p, RawQuery: url.Values{
-		"_busy_timeout": []string{"5000"},
-		"_foreign_keys": []string{"on"},
-		"_journal_mode": []string{"wal"},
-		"_synchronous":  []string{"full"},
-		"_txlock":       []string{"immediate"},
-	}.Encode()}).String()
-}
 
 const appSchema = `
 CREATE TABLE IF NOT EXISTS pack_revisions (game_id TEXT NOT NULL, revision TEXT NOT NULL, digest TEXT NOT NULL, digest_version INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(game_id,revision));
@@ -252,87 +132,12 @@ CREATE INDEX IF NOT EXISTS idx_perceptions_recipient_seq ON perceptions(recipien
 CREATE INDEX IF NOT EXISTS idx_memories_recipient_seq ON memories(recipient_id, seq);
 `
 
-func ensureWorldSchema(db *sql.DB) error {
-	rows, err := db.Query(`PRAGMA table_info(runs)`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid int
-		var name, columnType string
-		var notNull, primaryKey int
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
-			return err
-		}
-		columns[name] = true
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	additions := []struct{ name, definition string }{
-		{"input_id", `TEXT NOT NULL DEFAULT ''`}, {"input_seq", `INTEGER NOT NULL DEFAULT 0`},
-		{"base_turn_seq", `INTEGER NOT NULL DEFAULT 0`}, {"base_message_head", `INTEGER NOT NULL DEFAULT 0`},
-		{"base_event_head", `INTEGER NOT NULL DEFAULT 0`}, {"base_context_epoch", `INTEGER NOT NULL DEFAULT 0`},
-		{"base_scene_version", `INTEGER NOT NULL DEFAULT 0`},
-	}
-	for _, addition := range additions {
-		if columns[addition.name] {
-			continue
-		}
-		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN ` + addition.name + ` ` + addition.definition); err != nil {
-			return err
-		}
-	}
-	if _, err := db.Exec(`INSERT OR IGNORE INTO meta(key,value) SELECT 'input_seq', CAST(COALESCE(MAX(input_seq),0) AS TEXT) FROM runs`); err != nil {
-		return err
-	}
-	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_runs_input_seq ON runs(input_seq); CREATE INDEX IF NOT EXISTS idx_runs_input_id ON runs(input_id);`); err != nil {
-		return err
-	}
-	return nil
-}
-
-func metaGet(ctx context.Context, db *sql.DB, key string) (string, error) {
-	var value string
-	err := db.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, key).Scan(&value)
-	return value, err
-}
-
-func metaGetTx(ctx context.Context, tx *sql.Tx, key string) (string, error) {
-	var value string
-	err := tx.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, key).Scan(&value)
-	return value, err
-}
-
-func metaSetTx(ctx context.Context, tx *sql.Tx, key, value string) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
-	return err
-}
-
-func metaInt(ctx context.Context, db *sql.DB, key string) (int64, error) {
-	value, err := metaGet(ctx, db, key)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid meta %s: %w", key, err)
-	}
-	return n, nil
-}
-
-func initializeWorld(ctx context.Context, store *worldStore, userID, worldID string, def gameDefinition, mode, playerName, playerProfile string) error {
+func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, worldID string, def gameDefinition, mode, playerName, playerProfile string) error {
 	if mode != "open" && mode != "guided" {
 		return ErrInvalidRequest
 	}
 	now := wire.NowText()
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -368,21 +173,21 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 		if err := validatePlot(*def.Plot, state); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "plot_definition", wire.MarshalJSON(def.Plot)); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(state)); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(state)); err != nil {
 			return err
 		}
 	}
 	for _, c := range def.Characters {
-		if err := metaSetTx(ctx, tx, "appearance:"+c.EntityID, c.Appearance); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "appearance:"+c.EntityID, c.Appearance); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "definition_revision:"+c.EntityID, c.DefinitionRevision); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "definition_revision:"+c.EntityID, c.DefinitionRevision); err != nil {
 			return err
 		}
-		if err := metaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "initial_concerns:"+c.EntityID, c.InitialConcerns); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO characters(entity_id,definition_id,name,role,profile,knowledge,in_scene) VALUES(?,?,?,?,?,?,?)`, c.EntityID, c.DefinitionID, c.Name, c.Role, c.Profile, c.Knowledge, wire.BoolInt(c.InScene)); err != nil {
@@ -401,9 +206,9 @@ func initializeWorld(ctx context.Context, store *worldStore, userID, worldID str
 	return tx.Commit()
 }
 
-func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (worldSnapshot, error) {
+func loadWorldSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (worldSnapshot, error) {
 	var out worldSnapshot
-	get := func(key string) (string, error) { return metaGet(ctx, store.db, key) }
+	get := func(key string) (string, error) { return storage.MetaGet(ctx, store.Database(), key) }
 	var err error
 	out.Summary.GameID, err = get("game_id")
 	if err != nil {
@@ -450,17 +255,17 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if err != nil {
 		return out, err
 	}
-	out.Narrative, err = loadNarrativeSettings(ctx, store.db)
+	out.Narrative, err = loadNarrativeSettings(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
-	out.Plot, out.PlotProgress, err = readPlot(ctx, store.db)
+	out.Plot, out.PlotProgress, err = readPlot(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
 	out.Summary.StoryEnded = out.Summary.Mode == "guided" && out.PlotProgress.Ending != ""
 	for key, target := range map[string]*int64{"turn_seq": &out.Summary.TurnSeq, "message_head": &out.Summary.MessageHead, "event_head": &out.Summary.EventHead, "context_epoch": &out.Summary.ContextEpoch, "scene_version": &out.SceneVersion} {
-		*target, err = metaInt(ctx, store.db, key)
+		*target, err = storage.MetaInt(ctx, store.Database(), key)
 		if err != nil {
 			return out, err
 		}
@@ -471,7 +276,7 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	if value, e := get("bystanders"); e == nil {
 		_ = json.Unmarshal([]byte(value), &out.Bystanders)
 	}
-	out.Characters, err = loadCharacters(ctx, store.db)
+	out.Characters, err = storage.LoadCharacters(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
@@ -481,26 +286,26 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	}
 	out.Summary.GameTitle = out.Definition.Summary.Title
 	out.Summary.Revision = out.Definition.Revision
-	out.Messages, err = loadMessages(ctx, store.db, limit)
+	out.Messages, err = storage.LoadMessages(ctx, store.Database(), limit)
 	if err != nil {
 		return out, err
 	}
-	out.Events, err = loadEvents(ctx, store.db, limit)
+	out.Events, err = storage.LoadEvents(ctx, store.Database(), limit)
 	if err != nil {
 		return out, err
 	}
-	out.Dialogue, err = loadDialogue(ctx, store.db)
+	out.Dialogue, err = storage.LoadDialogue(ctx, store.Database())
 	if err != nil {
 		return out, err
 	}
 	out.Perceptions = make(map[string][]wiaworld.Perception)
 	out.Memories = make(map[string][]wiaworld.Memory)
 	for _, c := range out.Characters {
-		out.Perceptions[c.EntityID], err = loadPerceptions(ctx, store.db, c.EntityID, 20)
+		out.Perceptions[c.EntityID], err = storage.LoadPerceptions(ctx, store.Database(), c.EntityID, 20)
 		if err != nil {
 			return out, err
 		}
-		out.Memories[c.EntityID], err = loadMemories(ctx, store.db, c.EntityID, 20)
+		out.Memories[c.EntityID], err = storage.LoadMemories(ctx, store.Database(), c.EntityID, 20)
 		if err != nil {
 			return out, err
 		}
@@ -519,7 +324,7 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 			return out, err
 		}
 	}
-	out.GeneratedEvents, err = readGeneratedEvents(ctx, store.db, out.Definition)
+	out.GeneratedEvents, err = readGeneratedEvents(ctx, store.Database(), out.Definition)
 	if err != nil {
 		return out, err
 	}
@@ -529,188 +334,11 @@ func loadWorldSnapshot(ctx context.Context, store *worldStore, limit int) (world
 	return out, nil
 }
 
-func loadCharacters(ctx context.Context, db *sql.DB) ([]wiaworld.Character, error) {
-	rows, err := db.QueryContext(ctx, `SELECT c.entity_id,c.definition_id,c.name,c.role,c.profile,c.knowledge,c.in_scene,COALESCE(m.value,'') FROM characters c LEFT JOIN meta m ON m.key='initial_concerns:' || c.entity_id ORDER BY c.entity_id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []wiaworld.Character
-	for rows.Next() {
-		var c wiaworld.Character
-		var in int
-		if err := rows.Scan(&c.EntityID, &c.DefinitionID, &c.Name, &c.Role, &c.Profile, &c.Knowledge, &in, &c.InitialConcerns); err != nil {
-			return nil, err
-		}
-		c.InScene = in != 0
-		result = append(result, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	for i := range result {
-		revision, revisionErr := metaGet(ctx, db, "definition_revision:"+result[i].EntityID)
-		if revisionErr != nil && !errors.Is(revisionErr, sql.ErrNoRows) {
-			return nil, revisionErr
-		}
-		result[i].DefinitionRevision = revision
-		value, e := metaGet(ctx, db, "appearance:"+result[i].EntityID)
-		if e == nil {
-			result[i].Appearance = value
-		} else if !errors.Is(e, sql.ErrNoRows) {
-			return nil, e
-		}
-		// A promoted or authored character can carry its own avatar; the world copy is
-		// recorded separately under the world's assets.
-		if value, e := metaGet(ctx, db, "avatar:"+result[i].EntityID); e == nil {
-			result[i].Avatar = value
-		} else if !errors.Is(e, sql.ErrNoRows) {
-			return nil, e
-		}
-	}
-	return result, nil
-}
+// A promoted or authored character can carry its own avatar; the world copy is
+// recorded separately under the world's assets.
 
-func loadMessages(ctx context.Context, db *sql.DB, limit int) ([]wiaworld.Message, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	rows, err := db.QueryContext(ctx, `SELECT seq,message_id,kind,content,run_id,created_at FROM messages ORDER BY seq DESC LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []wiaworld.Message
-	for rows.Next() {
-		var m wiaworld.Message
-		var created string
-		if err := rows.Scan(&m.Seq, &m.MessageID, &m.Kind, &m.Content, &m.RunID, &created); err != nil {
-			return nil, err
-		}
-		m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-		result = append(result, m)
-	}
-	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-		result[i], result[j] = result[j], result[i]
-	}
-	return result, rows.Err()
-}
-
-func loadEvents(ctx context.Context, db *sql.DB, limit int) ([]wiaworld.Event, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	rows, err := db.QueryContext(ctx, `SELECT seq,event_id,event_type,actor_id,target_id,content,run_id,stage,scene_version,source_type,created_at FROM events ORDER BY seq DESC LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []wiaworld.Event
-	for rows.Next() {
-		var e wiaworld.Event
-		var created string
-		if err := rows.Scan(&e.Seq, &e.EventID, &e.EventType, &e.ActorID, &e.TargetID, &e.Content, &e.RunID, &e.Stage, &e.SceneVersion, &e.SourceType, &created); err != nil {
-			return nil, err
-		}
-		e.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-		result = append(result, e)
-	}
-	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-		result[i], result[j] = result[j], result[i]
-	}
-	return result, rows.Err()
-}
-
-func loadPerceptions(ctx context.Context, db *sql.DB, recipient string, limit int) ([]wiaworld.Perception, error) {
-	rows, err := db.QueryContext(ctx, `SELECT seq,recipient_id,source_event_id,source_type,content,stage,scene_version,created_at FROM perceptions WHERE recipient_id=? ORDER BY seq DESC LIMIT ?`, recipient, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []wiaworld.Perception
-	for rows.Next() {
-		var p wiaworld.Perception
-		var created string
-		if err := rows.Scan(&p.Seq, &p.RecipientID, &p.SourceEventID, &p.SourceType, &p.Content, &p.Stage, &p.SceneVersion, &created); err != nil {
-			return nil, err
-		}
-		p.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-		result = append(result, p)
-	}
-	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-		result[i], result[j] = result[j], result[i]
-	}
-	return result, rows.Err()
-}
-
-func loadMemories(ctx context.Context, db *sql.DB, recipient string, limit int) ([]wiaworld.Memory, error) {
-	rows, err := db.QueryContext(ctx, `SELECT seq,recipient_id,kind,content,source_event_id,created_at FROM memories WHERE recipient_id=? ORDER BY seq DESC LIMIT ?`, recipient, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []wiaworld.Memory
-	for rows.Next() {
-		var m wiaworld.Memory
-		var created string
-		if err := rows.Scan(&m.Seq, &m.RecipientID, &m.Kind, &m.Content, &m.SourceEventID, &created); err != nil {
-			return nil, err
-		}
-		m.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-		result = append(result, m)
-	}
-	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-		result[i], result[j] = result[j], result[i]
-	}
-	return result, rows.Err()
-}
-
-func scanRun(row interface{ Scan(...any) error }) (wiaworld.Run, bool, error) {
-	var r wiaworld.Run
-	var created, updated string
-	var foundErr error
-	foundErr = row.Scan(&r.RunID, &r.RequestKey, &r.RequestHash, &r.Input, &r.AddresseeID, &r.Attempt, &r.Status, &r.Reason, &r.Error, &r.MessageSeq, &r.InputID, &r.InputSeq, &r.BaseTurnSeq, &r.BaseMessageHead, &r.BaseEventHead, &r.BaseContextEpoch, &r.BaseSceneVersion, &created, &updated)
-	if errors.Is(foundErr, sql.ErrNoRows) {
-		return wiaworld.Run{}, false, nil
-	}
-	if foundErr != nil {
-		return wiaworld.Run{}, false, foundErr
-	}
-	r.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
-	r.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
-	return r, true, nil
-}
-
-func readRun(ctx context.Context, db *sql.DB, runID string) (wiaworld.Run, bool, error) {
-	return scanRun(db.QueryRowContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs WHERE run_id=?`, runID))
-}
-
-func readRunByRequest(ctx context.Context, db *sql.DB, key string) (wiaworld.Run, bool, error) {
-	return scanRun(db.QueryRowContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs WHERE request_key=?`, key))
-}
-
-func updateRunStatus(ctx context.Context, db *sql.DB, runID, status, reason, errorText string) error {
-	_, err := db.ExecContext(ctx, `UPDATE runs SET status=?,reason=?,error=?,updated_at=? WHERE run_id=?`, status, reason, errorText, wire.NowText(), runID)
-	return err
-}
-
-func runCancelRequested(ctx context.Context, db *sql.DB, runID string) (bool, error) {
-	var value int
-	err := db.QueryRowContext(ctx, `SELECT cancel_requested FROM runs WHERE run_id=?`, runID).Scan(&value)
-	return value != 0, err
-}
-
-func countActiveRuns(ctx context.Context, db *sql.DB) (int, error) {
-	var count int
-	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM runs WHERE status IN ('accepted','running')`).Scan(&count)
-	return count, err
-}
-
-func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
-	tx, err := store.db.BeginTx(ctx, nil)
+func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []SceneView, plotState *PlotProgress, generated ...*generatedEventState) (int64, error) {
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -731,7 +359,7 @@ func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrat
 	}
 	var messageHead, eventHead, turnSeq, currentSceneVersion, contextEpoch int64
 	for key, target := range map[string]*int64{"message_head": &messageHead, "event_head": &eventHead, "turn_seq": &turnSeq, "scene_version": &currentSceneVersion, "context_epoch": &contextEpoch} {
-		value, err := metaGetTx(ctx, tx, key)
+		value, err := storage.MetaGetTx(ctx, tx, key)
 		if err != nil {
 			return 0, err
 		}
@@ -779,47 +407,47 @@ func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrat
 		return 0, err
 	}
 	turnSeq++
-	if err := metaSetTx(ctx, tx, "message_head", strconv.FormatInt(messageHead, 10)); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "message_head", strconv.FormatInt(messageHead, 10)); err != nil {
 		return 0, err
 	}
-	if err := metaSetTx(ctx, tx, "event_head", strconv.FormatInt(eventHead, 10)); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "event_head", strconv.FormatInt(eventHead, 10)); err != nil {
 		return 0, err
 	}
-	if err := metaSetTx(ctx, tx, "turn_seq", strconv.FormatInt(turnSeq, 10)); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "turn_seq", strconv.FormatInt(turnSeq, 10)); err != nil {
 		return 0, err
 	}
-	if err := metaSetTx(ctx, tx, "clock", clock); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "clock", clock); err != nil {
 		return 0, err
 	}
 	if plotState != nil {
-		if err := metaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
 			return 0, err
 		}
 	}
 	if len(generated) > 0 && generated[0] != nil {
-		if err := metaSetTx(ctx, tx, "generated_events", wire.MarshalJSON(generated[0])); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "generated_events", wire.MarshalJSON(generated[0])); err != nil {
 			return 0, err
 		}
 	}
 	if scene == "" {
-		scene, _ = metaGetTx(ctx, tx, "scene")
+		scene, _ = storage.MetaGetTx(ctx, tx, "scene")
 	}
 	viewsJSON, err := json.Marshal(sceneViews)
 	if err != nil {
 		return 0, err
 	}
-	if err := metaSetTx(ctx, tx, "scene_views", string(viewsJSON)); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "scene_views", string(viewsJSON)); err != nil {
 		return 0, err
 	}
-	if err := metaSetTx(ctx, tx, "scene", scene); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "scene", scene); err != nil {
 		return 0, err
 	}
 	if sceneLocation != "" {
-		if err := metaSetTx(ctx, tx, "scene_location", sceneLocation); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "scene_location", sceneLocation); err != nil {
 			return 0, err
 		}
 	}
-	if err := metaSetTx(ctx, tx, "scene_version", strconv.FormatInt(sceneVersion, 10)); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "scene_version", strconv.FormatInt(sceneVersion, 10)); err != nil {
 		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE characters SET in_scene=0`); err != nil {
@@ -837,7 +465,7 @@ func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrat
 			return 0, ErrGenerationFailed
 		}
 	}
-	if err := metaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "updated_at", wire.NowText()); err != nil {
 		return 0, err
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE runs SET status='completed',reason='',error='',message_seq=?,updated_at=? WHERE run_id=? AND status='running' AND cancel_requested=0`, messageHead, wire.NowText(), run.RunID)
@@ -856,38 +484,33 @@ func commitTurn(ctx context.Context, store *worldStore, run wiaworld.Run, narrat
 	return messageHead, nil
 }
 
-func markRunInterrupted(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `UPDATE runs SET status='interrupted',reason='process_restarted',error='the previous process stopped before completion',updated_at=? WHERE status IN ('accepted','running')`, wire.NowText())
-	return err
-}
-
 func removeDir(path string) error { return os.RemoveAll(path) }
 
-func cloneWorld(ctx context.Context, source *worldStore, targetPath, targetWorldID, targetName string) error {
+func cloneWorld(ctx context.Context, source *storage.WorldStore, targetPath, targetWorldID, targetName string) error {
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return err
 	}
 	_ = os.Remove(targetPath)
-	if _, err := source.db.ExecContext(ctx, `VACUUM INTO ?`, targetPath); err != nil {
+	if _, err := source.Database().ExecContext(ctx, `VACUUM INTO ?`, targetPath); err != nil {
 		return err
 	}
-	target, err := openWorldDB(targetPath)
+	target, err := storage.OpenWorldDB(targetPath)
 	if err != nil {
 		return err
 	}
-	defer target.db.Close()
-	tx, err := target.db.BeginTx(ctx, nil)
+	defer target.Database().Close()
+	tx, err := target.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := metaSetTx(ctx, tx, "world_id", targetWorldID); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "world_id", targetWorldID); err != nil {
 		return err
 	}
-	if err := metaSetTx(ctx, tx, "name", targetName); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "name", targetName); err != nil {
 		return err
 	}
-	if err := metaSetTx(ctx, tx, "generation", "1"); err != nil {
+	if err := storage.MetaSetTx(ctx, tx, "generation", "1"); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {

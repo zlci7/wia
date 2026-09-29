@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -77,17 +78,17 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	for i := 1; i <= 12; i++ {
 		run := fmt.Sprintf("history-%02d", i)
-		if _, err = store.db.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = store.db.Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+100, "e"+run, "player_attempt", "player", "npc:innkeeper", "秘密铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+100, "e"+run, "player_attempt", "player", "npc:innkeeper", "秘密铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
 			t.Fatal(err)
 		}
 		for _, scope := range []string{"npc:innkeeper", "npc:mercenary"} {
@@ -95,7 +96,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 			if scope == "npc:innkeeper" {
 				content = "承诺在码头归还铜钥匙"
 			}
-			if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, scope, "e"+run, content); err != nil {
+			if _, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, scope, "e"+run, content); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -133,7 +134,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	if err = indexMemorySources(ctx, store); err != nil {
 		t.Fatal(err)
 	}
-	items, _ := readMemorySources(ctx, store.db, "npc:innkeeper", 0)
+	items, _ := readMemorySources(ctx, store.Database(), "npc:innkeeper", 0)
 	if len(items) != 12 {
 		t.Fatal("index not idempotent")
 	}
@@ -150,7 +151,7 @@ func TestMemoryScopeContinuityAndCompaction(t *testing.T) {
 	if err = publishDigest(ctx, store, stale, 0, w.ContextEpoch); !errors.Is(err, ErrVersionConflict) {
 		t.Fatal("late revision published", err)
 	}
-	if _, err = store.db.Exec(`UPDATE meta SET value='2' WHERE key='context_epoch'`); err != nil {
+	if _, err = store.Database().Exec(`UPDATE meta SET value='2' WHERE key='context_epoch'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = publishDigest(ctx, store, stale, 1, w.ContextEpoch); !errors.Is(err, ErrVersionConflict) {
@@ -167,11 +168,11 @@ func TestMemoryOptionalFailureKeepsCompleteTail(t *testing.T) {
 	}
 	seedMemoryHistory(t, a, w.WorldID)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.db.Close()
+	defer s.Database().Close()
 	snapshot, err := loadWorldSnapshot(ctx, s, 40)
 	if err != nil {
 		t.Fatal(err)
@@ -217,22 +218,22 @@ func TestMemoryPaginationUsesMessageOrderAndExcludesFailedRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 2; i <= 251; i++ {
-		if _, err = s.db.Exec(`INSERT INTO messages VALUES(?,?,'narrative',?,'','now')`, i, fmt.Sprintf("reverse-%03d", 300-i), fmt.Sprintf("历史%d", i)); err != nil {
+		if _, err = s.Database().Exec(`INSERT INTO messages VALUES(?,?,'narrative',?,'','now')`, i, fmt.Sprintf("reverse-%03d", 300-i), fmt.Sprintf("历史%d", i)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err = s.db.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES('failed','failed','failed','失败原话','',1,'failed','now','now')`); err != nil {
+	if _, err = s.Database().Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES('failed','failed','failed','失败原话','',1,'failed','now','now')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`INSERT INTO messages VALUES(252,'failed-input','player','失败原话','failed','now')`); err != nil {
+	if _, err = s.Database().Exec(`INSERT INTO messages VALUES(252,'failed-input','player','失败原话','failed','now')`); err != nil {
 		t.Fatal(err)
 	}
-	s.db.Close()
+	s.Database().Close()
 	before := int64(0)
 	count := 0
 	for page := 0; page < 3; page++ {
@@ -269,12 +270,12 @@ func TestSubjectiveMemoryIdentifiesItsOwner(t *testing.T) {
 	}
 	seedMemoryHistory(t, a, w.WorldID)
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.db.Exec(`INSERT INTO memories(recipient_id,kind,content,source_event_id,created_at) VALUES('npc:innkeeper','character_judgment','我还不能信任他。','fixture-history-01:input','now')`)
-	s.db.Close()
+	_, err = s.Database().Exec(`INSERT INTO memories(recipient_id,kind,content,source_event_id,created_at) VALUES('npc:innkeeper','character_judgment','我还不能信任他。','fixture-history-01:input','now')`)
+	s.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

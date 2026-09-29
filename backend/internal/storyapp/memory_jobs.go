@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -71,14 +72,14 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		worldRT.mu.Unlock()
 		return true, err
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		worldRT.mu.Unlock()
 		return true, err
 	}
-	job, err := readMemoryJob(ctx, store.db)
+	job, err := readMemoryJob(ctx, store.Database())
 	if err != nil || job.Status == "completed" || job.Status == "failed" {
-		store.db.Close()
+		store.Database().Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
@@ -87,32 +88,32 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		err = loadLongMemory(ctx, store, &snapshot)
 	}
 	if err != nil {
-		failMemoryJob(ctx, store.db, job.Epoch, err)
-		store.db.Close()
+		failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		store.Database().Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
 	if job.Completed >= len(job.Scopes) {
-		_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
-		store.db.Close()
+		_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='completed',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
+		store.Database().Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
 	scope := job.Scopes[job.Completed]
 	m := snapshot.LongMemory[scope]
-	corrections, err := readCorrections(ctx, store.db)
+	corrections, err := readCorrections(ctx, store.Database())
 	var eventRuns map[string]string
 	if err == nil {
-		eventRuns, err = correctionEventRuns(ctx, store.db, corrections)
+		eventRuns, err = correctionEventRuns(ctx, store.Database(), corrections)
 	}
 	if err != nil {
-		failMemoryJob(ctx, store.db, job.Epoch, err)
-		store.db.Close()
+		failMemoryJob(ctx, store.Database(), job.Epoch, err)
+		store.Database().Close()
 		worldRT.mu.Unlock()
 		return true, err
 	}
-	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
-	store.db.Close()
+	_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='running',error='',updated_at=? WHERE epoch=?`, wire.NowText(), job.Epoch)
+	store.Database().Close()
 	worldRT.mu.Unlock()
 	if err != nil {
 		return true, err
@@ -180,12 +181,12 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if checkErr != nil || status != "ready" {
 		return true, checkErr
 	}
-	store, checkErr = openWorldDB(path)
+	store, checkErr = storage.OpenWorldDB(path)
 	if checkErr != nil {
 		return true, checkErr
 	}
-	defer store.db.Close()
-	current, checkErr := readMemoryJob(ctx, store.db)
+	defer store.Database().Close()
+	current, checkErr := readMemoryJob(ctx, store.Database())
 	if checkErr != nil {
 		return true, checkErr
 	}
@@ -196,11 +197,11 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 		return true, ctx.Err()
 	}
 	if err != nil {
-		saveErr := failMemoryJob(ctx, store.db, job.Epoch, err)
+		saveErr := failMemoryJob(ctx, store.Database(), job.Epoch, err)
 		return true, saveErr
 	}
 	if err = publishDigest(ctx, store, d, previous.Revision, job.Epoch); err != nil {
-		failMemoryJob(ctx, store.db, job.Epoch, err)
+		failMemoryJob(ctx, store.Database(), job.Epoch, err)
 		return true, err
 	}
 	doneScope := len(prefix) == 0 || len(memoryGroups(afterMemory(m.Archive, d.Through))) <= 4
@@ -212,7 +213,7 @@ func (a *App) rebuildMemoryStep(ctx context.Context, worldID string) (bool, erro
 	if completed == len(job.Scopes) {
 		status = "completed"
 	}
-	_, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status=?,completed=?,updated_at=? WHERE epoch=?`, status, completed, wire.NowText(), job.Epoch)
+	_, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status=?,completed=?,updated_at=? WHERE epoch=?`, status, completed, wire.NowText(), job.Epoch)
 	return status == "completed", err
 }
 
@@ -293,19 +294,19 @@ func (a *App) RetryMemory(ctx context.Context, worldID string, epoch int64) erro
 	if status != "ready" {
 		return ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return err
 	}
-	defer store.db.Close()
-	current, err := metaInt(ctx, store.db, "context_epoch")
+	defer store.Database().Close()
+	current, err := storage.MetaInt(ctx, store.Database(), "context_epoch")
 	if err != nil {
 		return err
 	}
 	if current != epoch {
 		return ErrVersionConflict
 	}
-	if _, err = store.db.ExecContext(ctx, `UPDATE memory_jobs SET status='queued',error='' WHERE epoch=? AND status='failed'`, epoch); err != nil {
+	if _, err = store.Database().ExecContext(ctx, `UPDATE memory_jobs SET status='queued',error='' WHERE epoch=? AND status='failed'`, epoch); err != nil {
 		return err
 	}
 	schedule = true

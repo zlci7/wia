@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -222,12 +223,12 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	worldRT := a.worldRuntimeFor(worldID)
 	worldRT.mu.Lock()
 	defer worldRT.mu.Unlock()
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
-	defer store.db.Close()
-	if existing, found, err := readRunByRequest(ctx, store.db, request.RequestKey); err != nil {
+	defer store.Database().Close()
+	if existing, found, err := storage.ReadRunByRequest(ctx, store.Database(), request.RequestKey); err != nil {
 		return wiaworld.Run{}, err
 	} else if found {
 		if existing.RequestHash != a.hashRun(request) {
@@ -254,7 +255,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if worldRT.savePending {
 		return wiaworld.Run{}, ErrWorldBusy
 	}
-	if err := memoryReady(ctx, store.db); err != nil {
+	if err := memoryReady(ctx, store.Database()); err != nil {
 		return wiaworld.Run{}, err
 	}
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
@@ -281,7 +282,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 			return wiaworld.Run{}, ErrInvalidRequest
 		}
 	}
-	if count, err := countActiveRuns(ctx, store.db); err != nil {
+	if count, err := storage.CountActiveRuns(ctx, store.Database()); err != nil {
 		return wiaworld.Run{}, err
 	} else if count > 0 {
 		return wiaworld.Run{}, ErrWorldBusy
@@ -291,7 +292,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if attempt < 1 {
 		attempt = 1
 	}
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
@@ -317,7 +318,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 			return wiaworld.Run{}, ErrVersionConflict
 		}
 	} else {
-		value, err := metaGetTx(ctx, tx, "input_seq")
+		value, err := storage.MetaGetTx(ctx, tx, "input_seq")
 		if err != nil {
 			return wiaworld.Run{}, err
 		}
@@ -327,7 +328,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 		}
 		inputSeq++
 		inputID = wire.NewID("input")
-		if err := metaSetTx(ctx, tx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
+		if err := storage.MetaSetTx(ctx, tx, "input_seq", strconv.FormatInt(inputSeq, 10)); err != nil {
 			return wiaworld.Run{}, err
 		}
 	}
@@ -374,18 +375,18 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.R
 		a.logRunFailure(runtime.WorldID, run, "open_world", "storage_unavailable", err)
 		return
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		a.logRunFailure(runtime.WorldID, run, "open_world", "storage_unavailable", err)
 		return
 	}
-	defer store.db.Close()
-	if err := updateRunStatus(context.Background(), store.db, run.RunID, "running", "", ""); err != nil {
+	defer store.Database().Close()
+	if err := storage.UpdateRunStatus(context.Background(), store.Database(), run.RunID, "running", "", ""); err != nil {
 		a.logRunFailure(runtime.WorldID, run, "mark_running", "storage_unavailable", err)
 		return
 	}
 	if !a.isActive(context.Background(), runtime.WorldID, runtime.ActiveRevision) {
-		_ = updateRunStatus(context.Background(), store.db, run.RunID, "cancelled", "world_switched", "the active world changed")
+		_ = storage.UpdateRunStatus(context.Background(), store.Database(), run.RunID, "cancelled", "world_switched", "the active world changed")
 		return
 	}
 	output, err := a.executeTurn(ctx, store, run, runtime.Generator)
@@ -394,13 +395,13 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.R
 		if status == "failed" {
 			a.logRunFailure(runtime.WorldID, run, stageOf(err), reason, err)
 		}
-		if updateErr := updateRunStatus(context.Background(), store.db, run.RunID, status, reason, message); updateErr != nil {
+		if updateErr := storage.UpdateRunStatus(context.Background(), store.Database(), run.RunID, status, reason, message); updateErr != nil {
 			a.logRunFailure(runtime.WorldID, run, "record_failure", "storage_unavailable", updateErr)
 		}
 		return
 	}
 	if !a.isActive(context.Background(), runtime.WorldID, runtime.ActiveRevision) {
-		_ = updateRunStatus(context.Background(), store.db, run.RunID, "cancelled", "world_switched", "the active world changed")
+		_ = storage.UpdateRunStatus(context.Background(), store.Database(), run.RunID, "cancelled", "world_switched", "the active world changed")
 		return
 	}
 	commitStarted := time.Now()
@@ -413,7 +414,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.R
 		if status == "failed" {
 			a.logRunFailure(runtime.WorldID, run, string(turnStageCommit), reason, err)
 		}
-		if updateErr := updateRunStatus(context.Background(), store.db, run.RunID, status, reason, message); updateErr != nil {
+		if updateErr := storage.UpdateRunStatus(context.Background(), store.Database(), run.RunID, status, reason, message); updateErr != nil {
 			a.logRunFailure(runtime.WorldID, run, "record_failure", "storage_unavailable", updateErr)
 		}
 		return
@@ -449,12 +450,12 @@ func (a *App) Run(ctx context.Context, worldID, runID string) (wiaworld.Run, err
 	if status != "ready" {
 		return wiaworld.Run{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
-	defer store.db.Close()
-	run, found, err := readRun(ctx, store.db, runID)
+	defer store.Database().Close()
+	run, found, err := storage.ReadRun(ctx, store.Database(), runID)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
@@ -472,13 +473,13 @@ func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...strin
 	if status != "ready" {
 		return nil, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return nil, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	if len(requestKeys) > 0 && requestKeys[0] != "" {
-		run, found, err := readRunByRequest(ctx, store.db, requestKeys[0])
+		run, found, err := storage.ReadRunByRequest(ctx, store.Database(), requestKeys[0])
 		if err != nil {
 			return nil, err
 		}
@@ -487,14 +488,14 @@ func (a *App) ListRuns(ctx context.Context, worldID string, requestKeys ...strin
 		}
 		return []wiaworld.Run{run}, nil
 	}
-	rows, err := store.db.QueryContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs ORDER BY created_at DESC LIMIT 50`)
+	rows, err := store.Database().QueryContext(ctx, `SELECT run_id,request_key,request_hash,input,addressee_id,attempt,status,reason,error,message_seq,input_id,input_seq,base_turn_seq,base_message_head,base_event_head,base_context_epoch,base_scene_version,created_at,updated_at FROM runs ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	runs := make([]wiaworld.Run, 0)
 	for rows.Next() {
-		run, found, err := scanRun(rows)
+		run, found, err := storage.ScanRun(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -510,12 +511,12 @@ func (a *App) CancelRun(ctx context.Context, worldID, runID string) error {
 	if err != nil {
 		return err
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return err
 	}
-	defer store.db.Close()
-	if _, err := store.db.ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE run_id=? AND status IN ('accepted','running')`, wire.NowText(), runID); err != nil {
+	defer store.Database().Close()
+	if _, err := store.Database().ExecContext(ctx, `UPDATE runs SET cancel_requested=1,updated_at=? WHERE run_id=? AND status IN ('accepted','running')`, wire.NowText(), runID); err != nil {
 		return err
 	}
 	a.runsMu.Lock()
@@ -532,12 +533,12 @@ func (a *App) RetryRun(ctx context.Context, worldID, runID, requestKey string) (
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
-	run, found, err := readRun(ctx, store.db, runID)
-	_ = store.db.Close()
+	run, found, err := storage.ReadRun(ctx, store.Database(), runID)
+	_ = store.Database().Close()
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
@@ -600,7 +601,7 @@ func (a *App) resolveTurnIntent(ctx context.Context, generator model.TextGenerat
 // executeTurn runs one story turn. Every step below is a named stage, so the
 // pipeline can be read in order; the implementation of each stage lives in its
 // own function.
-func (a *App) executeTurn(ctx context.Context, store *worldStore, run wiaworld.Run, generator model.TextGenerator) (turnOutput, error) {
+func (a *App) executeTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (turnOutput, error) {
 	snapshot, err := a.loadTurn(ctx, store, run, generator)
 	if err != nil {
 		return turnOutput{}, err
@@ -651,7 +652,7 @@ func turnDefinition(snapshot *worldSnapshot) gameDefinition {
 
 // loadTurn reads the frozen turn input: the world snapshot, the long-memory
 // material and the coordination evidence.
-func (a *App) loadTurn(ctx context.Context, store *worldStore, run wiaworld.Run, generator model.TextGenerator) (worldSnapshot, error) {
+func (a *App) loadTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (worldSnapshot, error) {
 	loadStarted := time.Now()
 	snapshot, err := loadTurnSnapshot(ctx, store, 40)
 	if err != nil {
@@ -875,8 +876,8 @@ func (a *App) recordPlayerExperience(snapshot *worldSnapshot, output *turnOutput
 // includeNewCharactersInSceneViews gives every character present in the world a view
 // of the closing result when the scene projection predates them, so a roster change
 // does not invalidate the turn.
-func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *worldStore, snapshot *worldSnapshot, output *turnOutput) error {
-	current, err := loadCharacters(ctx, store.db)
+func (a *App) includeNewCharactersInSceneViews(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, output *turnOutput) error {
+	current, err := storage.LoadCharacters(ctx, store.Database())
 	if err != nil {
 		return err
 	}

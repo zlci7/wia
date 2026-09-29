@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -261,12 +262,12 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := app.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
-	if _, err = store.db.Exec(`UPDATE characters SET in_scene=0 WHERE entity_id='npc:mercenary'`); err != nil {
+	defer store.Database().Close()
+	if _, err = store.Database().Exec(`UPDATE characters SET in_scene=0 WHERE entity_id='npc:mercenary'`); err != nil {
 		t.Fatal(err)
 	}
 	run, err := app.SubmitRun(ctx, w.WorldID, RunRequest{RequestKey: "outside", Input: "我保密地等待"})
@@ -313,7 +314,7 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	if snapshot.SceneVersion < 3 {
 		t.Fatal("scene version did not advance")
 	}
-	history, err := loadDialogue(ctx, store.db)
+	history, err := storage.LoadDialogue(ctx, store.Database())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,12 +370,12 @@ func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 		t.Fatal("copy lost the plot's final scene view")
 	}
 	path, _, _ := app.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.db.Exec(`DELETE FROM meta WHERE key IN ('plot_definition','plot_progress')`)
-	store.db.Close()
+	_, err = store.Database().Exec(`DELETE FROM meta WHERE key IN ('plot_definition','plot_progress')`)
+	store.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

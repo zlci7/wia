@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"image"
 	_ "image/jpeg"
@@ -593,8 +594,8 @@ func (a *App) GameCover(id, revision string) ([]byte, string, error) {
 	return p.Cover, p.CoverType, nil
 }
 
-func snapshotDefinition(ctx context.Context, store *worldStore, s worldSnapshot) (gameDefinition, error) {
-	raw, err := metaGet(ctx, store.db, "definition_snapshot")
+func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s worldSnapshot) (gameDefinition, error) {
+	raw, err := storage.MetaGet(ctx, store.Database(), "definition_snapshot")
 	if err == nil {
 		var d gameDefinition
 		if json.Unmarshal([]byte(raw), &d) != nil || d.Summary.ID != s.Summary.GameID || d.Revision == "" {
@@ -603,7 +604,7 @@ func snapshotDefinition(ctx context.Context, store *worldStore, s worldSnapshot)
 		// Promotion removes a passer-by from the world, so the stored list is the
 		// authority once it exists. Legacy worlds keep display names only until the
 		// next world starts from the same content.
-		if stored, e := metaGet(ctx, store.db, "bystander_refs"); e == nil {
+		if stored, e := storage.MetaGet(ctx, store.Database(), "bystander_refs"); e == nil {
 			var refs []PackBystander
 			if json.Unmarshal([]byte(stored), &refs) == nil {
 				d.BystanderRefs = refs
@@ -618,7 +619,7 @@ func snapshotDefinition(ctx context.Context, store *worldStore, s worldSnapshot)
 	}
 	// Legacy worlds use only their persisted facts, never a newer installed pack.
 	d := gameDefinition{Summary: GameSummary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
-	d.Revision, _ = metaGet(ctx, store.db, "game_revision")
+	d.Revision, _ = storage.MetaGet(ctx, store.Database(), "game_revision")
 	d.Summary.Revision = d.Revision
 	if d.Summary.ID == GameID {
 		d.Summary.Title = "暮灯镇的失踪信使"

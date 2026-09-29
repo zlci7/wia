@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -338,12 +339,12 @@ func TestPackCorrectionAndLegacyIsolation(t *testing.T) {
 		t.Fatal("correction mutated initial template")
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	s, err := openWorldDB(path)
+	s, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.db.Exec(`DELETE FROM meta WHERE key='definition_snapshot'`)
-	s.db.Close()
+	_, err = s.Database().Exec(`DELETE FROM meta WHERE key='definition_snapshot'`)
+	s.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

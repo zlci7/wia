@@ -18,6 +18,7 @@ import (
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -51,7 +52,9 @@ func Open(ctx context.Context, options Options) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrAppBusy, err)
 	}
-	db, err := openAppDB(filepath.Join(appRoot, "app.db"))
+	// The application schema is assembled from the features that own these tables,
+	// so it is passed in rather than known by the storage package.
+	db, err := storage.OpenAppDB(filepath.Join(appRoot, "app.db"), appSchema+usageSchema+contentSchema)
 	if err != nil {
 		_ = processLock.Release()
 		return nil, err
@@ -242,11 +245,11 @@ func (a *App) worldSummary(ctx context.Context, worldID string) (wiaworld.WorldS
 	if status != "ready" {
 		return wiaworld.WorldSummary{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	snapshot, err := loadWorldSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
@@ -263,11 +266,11 @@ func (a *App) ReadWorld(ctx context.Context, worldID string, limit int) (worldSn
 	if status != "ready" {
 		return worldSnapshot{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return worldSnapshot{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	return loadWorldSnapshot(ctx, store, limit)
 }
 
@@ -345,15 +348,15 @@ func (a *App) markInterrupted(ctx context.Context) error {
 		paths = append(paths, path)
 	}
 	for _, path := range paths {
-		store, err := openWorldDB(path)
+		store, err := storage.OpenWorldDB(path)
 		if err != nil {
 			return err
 		}
-		if err := markRunInterrupted(ctx, store.db); err != nil {
-			store.db.Close()
+		if err := storage.MarkRunInterrupted(ctx, store.Database()); err != nil {
+			store.Database().Close()
 			return err
 		}
-		store.db.Close()
+		store.Database().Close()
 	}
 	return nil
 }

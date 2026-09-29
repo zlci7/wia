@@ -1,12 +1,15 @@
 package storyapp
 
-import "context"
+import (
+	"context"
+	"gameagent/backend/internal/storage"
+	// Coordinator history consists of world events, never player literary memory.
+	// Recent runs stay whole; old evidence is selected by the current input and the
+	// frozen plot conditions before Composer applies its group budget.
+)
 
-// Coordinator history consists of world events, never player literary memory.
-// Recent runs stay whole; old evidence is selected by the current input and the
-// frozen plot conditions before Composer applies its group budget.
-func loadCoordinationEvidence(ctx context.Context, store *worldStore, snapshot *worldSnapshot, input string) error {
-	events, err := loadEvents(ctx, store.db, int(snapshot.Summary.EventHead))
+func loadCoordinationEvidence(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, input string) error {
+	events, err := storage.LoadEvents(ctx, store.Database(), int(snapshot.Summary.EventHead))
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -126,12 +127,12 @@ func TestSuggestionsDiscardLateEpochAndWorldResponses(t *testing.T) {
 			switch mode {
 			case "epoch":
 				path, _, _ := a.worldRecord(ctx, w.WorldID)
-				store, err := openWorldDB(path)
+				store, err := storage.OpenWorldDB(path)
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = store.db.Exec(`UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='context_epoch'`)
-				store.db.Close()
+				_, err = store.Database().Exec(`UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='context_epoch'`)
+				store.Database().Close()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -178,28 +179,28 @@ func TestSuggestionsFailedInputExcludedAndFailuresBounded(t *testing.T) {
 	a, w, req := suggestionWorldFixture(t, g)
 	ctx := context.Background()
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A failed displayed input is not a narrative or a personal-memory source.
-	_, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'failed-input','player','FAILED_SECRET','failed-run',?)`, wire.NowText())
+	_, err = store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(2,'failed-input','player','FAILED_SECRET','failed-run',?)`, wire.NowText())
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.db.Close()
+	store.Database().Close()
 	if _, err := a.RequestSuggestions(ctx, w.WorldID, req); err != nil {
 		t.Fatal(err)
 	}
 	if g.calls.Load() != 0 {
 		t.Fatal("generated against uncommitted input")
 	}
-	store, err = openWorldDB(path)
+	store, err = storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = store.db.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(3,'new-narrative','narrative','公开观察','',?)`, wire.NowText())
-	store.db.Close()
+	_, err = store.Database().Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(3,'new-narrative','narrative','公开观察','',?)`, wire.NowText())
+	store.Database().Close()
 	if err != nil {
 		t.Fatal(err)
 	}

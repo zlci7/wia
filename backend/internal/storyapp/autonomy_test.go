@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
@@ -35,12 +36,12 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 		t.Fatal("concern scope")
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	db, err := openWorldDB(path)
+	db, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.db.Close()
-	if _, err = db.db.Exec("DELETE FROM meta WHERE key LIKE 'initial_concerns:%'"); err != nil {
+	defer db.Database().Close()
+	if _, err = db.Database().Exec("DELETE FROM meta WHERE key LIKE 'initial_concerns:%'"); err != nil {
 		t.Fatal(err)
 	}
 	legacy := readContextSnapshot(t, a, w.WorldID)

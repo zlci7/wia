@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	"strconv"
 	"strings"
@@ -115,19 +116,19 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if status != "ready" {
 		return Correction{}, ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return Correction{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	hash := wire.MarshalJSON(request)
 	var oldHash string
-	err = store.db.QueryRowContext(ctx, `SELECT request_hash FROM corrections WHERE request_key=?`, request.RequestKey).Scan(&oldHash)
+	err = store.Database().QueryRowContext(ctx, `SELECT request_hash FROM corrections WHERE request_key=?`, request.RequestKey).Scan(&oldHash)
 	if err == nil {
 		if hash != oldHash {
 			return Correction{}, ErrIdempotencyConflict
 		}
-		list, e := readCorrections(ctx, store.db)
+		list, e := readCorrections(ctx, store.Database())
 		if e != nil {
 			return Correction{}, e
 		}
@@ -144,7 +145,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if worldRT.savePending {
 		return Correction{}, ErrWorldBusy
 	}
-	if count, e := countActiveRuns(ctx, store.db); e != nil {
+	if count, e := storage.CountActiveRuns(ctx, store.Database()); e != nil {
 		return Correction{}, e
 	} else if count > 0 {
 		return Correction{}, ErrWorldBusy
@@ -165,16 +166,16 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	}
 	c := Correction{Epoch: request.ExpectedEpoch + 1, Kind: request.Kind, Scope: request.Scope, TargetID: request.TargetID, Original: original, Replacement: wire.Clean(request.Replacement), CreatedAt: wire.NowText()}
 	c.SceneVersion = snapshot.SceneVersion
-	if err = expandCorrection(ctx, store.db, &c); err != nil {
+	if err = expandCorrection(ctx, store.Database(), &c); err != nil {
 		return c, err
 	}
 	var eventRun string
 	if c.Kind == "event" {
-		if err = store.db.QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&eventRun); err != nil {
+		if err = store.Database().QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&eventRun); err != nil {
 			return c, err
 		}
 	}
-	tx, err := store.db.BeginTx(ctx, nil)
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return c, err
 	}
@@ -183,10 +184,10 @@ func (a *App) Correct(ctx context.Context, worldID string, request CorrectionReq
 	if err != nil {
 		return c, err
 	}
-	if err = metaSetTx(ctx, tx, "context_epoch", fmt.Sprint(c.Epoch)); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "context_epoch", fmt.Sprint(c.Epoch)); err != nil {
 		return c, err
 	}
-	if err = metaSetTx(ctx, tx, "updated_at", c.CreatedAt); err != nil {
+	if err = storage.MetaSetTx(ctx, tx, "updated_at", c.CreatedAt); err != nil {
 		return c, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE memory_jobs SET status='superseded' WHERE status!='completed'`); err != nil {
@@ -232,21 +233,21 @@ func correctionNotices(snapshot worldSnapshot, c Correction, eventRun string) ma
 	return notices
 }
 
-func correctionOriginal(ctx context.Context, store *worldStore, s worldSnapshot, r CorrectionRequest) (string, error) {
+func correctionOriginal(ctx context.Context, store *storage.WorldStore, s worldSnapshot, r CorrectionRequest) (string, error) {
 	switch r.Kind {
 	case "event":
 		if r.Scope != "author" {
 			return "", ErrInvalidRequest
 		}
 		var content string
-		err := store.db.QueryRowContext(ctx, `SELECT content FROM events e WHERE event_id=? AND (event_id='opening' OR run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed'))`, r.TargetID).Scan(&content)
+		err := store.Database().QueryRowContext(ctx, `SELECT content FROM events e WHERE event_id=? AND (event_id='opening' OR run_id='' OR EXISTS(SELECT 1 FROM runs r WHERE r.run_id=e.run_id AND r.status='completed'))`, r.TargetID).Scan(&content)
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrInvalidRequest
 		}
 		if err != nil {
 			return "", err
 		}
-		list, err := readCorrections(ctx, store.db)
+		list, err := readCorrections(ctx, store.Database())
 		if err != nil {
 			return "", err
 		}
@@ -336,8 +337,8 @@ func correctionEventRuns(ctx context.Context, db *sql.DB, list []Correction) (ma
 	return runs, nil
 }
 
-func applySnapshotCorrections(ctx context.Context, store *worldStore, s *worldSnapshot) error {
-	list, err := readCorrections(ctx, store.db)
+func applySnapshotCorrections(ctx context.Context, store *storage.WorldStore, s *worldSnapshot) error {
+	list, err := readCorrections(ctx, store.Database())
 	if err != nil {
 		return err
 	}

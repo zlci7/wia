@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -56,17 +57,17 @@ func readDigest(ctx context.Context, db *sql.DB, scope string) (MemoryDigest, er
 	return d, err
 }
 
-func loadLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnapshot) error {
+func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot) error {
 	if err := indexMemorySources(ctx, store); err != nil {
 		return err
 	}
 	snapshot.LongMemory = map[string]memoryContext{}
 	for _, scope := range memoryScopeIDs(*snapshot) {
-		archive, err := readMemorySources(ctx, store.db, scope, 0)
+		archive, err := readMemorySources(ctx, store.Database(), scope, 0)
 		if err != nil {
 			return err
 		}
-		d, err := readDigest(ctx, store.db, scope)
+		d, err := readDigest(ctx, store.Database(), scope)
 		if err != nil {
 			return err
 		}
@@ -83,7 +84,7 @@ func loadLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnaps
 
 // Maintenance reads only committed prefixes while the owning run protects the
 // world from deletion/copy. Publication is version checked outside model calls.
-func (a *App) prepareLongMemory(ctx context.Context, store *worldStore, snapshot *worldSnapshot, run wiaworld.Run, generator model.TextGenerator) error {
+func (a *App) prepareLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *worldSnapshot, run wiaworld.Run, generator model.TextGenerator) error {
 	if err := loadLongMemory(ctx, store, snapshot); err != nil {
 		return err
 	}
@@ -185,13 +186,13 @@ func (a *App) logMemoryValidation(world, scope, boundary string) {
 	}
 }
 
-func publishDigest(ctx context.Context, store *worldStore, d MemoryDigest, previous, epoch int64) error {
-	tx, err := store.db.BeginTx(ctx, nil)
+func publishDigest(ctx context.Context, store *storage.WorldStore, d MemoryDigest, previous, epoch int64) error {
+	tx, err := store.Database().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	actual, err := metaGetTx(ctx, tx, "context_epoch")
+	actual, err := storage.MetaGetTx(ctx, tx, "context_epoch")
 	if err != nil {
 		return err
 	}

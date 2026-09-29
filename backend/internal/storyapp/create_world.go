@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 	"os"
@@ -107,11 +108,11 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 	}
 	worldID := wire.NewID("world")
 	path := a.worldPathFor(def.Summary.ID, worldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	if err = initializeWorld(ctx, store, a.userID, worldID, def, def.Summary.Mode, playerName, playerProfile); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
@@ -119,7 +120,7 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 		if err = os.WriteFile(filepath.Join(filepath.Dir(path), "cover"), pack.Cover, 0644); err != nil {
 			return wiaworld.WorldSummary{}, err
 		}
-		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_type',?)`, pack.CoverType); err != nil {
+		if _, err = store.Database().ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_type',?)`, pack.CoverType); err != nil {
 			return wiaworld.WorldSummary{}, err
 		}
 	}
@@ -131,19 +132,19 @@ func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request 
 		return wiaworld.WorldSummary{}, err
 	}
 	if coverAsset != "" {
-		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_asset',?)`, coverAsset); err != nil {
+		if _, err = store.Database().ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('cover_asset',?)`, coverAsset); err != nil {
 			return wiaworld.WorldSummary{}, err
 		}
 	}
 	for entityID, asset := range avatars {
-		if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "avatar:"+entityID, asset); err != nil {
+		if _, err = store.Database().ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?)`, "avatar:"+entityID, asset); err != nil {
 			return wiaworld.WorldSummary{}, err
 		}
 	}
-	if _, err = store.db.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, wire.NowText()); err != nil {
+	if _, err = store.Database().ExecContext(ctx, `INSERT INTO meta(key,value) VALUES('name',?),('updated_at',?)`, name, wire.NowText()); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
-	if err = store.db.Close(); err != nil {
+	if err = store.Database().Close(); err != nil {
 		return wiaworld.WorldSummary{}, err
 	}
 	tx, err := a.appDB.BeginTx(ctx, nil)
@@ -184,12 +185,12 @@ func (a *App) worldGame(ctx context.Context, id string) (string, error) {
 func copyWorldCover(source, target string) error {
 	data, err := os.ReadFile(filepath.Join(filepath.Dir(source), "cover"))
 	if errors.Is(err, os.ErrNotExist) {
-		store, e := openWorldDB(source)
+		store, e := storage.OpenWorldDB(source)
 		if e != nil {
 			return e
 		}
-		defer store.db.Close()
-		_, e = metaGet(context.Background(), store.db, "cover_type")
+		defer store.Database().Close()
+		_, e = storage.MetaGet(context.Background(), store.Database(), "cover_type")
 		if e == nil {
 			return ErrStorageUnavailable
 		}
@@ -224,12 +225,12 @@ func (a *App) WorldCover(ctx context.Context, id string) ([]byte, string, error)
 	if status != "ready" {
 		return nil, "", ErrWorldNotReady
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		return nil, "", err
 	}
-	defer store.db.Close()
-	mime, err := metaGet(ctx, store.db, "cover_type")
+	defer store.Database().Close()
+	mime, err := storage.MetaGet(ctx, store.Database(), "cover_type")
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrWorldNotFound
 	}

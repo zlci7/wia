@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
@@ -40,12 +41,12 @@ func TestDialogueUsesFourCommittedTurns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
-	items, err := loadDialogue(context.Background(), store.db)
+	defer store.Database().Close()
+	items, err := storage.LoadDialogue(context.Background(), store.Database())
 	if err != nil {
 		t.Fatal(err)
 	}

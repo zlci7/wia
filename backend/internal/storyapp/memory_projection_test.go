@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 	"strings"
 	"testing"
@@ -175,20 +176,20 @@ func TestFailedMaintenanceKeepsStoredHistoryAndWatermark(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	for i := 1; i <= 12; i++ {
 		run := fmt.Sprintf("lag-%02d", i)
-		if _, err = store.db.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = store.db.Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+200, "e"+run, "player_attempt", "player", "npc:innkeeper", "铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+200, "e"+run, "player_attempt", "player", "npc:innkeeper", "铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, "npc:innkeeper", "e"+run, fmt.Sprintf("第%d轮承诺在码头归还铜钥匙", i)); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, "npc:innkeeper", "e"+run, fmt.Sprintf("第%d轮承诺在码头归还铜钥匙", i)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -231,20 +232,20 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	path, _, _ := a.worldRecord(ctx, w.WorldID)
-	store, err := openWorldDB(path)
+	store, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.db.Close()
+	defer store.Database().Close()
 	for i := 1; i <= 8; i++ {
 		run := fmt.Sprintf("corr-%02d", i)
-		if _, err = store.db.Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO runs(run_id,request_key,request_hash,input,addressee_id,attempt,status,created_at,updated_at) VALUES(?,?,?,'','',1,'completed','now','now')`, run, run, run); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = store.db.Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+300, "e"+run, "player_attempt", "player", "npc:innkeeper", "铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?)`, i+300, "e"+run, "player_attempt", "player", "npc:innkeeper", "铜钥匙", run, 1, 1, "player_private", "now"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = store.db.Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, "npc:innkeeper", "e"+run, fmt.Sprintf("第%d轮：约定明早在旧码头归还铜钥匙", i)); err != nil {
+		if _, err = store.Database().Exec(`INSERT INTO perceptions(recipient_id,source_event_id,source_type,content,stage,scene_version,created_at) VALUES(?,?,'player_private',?,1,1,'now')`, "npc:innkeeper", "e"+run, fmt.Sprintf("第%d轮：约定明早在旧码头归还铜钥匙", i)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -274,11 +275,11 @@ func TestBacklogRecallKeepsCorrectionsAndScope(t *testing.T) {
 	if correction.Epoch <= w.ContextEpoch {
 		t.Fatal("correction did not advance the epoch")
 	}
-	store2, err := openWorldDB(path)
+	store2, err := storage.OpenWorldDB(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store2.db.Close()
+	defer store2.Database().Close()
 	reloaded, err := loadWorldSnapshot(ctx, store2, 40)
 	if err != nil {
 		t.Fatal(err)

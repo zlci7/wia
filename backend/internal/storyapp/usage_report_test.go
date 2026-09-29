@@ -3,6 +3,7 @@ package storyapp
 import (
 	"context"
 	"encoding/json"
+	"gameagent/backend/internal/storage"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ func keepUsageReport(t *testing.T, a *App, dir string) {
 	t.Helper()
 	t.Cleanup(func() {
 		_ = a.Close()
-		db, err := openAppDB(filepath.Join(a.root, "app.db"))
+		db, err := storage.OpenAppDB(filepath.Join(a.root, "app.db"), appSchema+usageSchema+contentSchema)
 		if err != nil {
 			t.Error("usage report unavailable", err)
 			return
