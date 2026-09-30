@@ -122,8 +122,7 @@ func renderMemoryWindow(material Material, base string, m MemoryContext, scope s
 }
 
 // MemoryProjection is what this request already supplies, so retrieval does not offer the
-// same committed group twice. It is exported only while the material callers are still in
-// storyapp; A2 moves them here and takes it back to package-private.
+// same committed group twice. It stays exported while storyapp tests exercise this boundary.
 type MemoryProjection struct {
 	Context MemoryContext
 	// Supplied marks the records this request already provides; anything else the

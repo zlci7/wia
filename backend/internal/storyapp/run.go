@@ -742,9 +742,6 @@ func (a *App) coordinateTurn(ctx context.Context, generator model.TextGenerator,
 	return result, repairCount, nil
 }
 
-// formatBystanders lists passers-by with their stable identity so a coordinated
-// outcome can attribute experience to the one that actually took part.
-
 func characterIDs(items []wiaworld.Character) []string {
 	result := make([]string, 0, len(items))
 	for _, character := range items {
@@ -752,12 +749,3 @@ func characterIDs(items []wiaworld.Character) []string {
 	}
 	return result
 }
-
-// validateTurnIntent checks and normalizes what a model produced for a player's intent.
-//
-// The rules live here rather than on the type because the error they return is part of
-// this application's diagnostics: a repair pass needs to know which field was wrong and
-// what was expected, and that vocabulary belongs with the rest of the generation errors.
-// The three fields are constrained here and nowhere else, so every decode into a
-// TurnIntent gets the same rules. Normalizing first means a model answering "Speak" is
-// accepted rather than rejected on case.

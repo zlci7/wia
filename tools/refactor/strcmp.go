@@ -49,25 +49,26 @@ func runStrCmp(args []string) {
 	}
 }
 
-// literals collects every string literal in a directory, with how often it appears.
+// literals collects every string literal below a directory, with how often it appears.
 // Comments are not literals and are deliberately not compared: a comment may be rewritten
 // freely when code moves, and comparing them would bury a prompt change in noise.
 func literals(dir string) map[string]int {
 	out := map[string]int{}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		panic(err)
-	}
 	fset := token.NewFileSet()
-	for _, entry := range entries {
+	parsed := 0
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-			continue
+			return nil
 		}
-		file, err := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, 0)
+		file, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "skip %s: %v\n", entry.Name(), err)
-			continue
+			fmt.Fprintf(os.Stderr, "skip %s: %v\n", path, err)
+			return nil
 		}
+		parsed++
 		ast.Inspect(file, func(n ast.Node) bool {
 			lit, ok := n.(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
@@ -76,6 +77,13 @@ func literals(dir string) map[string]int {
 			out[lit.Value]++
 			return true
 		})
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if parsed == 0 {
+		panic(fmt.Sprintf("strcmp: no parseable Go files under %s", dir))
 	}
 	return out
 }
