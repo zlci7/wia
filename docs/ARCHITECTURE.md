@@ -18,9 +18,9 @@
 
 收敛前仓库同时存在两代产品：Game-native Agent Runtime（Agent / Context / Memory / Task / Tool / gRPC / Protocol / Adapter / Gateway）与 WIA 叙事应用（Story / NPC / Plot / Memory / Creator / Web）。当时同名能力各有一套：旧 context 与新上下文构建、旧 memory 与新记忆投影、旧 agent runtime 与叙事协调、旧 gRPC 与新 HTTP。
 
-这不是代码量问题，是**同一件事有两个权威来源**。D1/D2 已删除旧闭合簇，并把叙事职责归入 `turn`、`memory`、`content` 与薄 `app`。
+收敛解决的是同一能力存在两个权威来源的问题。当前叙事职责归入 `turn`、`memory`、`content` 与应用服务层 `app`。
 
-已核实的依赖事实：
+删除前核实的依赖事实：
 
 - `storyapp` 与 `storyapi` **对旧运行时零引用**；旧包只被旧入口 `runtime/cmd/server` 及它们彼此引用。
 - 旧包（`agent`、`gateway`、`task`、`tool`、`context`、`memory`、`httpapi`、`session`、`trace`、`traceview`、`bootstrap`、`browser`、`dataroot`、`definition`、`protocol/`）合计约 **7 万行**，与叙事链路无关。
@@ -42,18 +42,18 @@ wia/
 │   ├── cmd/wia/main.go
 │   └── internal/
 │       ├── storyapi/     HTTP 接口与请求适配
-│       ├── app/          生命周期与跨 owner 装配
+│       ├── app/          应用用例、生命周期、世界操作与最终提交
 │       ├── turn/         Turn Engine：冻结输入、上下文材料、人物决策与一轮故事主流程
 │       ├── world/        领域模型与纯规则
 │       ├── memory/       一个角色经历过什么、现在提供什么
 │       ├── plot/         世界事件与时间如何向前发展
 │       ├── story/        冻结的运行定义
-│       ├── model/        模型调用统一入口与 Provider
-│       ├── storage/      全部持久化
+│       ├── model/        中立的模型请求、响应与预算合同
+│       ├── llm/          Provider 配置与 OpenAI / DeepSeek 接入
+│       ├── storage/      世界库 schema、具名读写与事务原语
 │       ├── wire/         无领域含义的基础原语（文本规范、时间戳、JSON、标识生成）
-│       └── content/      开发者内容工具（剧本包、草稿、发布、导入导出）
+│       └── content/      开发者内容工具（packs/ 内置两个示例剧本）
 ├── frontend/             Vue 前端（原 console/web）
-├── stories/              随发布交付的示例剧本包
 ├── docs/
 ├── scripts/
 ├── go.mod
@@ -62,7 +62,7 @@ wia/
 
 - **不以包数量作为架构指标。** 判断标准是"是否对应一个稳定职责"。代码少时并入相邻模块即可。
 - 模块分三层：核心业务（`turn`、`world`、`memory`、`plot`、`story`）、基础设施（`model`、`storage`、`storyapi`）、产品外围（`content`、`app`）。人物决策与 purpose 驱动的上下文装配都属于一轮故事，代码量不足以证明需要独立 package，因此保留在 `turn`。
-- `stories/` 只放**随发布交付的示例剧本包**；开发者本地草稿与已发布修订属于用户数据目录，不进入仓库。
+- 内置示例剧本位于 `backend/internal/content/packs/lantern-dusk` 与 `orbital-repair`；开发者本地草稿、外部剧本包与已发布修订属于用户数据目录。
 
 ## 5. 模块职责与依赖规则
 
@@ -73,23 +73,26 @@ wia/
 | `plot` | 世界事件与时间如何向前发展：时间推进、条件判断、计划与事实、生成边界 | 不决定人物怎么回应、不负责叙述 |
 | `story` | 世界创建时冻结的运行定义：人物模板、地点、剧情与设置 | 不加载外部包、不访问数据库、不执行回合 |
 | `turn` | 加载冻结输入、按用途组装上下文、人物决策、协调、世界推进、叙述与输出 | 不管理应用生命周期、不处理 HTTP |
-| `model` | 统一调用入口、用途标记、用量与超时、Provider | 不理解剧情，不知道这是 NPC 还是记忆 |
+| `model` / `llm` | 中立的请求响应、容量与错误合同 / Provider 配置和协议接入 | 不理解剧情，不知道这是 NPC 还是记忆 |
 | `storage` | 持久化、事务、迁移、存档复制 | 不生成剧情、不做业务判断 |
 | `wire` | 无领域含义的基础原语：文本规范、时间戳、JSON 编码、标识生成 | 不放领域概念、不做业务判断、不依赖任何业务包 |
 | `storyapi` | HTTP 合同、请求校验、错误映射 | 不直接调用 Provider、不写业务规则 |
 | `content` | 开发者内容工具：项目、草稿、校验、发布、导入导出 | 不进入正常 Turn 主链 |
-| `app` | 进程与世界生命周期、服务装配、跨 owner 事务入口 | 不重新实现 Turn、Memory 或 Content 规则 |
+| `app` | 应用用例、世界生命周期、回合准入与最终提交、纠正与重建作业、建议状态、模型配置和计量 | 不重复实现人物决策、上下文装配或内容发布 |
 
 ### 5.1 运行流程（谁在什么时候调用模型）
 
 ```text
-Turn
- ├─ Load Snapshot + Memory
- ├─ Intent ───────────────→ Model
- ├─ Character Decisions ──→ Model
- ├─ Coordination / Plot ──→ Model
- ├─ Narration ────────────→ Model
- └─ Memory Maintenance ───→ Model
+app.SubmitRun → app.runWorker
+ ├─ turn.Service.Execute
+ │   ├─ Load Snapshot + Memory
+ │   │   └─ Memory Maintenance ─→ Model（需要整理时；发布摘要使用短事务）
+ │   ├─ Intent ───────────────→ Model
+ │   ├─ Character Decisions ──→ Model
+ │   ├─ Coordination / Plot ──→ Model
+ │   ├─ Narration ────────────→ Model
+ │   └─ Record Experience → Output
+ └─ app.commitTurn → 校验运行状态及版本 → 原子写入
 ```
 
 ### 5.2 Package 依赖
@@ -117,7 +120,7 @@ Turn
 
 ```text
 world      不依赖 model / storage / storyapi / turn / memory / plot
-turn 的上下文装配与人物决策不写数据库；冻结输入只经具名 storage 读取
+turn 的上下文装配与人物决策不写数据库；输入加载经 storage 读取，来源元数据查询仍使用受控 SQL
 model      不理解剧情
 storage    不生成剧情
 storyapi   不直接调用 Provider
@@ -126,7 +129,7 @@ wire       只依赖标准库；不放领域概念
 plot       不 import content：剧情规则是权威，内容包只是调用方
 story      只依赖 world / plot；不得长出 Service / Loader / Repository
 turn       是唯一回合主流程；人物决策、上下文材料、memory / plot / storage 的交接都在这里
-app        只装配 owner 与管理生命周期，不复制 turn / memory / content 规则
+app        拥有应用用例与跨领域事务，不复制人物决策、上下文装配或内容发布
 ```
 
 **四层归属**：
@@ -177,27 +180,21 @@ plot.Validate(def, progress)          // 两者都要时
 
 > **API DTO、Persistence Row、Model Output 不进入 `world`；在各自边界显式映射。** 否则一年后 `world` 会变成全项目公共 `types.go`。
 
-**`content` 与游玩内核必须隔离。** 依赖方向是 `content → 发布的 StoryDefinition → 世界创建`，不是 `turn ↔ content`。即使整个内容工具被删除，玩家仍能加载 `stories/foo/` 正常游玩。这是架构验收条件之一。
+**`content` 与游玩内核必须隔离。** `app` 在世界创建时把内容包转为冻结的 `story.Definition`；正常 Turn 从世界库读取该定义，不访问创作工作区。`turn` 不依赖 `content`。
 
 ## 6. Turn Engine
 
 ### 6.1 薄编排，不是第二个巨型文件
 
-`turn/service.go` 只负责编排，读起来是一条线：
+`turn/service.go` 编排回合生成，顺序如下：
 
-```go
-func (s *Service) Run(ctx context.Context, req Request) (Result, error) {
-    state    := s.load(ctx, req)
-    intent   := s.resolveIntent(ctx, state, req)
-    stages   := s.runCharacterStages(ctx, state, intent)
-    resolved := s.coordinate(ctx, state, intent, stages)
-    world    := s.advanceWorld(ctx, state, resolved)
-    script   := s.narrate(ctx, state, resolved, world)
-    return s.commit(ctx, state, script)
-}
+```text
+load → resolveIntent → runCharacters → notePlayerAction
+     → coordinate（场景协调与世界推进）→ narrate
+     → recordPlayerExperience → Output
 ```
 
-实现下沉到同包其他文件：`intent.go`、`stage.go`、`coordinate.go`、`narrate.go`、`commit.go`、`host_prompt.go`、`types.go`。
+阶段实现位于 `load.go`、`memory_store.go`、`stages.go`、`coordinate.go`、`progression.go` 与 `experience.go`。`Execute` 成功表示产出了待提交结果；`app/run.go` 的 `runWorker` 调用 `app/store.go` 的 `commitTurn` 才完成持久化。
 
 **主流程集中，不等于所有实现集中。** 把 `storyapp/run.go` 改名为 `turn/service.go` 不算解决问题。
 
@@ -244,9 +241,9 @@ World mutation reservation
 
 ### 6.4 Agent 划分
 
-- **Character Agent**（`agent/`）：决定人物这一步做什么。
+- **Character Agent**（`turn/stages.go`）：按每个人物获准的材料决定其说话与行动。
 - **场景主持（Host）**：协调实际结果、环境、背景人物、空间与世界变化，产出最终正文。**它是 Turn Engine 的智能部分，放 `turn/`。**
-- 协调与叙述是两个不同职责，分文件实现（`coordinate.go` / `narrate.go`），不合并。
+- 协调与叙述分别由 `turn/coordinate.go` 与 `turn/stages.go` 的命名阶段执行。
 
 不再保留 `AgentSession`、`ExecutionLane`、`AgentTurn`、`Tool`、`Task`、`Runtime` 作为 WIA 主抽象。
 
@@ -256,7 +253,7 @@ World mutation reservation
 
 1. **同一个 `world_id` 同时只允许一个修改权威故事状态的 Turn**（由 6.2 的预约保证）。
 2. **同一 Stage 中，每个 `entity_id` 最多产生一个 Character Decision。** 不同角色可以基于**同一个冻结快照**并行决策。
-3. **同一个角色的下一次决策只能发生在后续 Stage。** 前一 Stage 必须先完成协调，并形成新的获准感知；角色不能在同一 Stage 内基于自己的中间输出再次决策。
+3. **同一个角色的下一次决策只能发生在后续 Stage。** 前一 Stage 必须先完成汇合，再按接收者形成获准感知；角色不能在同一 Stage 内基于自己的中间输出再次决策。
 4. **派生任务（摘要、建议）可以异步，但只能通过 basis/version 校验发布，不能绕过 Turn 修改权威状态。**
 
 ```text
@@ -265,9 +262,10 @@ World A
   │    ├─ Stage 1      沈岚 ┐
   │    │               铁杉 ┼─ 并行（同一冻结快照）
   │    │               丙   ┘
-  │    ├─ Host 协调
-  │    └─ Stage 2      沈岚 ┐
-  │                    丙   ┘
+  │    ├─ 汇合与接收者感知投影
+  │    ├─ Stage 2      沈岚 ┐
+  │    │               丙   ┘
+  │    └─ 场景协调、世界推进与叙述
   ├─ Commit（短事务）
   └─ Turn 2
 ```
@@ -276,41 +274,23 @@ World A
 
 ### 6.6 Model 与 purpose
 
-统一入口 `Generator`（`Generate(ctx, Request) (Response, error)`）。业务侧调用带用途标记：
+统一生成接口为 `model.TextGenerator.GenerateText(ctx, TextRequest) (TextResponse, error)`。`turn.ContextGenerator` 在调用前完成材料预算与报告，通过 `ContextScope` 携带用途、接收者、阶段、版本和来源；`app.meteredText` 记录用量。`llm` 提供配置加载及 OpenAI / DeepSeek 协议实现。
 
-```go
-type Call struct {
-    Purpose Purpose
-    Request Request
-}
-```
-
-例如 `character_decision`、`scene_narration`、`memory_digest`、`memory_retrieval`、`suggestion`、`event_generation`，日志里可直接看到 `purpose=character_decision recipient=shenlan`。
-
-**`purpose` 属于 ModelService，不属于 Provider。** Provider 不必知道这是 NPC 还是记忆，否则 OpenAI / DeepSeek 实现会开始理解业务概念。
+业务用途如 `intent`、`npc`、`coordination`、`narration`、`memory_digest` 保留在调用作用域中。Provider 接收中立的 `TextRequest`，不承担人物或记忆规则。
 
 ```text
-业务 purpose → ModelService → Provider 中立请求 → OpenAI / DeepSeek
+turn.ContextGenerator → app.meteredText → model.TextGenerator → llm Provider
 ```
 
 ### 6.7 Context 用 purpose 驱动一个入口
 
-`context` 只回答一句话：**这次模型调用应该看到什么。**
+上下文装配位于 `turn`，只回答一句话：**这次模型调用应该看到什么。** 各用途先形成 `Material`，由 `ContextGenerator` 统一调用 `ContextComposer.Build(material, system, output)` 完成容量校验和来源报告。
 
-```go
-composer.Build(BuildRequest{
-    Purpose:   CharacterDecision,
-    Recipient: characterID,
-    World:     snapshot,
-    Stage:     stage,
-})
-```
-
-不再对外暴露 `BuildNPC()`、`BuildNarrator()`、`BuildMemory()`、`BuildSuggestion()` 这类会持续增长的函数集合。现有实现中值得保留的部分——接收者、用途、阶段、epoch、场景版本、来源授权、token 预算、必需与可选材料——继续沿用。
+接收者、用途、阶段、epoch、场景版本与模板放在 `ContextScope`；必需与可选文本及其来源放在 `Material`。人物决策、协调、正文、摘要和建议共用同一个生产构建入口。
 
 ### 6.8 Prompt 跟职责走
 
-人物决策在 `agent/character_prompt.go`，场景主持与正文在 `turn/host_prompt.go`、`turn/narration_prompt.go`，记忆整理在 `memory/digest_prompt.go`，事件生成在 `plot/event_prompt.go`。
+人物决策、场景主持与正文材料位于 `turn/compose.go`，共享指令位于 `turn/prompt.go`；记忆整理模型合同位于 `turn/memory_store.go`，事件生成合同位于 `turn/progression.go`。`memory` 拥有记录规则，`plot` 拥有剧情纯规则，它们均不调用模型。
 
 **不要建 `model/prompts.go` 集中堆放。** Prompt 是业务逻辑的一部分。
 
@@ -318,7 +298,7 @@ composer.Build(BuildRequest{
 
 ### 7.1 本次只统一代码责任
 
-**本轮不改存储语义。** 保留 `app.db` + `worlds/<id>/world.db`，把全部持久化代码集中到 `backend/internal/storage/`（`app.go`、`world.go`、`copy.go`、`schema.go`、`sqlite.go`）。
+**存储语义保持不变。** `app.db` 管理应用目录和操作，世界各有独立 `world.db`。`storage` 提供世界库 schema、具名读写与事务原语；应用表 schema、跨领域事务和部分 SQL 仍由 `app`、`content` 持有。
 
 效果是"**代码上只有一个 Storage 模块，物理上仍是多数据库**"。
 
@@ -391,7 +371,7 @@ backend/cmd/server  → backend/cmd/wia
 
 ### R3：Context / Memory / Agent / Plot / Content 拆分
 
-本节记录原抽取计划。实际执行按依赖闭包收敛为 `turn`（上下文材料、人物决策、主流程）、`memory`、`plot`、`content`、`story`、`world` 与薄 `app`，并在 D2 删除 `storyapp`。**未建兼容包装层。**
+本节记录原抽取计划。实际执行按依赖闭包收敛为 `turn`（上下文材料、人物决策、主流程）、`memory`、`plot`、`content`、`story`、`world` 与应用服务层 `app`，并在 D2 删除 `storyapp`。**未建兼容包装层。**
 
 **`storyapp` 不只包含这五项**，因此迁移前先按下面的表逐项确定归属；执行中出现表外文件时先补表再动手，不临时决定。
 
@@ -446,7 +426,7 @@ docs/
 
 ### LOC：空间系统
 
-**空间是 WIA 核心世界模型，不是内容创作工具的子问题**，因此不继续依附 Phase12 M3。R6 完成后再做区域 / 地点 / 当前位置 / 连接，正式依据写在 `docs/SPATIAL_MODEL.md`。
+**空间是 WIA 核心世界模型。** R6 文档主题化重组保持后置，不阻塞区域、地点、当前位置与连接的产品设计；空间方案定稿后再建立对应正式文档。
 
 原因：先把桌子收拾干净，再往上加新的核心领域状态。否则会同时改目录、改位置语义、改数据库 schema，评审无法判断缺陷来自架构迁移还是空间逻辑。
 

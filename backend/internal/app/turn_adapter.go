@@ -7,15 +7,7 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-// turnHost adapts the application to what a turn still asks it for.
-//
-// It exists so the pipeline can live in the turn package without the application
-// exporting its internals: every method calls the same private stage function the
-// in-package pipeline used, in the same order, so moving the pipeline changed where the
-// order is written down and nothing else.
-//
-// It holds no state. Everything one stage decides for the next travels in the turn's own
-// output, which is why a host can serve a turn without remembering anything about it.
+// turnHost connects turn stage observations to application diagnostics.
 type turnHost struct {
 	app *App
 }

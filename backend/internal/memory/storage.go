@@ -10,9 +10,8 @@ import (
 // The adapters below translate the storage package's rows into the memory and
 // correction types.
 //
-// They live here on purpose. Storage answers what is written down and knows nothing
-// about corrections or memory scopes; the memory package holds the rules and does no
-// I/O. Something in between has to name both, and this is it.
+// Storage owns neutral persistence operations. Memory translates those records and
+// applies scope, correction and digest coverage rules.
 
 func correctionFromRecord(record storage.CorrectionRecord) Correction {
 	return Correction{

@@ -9,16 +9,7 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-// Host is what a turn still needs from the application around it.
-//
-// Each method here is a piece of the turn that has not finished moving, and each one
-// says in its own comment what has to happen before it can go. The list is meant to
-// shrink to the logger alone; if it grows, the extraction has failed even though it
-// compiles, because a wide Host is just the application hidden behind an interface.
-//
-// The rule for adding a method: it must name an operation a turn performs, not a
-// capability of the application. Observing a turn is the one operation that stays;
-// `GetStore` or `AppConfig` would be the application leaking in.
+// Host observes stage completion. The turn owns all stage implementations.
 type Host interface {
 	// LogStage records one stage of a turn: what it was for, which model version it used,
 	// which events it read, who it resolved to, how many repairs it needed and how long
@@ -27,11 +18,8 @@ type Host interface {
 	LogStage(worldID string, run wiaworld.Run, stage Stage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration)
 }
 
-// Service runs one
-//
-// Execute is the whole of it, and it is meant to be read: the steps below are the story
-// of a turn, in the order they happen. Everything else in this package is either a piece
-// of the input those steps read or a helper they use.
+// Service generates one turn's Output. The application validates the world version
+// and commits that output in a separate transaction after Execute succeeds.
 type Service struct {
 	host Host
 	deps Deps

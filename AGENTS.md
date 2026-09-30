@@ -2,7 +2,7 @@
 
 本文件是 `wia` 仓库（本地目录 `D:\data\project\game-agent\wia`，远端 `https://github.com/zlci7/wia.git`）的项目级常驻指令。
 
-历史背景：本仓库原先与 Game-native Agent Runtime（Adapter、Protocol、Capability、Tool、Task）共处一仓，该产品的原始仓库是 `world-is-agent`。当前仓库只服务于 WIA 叙事产品，历史 Game Runtime 文档已从本仓库移除，其代码仍在仓库中并按下文顺序清理。
+历史背景：本仓库原先与 Game-native Agent Runtime（Adapter、Protocol、Capability、Tool、Task）共处一仓，该产品的原始仓库是 `world-is-agent`。当前仓库只服务于 WIA 叙事产品，旧 Game Runtime 代码与文档均已移除。
 
 ## 1. 当前产品与任务
 
@@ -12,7 +12,7 @@
 
 阅读入口：
 
-- [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)：目标架构、模块职责、依赖规则与迁移顺序。**待执行**。
+- [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)：当前架构、模块职责、依赖规则与历史迁移顺序。代码主体收敛已完成，R6 文档重组后置。
 - [Phase12 文档入口](docs/phase12/README.md)：产品范围、跨阶段技术合同、阶段方案与验证证据。
 - [开发指南](docs/phase12/开发指南.md)：开发节奏与验收责任。
 - [开发状态](docs/phase12/开发状态.md)：当前真正完成了什么。
@@ -21,12 +21,11 @@
 
 ## 2. 架构与依赖边界
 
-目标主流程是 **Turn Engine**：一轮故事的加载、意图、人物决策、协调、世界推进、叙述与提交集中在一个可通读的主流程中，具体实现下沉到同包其他文件。完整职责与依赖规则见[架构方案](docs/ARCHITECTURE.md)第 5 节，以下是硬约束：
+主流程是 **Turn Engine**：`turn.Service.Execute` 编排加载、意图、人物决策、协调、世界推进、叙述与经历输出；`app.runWorker` 负责运行管理与最终原子提交。完整职责与依赖规则见[架构方案](docs/ARCHITECTURE.md)第 5 节，以下是硬约束：
 
 ```text
 world      不依赖 model / storage / api / agent / context / memory / plot
-context    不写数据库、不调用模型
-agent      不写数据库
+turn 的上下文装配不写数据库、不调用模型；人物决策不写数据库
 model      不理解剧情
 storage    不生成剧情
 api        不直接调用 Provider
@@ -68,7 +67,7 @@ content    不进入正常 Turn 主链
 
 ## 6. Prompt 与 Context 边界
 
-- Prompt 属于它的业务模块：人物决策在 `agent`，场景主持与正文在 `turn`，记忆整理在 `memory`，事件生成在 `plot`。**不要建集中的 `prompts` 文件堆放。**
+- Prompt 属于执行对应模型调用的业务模块：当前人物决策、场景主持、正文、摘要与事件生成合同均在 `turn` 的对应职责文件中；`memory` 与 `plot` 持有记录和剧情纯规则。**不要建集中的 `prompts` 文件堆放。**
 - Prompt 只能引导模型，不能作为程序约束的唯一来源。需要强制执行的规则必须进入代码校验、数据结构或事务边界。
 - 通用主流程的 Prompt 不写死某个具体剧本或人物名。
 - Context 只回答"这次模型调用应该看到什么"，用用途（purpose）驱动一个入口；材料按接收者与用途裁剪，不把不相关或未获准的信息统一塞进请求。
