@@ -1,0 +1,10 @@
+This placeholder keeps the Go embed pattern valid before the web client is built.
+Generated client assets are ignored by Git.
+
+Build the client from the repository root:
+
+    cd frontend
+    npm ci
+    npm run build
+
+A WIA executable built without client assets reports assets_not_built over HTTP.

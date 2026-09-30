@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-Build the portable Runtime package: one executable, a README and the license.
+Build the portable WIA package: one executable, a README and the license.
 
 .DESCRIPTION
 The package is meant to be extracted anywhere and run with no arguments, so this
 script builds the client into the binary, builds the Runtime with the version from
 VERSION, and assembles a directory that contains nothing but what a user needs.
-It does not build the game adapter: adapters are installed separately, as mods.
+The executable embeds the browser client and the two built-in story packs.
 
 .EXAMPLE
 .\scripts\release-runtime.ps1

@@ -25,7 +25,7 @@ cd D:\data\project\game-agent\wia
 
 首次进入可先浏览剧本和已有故事，开始新故事或发送输入前再填写 DeepSeek 或 OpenAI 的 API Key。Runtime 会先验证连接，再将凭据保存在本机数据目录的 secrets 文件中；普通配置、页面响应和故事存档都不包含 API Key。
 
-也可以先构建可执行文件：
+After building the web client, you can also build an executable:
 
 ```powershell
 go build -o wia-runtime.exe ./backend/cmd/wia
