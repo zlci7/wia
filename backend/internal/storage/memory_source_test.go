@@ -51,4 +51,11 @@ func TestAppendMemorySourceReportsInsertRepeatAndContentConflict(t *testing.T) {
 	if len(stored) != 2 || stored[0].Seq != 1 || stored[0].Content != "first" || stored[1].Seq != 2 || stored[1].Content != "second" {
 		t.Fatalf("stored sources = %+v", stored)
 	}
+	identities, err := store.LoadMemorySourceIdentities(ctx, record.Scope, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(identities) != 1 || identities[0] != (MemorySourceIdentity{Scope: record.Scope, Seq: 1, ID: record.ID}) {
+		t.Fatalf("source identities = %+v", identities)
+	}
 }

@@ -45,6 +45,10 @@ type Section struct {
 
 type Material struct {
 	RecallSources []string
+	// RecallLimited means retrieval ended at its candidate, byte, query or time
+	// boundary. Callers must not treat an empty result as proof that no older match
+	// exists.
+	RecallLimited bool
 	// DeclinedSources are authorized records this request deliberately left out of
 	// the recent window. They stay retrievable, so they are reported but not treated
 	// as already supplied or already retrieved.
@@ -69,6 +73,7 @@ type ContextScope struct {
 
 type ContextBuildReport struct {
 	RecallIncluded, RecallExcluded                           int
+	RecallLimited                                            bool
 	SelectedSources                                          []string
 	ExcludedSources                                          int
 	Failure                                                  string
@@ -128,6 +133,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 			report.WindowShrunk = true
 		}
 	}
+	report.RecallLimited = material.RecallLimited
 	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
 	report.InputTokens = FramedContextTokens(req)
 	if _, err := model.ValidateTextRequest(req); err != nil {
@@ -164,7 +170,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 			parts = append(parts, section.Text)
 		}
 		parts = append(parts, material.Required)
-		if len(material.RecallSources) > 0 || len(material.DeclinedSources) > 0 {
+		if len(material.RecallSources) > 0 || len(material.DeclinedSources) > 0 || material.RecallLimited {
 			selected := map[string]bool{}
 			for _, section := range sections {
 				for _, id := range section.Sources {
@@ -178,7 +184,11 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 				}
 			}
 			report.RecallExcluded = len(material.RecallSources) - report.RecallIncluded + len(material.DeclinedSources)
-			parts = append(parts, fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources)+len(material.DeclinedSources), report.RecallIncluded, report.RecallExcluded))
+			note := fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources)+len(material.DeclinedSources), report.RecallIncluded, report.RecallExcluded)
+			if material.RecallLimited {
+				note += " 本次检索受近期候选窗口或检索预算限制；未命中不代表更早经历不存在。"
+			}
+			parts = append(parts, note)
 		}
 		req.Input = strings.Join(parts, "\n")
 		if _, err := model.ValidateTextRequest(req); err == nil {

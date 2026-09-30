@@ -130,3 +130,35 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 		t.Fatal("a single group must not be reported as reduced")
 	}
 }
+
+func TestBoundedMemoryRebuildRecomputesRecall(t *testing.T) {
+	archive := []memorymodel.MemorySource{{ID: "memory:old", Seq: 1, RunID: "run-old", Content: "copper key"}}
+	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
+		archive = append(archive, memorymodel.MemorySource{
+			ID:      "memory:recent-" + string(rune('a'+i)),
+			Seq:     int64(i + 2),
+			RunID:   "run-recent-" + string(rune('a'+i)),
+			Content: strings.Repeat("recent experience", 80),
+		})
+	}
+	material := WithLongMemory(
+		Material{Required: "current turn", System: "rules"},
+		Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Archive: archive, Tail: archive[1:]}}},
+		"player",
+		"copper",
+	)
+	reduced, changed := material.Bounded(recentWindowMinTokens + 200)
+	if !changed {
+		t.Fatal("the recent window did not shrink")
+	}
+	if len(reduced.RecallSources) != 1 || reduced.RecallSources[0] != "memory:old" {
+		t.Fatalf("recall sources after rebuild = %v", reduced.RecallSources)
+	}
+	found := false
+	for _, section := range reduced.Optional {
+		found = found || section.Name == "memory_recall" && strings.Contains(section.Text, "copper key")
+	}
+	if !found {
+		t.Fatal("bounded rebuild lost the recalled group")
+	}
+}

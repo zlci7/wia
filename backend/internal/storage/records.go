@@ -52,6 +52,14 @@ type MemorySourceRecord struct {
 	CreatedAt string
 }
 
+// MemorySourceIdentity is the minimum row needed to verify which continuous source
+// prefix a digest claims to cover.
+type MemorySourceIdentity struct {
+	Scope string
+	Seq   int64
+	ID    string
+}
+
 // MemoryDigestRecord is one stored standing summary row.
 type MemoryDigestRecord struct {
 	Revision int64
@@ -157,6 +165,25 @@ func (s *WorldStore) LoadMemorySources(ctx context.Context, scope string, after 
 			return nil, err
 		}
 		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// LoadMemorySourceIdentities reads the source identities through an inclusive
+// sequence watermark without loading their narrative bodies.
+func (s *WorldStore) LoadMemorySourceIdentities(ctx context.Context, scope string, through int64) ([]MemorySourceIdentity, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT scope,seq,source_id FROM memory_sources WHERE scope=? AND seq<=? ORDER BY seq`, scope, through)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []MemorySourceIdentity{}
+	for rows.Next() {
+		var identity MemorySourceIdentity
+		if err := rows.Scan(&identity.Scope, &identity.Seq, &identity.ID); err != nil {
+			return nil, err
+		}
+		out = append(out, identity)
 	}
 	return out, rows.Err()
 }

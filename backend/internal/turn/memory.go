@@ -10,7 +10,6 @@ import (
 
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
-	wiaworld "gameagent/backend/internal/world"
 )
 
 // MemoryCorrectionRule is the standing rule that a recorded correction outranks the
@@ -79,6 +78,8 @@ func renderMemoryWindow(material Material, base string, m MemoryContext, scope s
 	material.Required = base
 	material.RequiredSources = nil
 	material.DeclinedSources = nil
+	material.RecallSources = nil
+	material.RecallLimited = false
 	material.Optional = nil
 	groups := memorymodel.MemoryGroups(block)
 	included := map[string]bool{}
@@ -130,48 +131,30 @@ type MemoryProjection struct {
 	Supplied map[string]bool
 }
 
-func (p MemoryProjection) alreadySupplied(id string) bool {
-	return p.Supplied[id]
-}
-
 // WithRecall appends authorized retrieval hits to the material as optional sections, one
 // whole committed group per hit, lowest-ranked first when the composer has to drop
 // something.
 func WithRecall(material Material, projection MemoryProjection, query string) Material {
 	m := projection.Context
-	// Search returns a bounded ranked candidate set. Projection filtering happens
-	// before the five-group result limit so already supplied records do not consume a
-	// slot that could have returned another authorized experience.
-	hits := memorymodel.SearchMemory(m.Archive, query, len(m.Archive))
-	groups := memorymodel.MemoryGroups(m.Archive)
+	excluded := make(map[string]bool, len(projection.Supplied)+len(material.RecallSources))
+	for id := range projection.Supplied {
+		excluded[id] = true
+	}
+	for _, id := range material.RecallSources {
+		excluded[id] = true
+	}
+	search := memorymodel.SearchMemoryGroups(m.Archive, query, excluded, 5)
+	material.RecallLimited = material.RecallLimited || search.Limited
 	var selected []Section
-	// Lowest-ranked matches are removed first by the shared budgeter. A hit
-	// selects its entire committed group so attempts keep their outcomes.
-	for _, s := range hits {
-		if len(selected) >= 5 {
-			break
+	// Lowest-ranked matches are removed first by the shared budgeter. Search returns
+	// complete committed groups so attempts keep their outcomes.
+	for _, group := range search.Groups {
+		section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memorymodel.MemoryRecordsText(group)}
+		for _, record := range group {
+			section.Sources = append(section.Sources, record.ID)
+			material.RecallSources = append(material.RecallSources, record.ID)
 		}
-		if projection.alreadySupplied(s.ID) || wiaworld.ContainsID(material.RecallSources, s.ID) {
-			continue
-		}
-		for _, group := range groups {
-			contains := false
-			overlap := false
-			for _, record := range group {
-				contains = contains || record.ID == s.ID
-				overlap = overlap || projection.alreadySupplied(record.ID) || wiaworld.ContainsID(material.RecallSources, record.ID)
-			}
-			if !contains || overlap {
-				continue
-			}
-			section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memorymodel.MemoryRecordsText(group)}
-			for _, record := range group {
-				section.Sources = append(section.Sources, record.ID)
-				material.RecallSources = append(material.RecallSources, record.ID)
-			}
-			selected = append(selected, section)
-			break
-		}
+		selected = append(selected, section)
 	}
 	for i := len(selected) - 1; i >= 0; i-- {
 		material.Optional = append(material.Optional, selected[i])

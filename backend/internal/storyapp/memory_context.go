@@ -22,7 +22,7 @@ func loadLongMemory(ctx context.Context, store *storage.WorldStore, snapshot *tu
 		if err != nil {
 			return err
 		}
-		d, err := readDigest(ctx, store, scope)
+		d, err := readDigestAgainst(ctx, store, scope, archive)
 		if err != nil {
 			return err
 		}

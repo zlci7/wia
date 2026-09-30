@@ -97,29 +97,49 @@ func memoryReady(ctx context.Context, store *storage.WorldStore) error {
 
 // readDigest reads one scope's standing summary.
 func readDigest(ctx context.Context, store *storage.WorldStore, scope string) (memorymodel.MemoryDigest, error) {
+	d, found, err := readDigestRecord(ctx, store, scope)
+	if err != nil || !found {
+		return d, err
+	}
+	identities, err := store.LoadMemorySourceIdentities(ctx, scope, d.Through)
+	if err != nil {
+		return d, err
+	}
+	sources := make([]memorymodel.MemorySource, 0, len(identities))
+	for _, identity := range identities {
+		sources = append(sources, memorymodel.MemorySource{Scope: identity.Scope, Seq: identity.Seq, ID: identity.ID})
+	}
+	return validateDigestCoverage(d, sources)
+}
+
+func readDigestAgainst(ctx context.Context, store *storage.WorldStore, scope string, sources []memorymodel.MemorySource) (memorymodel.MemoryDigest, error) {
+	d, found, err := readDigestRecord(ctx, store, scope)
+	if err != nil || !found {
+		return d, err
+	}
+	return validateDigestCoverage(d, sources)
+}
+
+func readDigestRecord(ctx context.Context, store *storage.WorldStore, scope string) (memorymodel.MemoryDigest, bool, error) {
 	d := memorymodel.MemoryDigest{Scope: scope, States: []memorymodel.SubjectiveState{}, Sources: []string{}}
 	record, found, err := store.LatestMemoryDigest(ctx, scope)
 	if err != nil {
-		return d, err
+		return d, false, err
 	}
 	if !found {
-		return d, nil
+		return d, false, nil
 	}
 	d.Revision, d.Epoch, d.Through, d.Head, d.Content = record.Revision, record.Epoch, record.Through, record.Head, record.Content
 	if err := json.Unmarshal([]byte(record.States), &d.States); err != nil {
-		return d, err
+		return d, false, err
 	}
 	if err := json.Unmarshal([]byte(record.Sources), &d.Sources); err != nil {
-		return d, err
+		return d, false, err
 	}
-	records, err := store.LoadMemorySources(ctx, scope, 0)
-	if err != nil {
-		return d, err
-	}
-	sources := make([]memorymodel.MemorySource, 0, len(records))
-	for _, record := range records {
-		sources = append(sources, memorySourceFromRecord(record))
-	}
+	return d, true, nil
+}
+
+func validateDigestCoverage(d memorymodel.MemoryDigest, sources []memorymodel.MemorySource) (memorymodel.MemoryDigest, error) {
 	if !memorymodel.DigestCoverageMatches(d, sources) {
 		return d, ErrStorageUnavailable
 	}

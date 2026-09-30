@@ -112,6 +112,26 @@ const (
 	memorySearchTimeout        = 500 * time.Millisecond
 )
 
+type memorySearchCandidate struct {
+	index int
+	score int
+}
+
+type memorySearchBudget struct {
+	deadline time.Time
+	counted  map[int]bool
+	bytes    int
+	limited  bool
+}
+
+// MemoryGroupSearchResult contains complete committed groups only. Limited means the
+// candidate window, byte budget, query budget or deadline ended before the archive did;
+// an empty result under that condition is not proof that older memory has no match.
+type MemoryGroupSearchResult struct {
+	Groups  [][]MemorySource
+	Limited bool
+}
+
 // SearchMemory receives one authorized scope, not the world's unprojected events.
 // Work is bounded before matching: the query, records inspected, source bytes and
 // elapsed time all have fixed ceilings. Archive streams are ordered by sequence, so
@@ -121,57 +141,139 @@ func SearchMemory(items []MemorySource, query string, limit int) []MemorySource 
 	if limit <= 0 {
 		return nil
 	}
-	tokens := memorySearchTerms(query)
+	candidates, _ := searchMemoryCandidates(items, query)
+	result := []MemorySource{}
+	for i := 0; i < min(limit, len(candidates)); i++ {
+		result = append(result, items[candidates[i].index])
+	}
+	return result
+}
+
+// SearchMemoryGroups ranks a bounded recent candidate window, filters groups that
+// overlap records already supplied to the request, and expands only complete groups
+// that still fit the same byte and time budget. It never builds text for a rejected
+// group.
+func SearchMemoryGroups(items []MemorySource, query string, excluded map[string]bool, limit int) MemoryGroupSearchResult {
+	if limit <= 0 {
+		return MemoryGroupSearchResult{}
+	}
+	candidates, budget := searchMemoryCandidates(items, query)
+	result := MemoryGroupSearchResult{}
+	seenRuns := map[string]bool{}
+	selected := map[string]bool{}
+	for _, candidate := range candidates {
+		if len(result.Groups) >= limit {
+			break
+		}
+		hit := items[candidate.index]
+		if excluded[hit.ID] || selected[hit.ID] || seenRuns[hit.RunID] {
+			continue
+		}
+		seenRuns[hit.RunID] = true
+		group, complete := memoryGroupWithinBudget(items, candidate.index, budget)
+		if !complete {
+			continue
+		}
+		overlap := false
+		for _, record := range group {
+			if excluded[record.ID] {
+				overlap = true
+				break
+			}
+		}
+		if overlap {
+			continue
+		}
+		result.Groups = append(result.Groups, group)
+		for _, record := range group {
+			selected[record.ID] = true
+		}
+	}
+	result.Limited = budget.limited
+	return result
+}
+
+func searchMemoryCandidates(items []MemorySource, query string) ([]memorySearchCandidate, *memorySearchBudget) {
+	tokens, queryLimited := memorySearchTerms(query)
+	budget := &memorySearchBudget{deadline: time.Now().Add(memorySearchTimeout), counted: map[int]bool{}, limited: queryLimited}
 	if len(tokens) == 0 {
-		return nil
+		return nil, budget
 	}
-	type ranked struct {
-		s     MemorySource
-		score int
-	}
-	var candidates []ranked
-	deadline := time.Now().Add(memorySearchTimeout)
-	readBytes := 0
-	for i, scanned := len(items)-1, 0; i >= 0 && scanned < memorySearchScanCandidates; i, scanned = i-1, scanned+1 {
-		if time.Now().After(deadline) {
+	var candidates []memorySearchCandidate
+	scanned := 0
+	for i := len(items) - 1; i >= 0 && scanned < memorySearchScanCandidates; i-- {
+		if !budget.include(items, i) {
 			break
 		}
-		s := items[i]
-		sourceBytes := memorySourceBytes(s)
-		if sourceBytes > memorySearchBytes-readBytes {
-			break
-		}
-		readBytes += sourceBytes
+		scanned++
 		score := 0
-		text := strings.ToLower(s.Content)
+		text := strings.ToLower(items[i].Content)
 		for _, token := range tokens {
 			if strings.Contains(text, token) {
 				score++
 			}
 		}
 		if score > 0 {
-			candidates = append(candidates, ranked{s, score})
+			candidates = append(candidates, memorySearchCandidate{index: i, score: score})
 		}
 	}
+	if scanned < len(items) {
+		budget.limited = true
+	}
 	sort.SliceStable(candidates, func(i, j int) bool {
+		left, right := items[candidates[i].index], items[candidates[j].index]
 		if candidates[i].score == candidates[j].score {
-			return candidates[i].s.Seq > candidates[j].s.Seq
+			return left.Seq > right.Seq
 		}
 		return candidates[i].score > candidates[j].score
 	})
-	result := []MemorySource{}
-	for i := 0; i < min(limit, len(candidates)); i++ {
-		result = append(result, candidates[i].s)
+	return candidates, budget
+}
+
+func memoryGroupWithinBudget(items []MemorySource, index int, budget *memorySearchBudget) ([]MemorySource, bool) {
+	runID := items[index].RunID
+	start := index
+	for start > 0 && items[start-1].RunID == runID {
+		if !budget.include(items, start-1) {
+			return nil, false
+		}
+		start--
 	}
-	return result
+	end := index + 1
+	for end < len(items) && items[end].RunID == runID {
+		if !budget.include(items, end) {
+			return nil, false
+		}
+		end++
+	}
+	return items[start:end], true
+}
+
+func (budget *memorySearchBudget) include(items []MemorySource, index int) bool {
+	if time.Now().After(budget.deadline) {
+		budget.limited = true
+		return false
+	}
+	if budget.counted[index] {
+		return true
+	}
+	n := memorySourceBytes(items[index])
+	if n > memorySearchBytes-budget.bytes {
+		budget.limited = true
+		return false
+	}
+	budget.bytes += n
+	budget.counted[index] = true
+	return true
 }
 
 // memorySearchTerms mirrors the bounded literal query vocabulary previously used by
 // the history store: Latin/digit runs stay whole and adjacent Han characters form
 // bigrams. The rune and distinct-term ceilings apply during tokenization.
-func memorySearchTerms(text string) []string {
+func memorySearchTerms(text string) ([]string, bool) {
 	var terms []string
 	seen := map[string]bool{}
+	limited := false
 	add := func(term string) {
 		if term != "" && !seen[term] && len(terms) < memorySearchQueryTerms {
 			seen[term] = true
@@ -187,6 +289,7 @@ func memorySearchTerms(text string) []string {
 	}
 	for _, r := range text {
 		if count >= memorySearchQueryChars || len(terms) >= memorySearchQueryTerms {
+			limited = true
 			break
 		}
 		count++
@@ -206,11 +309,13 @@ func memorySearchTerms(text string) []string {
 		}
 	}
 	flush()
-	return terms
+	return terms, limited
 }
 
 func memorySourceBytes(source MemorySource) int {
-	return len(source.Scope) + len(source.ID) + len(source.EventID) + len(source.RunID) + len(source.Actor) + len(source.Kind) + len(source.Content) + len(source.CreatedAt)
+	// The fixed reserve covers the labels, sequence digits and separators added by
+	// MemoryRecordsText, so accepted groups cannot exceed the byte budget when rendered.
+	return len(source.Scope) + len(source.ID) + len(source.EventID) + len(source.RunID) + len(source.Actor) + len(source.Kind) + len(source.Content) + len(source.CreatedAt) + 128
 }
 
 // MemoryGroups splits a committed record stream into the runs it came from: one group
