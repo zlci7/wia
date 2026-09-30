@@ -109,7 +109,21 @@ func readDigest(ctx context.Context, store *storage.WorldStore, scope string) (m
 	if err := json.Unmarshal([]byte(record.States), &d.States); err != nil {
 		return d, err
 	}
-	return d, json.Unmarshal([]byte(record.Sources), &d.Sources)
+	if err := json.Unmarshal([]byte(record.Sources), &d.Sources); err != nil {
+		return d, err
+	}
+	records, err := store.LoadMemorySources(ctx, scope, 0)
+	if err != nil {
+		return d, err
+	}
+	sources := make([]memorymodel.MemorySource, 0, len(records))
+	for _, record := range records {
+		sources = append(sources, memorySourceFromRecord(record))
+	}
+	if !memorymodel.DigestCoverageMatches(d, sources) {
+		return d, ErrStorageUnavailable
+	}
+	return d, nil
 }
 
 // readMemorySources reads one scope's committed experiences with every correction

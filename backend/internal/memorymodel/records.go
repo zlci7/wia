@@ -7,6 +7,7 @@ package memorymodel
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -14,6 +15,33 @@ import (
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
+
+// DigestCoverageMatches verifies that a digest names exactly the continuous source
+// prefix it claims to cover. Source identifiers are canonicalized by stream sequence;
+// gaps, duplicate identifiers and records from another scope invalidate the claim.
+func DigestCoverageMatches(d MemoryDigest, items []MemorySource) bool {
+	if d.Through < 0 || d.Head < d.Through {
+		return false
+	}
+	covered := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	wantSeq := int64(1)
+	for _, item := range items {
+		if item.Seq > d.Through {
+			break
+		}
+		if item.Scope != d.Scope || item.Seq != wantSeq || item.ID == "" || seen[item.ID] {
+			return false
+		}
+		seen[item.ID] = true
+		covered = append(covered, item.ID)
+		wantSeq++
+	}
+	if wantSeq != d.Through+1 {
+		return false
+	}
+	return slices.Equal(covered, d.Sources)
+}
 
 // ProjectRecentExperience splits the unsummarized tail into the groups supplied to
 // this request and the older backlog that stays recall-only. The digest watermark

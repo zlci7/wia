@@ -39,7 +39,11 @@ func TestPlotRootCorrectionInvalidatesScopedProjections(t *testing.T) {
 	for _, scope := range []string{"player", "npc:mercenary"} {
 		m := before.LongMemory[scope]
 		head := m.Archive[len(m.Archive)-1].Seq
-		if _, err = store.Database().Exec(`INSERT INTO memory_digests VALUES(?,1,1,?,?, '旧铃声回顾','[]','[]','now')`, scope, head, head); err != nil {
+		sources := make([]string, 0, len(m.Archive))
+		for _, source := range m.Archive {
+			sources = append(sources, source.ID)
+		}
+		if _, err = store.Database().Exec(`INSERT INTO memory_digests VALUES(?,1,1,?,?, '旧铃声回顾','[]',?,'now')`, scope, head, head, wire.MarshalJSON(sources)); err != nil {
 			t.Fatal(err)
 		}
 	}
