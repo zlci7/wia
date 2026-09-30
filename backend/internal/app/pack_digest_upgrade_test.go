@@ -5,9 +5,124 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
+
+// These packages and registered hashes predate structured bystander identities.
+// The fixture comes from 605a8de, so it cannot drift with the current serializer.
+func TestOriginalSchemaV1CatalogCanCreateWorldsAfterUpgrade(t *testing.T) {
+	var fixtures map[string]struct {
+		Digest string                     `json:"digest"`
+		Files  map[string]json.RawMessage `json:"files"`
+	}
+	body, err := os.ReadFile("testdata/pack-digests-schema-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(body, &fixtures); err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []string{"unchanged", "changed story", "changed NPC", "structured bystander", "wrong digest version"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx := context.Background()
+			a := newTestApp(t, &scriptedGenerator{})
+			packRoot := t.TempDir()
+			for id, fixture := range fixtures {
+				for name, original := range fixture.Files {
+					data := original
+					var value map[string]any
+					if err := json.Unmarshal(data, &value); err != nil {
+						t.Fatal(err)
+					}
+					if name == "story.json" {
+						switch scenario {
+						case "changed story":
+							value["background"] = "Changed content under the same revision"
+						case "structured bystander":
+							names := value["bystanders"].([]any)
+							for i, name := range names {
+								names[i] = map[string]any{"name": name}
+							}
+						}
+					} else if scenario == "changed NPC" {
+						value["profile"] = "Changed character profile"
+					}
+					data, err = json.Marshal(value)
+					if err != nil {
+						t.Fatal(err)
+					}
+					path := filepath.Join(packRoot, id, filepath.FromSlash(name))
+					if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, data, 0644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				version := 1
+				if scenario == "wrong digest version" {
+					version = 2
+				}
+				if _, err := a.appDB.ExecContext(ctx, `INSERT INTO pack_revisions(game_id,revision,digest,digest_version) VALUES(?,?,?,?)`, id, id+".pack.v1", fixture.Digest, version); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := a.Close(); err != nil {
+				t.Fatal(err)
+			}
+			restarted, err := Open(ctx, Options{DataRoot: a.dataRoot, StoryPacksPath: packRoot, Generator: &scriptedGenerator{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer restarted.Close()
+			if scenario != "unchanged" {
+				if len(restarted.Games()) != 0 || len(restarted.PackIssues()) != 2 {
+					t.Fatalf("changed or unrecognized packages accepted: games=%v issues=%v", restarted.Games(), restarted.PackIssues())
+				}
+				for id, fixture := range fixtures {
+					var digest string
+					if err := restarted.appDB.QueryRowContext(ctx, `SELECT digest FROM pack_revisions WHERE game_id=? AND revision=?`, id, id+".pack.v1").Scan(&digest); err != nil {
+						t.Fatal(err)
+					}
+					if digest != fixture.Digest {
+						t.Fatal("rejection changed revision registration")
+					}
+				}
+				return
+			}
+			if len(restarted.Games()) != 2 || len(restarted.PackIssues()) != 0 {
+				t.Fatalf("unchanged original catalog rejected: %v", restarted.PackIssues())
+			}
+			for id := range fixtures {
+				pack, _ := restarted.Pack(id)
+				var digest string
+				var version int
+				if err := restarted.appDB.QueryRowContext(ctx, `SELECT digest,digest_version FROM pack_revisions WHERE game_id=? AND revision=?`, id, id+".pack.v1").Scan(&digest, &version); err != nil {
+					t.Fatal(err)
+				}
+				if digest != pack.Digest || version != packDigestVersion {
+					t.Fatalf("unmigrated registration: %s v%d", digest, version)
+				}
+				if _, err := restarted.CreateStoryWorld(ctx, CreateWorldRequest{GameID: id, ExpectedRevision: id + ".pack.v1", RequestKey: "upgraded-" + id, Activate: true}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := restarted.Close(); err != nil {
+				t.Fatal(err)
+			}
+			again, err := Open(ctx, Options{DataRoot: a.dataRoot, StoryPacksPath: packRoot, Generator: &scriptedGenerator{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer again.Close()
+			if len(again.Games()) != 2 || len(again.PackIssues()) != 0 {
+				t.Fatal("migrated catalog changed on restart")
+			}
+		})
+	}
+}
 
 // C01: a database written by the previous release holds first-algorithm digests. An
 // unchanged story must still be usable after the upgrade, and the record must be

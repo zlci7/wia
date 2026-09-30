@@ -1,0 +1,219 @@
+{
+  "lantern-dusk": {
+    "digest": "5001b7598fcb360463f2a82b54a3f7ea0249226d6f09d9be62bde5263eccacb4",
+    "files": {
+      "npcs/innkeeper.json": {
+        "entity_id": "npc:innkeeper",
+        "definition_id": "innkeeper.v1",
+        "revision": "1",
+        "name": "沈岚",
+        "role": "客栈老板",
+        "appearance": "",
+        "profile": "谨慎、善于观察，不愿让客人恐慌。她熟悉旧渡口的每一条消息，遇到危险时先保护客栈和无辜者。",
+        "knowledge": "知道失踪信使曾在今晚来过；知道柜台下的染血信蜡，但不会主动向陌生人承认。",
+        "initial_concerns": "今晚的异常让她担心客栈安全。她希望在打烊前弄清风险，同时保护客人和自己掌握的秘密；对陌生人的可靠程度保持观察。",
+        "initial_location": "inn"
+      },
+      "npcs/mercenary.json": {
+        "entity_id": "npc:mercenary",
+        "definition_id": "mercenary.v1",
+        "revision": "1",
+        "name": "铁杉",
+        "role": "佣兵",
+        "appearance": "",
+        "profile": "寡言、务实、对危险敏感。会根据自己看见和听见的迹象判断，不会凭空知道别人的秘密。",
+        "knowledge": "看见客栈里的人进出和异常动静；不知道沈岚藏着什么。",
+        "initial_concerns": "想弄清自己察觉的异常是否意味着危险，根据掌握的迹象决定查探、询问、提醒他人或继续观察。",
+        "initial_location": "inn"
+      },
+      "story.json": {
+        "schema_version": 1,
+        "game_id": "lantern-dusk",
+        "revision": "lantern-dusk.pack.v1",
+        "mode": "guided",
+        "title": "暮灯镇的失踪信使",
+        "description": "一场小型调查冒险：雨夜的旧渡口客栈里，失踪的信使留下了一封没有寄出的信。",
+        "gameplay": "围绕失踪信使展开一场雨夜调查。可以交谈、观察、调查或等待；参与、拒绝与错失机会会影响阶段结果。",
+        "background": "旧渡口是暮灯镇的河运入口，雨夜的客栈接待等船和避雨的人。",
+        "rules": "保持小型调查冒险的时代与物件一致，不引入现代科技或超自然力量。",
+        "author_facts": "沈岚在柜台下藏着一枚染血的信蜡，知道失踪信使曾在今晚来过；铁杉只注意到有人和沈岚低声交谈过，不知道谈话内容。",
+        "player": {
+          "name": "旅人",
+          "profile": "一个正在寻找答案的旅人。",
+          "requirements": "你是一位刚到旧渡口的旅人，可以自定义姓名与背景。",
+          "editable": true
+        },
+        "opening": "雨水顺着旧渡口客栈的屋檐落下。壁炉旁的老板沈岚擦拭着一只空酒杯，佣兵铁杉坐在窗边，目光落在黑沉沉的河面。门口还挤着十来个避雨的客人。就在你推门时，柜台下传来一声短促的金属碰撞。",
+        "initial_location": "inn",
+        "clock": "第 1 日 19:00",
+        "locations": [
+          {
+            "id": "inn",
+            "name": "旧渡口客栈",
+            "description": "雨夜的客栈，有大堂、柜台和后屋。",
+            "connections": [
+              "dock"
+            ]
+          },
+          {
+            "id": "dock",
+            "name": "旧渡口码头",
+            "description": "客栈外的码头，停靠往来渡船。",
+            "connections": [
+              "inn",
+              "warehouse"
+            ]
+          },
+          {
+            "id": "warehouse",
+            "name": "渡口仓棚",
+            "description": "码头附近的河运仓棚。",
+            "connections": [
+              "dock"
+            ]
+          }
+        ],
+        "npcs": [
+          "npcs/innkeeper.json",
+          "npcs/mercenary.json"
+        ],
+        "bystanders": [
+          "卖花的老人",
+          "戴蓝围巾的学生",
+          "赶车人",
+          "河运工",
+          "带孩子的旅客",
+          "醉酒的木匠",
+          "灰帽商人",
+          "修钟匠",
+          "披斗篷的妇人",
+          "打瞌睡的船夫"
+        ],
+        "plot": {
+          "revision": "lantern-dusk.plot.v2",
+          "facts": "故事限于旧渡口客栈、码头、渡口仓棚。末班夜渡在第一日20:00离岸。失踪信使名为陆舟，负伤后藏在仓棚，携带河运账目被篡改的证据，信蜡留在沈岚柜台下。沈岚只知道他来过和信蜡；铁杉只知道客栈异常，不自动知道信使位置。追索账目的陌生人会在渡船离岸前寻找信使。固定事实不得为了满足预设结局改写。未来节点是可受玩家和人物行动改变的计划。",
+          "nodes": [
+            {
+              "id": "dock_warning",
+              "at_minute": 1145,
+              "after": [],
+              "audience": [
+                "player",
+                "npc:innkeeper",
+                "npc:mercenary"
+              ],
+              "terminal": false,
+              "condition": "码头夜渡准备开始，未曾发生本节点。",
+              "development": "外部新刺激：码头传来催渡铃，河运工在他实际在场处提醒末班船将在戌初（20:00）离岸，并提及仓棚有人需要帮助。只向实际听到者投影消息；玩家已离开且未获知时不全知广播。重要NPC若要查看、提醒或处置，先交给本人作决定，节点本身不预写其选择。"
+            },
+            {
+              "id": "courier_window",
+              "at_minute": 1170,
+              "after": [
+                "dock_warning"
+              ],
+              "audience": [
+                "player",
+                "npc:innkeeper",
+                "npc:mercenary"
+              ],
+              "terminal": false,
+              "condition": "确认信使在这个时点的处境：依据此前已经成立的营救、转移、预警、阻拦或未干预。",
+              "development": "未干预时，寻人的陌生人到仓棚外，信使仍有走侧门到渡船的机会；已经转移或有人阻拦时，追索者按实际线索行动，不强行把信使移回仓棚。只呈现当前外部事件与风险，不替玩家接受任务。相关重要NPC需要新的选择时请求本人。只让目击者或实际收到消息者知道，不把未来去向直接广播。"
+            },
+            {
+              "id": "night_outcome",
+              "at_minute": 1200,
+              "after": [
+                "courier_window"
+              ],
+              "audience": [
+                "player",
+                "npc:innkeeper",
+                "npc:mercenary"
+              ],
+              "terminal": true,
+              "condition": "夜渡离岸，依据已提交行动和证据确认本段调查的阶段结果。",
+              "development": "已救出信使并取得证据时可形成证据保全的结束；干预阻止追索而未取证时保留相应真实结果。完全不参与时，信使可沿侧门自行上船离开，追索者失去踪迹，玩家错过当夜当面调查机会；如已发生受伤、受阻等改变则依据实际结果，不强行离开。流程型可在本段结果成立时结束，开放型仅结束这一事件，世界仍可继续。仅通过实际可感知的船离岸、目击或转述告知玩家；未获知具体去向不能在正文揭示。"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "orbital-repair": {
+    "digest": "32d6d69ffd72a5cdaa6301b7353349b07d4c20dcccdfaf1a61743d8b312eb116",
+    "files": {
+      "npcs/dispatcher.json": {
+        "entity_id": "npc:mercenary",
+        "definition_id": "dispatcher.v1",
+        "revision": "1",
+        "name": "许遥",
+        "role": "航班调度员",
+        "appearance": "袖口卷起，身边放着航班记录板。",
+        "profile": "利落、直接，重视班次安排，也愿意解释站内生活。",
+        "knowledge": "知道补给船延迟，掌握今日航班安排和站内公开值班表。",
+        "initial_concerns": "确认到站时间，让工作人员合理安排这一班的事务。",
+        "initial_location": "control"
+      },
+      "npcs/engineer.json": {
+        "entity_id": "npc:innkeeper",
+        "definition_id": "engineer.v1",
+        "revision": "1",
+        "name": "周宁",
+        "role": "值班工程师",
+        "appearance": "穿着带工具挂扣的工作服。",
+        "profile": "耐心、注重证据，解释设备问题时习惯先问对方知道多少。",
+        "knowledge": "熟悉维修站的设备；发现旧检修表漏签，还未向调度员说明。",
+        "initial_concerns": "希望确认漏签是否只是记录疏漏，带新人熟悉安全工作方式。",
+        "initial_location": "control"
+      },
+      "story.json": {
+        "schema_version": 1,
+        "game_id": "orbital-repair",
+        "revision": "orbital-repair.pack.v1",
+        "mode": "open",
+        "title": "远星维修站",
+        "description": "你抵达一座轨道维修站，在值班室与工程师和调度员共同度过一个工作班次。",
+        "gameplay": "自由交谈、观察与行动。可以参与维修站的日常事务，也可以只了解人物；本样例没有预设通关目标。",
+        "background": "近未来，人类使用轨道维修站维护运输飞船。你刚到站报到，生活舱维持正常重力与供氧。",
+        "rules": "尊重真空、舱门和设备安全。重要维修和资源使用需要已成立的行动结果，交谈不代表接受危险作业。",
+        "author_facts": "工程师发现一份旧检修表被漏签；调度员只知道物资到站延迟，不知道漏签记录。",
+        "player": {
+          "name": "林舟",
+          "profile": "新到站的维修助理，熟悉基础设备，愿意先了解值班情况。",
+          "requirements": "扮演新到站的工作人员，姓名与个人背景可以调整。",
+          "editable": true
+        },
+        "opening": "气闸指示灯转绿，你走进远星维修站的值班室。工程师周宁将检修平板放在桌上，调度员许遥正核对下一班补给船的时间。观察窗外，行星边缘透出一道淡蓝色的光。",
+        "initial_location": "control",
+        "clock": "第 1 日 09:00",
+        "locations": [
+          {
+            "id": "control",
+            "name": "维修站值班室",
+            "description": "值班桌、通信终端与观察窗所在的公共区域。",
+            "connections": [
+              "workshop"
+            ]
+          },
+          {
+            "id": "workshop",
+            "name": "设备检修间",
+            "description": "舱内检修工作区，进入后按设备安全规程作业。",
+            "connections": [
+              "control"
+            ]
+          }
+        ],
+        "npcs": [
+          "npcs/engineer.json",
+          "npcs/dispatcher.json"
+        ],
+        "bystanders": [
+          "正在登记工单的值班员"
+        ]
+      }
+    }
+  }
+}
