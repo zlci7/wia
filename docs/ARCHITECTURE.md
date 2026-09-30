@@ -1,6 +1,6 @@
 # WIA 1.0 架构收敛方案
 
-状态：**待执行**。本文定义目标架构与迁移顺序，不代表任何一步已经完成。执行进度与实际证据记录在开发状态类文档中。
+状态：**主体收敛已完成**。R0–R3 与 R5 已执行，`storyapp` 和旧 Game Runtime 已删除；R6 文档重组尚未开始。实际证据见 [Phase12 开发状态](phase12/开发状态.md)，本文件保留迁移顺序作为历史决策记录。
 
 本文取代此前"阶段式"文档对架构的描述。现有 `docs/phase12/` 继续作为产品范围、数据合同与历史验证的证据；其中与本文冲突的架构描述以本文为准。文档重组在 R6 完成。
 
@@ -16,15 +16,15 @@
 
 ## 2. 为什么重构
 
-仓库里同时存在两代产品：Game-native Agent Runtime（Agent / Context / Memory / Task / Tool / gRPC / Protocol / Adapter / Gateway）与 WIA 叙事应用（Story / NPC / Plot / Memory / Creator / Web）。结果是同名能力各有一套：旧 context 与新上下文构建、旧 memory 与新记忆投影、旧 agent runtime 与 `storyapp` 自己协调 Agent、旧 gRPC 与新 HTTP。
+收敛前仓库同时存在两代产品：Game-native Agent Runtime（Agent / Context / Memory / Task / Tool / gRPC / Protocol / Adapter / Gateway）与 WIA 叙事应用（Story / NPC / Plot / Memory / Creator / Web）。当时同名能力各有一套：旧 context 与新上下文构建、旧 memory 与新记忆投影、旧 agent runtime 与叙事协调、旧 gRPC 与新 HTTP。
 
-这不是代码量问题，是**同一件事有两个权威来源**。叙事功能事实上已经长成独立产品内核（`storyapp` 94 个文件、约 2.2 万行，其中 `run.go` 约 1.5 千行），却仍被放在旧 Runtime 的目录与命名之下。
+这不是代码量问题，是**同一件事有两个权威来源**。D1/D2 已删除旧闭合簇，并把叙事职责归入 `turn`、`memory`、`content` 与薄 `app`。
 
 已核实的依赖事实：
 
 - `storyapp` 与 `storyapi` **对旧运行时零引用**；旧包只被旧入口 `runtime/cmd/server` 及它们彼此引用。
 - 旧包（`agent`、`gateway`、`task`、`tool`、`context`、`memory`、`httpapi`、`session`、`trace`、`traceview`、`bootstrap`、`browser`、`dataroot`、`definition`、`protocol/`）合计约 **7 万行**，与叙事链路无关。
-- 唯一交叉依赖是 `runtime/config`：`storyapp/app.go` 引用了它的 `WriteFile`，而它又引用 `agent` 与 `definition`。这根绳子必须在删除旧包之前切断。
+- 当时唯一的交叉依赖是 `runtime/config`：`storyapp/app.go` 引用了它的 `WriteFile`，而它又引用 `agent` 与 `definition`。这条依赖已由 `atomicfile` 取代后随旧包删除。
 
 ## 3. 定位
 
@@ -34,20 +34,20 @@
 
 以后读代码只有一个入口：**Turn Engine 是绝对主流程。**
 
-## 4. 目标目录
+## 4. 当前目录
 
 ```text
 wia/
 ├── backend/
 │   ├── cmd/wia/main.go
 │   └── internal/
-│       ├── api/          HTTP 接口与请求适配
-│       ├── turn/         Turn Engine：一轮故事的主流程
+│       ├── storyapi/     HTTP 接口与请求适配
+│       ├── app/          生命周期与跨 owner 装配
+│       ├── turn/         Turn Engine：冻结输入、上下文材料、人物决策与一轮故事主流程
 │       ├── world/        领域模型与纯规则
-│       ├── agent/        人物决策（Character Agent）
-│       ├── context/      某次模型调用应该看到什么
 │       ├── memory/       一个角色经历过什么、现在提供什么
 │       ├── plot/         世界事件与时间如何向前发展
+│       ├── story/        冻结的运行定义
 │       ├── model/        模型调用统一入口与 Provider
 │       ├── storage/      全部持久化
 │       ├── wire/         无领域含义的基础原语（文本规范、时间戳、JSON、标识生成）
@@ -61,7 +61,7 @@ wia/
 ```
 
 - **不以包数量作为架构指标。** 判断标准是"是否对应一个稳定职责"。代码少时并入相邻模块即可。
-- 模块分三层：核心业务（`turn`、`world`、`agent`、`context`、`memory`、`plot`）、基础设施（`model`、`storage`、`api`）、产品外围（`content`）。
+- 模块分三层：核心业务（`turn`、`world`、`memory`、`plot`、`story`）、基础设施（`model`、`storage`、`storyapi`）、产品外围（`content`、`app`）。人物决策与 purpose 驱动的上下文装配都属于一轮故事，代码量不足以证明需要独立 package，因此保留在 `turn`。
 - `stories/` 只放**随发布交付的示例剧本包**；开发者本地草稿与已发布修订属于用户数据目录，不进入仓库。
 
 ## 5. 模块职责与依赖规则
@@ -69,62 +69,64 @@ wia/
 | 模块 | 只负责 | 明确不负责 |
 | --- | --- | --- |
 | `world` | 领域结构与纯规则：世界、场景、人物、玩家、地点、事件、感知、游戏时间 | 不访问数据库、不调用模型、不懂 HTTP |
-| `agent` | 人物决策：据本人定义、记忆、感知与获准信息决定说话、行动、保持沉默 | 不写数据库、不直接读全局世界状态 |
-| `context` | 组装"这次调用该看到什么"：接收者、用途、阶段、来源授权、预算、必需与可选材料 | 不写数据库、**不执行模型调用** |
 | `memory` | 一个角色经历过什么、本轮该提供哪些记忆材料：来源、近期尾部、整理、检索 | 不裁定事件是否发生、不管人物在哪、不管世界时间 |
 | `plot` | 世界事件与时间如何向前发展：时间推进、条件判断、计划与事实、生成边界 | 不决定人物怎么回应、不负责叙述 |
-| `turn` | 编排：加载、意图、人物阶段、协调、世界推进、叙述、提交 | 不放具体实现细节 |
+| `story` | 世界创建时冻结的运行定义：人物模板、地点、剧情与设置 | 不加载外部包、不访问数据库、不执行回合 |
+| `turn` | 加载冻结输入、按用途组装上下文、人物决策、协调、世界推进、叙述与输出 | 不管理应用生命周期、不处理 HTTP |
 | `model` | 统一调用入口、用途标记、用量与超时、Provider | 不理解剧情，不知道这是 NPC 还是记忆 |
 | `storage` | 持久化、事务、迁移、存档复制 | 不生成剧情、不做业务判断 |
 | `wire` | 无领域含义的基础原语：文本规范、时间戳、JSON 编码、标识生成 | 不放领域概念、不做业务判断、不依赖任何业务包 |
-| `api` | HTTP 合同、请求校验、错误映射 | 不直接调用 Provider、不写业务规则 |
+| `storyapi` | HTTP 合同、请求校验、错误映射 | 不直接调用 Provider、不写业务规则 |
 | `content` | 开发者内容工具：项目、草稿、校验、发布、导入导出 | 不进入正常 Turn 主链 |
+| `app` | 进程与世界生命周期、服务装配、跨 owner 事务入口 | 不重新实现 Turn、Memory 或 Content 规则 |
 
 ### 5.1 运行流程（谁在什么时候调用模型）
 
 ```text
 Turn
- ├─ Context Build          （只产材料，不调用模型）
- ├─ Character Agent ──────→ Model
- ├─ Host：协调 ───────────→ Model
- ├─ Host：正文 ───────────→ Model
- ├─ Memory（维护时）────────→ Model
- └─ Plot（需要语义生成时）──→ Model
+ ├─ Load Snapshot + Memory
+ ├─ Intent ───────────────→ Model
+ ├─ Character Decisions ──→ Model
+ ├─ Coordination / Plot ──→ Model
+ ├─ Narration ────────────→ Model
+ └─ Memory Maintenance ───→ Model
 ```
 
 ### 5.2 Package 依赖
 
 ```text
-                  api
+               storyapi
+                   │
+                   ▼
+                  app
                    │
                    ▼
                  turn ──────────────┐
        ┌───────────┼────────────┐   │
        ▼           ▼            ▼   ▼
-     agent       memory        plot  storage
+     memory       story         plot  storage
        │           │            │
-       └─────┬─────┴──────┬─────┘
-             ▼            ▼
-           context       world
-             │
-             ▼
-           model（仅请求类型）
+       └───────────┴──────┬─────┘
+                          ▼
+                        world
+
+                 turn ───────────→ model
 ```
 
 **硬约束：**
 
 ```text
-world      不依赖 model / storage / api / agent / context / memory / plot
-context    不写数据库、不执行模型调用（可依赖 model 的请求类型）
-agent      不写数据库
+world      不依赖 model / storage / storyapi / turn / memory / plot
+turn 的上下文装配与人物决策不写数据库；冻结输入只经具名 storage 读取
 model      不理解剧情
 storage    不生成剧情
-api        不直接调用 Provider
+storyapi   不直接调用 Provider
 content    不进入正常 Turn 主链
 wire       只依赖标准库；不放领域概念
 plot       不 import content：剧情规则是权威，内容包只是调用方
 story      只依赖 world / plot；不得长出 Service / Loader / Repository
-turn       是唯一同时使用 context / agent / memory / plot / storage 的模块
+turn       是唯一回合主流程；人物决策、上下文材料、memory / plot / storage 的交接都在这里
+app        只装配 owner 与管理生命周期，不复制 turn / memory / content 规则
 ```
 
 **四层归属**：
@@ -383,13 +385,13 @@ backend/cmd/server  → backend/cmd/wia
 **执行中的偏离（记录，不修改原计划结论）**：实际勘察后确认，`turn` 若此刻抽成独立包，需要调用 `storyapp` 约 20 个未导出方法与字段；跨包意味着把这些全部导出并把 `App` 拆成接口，属于深改而非搬移，风险远超一个阶段。因此 R2 拆成两步：
 
 1. **包内完成流水线提取（已完成）**：`executeTurn` 改为按顺序调用命名阶段，各阶段实现各自成函数，主流程可通读；行为零变化。阅读入口此时仍是 `storyapp/run.go`，其中 `executeTurn` 就是那条流水线。
-2. **模块边界（待做）**：等 `storyapp` 内部职责按 R3 清理到只剩编排之后，再把编排移入独立的 `turn/` 包，并把领域类型移入 `world/`。届时验收标准仍是"打开 `turn/service.go` 十分钟看懂一轮"。
+2. **模块边界（已完成）**：编排进入独立 `turn`，领域词汇进入 `world`，冻结运行定义进入 `story`；D2 后输入加载也由 `turn` 持有，`Host` 只剩 `LogStage`。
 
-`world/` 的领域类型提取同样推迟到第 2 步：`types.go` 中的领域结构（`WorldSummary`、`Character`、`Event`、`Perception`、`Memory`、`Message`、`Run`）只依赖 `string` 与 `time.Time`，提取本身可行，但会触及约 40 个文件、数百处引用；放在模块边界那一步一次做完，避免两次大规模改名。
+`world/` 的领域类型已随模块边界一次迁移完成，依赖守卫要求它只使用标准库。
 
 ### R3：Context / Memory / Agent / Plot / Content 拆分
 
-按 `context` → `agent` → `memory` → `plot` → `content` 顺序抽取，每抽一个就删除 `storyapp` 中对应旧实现。**不建兼容包装层。**
+本节记录原抽取计划。实际执行按依赖闭包收敛为 `turn`（上下文材料、人物决策、主流程）、`memory`、`plot`、`content`、`story`、`world` 与薄 `app`，并在 D2 删除 `storyapp`。**未建兼容包装层。**
 
 **`storyapp` 不只包含这五项**，因此迁移前先按下面的表逐项确定归属；执行中出现表外文件时先补表再动手，不临时决定。
 
@@ -412,13 +414,13 @@ backend/cmd/server  → backend/cmd/wia
 
 **R3 的结束条件是：`storyapp` 每一项职责都有明确新 owner，目录清空并删除。** 不是"四个核心模块抽完了就宣布它消失"。
 
-### R4：Storage
+### R4：Storage 边界
 
-把所有 SQL、schema、迁移、事务、存档复制、AppStore 与 WorldStore 收拢进 `storage/`。**保留 `app.db + N world.db`，只改代码边界。**
+Storage 已拥有 schema、中性记录、具名读写与事务端口；物理语义保持 `app.db + N world.db`。应用装配仍有 23 处受守卫约束的 `Database()` 逃生口，本轮明确不以归零为目标，也不为归零引入 repository 层。
 
 ### R5：删除旧 Game Runtime
 
-删除 `protocol/`、`gateway/`、`tool/`、`task/`、旧 `agent`、旧 `context`、旧 `memory`、旧 `httpapi`、旧入口，以及 `scenarios/` 中不属于 WIA 的内容。
+已删除 `protocol/`、`gateway/`、`tool/`、`task`、旧 `agent`、旧 `context`、旧 `memory`、旧 `httpapi`、旧入口，以及 `scenarios/` 中不属于 WIA 的内容。
 
 **删除测试的条件不是"它属于旧包"，而是"被迁移行为的覆盖没有下降"。** 依据 R0 的测试保留表：仅验证已废弃行为的测试可删；仍覆盖 WIA 复用能力的必须迁移或由等价新测试替代后再删；已有新版覆盖的才可以随旧包一起删除。
 
