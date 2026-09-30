@@ -2,6 +2,7 @@ package storyapp
 
 import (
 	"context"
+	"fmt"
 
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
@@ -44,7 +45,7 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 			return err
 		}
 		for _, record := range records {
-			if err := tx.AppendMemorySourceIfAbsent(ctx, storage.MemorySourceWrite{
+			if err := appendMemorySource(ctx, tx, storage.MemorySourceWrite{
 				Scope:     record.Scope,
 				ID:        record.ID,
 				EventID:   record.EventID,
@@ -59,6 +60,17 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 		}
 		return nil
 	})
+}
+
+func appendMemorySource(ctx context.Context, tx *storage.WorldTx, record storage.MemorySourceWrite) error {
+	result, err := tx.AppendMemorySource(ctx, record)
+	if err != nil {
+		return err
+	}
+	if result == storage.MemorySourceContentConflict {
+		return fmt.Errorf("%w: memory source %q in scope %q has conflicting content", ErrStorageUnavailable, record.ID, record.Scope)
+	}
+	return nil
 }
 
 func memoryScopeIDs(snapshot turn.Snapshot) []string {

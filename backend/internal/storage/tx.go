@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -319,16 +320,27 @@ func (s *WorldStore) RequeueMemoryJobIfFailed(ctx context.Context, epoch int64) 
 	return err
 }
 
-// AppendMemorySourceIfAbsent appends one committed experience to a scope's stream,
-// unless that source identifier is already recorded.
-//
-// The sequence is taken inside the same statement so two appends cannot claim the same
-// number.
-func (t *WorldTx) AppendMemorySourceIfAbsent(ctx context.Context, record MemorySourceWrite) error {
-	_, err := t.tx.ExecContext(ctx, `INSERT OR IGNORE INTO memory_sources(scope,seq,source_id,event_id,run_id,actor,kind,content,created_at)
+// AppendMemorySource reports the persisted fact for one source identity. A source that
+// is not present is appended, the same content is an idempotent repeat, and different
+// content is reported as a conflict for the caller to interpret.
+func (t *WorldTx) AppendMemorySource(ctx context.Context, record MemorySourceWrite) (MemorySourceAppendResult, error) {
+	var content string
+	err := t.tx.QueryRowContext(ctx, `SELECT content FROM memory_sources WHERE scope=? AND source_id=?`, record.Scope, record.ID).Scan(&content)
+	switch {
+	case err == nil && content == record.Content:
+		return MemorySourceUnchanged, nil
+	case err == nil:
+		return MemorySourceContentConflict, nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return 0, err
+	}
+	_, err = t.tx.ExecContext(ctx, `INSERT INTO memory_sources(scope,seq,source_id,event_id,run_id,actor,kind,content,created_at)
  SELECT ?,COALESCE(MAX(seq),0)+1,?,?,?,?,?,?,? FROM memory_sources WHERE scope=?`,
 		record.Scope, record.ID, record.EventID, record.RunID, record.Actor, record.Kind, record.Content, record.CreatedAt, record.Scope)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return MemorySourceInserted, nil
 }
 
 // CountMissingEventSources reports how many perceptions or memories name an event that
@@ -425,3 +437,14 @@ type MemorySourceWrite struct {
 	Content   string
 	CreatedAt string
 }
+
+// MemorySourceAppendResult is the storage-level outcome of appending one source.
+// It deliberately carries no business error: the caller decides what a content
+// conflict means for indexing, correction or another workflow.
+type MemorySourceAppendResult uint8
+
+const (
+	MemorySourceInserted MemorySourceAppendResult = iota + 1
+	MemorySourceUnchanged
+	MemorySourceContentConflict
+)

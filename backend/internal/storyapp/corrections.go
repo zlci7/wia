@@ -135,7 +135,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memorymodel.C
 			return err
 		}
 		for scope, content := range correctionNotices(snapshot, c, eventRun) {
-			if err := tx.AppendMemorySourceIfAbsent(ctx, storage.MemorySourceWrite{
+			if err := appendMemorySource(ctx, tx, storage.MemorySourceWrite{
 				Scope:     scope,
 				ID:        fmt.Sprintf("correction:%d", c.Epoch),
 				Actor:     "author",

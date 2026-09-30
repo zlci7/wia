@@ -26,7 +26,7 @@ func TestReadDigestRejectsUnverifiableCoverage(t *testing.T) {
 	defer store.Close()
 	if err = store.InTx(ctx, func(tx *storage.WorldTx) error {
 		for _, id := range []string{"source:1", "source:2"} {
-			if appendErr := tx.AppendMemorySourceIfAbsent(ctx, storage.MemorySourceWrite{Scope: "npc:innkeeper", ID: id, EventID: "event", RunID: "run", Actor: "player", Kind: "perception:test", Content: id, CreatedAt: "now"}); appendErr != nil {
+			if _, appendErr := tx.AppendMemorySource(ctx, storage.MemorySourceWrite{Scope: "npc:innkeeper", ID: id, EventID: "event", RunID: "run", Actor: "player", Kind: "perception:test", Content: id, CreatedAt: "now"}); appendErr != nil {
 				return appendErr
 			}
 		}
