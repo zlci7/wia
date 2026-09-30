@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"gameagent/backend/internal/wire"
@@ -103,28 +104,47 @@ func RetainedStateSources(d MemoryDigest) []string {
 	return ids
 }
 
-// Search receives one authorized scope, not the world's unprojected events.
+const (
+	memorySearchQueryChars     = 256
+	memorySearchQueryTerms     = 32
+	memorySearchScanCandidates = 512
+	memorySearchBytes          = 32 << 20
+	memorySearchTimeout        = 500 * time.Millisecond
+)
+
+// SearchMemory receives one authorized scope, not the world's unprojected events.
+// Work is bounded before matching: the query, records inspected, source bytes and
+// elapsed time all have fixed ceilings. Archive streams are ordered by sequence, so
+// scanning from the end keeps the newest eligible records when the archive grows past
+// the scan budget.
 func SearchMemory(items []MemorySource, query string, limit int) []MemorySource {
-	tokens := map[string]bool{}
-	for _, word := range strings.FieldsFunc(strings.ToLower(query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) }) {
-		rs := []rune(word)
-		if len(rs) < 2 {
-			continue
-		}
-		tokens[word] = true
-		for i := 0; i+1 < len(rs); i++ {
-			tokens[string(rs[i:i+2])] = true
-		}
+	if limit <= 0 {
+		return nil
+	}
+	tokens := memorySearchTerms(query)
+	if len(tokens) == 0 {
+		return nil
 	}
 	type ranked struct {
 		s     MemorySource
 		score int
 	}
 	var candidates []ranked
-	for _, s := range items {
+	deadline := time.Now().Add(memorySearchTimeout)
+	readBytes := 0
+	for i, scanned := len(items)-1, 0; i >= 0 && scanned < memorySearchScanCandidates; i, scanned = i-1, scanned+1 {
+		if time.Now().After(deadline) {
+			break
+		}
+		s := items[i]
+		sourceBytes := memorySourceBytes(s)
+		if sourceBytes > memorySearchBytes-readBytes {
+			break
+		}
+		readBytes += sourceBytes
 		score := 0
 		text := strings.ToLower(s.Content)
-		for token := range tokens {
+		for _, token := range tokens {
 			if strings.Contains(text, token) {
 				score++
 			}
@@ -144,6 +164,53 @@ func SearchMemory(items []MemorySource, query string, limit int) []MemorySource 
 		result = append(result, candidates[i].s)
 	}
 	return result
+}
+
+// memorySearchTerms mirrors the bounded literal query vocabulary previously used by
+// the history store: Latin/digit runs stay whole and adjacent Han characters form
+// bigrams. The rune and distinct-term ceilings apply during tokenization.
+func memorySearchTerms(text string) []string {
+	var terms []string
+	seen := map[string]bool{}
+	add := func(term string) {
+		if term != "" && !seen[term] && len(terms) < memorySearchQueryTerms {
+			seen[term] = true
+			terms = append(terms, term)
+		}
+	}
+	var latin strings.Builder
+	var previous rune
+	count := 0
+	flush := func() {
+		add(latin.String())
+		latin.Reset()
+	}
+	for _, r := range text {
+		if count >= memorySearchQueryChars || len(terms) >= memorySearchQueryTerms {
+			break
+		}
+		count++
+		switch {
+		case unicode.Is(unicode.Han, r):
+			flush()
+			if previous != 0 {
+				add(string([]rune{previous, r}))
+			}
+			previous = r
+		case unicode.Is(unicode.Latin, r) || unicode.IsDigit(r):
+			previous = 0
+			latin.WriteRune(unicode.ToLower(r))
+		default:
+			previous = 0
+			flush()
+		}
+	}
+	flush()
+	return terms
+}
+
+func memorySourceBytes(source MemorySource) int {
+	return len(source.Scope) + len(source.ID) + len(source.EventID) + len(source.RunID) + len(source.Actor) + len(source.Kind) + len(source.Content) + len(source.CreatedAt)
 }
 
 // MemoryGroups splits a committed record stream into the runs it came from: one group

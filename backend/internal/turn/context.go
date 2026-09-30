@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/wire"
 )
 
 // SceneFor is the scene text one recipient last received.
@@ -39,7 +38,7 @@ func EventOpportunityContract(s Snapshot) string {
 	if p == nil {
 		return ""
 	}
-	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + wire.MarshalJSON(p.Locations)
+	return "\n开放事件机会：本轮确已抵达另一个地点或发生显著场景变化时，可额外返回 event_opportunity 对象，字段 kind(arrival/significant_change)、location(下列允许地点ID)、action_id(本轮造成变化且结果为succeeded或partial的outcome.action_id)。单纯交谈、读表、重复观察、未成功移动和文学补写不构成机会；无机会省略此字段。它只申请一次受限的外部情节生成，不替玩家接受任务。允许地点：" + contextJSON(p.Locations)
 }
 
 func NextPlotNode(snapshot Snapshot) (plot.Node, int, bool) {
@@ -89,9 +88,9 @@ func PlotContext(snapshot Snapshot) string {
 		return ""
 	}
 	if snapshot.Plot == nil {
-		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", PlotTimeLimit(snapshot), wire.MarshalJSON(snapshot.GeneratedEvents.Active))
+		return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。开放事件的 node 是未来计划，premise 是已成立起点：%s。当前只裁定本轮行动，不提前展开未来事件。", PlotTimeLimit(snapshot), contextJSON(snapshot.GeneratedEvents.Active))
 	}
-	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", PlotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, wire.MarshalJSON(snapshot.PlotProgress))
+	return fmt.Sprintf("\n世界剧情时间边界：本轮 time_minutes 最大为 %d。长时间行动或等待先停在下一剧情节点，不宣称剩余等待已经完成；遇到主角关键选择即停下。模式=%s。未来节点由后续剧情协调处理，本次只裁定已经提交的行动，不展开未来剧情。作者固定资料（并非人物共有知识）：%s\n已提交剧情进度：%s\n输出简明状态与结果，不复述输入、来源全文或剧情计划。scene只写简短结束情境；每个outcome用一两句写清结果，scene_updates仅更新确有变化的接收者，每项简明保留其当前状态。", PlotTimeLimit(snapshot), snapshot.Summary.Mode, snapshot.Plot.Facts, contextJSON(snapshot.PlotProgress))
 }
 
 // The prompt context of a turn: the fragments a stage adds to tell a model what it needs

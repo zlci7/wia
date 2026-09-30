@@ -139,12 +139,18 @@ func (p MemoryProjection) alreadySupplied(id string) bool {
 // something.
 func WithRecall(material Material, projection MemoryProjection, query string) Material {
 	m := projection.Context
-	hits := memorymodel.SearchMemory(m.Archive, query, 5)
+	// Search returns a bounded ranked candidate set. Projection filtering happens
+	// before the five-group result limit so already supplied records do not consume a
+	// slot that could have returned another authorized experience.
+	hits := memorymodel.SearchMemory(m.Archive, query, len(m.Archive))
 	groups := memorymodel.MemoryGroups(m.Archive)
 	var selected []Section
 	// Lowest-ranked matches are removed first by the shared budgeter. A hit
 	// selects its entire committed group so attempts keep their outcomes.
 	for _, s := range hits {
+		if len(selected) >= 5 {
+			break
+		}
 		if projection.alreadySupplied(s.ID) || wiaworld.ContainsID(material.RecallSources, s.ID) {
 			continue
 		}

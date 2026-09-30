@@ -1,6 +1,10 @@
 package memorymodel
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestDigestCoverageMatchesTheContinuousScopePrefix(t *testing.T) {
 	items := []MemorySource{
@@ -49,4 +53,44 @@ func TestDigestCoverageMatchesTheContinuousScopePrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSearchMemoryAppliesQueryAndScanBudgets(t *testing.T) {
+	t.Run("query runes", func(t *testing.T) {
+		query := strings.Repeat("界", memorySearchQueryChars) + " 铜钥匙"
+		if got := SearchMemory([]MemorySource{{ID: "late", Seq: 1, Content: "铜钥匙"}}, query, 1); len(got) != 0 {
+			t.Fatalf("text after query rune limit matched: %+v", got)
+		}
+	})
+
+	t.Run("query terms", func(t *testing.T) {
+		terms := make([]string, memorySearchQueryTerms+1)
+		for i := range terms {
+			terms[i] = fmt.Sprintf("term%02d", i)
+		}
+		if got := SearchMemory([]MemorySource{{ID: "late", Seq: 1, Content: terms[len(terms)-1]}}, strings.Join(terms, " "), 1); len(got) != 0 {
+			t.Fatalf("term after query term limit matched: %+v", got)
+		}
+	})
+
+	t.Run("newest scan candidates", func(t *testing.T) {
+		items := make([]MemorySource, memorySearchScanCandidates+1)
+		for i := range items {
+			items[i] = MemorySource{ID: fmt.Sprintf("source:%03d", i), Seq: int64(i + 1), Content: "copper key"}
+		}
+		got := SearchMemory(items, "copper", len(items))
+		if len(got) != memorySearchScanCandidates || got[0].Seq != int64(len(items)) || got[len(got)-1].Seq != 2 {
+			t.Fatalf("bounded newest candidates = %d [%d..%d]", len(got), got[0].Seq, got[len(got)-1].Seq)
+		}
+	})
+
+	t.Run("source bytes", func(t *testing.T) {
+		items := []MemorySource{
+			{ID: "older", Seq: 1, Content: "copper key"},
+			{ID: "oversized", Seq: 2, Content: strings.Repeat("x", memorySearchBytes+1)},
+		}
+		if got := SearchMemory(items, "copper", 1); len(got) != 0 {
+			t.Fatalf("search crossed source byte budget: %+v", got)
+		}
+	})
 }
