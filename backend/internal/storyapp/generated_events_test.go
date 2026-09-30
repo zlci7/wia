@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
@@ -58,9 +59,9 @@ func TestBackgroundConversationHasResolvedInteraction(t *testing.T) {
 }
 
 func withoutWorldEvents(a *App) {
-	p := a.packs["orbital-repair"]
+	p := testPack(a, "orbital-repair")
 	p.Definition.Plot, p.Definition.EventGeneration = nil, nil
-	a.packs["orbital-repair"] = p
+	a.SetPack("orbital-repair", p)
 }
 
 func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
@@ -113,9 +114,9 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 func eventTestWorld(t *testing.T, g *generatedTestGenerator) (*App, wiaworld.WorldSummary) {
 	t.Helper()
 	a := newTestApp(t, g)
-	p := a.packs["orbital-repair"]
+	p := testPack(a, "orbital-repair")
 	p.Definition.Plot = nil
-	a.packs["orbital-repair"] = p
+	a.SetPack("orbital-repair", p)
 	return a, createPackWorld(t, a, "orbital-repair")
 }
 
@@ -210,7 +211,7 @@ func TestGeneratedEventsEmptyChoiceAndInvalidScope(t *testing.T) {
 	for _, change := range []func(*plot.EventGenerationPolicy){func(p *plot.EventGenerationPolicy) { p.Locations = []string{"outside"} }, func(p *plot.EventGenerationPolicy) { p.Participants = []string{"npc:invented"} }, func(p *plot.EventGenerationPolicy) { p.MaxActive = 4 }} {
 		p := *s.Definition.EventGeneration
 		change(&p)
-		if validateEventPolicy(&p, s.Definition) == nil {
+		if content.ValidateEventPolicy(&p, s.Definition) == nil {
 			t.Fatal("invalid author boundary admitted")
 		}
 	}

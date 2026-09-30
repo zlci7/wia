@@ -76,7 +76,7 @@ func TestUpdatePlayerProfileAdvancesEpochAndKeepsHistory(t *testing.T) {
 func TestUpdatePlayerProfileRejectsFixedPlayer(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	pack := a.packs[GameID]
+	pack := testPack(a, GameID)
 	definition := pack.Definition
 	definition.Summary.Player = story.Player{Name: "固定主角", Profile: "固定简介", Editable: false}
 	world, err := a.createWorldFromPack(ctx, loadedPack{Definition: definition}, CreateWorldRequest{

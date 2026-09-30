@@ -2,13 +2,16 @@ package storyapp
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
@@ -82,7 +85,7 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 	}
 	bystander, ok := bystanderByID(snapshot.Definition.BystanderRefs, bystanderID)
 	if !ok {
-		return PromotionPreview{}, ErrContentNotFound
+		return PromotionPreview{}, content.ErrContentNotFound
 	}
 	preview := PromotionPreview{
 		BystanderID:   bystander.BystanderID,
@@ -165,7 +168,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	}
 	bystander, ok := bystanderByID(snapshot.Definition.BystanderRefs, request.BystanderID)
 	if !ok {
-		return wiaworld.Character{}, ErrContentNotFound
+		return wiaworld.Character{}, content.ErrContentNotFound
 	}
 	experiences, err := readBystanderExperiences(ctx, store.Database(), bystander.BystanderID)
 	if err != nil {
@@ -178,7 +181,7 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	selected := normalizedSourceIDs(request.SourceIDs)
 	for _, id := range selected {
 		if !authorized[id] {
-			return wiaworld.Character{}, fmt.Errorf("%w: %s is not an experience of this person", ErrContentInvalid, id)
+			return wiaworld.Character{}, fmt.Errorf("%w: %s is not an experience of this person", content.ErrContentInvalid, id)
 		}
 	}
 	// The authoritative hash uses the validated selection, so a repeat whose source list
@@ -338,10 +341,10 @@ func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
 		draft.Role = "背景人物"
 	}
 	if draft.Profile == "" {
-		return PromotionDraft{}, fmt.Errorf("%w: a promoted character needs a profile", ErrContentInvalid)
+		return PromotionDraft{}, fmt.Errorf("%w: a promoted character needs a profile", content.ErrContentInvalid)
 	}
 	if len([]rune(draft.Role)) > 200 || len([]rune(draft.Profile)) > 8000 || len([]rune(draft.Knowledge)) > 8000 || len([]rune(draft.InitialConcerns)) > 4000 {
-		return PromotionDraft{}, fmt.Errorf("%w: draft field length", ErrContentInvalid)
+		return PromotionDraft{}, fmt.Errorf("%w: draft field length", content.ErrContentInvalid)
 	}
 	examples := []string{}
 	for _, line := range draft.SpeakingExamples {
@@ -349,10 +352,10 @@ func validatePromotionDraft(draft PromotionDraft) (PromotionDraft, error) {
 		if line == "" {
 			continue
 		}
-		examples = append(examples, truncateRunes(line, 500))
+		examples = append(examples, truncatePromotionText(line, 500))
 	}
 	if len(examples) > 12 {
-		return PromotionDraft{}, fmt.Errorf("%w: too many speaking examples", ErrContentInvalid)
+		return PromotionDraft{}, fmt.Errorf("%w: too many speaking examples", content.ErrContentInvalid)
 	}
 	draft.SpeakingExamples = examples
 	return draft, nil
@@ -428,9 +431,11 @@ func normalizedSourceIDs(ids []string) []string {
 // promotionRequestHash identifies one promotion request by its whole payload, so the
 // same key with a different payload is a conflict rather than a silent repeat.
 func promotionRequestHash(request PromotionRequest, selected []string) string {
-	return hashJSON(map[string]any{
+	body, _ := json.Marshal(map[string]any{
 		"key": request.RequestKey, "bystander": request.BystanderID, "sources": selected, "draft": request.Draft,
 	})
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }
 
 // promotionSceneContent seeds the promoted person's own view. It states where they
@@ -546,9 +551,40 @@ func promotionIdentity(bystander story.Bystander, definition story.Definition) (
 		slug = "b" + slug
 	}
 	entity := "npc:" + slug
-	if !entityID.MatchString(entity) {
-		slug = importDefinitionID(bystander.Name)
+	if !runtimeID.MatchString(strings.TrimPrefix(entity, "npc:")) {
+		slug = promotionDefinitionID(bystander.Name)
 		entity = "npc:" + slug
 	}
 	return entity, slug
+}
+
+func truncatePromotionText(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit])
+}
+
+func promotionDefinitionID(name string) string {
+	var builder strings.Builder
+	for _, r := range strings.ToLower(name) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r > 127:
+			builder.WriteString(fmt.Sprintf("%x", r))
+		}
+	}
+	out := builder.String()
+	if out == "" {
+		out = "imported"
+	}
+	if len(out) > 60 {
+		out = out[:60]
+	}
+	if out[0] < 'a' || out[0] > 'z' {
+		out = "npc" + out
+	}
+	return out
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
@@ -80,7 +81,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 	// ordinary preview.
 	secret := seedBystanderExperience(t, a, w.WorldID, target.BystanderID, 3, "船夫在玩家没看见时收了别人的钱。", false)
 	// Being present without an attributed result grants nothing.
-	if _, err = a.PreviewCharacterPromotion(ctx, w.WorldID, "bystander:missing", false); !errors.Is(err, ErrContentNotFound) {
+	if _, err = a.PreviewCharacterPromotion(ctx, w.WorldID, "bystander:missing", false); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("unknown passer-by previewed: %v", err)
 	}
 	playerView, err := a.PreviewCharacterPromotion(ctx, w.WorldID, target.BystanderID, false)
@@ -121,7 +122,7 @@ func TestPromoteBystanderInheritsOnlyAttributedExperience(t *testing.T) {
 		SourceIDs: []string{theirs},
 		Draft:     PromotionDraft{Role: "船夫", Profile: "在栈桥等活的船夫。"},
 	}
-	if _, err = a.PromoteCharacter(ctx, w.WorldID, request); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, request); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("foreign experience accepted: %v", err)
 	}
 	request.SourceIDs = []string{mine, secret}
@@ -227,7 +228,7 @@ func TestPromotionGuardsAndEmptyExperience(t *testing.T) {
 	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "", ExpectedContextEpoch: 1, BystanderID: target.BystanderID, Draft: PromotionDraft{Profile: "资料"}}); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("missing request key: %v", err)
 	}
-	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "no-profile", ExpectedContextEpoch: snapshot.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: PromotionDraft{}}); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "no-profile", ExpectedContextEpoch: snapshot.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: PromotionDraft{}}); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("profile-less promotion: %v", err)
 	}
 	promoted, err := a.PromoteCharacter(ctx, w.WorldID, PromotionRequest{RequestKey: "empty-experience", ExpectedContextEpoch: snapshot.Summary.ContextEpoch, BystanderID: target.BystanderID, Draft: PromotionDraft{Profile: "在栈桥上等活的船夫。"}})

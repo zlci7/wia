@@ -13,7 +13,7 @@ func TestBuiltInPacksAuthorACharacterVoice(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
 	for _, gameID := range []string{"lantern-dusk", "orbital-repair"} {
-		pack, ok := a.pack(gameID)
+		pack, ok := a.Pack(gameID)
 		if !ok {
 			t.Fatalf("%s is not loaded", gameID)
 		}

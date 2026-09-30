@@ -85,7 +85,7 @@ func TestBundledGuidedRoutesClose(t *testing.T) {
 		t.Run(fmt.Sprint(participate), func(t *testing.T) {
 			g := &packPlotGenerator{plotTestGenerator: plotTestGenerator{intervene: participate}}
 			a := newTestApp(t, g)
-			g.revision = a.packs[GameID].Definition.Plot.Revision
+			g.revision = testPack(a, GameID).Definition.Plot.Revision
 			w := createPackWorld(t, a, GameID)
 			for i := 0; i < 3; i++ {
 				input := "留在客栈等待，不参与调查"

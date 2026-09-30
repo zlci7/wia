@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 )
 
@@ -30,10 +31,10 @@ func TestImportPlainTextPreviewAndConfirm(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
 	project := importProject(t, a, "harbor-text")
 
-	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "empty.txt", nil); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "empty.txt", nil); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("empty upload accepted: %v", err)
 	}
-	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "big.txt", bytes.Repeat([]byte("x"), importTextLimit+1)); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "big.txt", bytes.Repeat([]byte("x"), importTextLimit+1)); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("oversized text accepted: %v", err)
 	}
 	preview, err := a.PreviewContentImport(ctx, project.ProjectID, "harbor.md", []byte("# 港口\n\n夜里的港口只剩潮声。\n第二行。"))
@@ -55,7 +56,7 @@ func TestImportPlainTextPreviewAndConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("preview draft must accept edits: %v", err)
 	}
-	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", draft.Version); !errors.Is(err, ErrVersionConflict) {
+	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", draft.Version); !errors.Is(err, content.ErrVersionConflict) {
 		t.Fatalf("stale confirmation accepted: %v", err)
 	}
 	confirmed, err := a.ConfirmContentImport(ctx, draft.DraftID, "confirm-1", saved.Version)
@@ -74,11 +75,11 @@ func TestImportPlainTextPreviewAndConfirm(t *testing.T) {
 	if repeated.Version != confirmed.Version || repeated.Status != draftStatusEditing {
 		t.Fatalf("a repeated confirmation changed the draft: %+v", repeated)
 	}
-	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-other", confirmed.Version); !errors.Is(err, ErrIdempotencyConflict) {
+	if _, err = a.ConfirmContentImport(ctx, draft.DraftID, "confirm-other", confirmed.Version); !errors.Is(err, content.ErrIdempotencyConflict) {
 		t.Fatalf("a second confirmation key was accepted: %v", err)
 	}
 	// The original bytes stay as a non-executed attachment on disk.
-	source, err := os.ReadFile(a.importSourcePath(draft.DraftID, "harbor.md"))
+	source, err := os.ReadFile(testImportSourcePath(a, draft.DraftID, "harbor.md"))
 	if err != nil || !strings.Contains(string(source), "夜里的港口") {
 		t.Fatalf("source attachment: %v", err)
 	}
@@ -149,10 +150,10 @@ func TestImportCharacterCard(t *testing.T) {
 		}
 	}
 	// Wrong spec versions and JSON are refused without creating a draft.
-	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "old.json", []byte(`{"spec":"chara_card_v1","spec_version":"1.0","data":{"name":"甲"}}`)); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "old.json", []byte(`{"spec":"chara_card_v1","spec_version":"1.0","data":{"name":"甲"}}`)); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("v1 card accepted: %v", err)
 	}
-	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "broken.json", []byte(`{"spec":"chara_card_v2"`)); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, project.ProjectID, "broken.json", []byte(`{"spec":"chara_card_v2"`)); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("broken JSON accepted: %v", err)
 	}
 	// A card whose bytes arrive with a byte-order mark is still a card, and so is one
@@ -194,7 +195,7 @@ func TestImportWIAPackageAndExportRoundTrip(t *testing.T) {
 	if _, ok := files["story.json"]; !ok || len(files) < 2 {
 		t.Fatalf("export contents: %v", keysOf(files))
 	}
-	if _, _, err = a.ExportContentRevision(ctx, "harbor-round", "r-unknown"); !errors.Is(err, ErrContentNotFound) {
+	if _, _, err = a.ExportContentRevision(ctx, "harbor-round", "r-unknown"); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("unknown revision exported: %v", err)
 	}
 
@@ -240,17 +241,17 @@ func TestImportWIAPackageAndExportRoundTrip(t *testing.T) {
 		{"unknown fields", map[string][]byte{"story.json": []byte(`{"schema_version":2,"game_id":"x","revision":"v1","mode":"open","title":"t","description":"d","gameplay":"g","opening":"o","initial_location":"a","clock":"第 1 日 19:00","locations":[{"id":"a","name":"A","connections":[]}],"npcs":["npcs/a.json"],"bystanders":[],"secret_field":true}`), "npcs/a.json": []byte(`{"definition_id":"a","revision":"v1","entity_id":"npc:a","name":"甲","role":"角色","profile":"资料","initial_location":"a"}`)}},
 	} {
 		archive := zipBytes(t, tc.entries)
-		if _, err := a.PreviewContentImport(ctx, target.ProjectID, "bad.wia-story.zip", archive); !errors.Is(err, ErrContentInvalid) {
+		if _, err := a.PreviewContentImport(ctx, target.ProjectID, "bad.wia-story.zip", archive); !errors.Is(err, content.ErrContentInvalid) {
 			t.Fatalf("%s accepted: %v", tc.name, err)
 		}
 	}
 	// A zip bomb is refused by the unpacked limit rather than exhausting memory.
 	bomb := zipBytes(t, map[string][]byte{"story.json": bytes.Repeat([]byte("x"), importUnzipLimit+1)})
-	if _, err := a.PreviewContentImport(ctx, target.ProjectID, "bomb.zip", bomb); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, target.ProjectID, "bomb.zip", bomb); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("oversized archive accepted: %v", err)
 	}
 	// Duplicate normalized paths are refused.
-	if _, err := a.PreviewContentImport(ctx, target.ProjectID, "dupe.zip", duplicateEntryZip(t)); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.PreviewContentImport(ctx, target.ProjectID, "dupe.zip", duplicateEntryZip(t)); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("duplicate entries accepted: %v", err)
 	}
 }
@@ -266,7 +267,7 @@ func TestImportedCardDraftCanBePublished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "unconfirmed", DraftID: preview.DraftID, ExpectedDraftVersion: preview.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "unconfirmed", DraftID: preview.DraftID, ExpectedDraftVersion: preview.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("an unconfirmed preview was published: %v", err)
 	}
 	confirmed, err := a.ConfirmContentImport(ctx, preview.DraftID, "confirm-1", preview.Version)

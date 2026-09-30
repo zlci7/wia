@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"sync"
 	"time"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -27,9 +29,6 @@ var (
 	ErrInvalidRequest      = errors.New("invalid request")
 	ErrRunNotFound         = errors.New("run not found")
 	ErrPersonaNotFound     = errors.New("persona not found")
-	ErrContentNotFound     = errors.New("content not found")
-	ErrContentBusy         = errors.New("content is busy")
-	ErrContentInvalid      = errors.New("content is invalid")
 )
 
 const (
@@ -37,6 +36,8 @@ const (
 	GameID        = "lantern-dusk"
 	SchemaVersion = 1
 )
+
+var runtimeID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
 
 type Options struct {
 	StoryPacksPath  string
@@ -56,20 +57,7 @@ type Logger interface {
 }
 
 type App struct {
-	packs      map[string]loadedPack
-	packErrors []PackIssue
-	packRoot   string
-	// packsMu guards the story directory. M3 publishes into a running process, so the
-	// map is no longer written only at startup; loading and validating a package stays
-	// outside the lock and only the directory entry swap is inside it.
-	packsMu sync.RWMutex
-	// liveOps holds the publications running in this process, keyed by request key, so
-	// a repeated request returns the live operation instead of recovering it.
-	liveMu  sync.Mutex
-	liveOps map[string]ContentOperation
-	// contentDir holds this instance's published user content. Tests may point it
-	// at a temporary directory.
-	contentDir string
+	*content.Service
 	// worldPlayerName overrides the lead character name of worlds created through
 	// this instance; the disposable browser fixture uses it.
 	worldPlayerName string

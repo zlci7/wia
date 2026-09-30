@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storyapp"
 )
 
@@ -54,7 +55,7 @@ func TestContentRoutes(t *testing.T) {
 		t.Fatalf("create project: %d %s", created.Code, created.Body.String())
 	}
 	var projectPayload struct {
-		Project storyapp.ContentProject `json:"project"`
+		Project content.ContentProject `json:"project"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &projectPayload); err != nil {
 		t.Fatal(err)
@@ -71,7 +72,7 @@ func TestContentRoutes(t *testing.T) {
 		t.Fatalf("create draft: %d %s", createdDraft.Code, createdDraft.Body.String())
 	}
 	var draftPayload struct {
-		Draft storyapp.ContentDraft `json:"draft"`
+		Draft content.ContentDraft `json:"draft"`
 	}
 	if err := json.Unmarshal(createdDraft.Body.Bytes(), &draftPayload); err != nil {
 		t.Fatal(err)
@@ -158,7 +159,7 @@ func TestContentRoutes(t *testing.T) {
 	writer := multipart.NewWriter(&oversized)
 	_ = writer.WriteField("project_id", "project_missing")
 	part, _ := writer.CreateFormFile("file", "big.zip")
-	_, _ = part.Write(bytes.Repeat([]byte("x"), int(storyapp.ImportUploadLimit())+4096))
+	_, _ = part.Write(bytes.Repeat([]byte("x"), int(content.ImportUploadLimit())+4096))
 	_ = writer.Close()
 	request := httptest.NewRequest("POST", "/api/v1/content/imports/preview", &oversized)
 	request.Header.Set("Content-Type", writer.FormDataContentType())

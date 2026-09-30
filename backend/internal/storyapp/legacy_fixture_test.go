@@ -16,7 +16,7 @@ func lanternFixtureDefinition(pack loadedPack) story.Definition {
 }
 
 func (a *App) createFixtureWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (wiaworld.WorldSummary, error) {
-	p, ok := a.pack(GameID)
+	p, ok := a.Pack(GameID)
 	if !ok {
 		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}

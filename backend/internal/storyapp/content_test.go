@@ -17,7 +17,7 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 		t.Fatalf("empty catalog: %+v %v", projects, err)
 	}
 	for _, bad := range []struct{ id, title string }{{"bad id", "标题"}, {"ok-id", ""}, {"ok-id", strings.Repeat("长", 121)}} {
-		if _, err := a.CreateContentProject(ctx, bad.id, bad.title); !errors.Is(err, ErrInvalidRequest) {
+		if _, err := a.CreateContentProject(ctx, bad.id, bad.title); !errors.Is(err, content.ErrInvalidRequest) {
 			t.Fatalf("invalid project accepted: %+v %v", bad, err)
 		}
 	}
@@ -30,7 +30,7 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 		t.Fatalf("a derived identity must not collide: %+v %v", second, err)
 	}
 	// Official identities are not takeable.
-	if _, err := a.CreateContentProject(ctx, GameID, "冒充官方"); !errors.Is(err, ErrContentInvalid) {
+	if _, err := a.CreateContentProject(ctx, GameID, "冒充官方"); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("official game_id accepted: %v", err)
 	}
 	project, err := a.CreateContentProject(ctx, "harbor-lights", "港口的灯")
@@ -40,7 +40,7 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	if project.ProjectID == "" || project.GameID != "harbor-lights" || project.CurrentRevision != "" || project.Version != 1 {
 		t.Fatalf("project: %+v", project)
 	}
-	if _, err = a.CreateContentProject(ctx, "harbor-lights", "重复身份"); !errors.Is(err, ErrContentBusy) {
+	if _, err = a.CreateContentProject(ctx, "harbor-lights", "重复身份"); !errors.Is(err, content.ErrContentBusy) {
 		t.Fatalf("duplicate game_id accepted: %v", err)
 	}
 
@@ -78,41 +78,41 @@ func TestContentProjectAndDraftLifecycle(t *testing.T) {
 	if err != nil || saved.Version != 2 || saved.Payload.Title != "港口的灯 · 修订" {
 		t.Fatalf("save draft: %+v %v", saved, err)
 	}
-	if _, err = a.SaveContentDraft(ctx, blank.DraftID, payload, 1); !errors.Is(err, ErrVersionConflict) {
+	if _, err = a.SaveContentDraft(ctx, blank.DraftID, payload, 1); !errors.Is(err, content.ErrVersionConflict) {
 		t.Fatalf("stale save: %v", err)
 	}
 	current, err := a.ReadContentDraft(ctx, blank.DraftID)
 	if err != nil || current.Version != 2 || current.Payload.Title != "港口的灯 · 修订" {
 		t.Fatalf("stale save changed the draft: %+v %v", current, err)
 	}
-	if _, err = a.SaveContentDraft(ctx, blank.DraftID, payload, 0); !errors.Is(err, ErrInvalidRequest) {
+	if _, err = a.SaveContentDraft(ctx, blank.DraftID, payload, 0); !errors.Is(err, content.ErrInvalidRequest) {
 		t.Fatalf("missing version accepted: %v", err)
 	}
 	invalid := payload
 	invalid.Mode = "sandbox"
-	if _, err = a.SaveContentDraft(ctx, blank.DraftID, invalid, 2); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.SaveContentDraft(ctx, blank.DraftID, invalid, 2); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("invalid mode accepted: %v", err)
 	}
 	invalid = payload
 	invalid.Locations = []content.PackLocation{{ID: "inn", Name: "客栈"}, {ID: "inn", Name: "客栈"}}
-	if _, err = a.SaveContentDraft(ctx, blank.DraftID, invalid, 2); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.SaveContentDraft(ctx, blank.DraftID, invalid, 2); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("duplicate location accepted: %v", err)
 	}
 
 	if err = a.DeleteContentDraft(ctx, blank.DraftID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.ReadContentDraft(ctx, blank.DraftID); !errors.Is(err, ErrContentNotFound) {
+	if _, err = a.ReadContentDraft(ctx, blank.DraftID); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("deleted draft readable: %v", err)
 	}
-	if err = a.DeleteContentDraft(ctx, blank.DraftID); !errors.Is(err, ErrContentNotFound) {
+	if err = a.DeleteContentDraft(ctx, blank.DraftID); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("second delete: %v", err)
 	}
-	other := &App{appDB: a.appDB, userID: "other"}
+	other := &App{appDB: a.appDB, userID: "other", Service: content.NewService(content.ServiceOptions{Root: a.root, UserID: "other", DB: a.appDB})}
 	if list, err := other.ListContentProjects(ctx); err != nil || len(list) != 0 {
 		t.Fatalf("owner leak: %+v %v", list, err)
 	}
-	if _, err := other.ReadContentDraft(ctx, blank.DraftID); !errors.Is(err, ErrContentNotFound) {
+	if _, err := other.ReadContentDraft(ctx, blank.DraftID); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("draft leaked to another owner: %v", err)
 	}
 }
@@ -179,7 +179,7 @@ func TestPublishedIdentityCoversEveryReferencedImage(t *testing.T) {
 func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	pack := a.packs[GameID]
+	pack := testPack(a, GameID)
 	project, err := a.CreateContentProject(ctx, "lantern-npc", "人物往返")
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +230,7 @@ func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 		invalid := saved.Payload
 		invalid.NPCs = append([]ContentDraftNPC{}, saved.Payload.NPCs...)
 		bad.mutate(&invalid)
-		if _, err := a.SaveContentDraft(ctx, draft.DraftID, invalid, saved.Version); !errors.Is(err, ErrContentInvalid) {
+		if _, err := a.SaveContentDraft(ctx, draft.DraftID, invalid, saved.Version); !errors.Is(err, content.ErrContentInvalid) {
 			t.Fatalf("%s accepted: %v", bad.name, err)
 		}
 	}
@@ -278,7 +278,7 @@ func TestContentDraftNPCFieldsRoundTrip(t *testing.T) {
 func TestContentDraftPreviewViews(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	pack := a.packs[GameID]
+	pack := testPack(a, GameID)
 	project, err := a.CreateContentProject(ctx, "lantern-preview", "预览隔离")
 	if err != nil {
 		t.Fatal(err)
@@ -317,7 +317,7 @@ func TestContentDraftPreviewViews(t *testing.T) {
 	if author.AuthorCharacters[0].Knowledge == "" || author.AuthorCharacters[0].Profile == "" {
 		t.Fatalf("author view lost private fields: %+v", author.AuthorCharacters[0])
 	}
-	if _, err := a.PreviewContentDraft(ctx, "draft_missing", false); !errors.Is(err, ErrContentNotFound) {
+	if _, err := a.PreviewContentDraft(ctx, "draft_missing", false); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("missing draft previewed: %v", err)
 	}
 	// Preview is read-only: it neither bumps the draft version nor touches a world.
@@ -332,7 +332,7 @@ func TestContentDraftPreviewViews(t *testing.T) {
 func TestContentDraftFromRevisionStaysOutOfWorlds(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
-	pack := a.packs[GameID]
+	pack := testPack(a, GameID)
 	project, err := a.CreateContentProject(ctx, "lantern-copy", "暮灯镇副本")
 	if err != nil {
 		t.Fatal(err)
@@ -347,7 +347,7 @@ func TestContentDraftFromRevisionStaysOutOfWorlds(t *testing.T) {
 	if draft.Payload.InitialLocation == "" || len(draft.Payload.Locations) == 0 || len(draft.Payload.NPCs) == 0 {
 		t.Fatalf("copy lost structure: %+v", draft.Payload)
 	}
-	if _, err = a.CreateContentDraft(ctx, project.ProjectID, "unknown.revision"); !errors.Is(err, ErrContentNotFound) {
+	if _, err = a.CreateContentDraft(ctx, project.ProjectID, "unknown.revision"); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("unknown revision accepted: %v", err)
 	}
 

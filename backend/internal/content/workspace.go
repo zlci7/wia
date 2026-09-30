@@ -1,4 +1,4 @@
-package storyapp
+package content
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -83,13 +82,13 @@ type ContentDraftPayload struct {
 	AuthorFacts     string                      `json:"author_facts"`
 	Cover           string                      `json:"cover,omitempty"`
 	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          content.PlayerDefaults      `json:"player"`
+	Player          PlayerDefaults              `json:"player"`
 	Opening         string                      `json:"opening"`
 	InitialLocation string                      `json:"initial_location"`
 	Clock           string                      `json:"clock"`
-	Locations       []content.PackLocation      `json:"locations"`
+	Locations       []PackLocation              `json:"locations"`
 	NPCs            []ContentDraftNPC           `json:"npcs"`
-	Bystanders      []content.PackBystander     `json:"bystanders"`
+	Bystanders      []PackBystander             `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
@@ -112,10 +111,10 @@ type ContentDraftPreview struct {
 	Opening           string                      `json:"opening"`
 	Clock             string                      `json:"clock"`
 	InitialLocation   string                      `json:"initial_location"`
-	Player            content.PlayerDefaults      `json:"player"`
+	Player            PlayerDefaults              `json:"player"`
 	Characters        []ContentPreviewNPC         `json:"characters"`
-	Bystanders        []content.PackBystander     `json:"bystanders"`
-	Locations         []content.PackLocation      `json:"locations"`
+	Bystanders        []PackBystander             `json:"bystanders"`
+	Locations         []PackLocation              `json:"locations"`
 	SpoilerWarning    string                      `json:"spoiler_warning,omitempty"`
 	AuthorRules       string                      `json:"author_rules,omitempty"`
 	AuthorFacts       string                      `json:"author_facts,omitempty"`
@@ -146,7 +145,7 @@ type ContentPreviewAuthorNPC struct {
 	SpeakingExamples []string `json:"speaking_examples,omitempty"`
 }
 
-func (a *App) PreviewContentDraft(ctx context.Context, draftID string, author bool) (ContentDraftPreview, error) {
+func (a *Service) PreviewContentDraft(ctx context.Context, draftID string, author bool) (ContentDraftPreview, error) {
 	draft, err := a.ReadContentDraft(ctx, draftID)
 	if err != nil {
 		return ContentDraftPreview{}, err
@@ -190,7 +189,7 @@ func (a *App) PreviewContentDraft(ctx context.Context, draftID string, author bo
 // CreateContentProject reserves a stable game identity for one author project. Official
 // packages and other projects of the same account cannot be taken over. An author who
 // only supplies a title gets an identifier derived from it, fixed at creation.
-func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (ContentProject, error) {
+func (a *Service) CreateContentProject(ctx context.Context, gameID, title string) (ContentProject, error) {
 	gameID, title = wire.Clean(gameID), wire.Clean(title)
 	if title == "" || len([]rune(title)) > 120 {
 		return ContentProject{}, ErrInvalidRequest
@@ -224,7 +223,7 @@ func (a *App) CreateContentProject(ctx context.Context, gameID, title string) (C
 	return project, nil
 }
 
-func (a *App) ListContentProjects(ctx context.Context) ([]ContentProject, error) {
+func (a *Service) ListContentProjects(ctx context.Context) ([]ContentProject, error) {
 	rows, err := a.appDB.QueryContext(ctx, `SELECT project_id,game_id,title,current_revision,version,created_at,updated_at FROM content_projects WHERE user_id=? AND deleted_at='' ORDER BY updated_at DESC, project_id`, a.userID)
 	if err != nil {
 		return nil, err
@@ -243,7 +242,7 @@ func (a *App) ListContentProjects(ctx context.Context) ([]ContentProject, error)
 
 // onlyListProjectSummary keeps the catalog cheap: full draft payloads load when an
 // editor opens, never while listing.
-func (a *App) ReadContentProject(ctx context.Context, projectID string) (ContentProject, []ContentDraftSummary, error) {
+func (a *Service) ReadContentProject(ctx context.Context, projectID string) (ContentProject, []ContentDraftSummary, error) {
 	var p ContentProject
 	err := a.appDB.QueryRowContext(ctx, `SELECT project_id,game_id,title,current_revision,version,created_at,updated_at FROM content_projects WHERE user_id=? AND project_id=? AND deleted_at=''`, a.userID, strings.TrimSpace(projectID)).
 		Scan(&p.ProjectID, &p.GameID, &p.Title, &p.CurrentRevision, &p.Version, &p.CreatedAt, &p.UpdatedAt)
@@ -271,17 +270,17 @@ func (a *App) ReadContentProject(ctx context.Context, projectID string) (Content
 
 // CreateContentDraft starts from blank or from an existing package revision. The
 // project identity is fixed at creation and cannot be renamed into another one.
-func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision string) (ContentDraft, error) {
+func (a *Service) CreateContentDraft(ctx context.Context, projectID, baseRevision string) (ContentDraft, error) {
 	project, _, err := a.ReadContentProject(ctx, projectID)
 	if err != nil {
 		return ContentDraft{}, err
 	}
 	baseRevision = wire.Clean(baseRevision)
 	payload := ContentDraftPayload{
-		SchemaVersion: content.SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
-		NPCs: []ContentDraftNPC{}, Locations: []content.PackLocation{}, Bystanders: []content.PackBystander{},
+		SchemaVersion: SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title, InitialLocation: "",
+		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
 		// New content starts with a lead the player may adjust; the editor can lock it.
-		Player: content.PlayerDefaults{Editable: true},
+		Player: PlayerDefaults{Editable: true},
 	}
 	status := draftStatusEditing
 	draftID := wire.NewID("draft")
@@ -316,7 +315,7 @@ func (a *App) CreateContentDraft(ctx context.Context, projectID, baseRevision st
 	return draft, nil
 }
 
-func (a *App) ReadContentDraft(ctx context.Context, draftID string) (ContentDraft, error) {
+func (a *Service) ReadContentDraft(ctx context.Context, draftID string) (ContentDraft, error) {
 	var draft ContentDraft
 	var raw string
 	err := a.appDB.QueryRowContext(ctx, `SELECT draft_id,project_id,base_revision,version,status,payload_json,updated_at FROM content_drafts WHERE user_id=? AND draft_id=?`, a.userID, strings.TrimSpace(draftID)).
@@ -335,7 +334,7 @@ func (a *App) ReadContentDraft(ctx context.Context, draftID string) (ContentDraf
 
 // SaveContentDraft writes one versioned draft. A stale expected version keeps the
 // stored draft intact so the author can reload or copy instead of losing work.
-func (a *App) SaveContentDraft(ctx context.Context, draftID string, payload ContentDraftPayload, expectedVersion int64) (ContentDraft, error) {
+func (a *Service) SaveContentDraft(ctx context.Context, draftID string, payload ContentDraftPayload, expectedVersion int64) (ContentDraft, error) {
 	if expectedVersion < 1 {
 		return ContentDraft{}, ErrInvalidRequest
 	}
@@ -373,7 +372,7 @@ func (a *App) SaveContentDraft(ctx context.Context, draftID string, payload Cont
 	return a.ReadContentDraft(ctx, draftID)
 }
 
-func (a *App) DeleteContentDraft(ctx context.Context, draftID string) error {
+func (a *Service) DeleteContentDraft(ctx context.Context, draftID string) error {
 	result, err := a.appDB.ExecContext(ctx, `DELETE FROM content_drafts WHERE user_id=? AND draft_id=?`, a.userID, strings.TrimSpace(draftID))
 	if err != nil {
 		return err
@@ -573,7 +572,7 @@ func generatedBystanderID(name string, index int, used map[string]bool) string {
 }
 
 // availableGameID derives an unused story identity from a title.
-func (a *App) availableGameID(ctx context.Context, title string) (string, error) {
+func (a *Service) availableGameID(ctx context.Context, title string) (string, error) {
 	base := identifierSlug(title)
 	if base == "" {
 		base = "story"
@@ -606,7 +605,7 @@ func (a *App) availableGameID(ctx context.Context, title string) (string, error)
 
 // publishedPack resolves one immutable revision by identity. Official packages are
 // already loaded; user revisions resolve through the registered content path.
-func (a *App) publishedPack(revision string) (loadedPack, error) {
+func (a *Service) publishedPack(revision string) (loadedPack, error) {
 	revision = wire.Clean(revision)
 	for _, pack := range a.packs {
 		if pack.Definition.Revision == revision {
@@ -629,7 +628,7 @@ func (a *App) publishedPack(revision string) (loadedPack, error) {
 }
 
 // draftPayloadFromRevision copies a published revision back into an editable draft.
-func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPayload, error) {
+func (a *Service) draftPayloadFromRevision(revision, gameID string) (ContentDraftPayload, error) {
 	pack, err := a.publishedPack(revision)
 	if err != nil {
 		return ContentDraftPayload{}, err
@@ -641,14 +640,14 @@ func (a *App) draftPayloadFromRevision(revision, gameID string) (ContentDraftPay
 // It reads the package's own files instead of guessing paths, and carries the fields
 // the editor can change, so a round trip through a draft is lossless for the content
 // the product supports.
-func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
+func (a *Service) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (ContentDraftPayload, error) {
 	definition := pack.Definition
 	// The draft is the pack's own view, read from the pack's JSON rather than
 	// re-serialised from the running definition, so editing a package cannot quietly
 	// drop a field the runtime does not use.
 	story := pack.Story
 	payload := ContentDraftPayload{
-		SchemaVersion: content.SchemaV2, GameID: gameID, Mode: story.Mode, Title: story.Title,
+		SchemaVersion: SchemaV2, GameID: gameID, Mode: story.Mode, Title: story.Title,
 		Description: story.Description, Gameplay: story.Gameplay, Background: story.Background,
 		Rules: story.Rules, AuthorFacts: story.AuthorFacts, Player: story.Player, Opening: story.Opening,
 		Cover: story.Cover, CoverAlt: story.CoverAlt, EventGeneration: story.EventGeneration,
@@ -690,7 +689,7 @@ func (a *App) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (Conten
 
 // copyPackAssets gives a draft its own copy of the images a source package uses, so
 // publishing the draft does not depend on files it does not own.
-func (a *App) copyPackAssets(ctx context.Context, draftID string, assets map[string][]byte) error {
+func (a *Service) copyPackAssets(ctx context.Context, draftID string, assets map[string][]byte) error {
 	if len(assets) == 0 {
 		return nil
 	}
@@ -733,9 +732,9 @@ func (a *App) copyPackAssets(ctx context.Context, draftID string, assets map[str
 	return nil
 }
 
-// draftNPCFiles renders the draft's characters back into package files. Publication
+// DraftNPCFiles renders the draft's characters back into package files. Publication
 // uses this mapping so the editor and the package agree on one shape.
-func draftNPCFiles(payload ContentDraftPayload) (map[string]PackNPC, error) {
+func DraftNPCFiles(payload ContentDraftPayload) (map[string]PackNPC, error) {
 	files := map[string]PackNPC{}
 	for index, npc := range payload.NPCs {
 		if !packID.MatchString(npc.DefinitionID) || !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.Revision) {

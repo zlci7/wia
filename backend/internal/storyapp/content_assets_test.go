@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"gameagent/backend/internal/content"
 )
 
 func readFileIfExists(path string) ([]byte, error) { return os.ReadFile(path) }
@@ -19,7 +21,7 @@ func TestDraftAssetUploadAndRemoval(t *testing.T) {
 	if _, err := a.ListContentDraftAssets(ctx, draft.DraftID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.UploadContentDraftAsset(ctx, "draft_missing", "assets/a.png", pngBytes(t, 4, 4)); !errors.Is(err, ErrContentNotFound) {
+	if _, err := a.UploadContentDraftAsset(ctx, "draft_missing", "assets/a.png", pngBytes(t, 4, 4)); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("unknown draft accepted: %v", err)
 	}
 	for _, tc := range []struct {
@@ -34,7 +36,7 @@ func TestDraftAssetUploadAndRemoval(t *testing.T) {
 		{"not an image", "assets/a.png", []byte("not an image")},
 		{"empty", "assets/a.png", nil},
 	} {
-		if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, tc.path, tc.body); !errors.Is(err, ErrContentInvalid) {
+		if _, err := a.UploadContentDraftAsset(ctx, draft.DraftID, tc.path, tc.body); !errors.Is(err, content.ErrContentInvalid) {
 			t.Fatalf("%s accepted: %v", tc.name, err)
 		}
 	}
@@ -81,7 +83,7 @@ func TestDraftAssetUploadAndRemoval(t *testing.T) {
 	if list, err = a.ListContentDraftAssets(ctx, draft.DraftID); err != nil || len(list) != 0 {
 		t.Fatalf("asset not removed: %+v %v", list, err)
 	}
-	if err = a.RemoveContentDraftAsset(ctx, draft.DraftID, asset.AssetID); !errors.Is(err, ErrContentNotFound) {
+	if err = a.RemoveContentDraftAsset(ctx, draft.DraftID, asset.AssetID); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("second removal: %v", err)
 	}
 }
@@ -92,7 +94,7 @@ func TestReadUploadedAssetLimit(t *testing.T) {
 	if _, err := ReadUploadedAsset(strings.NewReader("ok")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ReadUploadedAsset(strings.NewReader(strings.Repeat("x", assetImageLimit+1))); !errors.Is(err, ErrContentInvalid) {
+	if _, err := ReadUploadedAsset(strings.NewReader(strings.Repeat("x", assetImageLimit+1))); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("oversized upload accepted: %v", err)
 	}
 }

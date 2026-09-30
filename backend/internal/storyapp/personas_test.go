@@ -62,7 +62,7 @@ func TestPersonaCopiedIntoNewWorld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pack := a.packs[GameID]
+	pack := testPack(a, GameID)
 	world, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: pack.Definition.Revision, RequestKey: "persona-world", Name: "模板开局", PersonaID: persona.PersonaID, Activate: true})
 	if err != nil {
 		t.Fatal(err)

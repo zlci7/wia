@@ -1,12 +1,10 @@
-package storyapp
+package content
 
 import (
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
-
-	"gameagent/backend/internal/content"
 )
 
 // Pack loading normalizes both schema generations into the v2 shape, and everything
@@ -15,16 +13,16 @@ import (
 
 var bystanderIDPattern = regexp.MustCompile(`^bystander:[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
 
-// normalizePackBystanders is the single compatibility entry: it validates the
+// NormalizePackBystanders is the single compatibility entry: it validates the
 // v1/v2 input, fills stable ids for legacy entries and rejects duplicates.
-func normalizePackBystanders(items []content.PackBystander, revision string, locations map[string]content.PackLocation) ([]content.PackBystander, error) {
+func NormalizePackBystanders(items []PackBystander, revision string, locations map[string]PackLocation) ([]PackBystander, error) {
 	if len(items) > 40 {
 		return nil, errors.New("bystanders exceed 40")
 	}
 	seenID, seenName := map[string]bool{}, map[string]bool{}
-	out := make([]content.PackBystander, 0, len(items))
+	out := make([]PackBystander, 0, len(items))
 	for index, item := range items {
-		entry := content.PackBystander{
+		entry := PackBystander{
 			BystanderID:     strings.TrimSpace(item.BystanderID),
 			Name:            strings.TrimSpace(item.Name),
 			Description:     strings.TrimSpace(item.Description),

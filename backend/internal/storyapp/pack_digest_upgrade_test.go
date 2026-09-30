@@ -16,7 +16,7 @@ func TestLegacyPackDigestIsMigratedNotReportedAsChanged(t *testing.T) {
 	ctx := context.Background()
 	a := newTestApp(t, &scriptedGenerator{})
 	for _, gameID := range []string{"lantern-dusk", "orbital-repair"} {
-		pack, ok := a.pack(gameID)
+		pack, ok := a.Pack(gameID)
 		if !ok {
 			t.Fatalf("%s not loaded", gameID)
 		}
@@ -48,7 +48,7 @@ func TestLegacyPackDigestIsMigratedNotReportedAsChanged(t *testing.T) {
 		t.Fatalf("an unchanged story was reported as changed after an upgrade: %+v", issues)
 	}
 	for _, gameID := range []string{"lantern-dusk", "orbital-repair"} {
-		pack, ok := restarted.pack(gameID)
+		pack, ok := restarted.Pack(gameID)
 		if !ok {
 			t.Fatalf("%s is missing from the catalog after the upgrade", gameID)
 		}
@@ -66,7 +66,7 @@ func TestLegacyPackDigestIsMigratedNotReportedAsChanged(t *testing.T) {
 		}
 	}
 	// Genuinely edited content is still refused, so the migration is not a blanket pass.
-	pack, _ := restarted.pack("lantern-dusk")
+	pack, _ := restarted.Pack("lantern-dusk")
 	if _, err := restarted.appDB.ExecContext(ctx, `UPDATE pack_revisions SET digest='not-the-real-digest',digest_version=? WHERE game_id=? AND revision=?`, packDigestVersion, "lantern-dusk", pack.Definition.Revision); err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestLegacyPackDigestIsMigratedNotReportedAsChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer again.Close()
-	if _, ok := again.pack("lantern-dusk"); ok {
+	if _, ok := again.Pack("lantern-dusk"); ok {
 		t.Fatal("a genuinely changed story was accepted")
 	}
 	if len(again.PackIssues()) == 0 {
@@ -90,12 +90,12 @@ func TestLegacyPackDigestIsMigratedNotReportedAsChanged(t *testing.T) {
 // old canonical form, so a database written before the change is recognised.
 func TestLegacyDigestMatchesTheOldCanonicalForm(t *testing.T) {
 	a := newTestApp(t, &scriptedGenerator{})
-	pack, ok := a.pack("lantern-dusk")
+	pack, ok := a.Pack("lantern-dusk")
 	if !ok {
 		t.Fatal("pack missing")
 	}
 	// Recompute the first algorithm from the same inputs the loader used.
-	raw, err := loadPack(filepath.Join(a.packRoot, "lantern-dusk"))
+	raw, err := loadPack(filepath.Join(a.PackRoot(), "lantern-dusk"))
 	if err != nil {
 		t.Fatal(err)
 	}

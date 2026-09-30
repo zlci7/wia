@@ -41,7 +41,7 @@ func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, overflowingWaitGenerator{})
 	withoutWorldEvents(app)
-	w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "wait", Activate: true})
+	w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: testPack(app, "orbital-repair").Definition.Revision, RequestKey: "wait", Activate: true})
 	if err != nil {
 		t.Fatal(err)
 	}

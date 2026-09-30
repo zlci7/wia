@@ -131,7 +131,7 @@ func TestPublishContentDraftIsImmutableAndResumable(t *testing.T) {
 	}
 	conflicting := request
 	conflicting.ExpectedProjectVersion = project.Version + 3
-	if _, err = a.PublishContentDraft(ctx, conflicting); !errors.Is(err, ErrIdempotencyConflict) {
+	if _, err = a.PublishContentDraft(ctx, conflicting); !errors.Is(err, content.ErrIdempotencyConflict) {
 		t.Fatalf("different payload accepted for the same key: %v", err)
 	}
 
@@ -143,7 +143,7 @@ func TestPublishContentDraftIsImmutableAndResumable(t *testing.T) {
 
 	// Publishing again from the same unchanged draft state is an explicit conflict.
 	again := PublishRequest{RequestKey: "publish-2", DraftID: draft.DraftID, ExpectedDraftVersion: draft.Version, ExpectedProjectVersion: project.Version}
-	if _, err = a.PublishContentDraft(ctx, again); !errors.Is(err, ErrVersionConflict) {
+	if _, err = a.PublishContentDraft(ctx, again); !errors.Is(err, content.ErrVersionConflict) {
 		t.Fatalf("stale project version accepted: %v", err)
 	}
 
@@ -183,7 +183,7 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "bad", DraftID: draft.DraftID, ExpectedDraftVersion: reloaded.Version, ExpectedProjectVersion: project.Version}); err == nil {
 		t.Fatal("invalid draft published")
 	}
-	entries, err := os.ReadDir(a.contentRoot())
+	entries, err := os.ReadDir(testContentRoot(a))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 	}
 
 	// A staged directory left by an interrupted process is discarded on recovery.
-	stale := filepath.Join(a.contentRoot(), "publish_stale.staging")
+	stale := filepath.Join(testContentRoot(a), "publish_stale.staging")
 	if err := os.MkdirAll(stale, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestPublishRejectsInvalidDraftAndProgressesStages(t *testing.T) {
 		VALUES(?,'interrupted','hash','publish_stale','publish',?,'files_written','running','','',?,?)`, a.userID, draft.DraftID, wire.NowText(), wire.NowText()); err != nil {
 		t.Fatal(err)
 	}
-	if err = a.recoverContentOperations(ctx); err != nil {
+	if err = a.Service.Initialize(ctx, a.PackRoot()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
@@ -251,7 +251,7 @@ func TestPublishCarriesReferencedAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "no-asset", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, ErrContentInvalid) {
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "no-asset", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, content.ErrContentInvalid) {
 		t.Fatalf("missing asset accepted: %v", err)
 	}
 	// Stage the asset the way the upload endpoint will.
@@ -281,7 +281,7 @@ func TestPublishCarriesReferencedAssets(t *testing.T) {
 	}
 	// Publishing the same content again under a fresh key conflicts on the project
 	// version instead of overwriting the immutable revision.
-	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "again", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, ErrVersionConflict) {
+	if _, err = a.PublishContentDraft(ctx, PublishRequest{RequestKey: "again", DraftID: saved.DraftID, ExpectedDraftVersion: saved.Version, ExpectedProjectVersion: project.Version}); !errors.Is(err, content.ErrVersionConflict) {
 		t.Fatalf("overwrite attempt: %v", err)
 	}
 }
@@ -364,30 +364,8 @@ func TestWorldSnapshotKeepsItsOwnImages(t *testing.T) {
 	if _, err = a.worldAsset(worldPath, "../cover"); !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("traversal accepted: %v", err)
 	}
-	if _, err = a.worldAsset(worldPath, "missing.png"); !errors.Is(err, ErrContentNotFound) {
+	if _, err = a.worldAsset(worldPath, "missing.png"); !errors.Is(err, content.ErrContentNotFound) {
 		t.Fatalf("missing asset: %v", err)
-	}
-}
-
-// The published identity is stable: the same content always derives the same
-// revision identity, and a changed field derives a different one.
-func TestPackageRevisionIdentity(t *testing.T) {
-	story := StoryPack{SchemaVersion: content.SchemaV2, GameID: "harbor", Mode: "open", Title: "港口的灯", Description: "d", Gameplay: "g", Opening: "o", Clock: "第 1 日 19:00", InitialLocation: "harbor", Locations: []content.PackLocation{{ID: "harbor", Name: "港口"}}, Bystanders: []content.PackBystander{}}
-	npcs := map[string]PackNPC{"npcs/keeper.json": {DefinitionID: "keeper", Revision: "v1", EntityID: "npc:keeper", Name: "看灯人", Role: "看灯人", Profile: "资料", InitialLocation: "harbor"}}
-	first, err := newContentRevision(story, npcs, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again, err := newContentRevision(story, npcs, nil); err != nil || again != first {
-		t.Fatalf("revision identity is not stable: %q %q %v", first, again, err)
-	}
-	if first == "" || !packID.MatchString(first) {
-		t.Fatalf("revision identity: %q", first)
-	}
-	changed := story
-	changed.Background = "改过的背景"
-	if other, err := newContentRevision(changed, npcs, nil); err != nil || other == first {
-		t.Fatalf("revision identity ignored a content change: %q %v", other, err)
 	}
 }
 

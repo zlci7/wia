@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/memorymodel"
 	"gameagent/backend/internal/storyapp"
 	"gameagent/backend/internal/turn"
@@ -703,7 +704,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeAppError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "storage_unavailable"
 	switch {
-	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings), errors.Is(err, turn.ErrInvalidRequest):
+	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings), errors.Is(err, turn.ErrInvalidRequest), errors.Is(err, content.ErrInvalidRequest):
 		status = 400
 		code = "invalid_request"
 	case errors.Is(err, storyapp.ErrUnauthorized):
@@ -733,10 +734,10 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrAppBusy):
 		status = 409
 		code = "app_busy"
-	case errors.Is(err, storyapp.ErrVersionConflict):
+	case errors.Is(err, storyapp.ErrVersionConflict), errors.Is(err, content.ErrVersionConflict):
 		status = 409
 		code = "version_conflict"
-	case errors.Is(err, storyapp.ErrIdempotencyConflict):
+	case errors.Is(err, storyapp.ErrIdempotencyConflict), errors.Is(err, content.ErrIdempotencyConflict):
 		status = 409
 		code = "idempotency_conflict"
 	case errors.Is(err, storyapp.ErrModelNotConfigured), errors.Is(err, turn.ErrModelNotConfigured):
@@ -751,13 +752,13 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, storyapp.ErrPersonaNotFound):
 		status = 404
 		code = "persona_not_found"
-	case errors.Is(err, storyapp.ErrContentNotFound):
+	case errors.Is(err, content.ErrContentNotFound):
 		status = 404
 		code = "content_not_found"
-	case errors.Is(err, storyapp.ErrContentBusy):
+	case errors.Is(err, content.ErrContentBusy):
 		status = 409
 		code = "content_busy"
-	case errors.Is(err, storyapp.ErrContentInvalid):
+	case errors.Is(err, content.ErrContentInvalid):
 		status = 400
 		code = "content_invalid"
 	}

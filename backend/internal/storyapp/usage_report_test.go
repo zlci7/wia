@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 )
@@ -22,7 +23,7 @@ func keepUsageReport(t *testing.T, a *App, dir string) {
 	t.Helper()
 	t.Cleanup(func() {
 		_ = a.Close()
-		db, err := storage.OpenAppDB(filepath.Join(a.root, "app.db"), appSchema+usageSchema+contentSchema)
+		db, err := storage.OpenAppDB(filepath.Join(a.root, "app.db"), appSchema+usageSchema+personaSchema+content.DatabaseSchema)
 		if err != nil {
 			t.Error("usage report unavailable", err)
 			return

@@ -1,4 +1,4 @@
-package storyapp
+package content
 
 import (
 	"bytes"
@@ -43,7 +43,7 @@ type ContentDraftAsset struct {
 // UploadContentDraftAsset stores one image for a draft. The declared name only has
 // to be a package-relative assets/ path; the bytes decide the media type, and an
 // image that cannot be decoded is rejected.
-func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName string, body []byte) (ContentDraftAsset, error) {
+func (a *Service) UploadContentDraftAsset(ctx context.Context, draftID, relativeName string, body []byte) (ContentDraftAsset, error) {
 	draft, err := a.ReadContentDraft(ctx, draftID)
 	if err != nil {
 		return ContentDraftAsset{}, err
@@ -103,7 +103,7 @@ func (a *App) UploadContentDraftAsset(ctx context.Context, draftID, relativeName
 }
 
 // ListContentDraftAssets returns the assets a draft already staged.
-func (a *App) ListContentDraftAssets(ctx context.Context, draftID string) ([]ContentDraftAsset, error) {
+func (a *Service) ListContentDraftAssets(ctx context.Context, draftID string) ([]ContentDraftAsset, error) {
 	if _, err := a.ReadContentDraft(ctx, draftID); err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (a *App) ListContentDraftAssets(ctx context.Context, draftID string) ([]Con
 }
 
 // RemoveContentDraftAsset deletes one staged asset of a draft.
-func (a *App) RemoveContentDraftAsset(ctx context.Context, draftID, assetID string) error {
+func (a *Service) RemoveContentDraftAsset(ctx context.Context, draftID, assetID string) error {
 	if _, err := a.ReadContentDraft(ctx, draftID); err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (a *App) RemoveContentDraftAsset(ctx context.Context, draftID, assetID stri
 
 // ReadContentDraftAsset returns one staged asset's bytes, which is what publication
 // copies into the package.
-func (a *App) ReadContentDraftAsset(ctx context.Context, draftID, relativeName string) ([]byte, error) {
+func (a *Service) ReadContentDraftAsset(ctx context.Context, draftID, relativeName string) ([]byte, error) {
 	if _, err := a.ReadContentDraft(ctx, draftID); err != nil {
 		return nil, err
 	}

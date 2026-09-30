@@ -25,16 +25,16 @@ import (
 func packFixture(t *testing.T, id string) string {
 	t.Helper()
 	root := t.TempDir()
-	err := fs.WalkDir(packagedStories, "packs/"+id, func(path string, entry fs.DirEntry, err error) error {
+	source := filepath.Join("..", "content", "packs", id)
+	err := fs.WalkDir(os.DirFS(source), ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel := strings.TrimPrefix(path, "packs/"+id)
-		target := filepath.Join(root, filepath.FromSlash(rel))
+		target := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(path, "./")))
 		if entry.IsDir() {
 			return os.MkdirAll(target, 0755)
 		}
-		b, e := packagedStories.ReadFile(path)
+		b, e := os.ReadFile(filepath.Join(source, filepath.FromSlash(path)))
 		if e != nil {
 			return e
 		}
@@ -90,8 +90,18 @@ func TestPackValidation(t *testing.T) {
 			}
 		})
 	}
-	var v StoryPack
-	if strictPackJSON([]byte(`{"mode":"open","mode":"guided"}`), &v) == nil {
+	root := packFixture(t, "orbital-repair")
+	storyPath := filepath.Join(root, "story.json")
+	body, err := os.ReadFile(storyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bytes.TrimSpace(body)
+	body = append(append([]byte{}, body[:len(body)-1]...), []byte(`,"mode":"guided"}`)...)
+	if err = os.WriteFile(storyPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = loadPack(root); err == nil {
 		t.Fatal("duplicate key accepted")
 	}
 }
@@ -115,7 +125,7 @@ func TestPackDigestAndIsolation(t *testing.T) {
 	if _, e = app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "wrong", RequestKey: "wrong"}); !errors.Is(e, ErrVersionConflict) {
 		t.Fatal(e)
 	}
-	req := CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "unique"}
+	req := CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: testPack(app, "orbital-repair").Definition.Revision, RequestKey: "unique"}
 	w, e := app.CreateStoryWorld(ctx, req)
 	if e != nil {
 		t.Fatal(e)
@@ -146,7 +156,7 @@ func TestPackSnapshotSurvivesReplacementAndRemoval(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	packRoot := app.packRoot
+	packRoot := app.PackRoot()
 	// Use a real encoded image, then reload its revised package.
 	var cover bytes.Buffer
 	if e = png.Encode(&cover, image.NewRGBA(image.Rect(0, 0, 2, 2))); e != nil {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/atomicfile"
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
@@ -54,13 +55,14 @@ func Open(ctx context.Context, options Options) (*App, error) {
 	}
 	// The application schema is assembled from the features that own these tables,
 	// so it is passed in rather than known by the storage package.
-	db, err := storage.OpenAppDB(filepath.Join(appRoot, "app.db"), appSchema+usageSchema+contentSchema)
+	db, err := storage.OpenAppDB(filepath.Join(appRoot, "app.db"), appSchema+usageSchema+personaSchema+content.DatabaseSchema)
 	if err != nil {
 		_ = processLock.Release()
 		return nil, err
 	}
 	copyCtx, copyCancel := context.WithCancel(context.Background())
 	app := &App{root: appRoot, dataRoot: root, appDB: db, processLock: processLock, userID: userID, worlds: make(map[string]*worldRuntime), runs: make(map[string]*runRuntime), copyCtx: copyCtx, copyCancel: copyCancel, logger: options.Logger, closed: make(chan struct{}), worldPlayerName: wire.Clean(options.WorldPlayerName)}
+	app.Service = content.NewService(content.ServiceOptions{Root: appRoot, UserID: userID, DB: db, Logger: options.Logger})
 	if options.ModelConfigPath != "" {
 		app.modelPath = options.ModelConfigPath
 	} else if value := strings.TrimSpace(os.Getenv("WIA_MODEL_CONFIG")); value != "" {
@@ -74,15 +76,7 @@ func Open(ctx context.Context, options Options) (*App, error) {
 	} else {
 		app.loadModelConfig(options.AllowFake)
 	}
-	if err := app.loadPacks(ctx, options.StoryPacksPath); err != nil {
-		app.Close()
-		return nil, err
-	}
-	if err := app.recoverContentOperations(ctx); err != nil {
-		app.Close()
-		return nil, err
-	}
-	if err := app.loadPublishedRevisions(ctx); err != nil {
+	if err := app.Service.Initialize(ctx, options.StoryPacksPath); err != nil {
 		app.Close()
 		return nil, err
 	}
@@ -318,7 +312,7 @@ func (a *App) worldRecord(ctx context.Context, worldID string) (string, string, 
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", ErrWorldNotFound
 	}
-	if err == nil && (!packID.MatchString(gameID) || !packID.MatchString(worldID) || filepath.Clean(path) != filepath.Clean(a.worldPathFor(gameID, worldID))) {
+	if err == nil && (!runtimeID.MatchString(gameID) || !runtimeID.MatchString(worldID) || filepath.Clean(path) != filepath.Clean(a.worldPathFor(gameID, worldID))) {
 		return "", "", ErrWorldNotFound
 	}
 	return path, status, err

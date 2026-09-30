@@ -1,10 +1,9 @@
-package storyapp
+package content
 
 import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -17,14 +16,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
-	"gameagent/backend/internal/turn"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -44,13 +42,13 @@ type StoryPack struct {
 	AuthorFacts     string                      `json:"author_facts"`
 	Cover           string                      `json:"cover,omitempty"`
 	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          content.PlayerDefaults      `json:"player"`
+	Player          PlayerDefaults              `json:"player"`
 	Opening         string                      `json:"opening"`
 	InitialLocation string                      `json:"initial_location"`
 	Clock           string                      `json:"clock"`
-	Locations       []content.PackLocation      `json:"locations"`
+	Locations       []PackLocation              `json:"locations"`
 	NPCs            []string                    `json:"npcs"`
-	Bystanders      []content.PackBystander     `json:"bystanders"`
+	Bystanders      []PackBystander             `json:"bystanders"`
 	Plot            *plot.Definition            `json:"plot,omitempty"`
 	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
 	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
@@ -75,13 +73,13 @@ type PackNPC struct {
 // running definition on purpose: modes, cover route and alternative text are things
 // the catalog and the editor display, built from the pack itself so the definition a
 // world runs from carries none of them.
-type loadedPack struct {
+type LoadedPack struct {
 	Definition story.Definition
 	// Catalog is the entry the content routes serve for this pack. It is wider than
 	// the running definition on purpose: modes, the cover route and alternative text
 	// are things the catalog and the editor display, and they are built from the pack
 	// itself so the definition a world runs from carries none of them.
-	Catalog   content.GameSummary
+	Catalog   GameSummary
 	Cover     []byte
 	CoverType string
 	Digest    string
@@ -99,6 +97,58 @@ type loadedPack struct {
 	NPCFiles map[string][]byte
 	// Assets maps package-relative asset paths to their bytes.
 	Assets map[string][]byte
+}
+
+type loadedPack = LoadedPack
+
+const worldAssetLimit = 4 * 1024 * 1024
+
+// Load reads and validates one story package directory.
+func Load(root string) (LoadedPack, error) { return loadPack(root) }
+
+// ReadAsset reads one validated package-relative asset from the package directory.
+func (p LoadedPack) ReadAsset(relative string, maxSize int64) ([]byte, error) {
+	return packFile(p.Root, relative, maxSize)
+}
+
+func storyLocations(items []PackLocation) []story.Location {
+	out := make([]story.Location, 0, len(items))
+	for _, item := range items {
+		out = append(out, story.Location{ID: item.ID, Name: item.Name, Description: item.Description, Connections: item.Connections})
+	}
+	return out
+}
+
+func storyBystanders(items []PackBystander) []story.Bystander {
+	out := make([]story.Bystander, 0, len(items))
+	for _, item := range items {
+		out = append(out, story.Bystander{BystanderID: item.BystanderID, Name: item.Name, Description: item.Description, InitialLocation: item.InitialLocation, Avatar: item.Avatar})
+	}
+	return out
+}
+
+func ValidateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) error {
+	if p == nil {
+		return nil
+	}
+	if def.Summary.Mode != "open" || wire.Clean(p.Scope) == "" || p.MaxActive < 1 || p.MaxActive > 3 || p.CooldownTurns < 2 || p.CooldownTurns > 20 || len(p.Locations) == 0 {
+		return fmt.Errorf("story.json: invalid event_generation policy")
+	}
+	seen := map[string]bool{}
+	for _, id := range p.Locations {
+		if seen[id] || !slices.ContainsFunc(def.Locations, func(l story.Location) bool { return l.ID == id }) {
+			return fmt.Errorf("story.json: invalid event_generation location")
+		}
+		seen[id] = true
+	}
+	seen = map[string]bool{}
+	for _, id := range p.Participants {
+		if _, ok := story.CharacterByID(def, id); !ok || seen[id] {
+			return fmt.Errorf("story.json: invalid event_generation participant")
+		}
+		seen[id] = true
+	}
+	return nil
 }
 
 type PackIssue struct {
@@ -214,14 +264,14 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
-	p := StoryPack{Player: content.PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
+	p := StoryPack{Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
 	if err := strictPackJSON(data, &p); err != nil {
 		return result, fmt.Errorf("story.json: %w", err)
 	}
 	bad := func(field string) (loadedPack, error) {
 		return result, fmt.Errorf("story.json: invalid or missing %s", field)
 	}
-	if p.SchemaVersion != content.SchemaV1 && p.SchemaVersion != content.SchemaV2 {
+	if p.SchemaVersion != SchemaV1 && p.SchemaVersion != SchemaV2 {
 		return bad("schema_version")
 	}
 	if !packID.MatchString(p.GameID) {
@@ -247,7 +297,7 @@ func loadPack(root string) (loadedPack, error) {
 	if len(p.Locations) == 0 || len(p.Locations) > 32 {
 		return bad("locations")
 	}
-	locations := map[string]content.PackLocation{}
+	locations := map[string]PackLocation{}
 	for _, loc := range p.Locations {
 		if !packID.MatchString(loc.ID) || loc.Name == "" || locations[loc.ID].ID != "" {
 			return bad("locations.id/name")
@@ -267,7 +317,7 @@ func loadPack(root string) (loadedPack, error) {
 	if len(p.NPCs) == 0 || len(p.NPCs) > 16 || len(p.Bystanders) > 40 {
 		return bad("npcs/bystanders")
 	}
-	bystanders, err := normalizePackBystanders(p.Bystanders, p.Revision, locations)
+	bystanders, err := NormalizePackBystanders(p.Bystanders, p.Revision, locations)
 	if err != nil {
 		return bad("bystanders")
 	}
@@ -356,12 +406,12 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		result.CoverType = "image/" + format
 	}
-	if err := validateEventPolicy(p.EventGeneration, def); err != nil {
+	if err := ValidateEventPolicy(p.EventGeneration, def); err != nil {
 		return result, err
 	}
 	def.EventGeneration = p.EventGeneration
 	result.Definition = def
-	result.Catalog = content.GameSummary{
+	result.Catalog = GameSummary{
 		ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision,
 		Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay,
 		Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt,
@@ -398,7 +448,7 @@ func loadPack(root string) (loadedPack, error) {
 	}
 	result.Digest = packDigest(packDigestCurrent, p, npcBodies, result.Cover, assetList)
 	// The previous algorithm is kept so a database written by an earlier release is
-	// still recognised instead of being reported as changed content.
+	// still recognised instead of being reported as changed
 	result.LegacyDigest = packDigest(packDigestAssetsExcluded, p, npcBodies, result.Cover, assetList)
 	return result, nil
 }
@@ -446,7 +496,7 @@ func (p loadedPack) matchesLegacyDigest(stored string) bool {
 	return stored != "" && p.LegacyDigest != "" && stored == p.LegacyDigest
 }
 
-func (a *App) loadPacks(ctx context.Context, path string) error {
+func (a *Service) loadPacks(ctx context.Context, path string) error {
 	a.packsMu.Lock()
 	a.packs = map[string]loadedPack{}
 	a.packErrors = []PackIssue{}
@@ -539,7 +589,7 @@ func (a *App) loadPacks(ctx context.Context, path string) error {
 
 // setPack swaps one directory entry inside a short critical section; loading and
 // validating a package always happens outside it.
-func (a *App) setPack(id string, pack loadedPack) {
+func (a *Service) setPack(id string, pack loadedPack) {
 	a.packsMu.Lock()
 	defer a.packsMu.Unlock()
 	if a.packs == nil {
@@ -548,14 +598,14 @@ func (a *App) setPack(id string, pack loadedPack) {
 	a.packs[id] = pack
 }
 
-func (a *App) pack(id string) (loadedPack, bool) {
+func (a *Service) pack(id string) (loadedPack, bool) {
 	a.packsMu.RLock()
 	defer a.packsMu.RUnlock()
 	pack, ok := a.packs[id]
 	return pack, ok
 }
 
-func (a *App) packList() []loadedPack {
+func (a *Service) packList() []loadedPack {
 	a.packsMu.RLock()
 	defer a.packsMu.RUnlock()
 	out := make([]loadedPack, 0, len(a.packs))
@@ -565,66 +615,31 @@ func (a *App) packList() []loadedPack {
 	return out
 }
 
-func (a *App) Games() []content.GameSummary {
+func (a *Service) Games() []GameSummary {
 	packs := a.packList()
-	result := make([]content.GameSummary, 0, len(packs))
+	result := make([]GameSummary, 0, len(packs))
 	for _, p := range packs {
 		result = append(result, p.Catalog)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
 }
-func (a *App) PackIssues() []PackIssue {
+func (a *Service) PackIssues() []PackIssue {
 	a.packsMu.RLock()
 	defer a.packsMu.RUnlock()
 	return append([]PackIssue{}, a.packErrors...)
 }
-func (a *App) Game(id string) (content.GameSummary, error) {
+func (a *Service) Game(id string) (GameSummary, error) {
 	p, ok := a.pack(id)
 	if !ok {
-		return content.GameSummary{}, ErrWorldNotFound
+		return GameSummary{}, ErrContentNotFound
 	}
 	return p.Catalog, nil
 }
-func (a *App) GameCover(id, revision string) ([]byte, string, error) {
+func (a *Service) GameCover(id, revision string) ([]byte, string, error) {
 	p, ok := a.pack(id)
 	if !ok || p.Definition.Revision != revision || len(p.Cover) == 0 {
-		return nil, "", ErrWorldNotFound
+		return nil, "", ErrContentNotFound
 	}
 	return p.Cover, p.CoverType, nil
-}
-
-func snapshotDefinition(ctx context.Context, store *storage.WorldStore, s turn.Snapshot) (story.Definition, error) {
-	raw, err := store.MetaGet(ctx, "definition_snapshot")
-	if err == nil {
-		var d story.Definition
-		if json.Unmarshal([]byte(raw), &d) != nil || d.Summary.ID != s.Summary.GameID || d.Revision == "" {
-			return d, ErrStorageUnavailable
-		}
-		// Promotion removes a passer-by from the world, so the stored list is the
-		// authority once it exists. Legacy worlds keep display names only until the
-		// next world starts from the same content.
-		if stored, e := store.MetaGet(ctx, "bystander_refs"); e == nil {
-			var refs []story.Bystander
-			if json.Unmarshal([]byte(stored), &refs) == nil {
-				d.BystanderRefs = refs
-			}
-		} else if !errors.Is(e, sql.ErrNoRows) {
-			return d, e
-		}
-		return d, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return story.Definition{}, err
-	}
-	// Legacy worlds use only their persisted facts, never a newer installed pack.
-	d := story.Definition{Summary: story.Summary{ID: s.Summary.GameID, Mode: s.Summary.Mode}, Characters: s.Characters, Bystanders: s.Bystanders, Clock: s.Summary.Clock, Plot: s.Plot, Settings: s.Narrative}
-	d.Revision, _ = store.MetaGet(ctx, "game_revision")
-	d.Summary.Revision = d.Revision
-	if d.Summary.ID == GameID {
-		d.Summary.Title = "暮灯镇的失踪信使"
-	} else {
-		d.Summary.Title = d.Summary.ID
-	}
-	return d, nil
 }

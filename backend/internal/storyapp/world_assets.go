@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 )
@@ -23,7 +24,7 @@ const worldAssetLimit = 4 * 1024 * 1024
 
 // snapshotWorldAssets copies a package's referenced images into the world directory
 // and returns the cover file name plus each character's avatar file name.
-func (a *App) snapshotWorldAssets(pack loadedPack, worldDir string) (string, map[string]string, error) {
+func (a *App) snapshotWorldAssets(pack content.LoadedPack, worldDir string) (string, map[string]string, error) {
 	avatars := map[string]string{}
 	references := map[string]bool{}
 	if pack.CoverRelative != "" {
@@ -39,7 +40,7 @@ func (a *App) snapshotWorldAssets(pack loadedPack, worldDir string) (string, map
 	}
 	for asset := range references {
 		if !strings.HasPrefix(asset, "assets/") || strings.Contains(asset, "\\") || strings.Contains(asset, "..") || !fs.ValidPath(asset) {
-			return "", nil, ErrContentInvalid
+			return "", nil, content.ErrContentInvalid
 		}
 	}
 	if err := os.MkdirAll(filepath.Join(worldDir, "assets"), 0o755); err != nil {
@@ -47,12 +48,12 @@ func (a *App) snapshotWorldAssets(pack loadedPack, worldDir string) (string, map
 	}
 	cover := ""
 	for asset := range references {
-		body, err := packFile(pack.Root, asset, worldAssetLimit)
+		body, err := pack.ReadAsset(asset, worldAssetLimit)
 		if err != nil {
 			return "", nil, err
 		}
 		name := strings.ReplaceAll(strings.TrimPrefix(asset, "assets/"), "/", "-")
-		if err = os.WriteFile(filepath.Join(worldDir, "assets", name), body, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(worldDir, "assets", name), body, 0o644); err != nil {
 			return "", nil, err
 		}
 		if asset == pack.CoverRelative {
@@ -76,11 +77,11 @@ func (a *App) worldAsset(worldPath, name string) ([]byte, error) {
 	target := filepath.Join(filepath.Dir(worldPath), "assets", name)
 	info, err := os.Stat(target)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > worldAssetLimit {
-		return nil, ErrContentNotFound
+		return nil, content.ErrContentNotFound
 	}
 	file, err := os.Open(target)
 	if err != nil {
-		return nil, ErrContentNotFound
+		return nil, content.ErrContentNotFound
 	}
 	defer file.Close()
 	if _, _, err := image.DecodeConfig(file); err != nil {
@@ -107,7 +108,7 @@ func (a *App) WorldCharacterAsset(ctx context.Context, worldID, entityID string)
 	name, err := store.MetaGet(ctx, "avatar:"+wire.Clean(entityID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, "", ErrContentNotFound
+			return nil, "", content.ErrContentNotFound
 		}
 		return nil, "", err
 	}

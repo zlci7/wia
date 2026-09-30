@@ -118,11 +118,11 @@ type actionConsistencyGenerator struct{ status string }
 func TestArrivalSharesOnlyNewOutcomeWithEnteringNPC(t *testing.T) {
 	a := newTestApp(t, actionConsistencyGenerator{"succeeded"})
 	withoutWorldEvents(a)
-	p := a.packs["orbital-repair"]
+	p := testPack(a, "orbital-repair")
 	for i := range p.Definition.Characters {
 		p.Definition.Characters[i].InScene = false
 	}
-	a.packs["orbital-repair"] = p
+	a.SetPack("orbital-repair", p)
 	w := createPackWorld(t, a, "orbital-repair")
 	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: "arrival", Input: "走回值班室"})
 	if err != nil {
@@ -174,7 +174,7 @@ func TestPackWithoutPlotResolvesPlayerActions(t *testing.T) {
 			ctx := context.Background()
 			app := newTestApp(t, actionConsistencyGenerator{status})
 			withoutWorldEvents(app)
-			w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: app.packs["orbital-repair"].Definition.Revision, RequestKey: "action", Activate: true})
+			w, err := app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: testPack(app, "orbital-repair").Definition.Revision, RequestKey: "action", Activate: true})
 			if err != nil {
 				t.Fatal(err)
 			}

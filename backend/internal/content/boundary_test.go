@@ -14,14 +14,15 @@ import (
 // have: it is a tool that prepares material, not part of the story engine.
 //
 // It may validate a pack against plot's rules (plot is the authority on what a legal
-// story line is) and name domain vocabulary from world. It may not import storyapp or
-// turn: the engine reads what the tool produced, not the other way around, and the
+// story line is) and compile it into story and world domain values. It may not import
+// storyapp or turn: the engine reads what the tool produced, not the other way around, and the
 // architecture requires that deleting the whole content tool still leaves a playable
 // game.
 func TestContentDoesNotDependOnTheApplication(t *testing.T) {
 	allowed := map[string]bool{
 		"gameagent/backend/internal/world": true,
 		"gameagent/backend/internal/plot":  true,
+		"gameagent/backend/internal/story": true,
 		"gameagent/backend/internal/wire":  true,
 	}
 	entries, err := os.ReadDir(".")
@@ -49,7 +50,7 @@ func TestContentDoesNotDependOnTheApplication(t *testing.T) {
 				continue // standard library
 			}
 			if !allowed[path] {
-				t.Errorf("%s imports %q: content may depend only on world, plot and wire; the engine reads what it produces, not the reverse", name, path)
+				t.Errorf("%s imports %q: content may depend only on story, world, plot and wire; the engine reads what it produces, not the reverse", name, path)
 			}
 		}
 	}

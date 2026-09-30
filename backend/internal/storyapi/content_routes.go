@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/storyapp"
 )
 
@@ -128,7 +129,7 @@ func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action st
 	case "preview":
 		// The request is bounded before the multipart parser can buffer it, and the
 		// import's own ceiling is applied to the file rather than the image limit.
-		r.Body = http.MaxBytesReader(w, r.Body, storyapp.ImportUploadLimit())
+		r.Body = http.MaxBytesReader(w, r.Body, content.ImportUploadLimit())
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			writeError(w, 400, "invalid_request", "upload a file with an optional project_id field")
 			return
@@ -139,7 +140,7 @@ func (s *Server) contentImport(w http.ResponseWriter, r *http.Request, action st
 			return
 		}
 		defer file.Close()
-		body, err := storyapp.ReadUploadedFile(file, storyapp.ImportUploadLimit())
+		body, err := content.ReadUploadedFile(file, content.ImportUploadLimit())
 		if err != nil {
 			writeAppError(w, err)
 			return
@@ -195,7 +196,7 @@ func (s *Server) publishContentDraft(w http.ResponseWriter, r *http.Request, dra
 		writeError(w, 405, "method_not_allowed", "publication uses POST")
 		return
 	}
-	var request storyapp.PublishRequest
+	var request content.PublishRequest
 	if !decodeJSON(w, r, &request) {
 		return
 	}
@@ -235,7 +236,7 @@ func (s *Server) contentDraftAssets(w http.ResponseWriter, r *http.Request, draf
 	case "POST":
 		// The request is bounded before the multipart parser can buffer it; the file's own
 		// ceiling is applied afterwards, so an oversized upload never reaches the service.
-		r.Body = http.MaxBytesReader(w, r.Body, storyapp.AssetUploadLimit())
+		r.Body = http.MaxBytesReader(w, r.Body, content.AssetUploadLimit())
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			writeError(w, 400, "invalid_request", "upload an image file with a name field")
 			return
@@ -246,7 +247,7 @@ func (s *Server) contentDraftAssets(w http.ResponseWriter, r *http.Request, draf
 			return
 		}
 		defer file.Close()
-		body, err := storyapp.ReadUploadedAsset(file)
+		body, err := content.ReadUploadedAsset(file)
 		if err != nil {
 			writeAppError(w, err)
 			return
@@ -343,8 +344,8 @@ func (s *Server) contentDraft(w http.ResponseWriter, r *http.Request, draftID st
 		writeJSON(w, 200, map[string]any{"draft": draft})
 	case "PUT":
 		var request struct {
-			ExpectedVersion int64                        `json:"expected_version"`
-			Payload         storyapp.ContentDraftPayload `json:"payload"`
+			ExpectedVersion int64                       `json:"expected_version"`
+			Payload         content.ContentDraftPayload `json:"payload"`
 		}
 		if !decodeJSON(w, r, &request) {
 			return

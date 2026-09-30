@@ -1,4 +1,4 @@
-package storyapp
+package content
 
 import (
 	"archive/zip"
@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -67,7 +66,7 @@ type ImportPreview struct {
 
 // PreviewContentImport detects the format, maps it onto a draft and stores the
 // original bytes as a non-executed source attachment.
-func (a *App) PreviewContentImport(ctx context.Context, projectID, fileName string, body []byte) (ImportPreview, error) {
+func (a *Service) PreviewContentImport(ctx context.Context, projectID, fileName string, body []byte) (ImportPreview, error) {
 	project, _, err := a.ReadContentProject(ctx, projectID)
 	if err != nil {
 		return ImportPreview{}, err
@@ -109,7 +108,7 @@ func (a *App) PreviewContentImport(ctx context.Context, projectID, fileName stri
 // versioned, idempotent transition: the same confirmation returns the same result
 // instead of failing, a stale one conflicts, and anything already past the preview
 // state is refused.
-func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey string, expectedVersion int64) (ContentDraft, error) {
+func (a *Service) ConfirmContentImport(ctx context.Context, draftID, requestKey string, expectedVersion int64) (ContentDraft, error) {
 	draft, err := a.ReadContentDraft(ctx, draftID)
 	if err != nil {
 		return ContentDraft{}, err
@@ -158,7 +157,7 @@ func (a *App) ConfirmContentImport(ctx context.Context, draftID, requestKey stri
 
 // A draft records which confirmation request produced it, so a repeat is answered
 // instead of applied twice.
-func (a *App) readDraftConfirmation(ctx context.Context, draftID string) (string, bool, error) {
+func (a *Service) readDraftConfirmation(ctx context.Context, draftID string) (string, bool, error) {
 	var key string
 	err := a.appDB.QueryRowContext(ctx, `SELECT confirmation_key FROM content_drafts WHERE user_id=? AND draft_id=?`, a.userID, draftID).Scan(&key)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -170,7 +169,7 @@ func (a *App) readDraftConfirmation(ctx context.Context, draftID string) (string
 	return key, key != "", nil
 }
 
-func (a *App) writeDraftConfirmation(ctx context.Context, draftID, requestKey string) error {
+func (a *Service) writeDraftConfirmation(ctx context.Context, draftID, requestKey string) error {
 	_, err := a.appDB.ExecContext(ctx, `UPDATE content_drafts SET confirmation_key=? WHERE user_id=? AND draft_id=?`, requestKey, a.userID, draftID)
 	return err
 }
@@ -189,7 +188,7 @@ func ImportUploadLimit() int64 {
 // buildImportDraft picks the format from the bytes and the declared name together: a
 // card can arrive with a byte-order mark or an ambiguous first byte, and the extension
 // is what the author chose.
-func (a *App) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
+func (a *Service) buildImportDraft(ctx context.Context, project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	lower := strings.ToLower(safeFileName(fileName))
 	switch {
 	case isZIP(body) || strings.HasSuffix(lower, ".zip"):
@@ -203,7 +202,7 @@ func (a *App) buildImportDraft(ctx context.Context, project ContentProject, file
 
 // ---- plain text and Markdown -------------------------------------------------
 
-func (a *App) importPlainText(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
+func (a *Service) importPlainText(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importTextLimit {
 		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: text import exceeds the size limit", ErrContentInvalid)
 	}
@@ -235,7 +234,7 @@ func (a *App) importPlainText(project ContentProject, fileName string, body []by
 
 // ---- WIA package -------------------------------------------------------------
 
-func (a *App) importWIAPackage(ctx context.Context, project ContentProject, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
+func (a *Service) importWIAPackage(ctx context.Context, project ContentProject, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importZIPLimit {
 		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: package exceeds the size limit", ErrContentInvalid)
 	}
@@ -342,7 +341,7 @@ func readPackageZip(body []byte) (map[string][]byte, error) {
 
 // ---- Character Card V2 -------------------------------------------------------
 
-func (a *App) importCharacterCard(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
+func (a *Service) importCharacterCard(project ContentProject, fileName string, body []byte) (ContentDraft, ImportReport, map[string][]byte, error) {
 	if len(body) > importTextLimit {
 		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: card exceeds the size limit", ErrContentInvalid)
 	}
@@ -399,7 +398,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 	// A card has no world structure, so the draft starts with the minimum a package
 	// needs: one usable place, a starting time, the greeting as the opening candidate
 	// and a neutral goal line the author replaces.
-	payload.Locations = []content.PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
+	payload.Locations = []PackLocation{{ID: defaultImportLocation, Name: defaultImportLocationName, Connections: []string{}}}
 	payload.InitialLocation = defaultImportLocation
 	npc.InitialLocation = defaultImportLocation
 	payload.NPCs = []ContentDraftNPC{npc}
@@ -450,7 +449,7 @@ func (a *App) importCharacterCard(project ContentProject, fileName string, body 
 // ExportContentRevision rebuilds a canonical package archive for one published
 // revision. It never packs an arbitrary directory and never includes worlds,
 // credentials, sessions, logs or usage.
-func (a *App) ExportContentRevision(ctx context.Context, gameID, revision string) ([]byte, string, error) {
+func (a *Service) ExportContentRevision(ctx context.Context, gameID, revision string) ([]byte, string, error) {
 	if !packID.MatchString(gameID) || !packID.MatchString(revision) {
 		return nil, "", ErrInvalidRequest
 	}
@@ -497,15 +496,15 @@ func (a *App) ExportContentRevision(ctx context.Context, gameID, revision string
 
 func newDraftPayload(project ContentProject) ContentDraftPayload {
 	return ContentDraftPayload{
-		SchemaVersion: content.SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title,
-		NPCs: []ContentDraftNPC{}, Locations: []content.PackLocation{}, Bystanders: []content.PackBystander{},
+		SchemaVersion: SchemaV2, GameID: project.GameID, Mode: "open", Title: project.Title,
+		NPCs: []ContentDraftNPC{}, Locations: []PackLocation{}, Bystanders: []PackBystander{},
 		// Imported cards address the player as {{user}}; the default lead keeps that
 		// replacement previewable and the draft publishable.
-		Player: content.PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true},
+		Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true},
 	}
 }
 
-func (a *App) importSourcePath(draftID, fileName string) string {
+func (a *Service) importSourcePath(draftID, fileName string) string {
 	return filepath.Join(a.contentRoot(), "imports", draftID+"-"+safeFileName(fileName))
 }
 

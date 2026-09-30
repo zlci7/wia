@@ -1,4 +1,4 @@
-package storyapp
+package content
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/wire"
 )
 
@@ -64,7 +63,7 @@ type publishPlan struct {
 // it. A repeated request key returns the original result; a different payload
 // conflicts; the same key while the original request is still running returns that
 // live operation instead of treating it as a crash to recover.
-func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (ContentOperation, error) {
+func (a *Service) PublishContentDraft(ctx context.Context, request PublishRequest) (ContentOperation, error) {
 	if wire.Clean(request.RequestKey) == "" || len(request.RequestKey) > 200 || request.ExpectedDraftVersion < 1 {
 		return ContentOperation{}, ErrInvalidRequest
 	}
@@ -117,7 +116,7 @@ func (a *App) PublishContentDraft(ctx context.Context, request PublishRequest) (
 
 // existingRevision reports a publication of this exact content, including one that a
 // previous interruption registered but did not point the project at.
-func (a *App) existingRevision(ctx context.Context, revision string) (ContentRevisionRef, bool, error) {
+func (a *Service) existingRevision(ctx context.Context, revision string) (ContentRevisionRef, bool, error) {
 	var ref ContentRevisionRef
 	ref.Revision = revision
 	err := a.appDB.QueryRowContext(ctx, `SELECT path,digest FROM content_revisions WHERE user_id=? AND revision=? AND status=?`, a.userID, revision, publishReady).Scan(&ref.Path, &ref.Digest)
@@ -138,7 +137,7 @@ type ContentRevisionRef struct {
 }
 
 // registerRevision points the project at an already published revision.
-func (a *App) registerRevision(ctx context.Context, requestKey, hash string, operation ContentOperation, project ContentProject, revision, digest, path string) error {
+func (a *Service) registerRevision(ctx context.Context, requestKey, hash string, operation ContentOperation, project ContentProject, revision, digest, path string) error {
 	_, err := a.completePublish(ctx, requestKey, hash, operation, publishPlan{
 		GameID: project.GameID, ProjectID: project.ProjectID, ProjectVersion: project.Version,
 		Revision: revision, Digest: digest, FinalPath: path,
@@ -146,7 +145,7 @@ func (a *App) registerRevision(ctx context.Context, requestKey, hash string, ope
 	return err
 }
 
-func (a *App) startPublish(ctx context.Context, request PublishRequest, draft ContentDraft, project ContentProject, hash string) (ContentOperation, error) {
+func (a *Service) startPublish(ctx context.Context, request PublishRequest, draft ContentDraft, project ContentProject, hash string) (ContentOperation, error) {
 	revision, files, _, err := a.buildPackage(ctx, draft, project)
 	if err != nil {
 		return ContentOperation{}, err
@@ -182,7 +181,7 @@ func (a *App) startPublish(ctx context.Context, request PublishRequest, draft Co
 	return a.runPublish(ctx, request.RequestKey, hash, operation, plan, files)
 }
 
-func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, files map[string][]byte) (ContentOperation, error) {
+func (a *Service) runPublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, files map[string][]byte) (ContentOperation, error) {
 	root := a.contentRoot()
 	staging := filepath.Join(root, operation.OperationID+".staging")
 	final := plan.FinalPath
@@ -255,7 +254,7 @@ func (a *App) runPublish(ctx context.Context, requestKey, hash string, operation
 
 // completePublish registers the revision and moves the project forward in one
 // application transaction; the directory is already in place.
-func (a *App) completePublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, digest string) (ContentOperation, error) {
+func (a *Service) completePublish(ctx context.Context, requestKey, hash string, operation ContentOperation, plan publishPlan, digest string) (ContentOperation, error) {
 	revision, project := plan.Revision, ContentProject{ProjectID: plan.ProjectID, GameID: plan.GameID, Version: plan.ProjectVersion}
 	path := plan.FinalPath
 	tx, err := a.appDB.BeginTx(ctx, nil)
@@ -307,7 +306,7 @@ func (a *App) completePublish(ctx context.Context, requestKey, hash string, oper
 // catalog entry. Loading and verifying happen outside the directory lock; only the
 // entry swap is inside it. A failed load keeps the database record; a later start
 // rebuilds it.
-func (a *App) installPublishedRevision(gameID, revision, path string) {
+func (a *Service) installPublishedRevision(gameID, revision, path string) {
 	pack, err := loadPack(path)
 	if err != nil {
 		if a.logger != nil {
@@ -321,7 +320,7 @@ func (a *App) installPublishedRevision(gameID, revision, path string) {
 // resumePublish finishes an operation interrupted between stages. The frozen plan
 // says which directory and digest the publication was creating, so a rename that
 // completed before the interruption is finished rather than discarded.
-func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (ContentOperation, error) {
+func (a *Service) resumePublish(ctx context.Context, operation ContentOperation) (ContentOperation, error) {
 	if live, ok := a.liveOperation(operation.OperationID); ok {
 		return live, nil
 	}
@@ -375,14 +374,14 @@ func (a *App) resumePublish(ctx context.Context, operation ContentOperation) (Co
 
 // writeContentOperationPlanDigest updates only the frozen plan, keeping the operation's
 // recorded request identity untouched.
-func (a *App) writeContentOperationPlanDigest(ctx context.Context, operationID, plan string) error {
+func (a *Service) writeContentOperationPlanDigest(ctx context.Context, operationID, plan string) error {
 	_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET plan_json=?,updated_at=? WHERE user_id=? AND operation_id=?`, plan, wire.NowText(), a.userID, operationID)
 	return err
 }
 
 // operationRequestIdentity finds the request key and hash that recorded an operation, so
 // finishing it updates that same row.
-func (a *App) operationRequestIdentity(ctx context.Context, operationID string) (string, string, error) {
+func (a *Service) operationRequestIdentity(ctx context.Context, operationID string) (string, string, error) {
 	var requestKey, requestHash string
 	err := a.appDB.QueryRowContext(ctx, `SELECT request_key,request_hash FROM content_operations WHERE user_id=? AND operation_id=? AND request_key<>''`, a.userID, operationID).Scan(&requestKey, &requestHash)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -394,7 +393,7 @@ func (a *App) operationRequestIdentity(ctx context.Context, operationID string) 
 	return requestKey, requestHash, nil
 }
 
-func (a *App) readContentOperationPlan(ctx context.Context, operationID string) (string, error) {
+func (a *Service) readContentOperationPlan(ctx context.Context, operationID string) (string, error) {
 	var plan string
 	err := a.appDB.QueryRowContext(ctx, `SELECT plan_json FROM content_operations WHERE user_id=? AND operation_id=?`, a.userID, operationID).Scan(&plan)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -403,7 +402,7 @@ func (a *App) readContentOperationPlan(ctx context.Context, operationID string) 
 	return plan, err
 }
 
-func (a *App) readContentOperationByID(ctx context.Context, operationID string) (ContentOperation, string, bool, error) {
+func (a *Service) readContentOperationByID(ctx context.Context, operationID string) (ContentOperation, string, bool, error) {
 	var operation ContentOperation
 	var result string
 	err := a.appDB.QueryRowContext(ctx, `SELECT operation_id,kind,target_id,stage,status,result_json FROM content_operations WHERE user_id=? AND operation_id=?`, a.userID, operationID).
@@ -419,7 +418,7 @@ func (a *App) readContentOperationByID(ctx context.Context, operationID string) 
 
 // recoverContentOperations runs at startup and only touches operations this
 // application recorded; unknown directories are never scanned or deleted.
-func (a *App) recoverContentOperations(ctx context.Context) error {
+func (a *Service) recoverContentOperations(ctx context.Context) error {
 	rows, err := a.appDB.QueryContext(ctx, `SELECT operation_id,target_id,stage FROM content_operations WHERE user_id=? AND status='running'`, a.userID)
 	if err != nil {
 		return err
@@ -452,12 +451,12 @@ func (a *App) recoverContentOperations(ctx context.Context) error {
 // buildPackage assembles the complete package for one draft. Validation and the
 // package digest both come from the real loader, so a published revision is exactly
 // what a later world would read.
-func (a *App) buildPackage(ctx context.Context, draft ContentDraft, project ContentProject) (string, map[string][]byte, string, error) {
+func (a *Service) buildPackage(ctx context.Context, draft ContentDraft, project ContentProject) (string, map[string][]byte, string, error) {
 	payload := draft.Payload
 	if err := validateDraftPayload(payload); err != nil {
 		return "", nil, "", err
 	}
-	npcFiles, err := draftNPCFiles(payload)
+	npcFiles, err := DraftNPCFiles(payload)
 	if err != nil {
 		return "", nil, "", err
 	}
@@ -475,7 +474,7 @@ func (a *App) buildPackage(ctx context.Context, draft ContentDraft, project Cont
 	}
 	sort.Strings(names)
 	story := StoryPack{
-		SchemaVersion: content.SchemaV2, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
+		SchemaVersion: SchemaV2, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
 		Description: payload.Description, Gameplay: payload.Gameplay, Background: payload.Background, Rules: payload.Rules,
 		AuthorFacts: payload.AuthorFacts, Cover: payload.Cover, CoverAlt: payload.CoverAlt, Player: payload.Player,
 		Opening: payload.Opening, InitialLocation: payload.InitialLocation, Clock: payload.Clock, Locations: payload.Locations,
@@ -577,7 +576,7 @@ func referencedAssets(payload ContentDraftPayload) []string {
 
 // draftAsset resolves one staged asset of the draft. Uploads arrive in a later unit;
 // until then a referenced asset that is absent fails the publication explicitly.
-func (a *App) draftAsset(ctx context.Context, draftID, relative string) ([]byte, error) {
+func (a *Service) draftAsset(ctx context.Context, draftID, relative string) ([]byte, error) {
 	var staged string
 	err := a.appDB.QueryRowContext(ctx, `SELECT staged_path FROM content_draft_assets WHERE user_id=? AND draft_id=? AND relative_name=?`, a.userID, draftID, relative).Scan(&staged)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -597,14 +596,14 @@ func (a *App) draftAsset(ctx context.Context, draftID, relative string) ([]byte,
 	return body, nil
 }
 
-func (a *App) contentRoot() string {
+func (a *Service) contentRoot() string {
 	if a.contentDir != "" {
 		return a.contentDir
 	}
 	return filepath.Join(a.root, "content")
 }
 
-func (a *App) readContentOperation(ctx context.Context, requestKey string) (ContentOperation, string, bool, error) {
+func (a *Service) readContentOperation(ctx context.Context, requestKey string) (ContentOperation, string, bool, error) {
 	var operation ContentOperation
 	var hash, result string
 	err := a.appDB.QueryRowContext(ctx, `SELECT request_hash,operation_id,kind,target_id,stage,status,result_json FROM content_operations WHERE user_id=? AND request_key=?`, a.userID, requestKey).
@@ -621,7 +620,7 @@ func (a *App) readContentOperation(ctx context.Context, requestKey string) (Cont
 	return operation, hash, true, nil
 }
 
-func (a *App) writeContentOperation(ctx context.Context, requestKey, hash string, operation ContentOperation, safeError string) error {
+func (a *Service) writeContentOperation(ctx context.Context, requestKey, hash string, operation ContentOperation, safeError string) error {
 	if requestKey == "" {
 		_, err := a.appDB.ExecContext(ctx, `UPDATE content_operations SET stage=?,status=?,safe_error=?,updated_at=? WHERE user_id=? AND operation_id=?`,
 			operation.Stage, operation.Status, safeError, wire.NowText(), a.userID, operation.OperationID)
@@ -642,7 +641,7 @@ func (a *App) writeContentOperation(ctx context.Context, requestKey, hash string
 
 // writeContentOperationPlan records the frozen plan together with the operation, so
 // recovery knows exactly which directory and digest it is finishing.
-func (a *App) writeContentOperationPlan(ctx context.Context, requestKey, hash string, operation ContentOperation, plan string) error {
+func (a *Service) writeContentOperationPlan(ctx context.Context, requestKey, hash string, operation ContentOperation, plan string) error {
 	_, err := a.appDB.ExecContext(ctx, `INSERT INTO content_operations(user_id,request_key,request_hash,operation_id,kind,target_id,stage,status,result_json,safe_error,plan_json,created_at,updated_at)
 		VALUES(?,?,?,?,?,?,?,?,'','',?,?,?) ON CONFLICT(user_id,request_key) DO UPDATE SET stage=excluded.stage,status=excluded.status,plan_json=excluded.plan_json,updated_at=excluded.updated_at`,
 		a.userID, requestKey, hash, operation.OperationID, operation.Kind, operation.TargetID, operation.Stage, operation.Status, plan, wire.NowText(), wire.NowText())
@@ -656,7 +655,7 @@ type liveOperation struct {
 	operation ContentOperation
 }
 
-func (a *App) beginLiveOperation(requestKey string, operation ContentOperation) {
+func (a *Service) beginLiveOperation(requestKey string, operation ContentOperation) {
 	a.liveMu.Lock()
 	defer a.liveMu.Unlock()
 	if a.liveOps == nil {
@@ -665,20 +664,20 @@ func (a *App) beginLiveOperation(requestKey string, operation ContentOperation) 
 	a.liveOps[requestKey] = operation
 }
 
-func (a *App) endLiveOperation(requestKey string) {
+func (a *Service) endLiveOperation(requestKey string) {
 	a.liveMu.Lock()
 	defer a.liveMu.Unlock()
 	delete(a.liveOps, requestKey)
 }
 
-func (a *App) liveOperation(requestKey string) (ContentOperation, bool) {
+func (a *Service) liveOperation(requestKey string) (ContentOperation, bool) {
 	a.liveMu.Lock()
 	defer a.liveMu.Unlock()
 	operation, ok := a.liveOps[requestKey]
 	return operation, ok
 }
 
-func (a *App) ReadContentOperation(ctx context.Context, operationID string) (ContentOperation, error) {
+func (a *Service) ReadContentOperation(ctx context.Context, operationID string) (ContentOperation, error) {
 	var operation ContentOperation
 	var result string
 	err := a.appDB.QueryRowContext(ctx, `SELECT operation_id,kind,target_id,stage,status,result_json FROM content_operations WHERE user_id=? AND operation_id=?`, a.userID, strings.TrimSpace(operationID)).
@@ -696,7 +695,7 @@ func (a *App) ReadContentOperation(ctx context.Context, operationID string) (Con
 // restart keeps published content available without re-publishing it. The project's
 // own current revision is the authority: revision identifiers order by their digest,
 // which says nothing about which publish came last, so the catalog must not guess.
-func (a *App) loadPublishedRevisions(ctx context.Context) error {
+func (a *Service) loadPublishedRevisions(ctx context.Context) error {
 	current, err := a.projectRevisions(ctx)
 	if err != nil {
 		return err
@@ -733,7 +732,7 @@ func (a *App) loadPublishedRevisions(ctx context.Context) error {
 }
 
 // projectRevisions maps each story to the revision its project currently publishes.
-func (a *App) projectRevisions(ctx context.Context) (map[string]string, error) {
+func (a *Service) projectRevisions(ctx context.Context) (map[string]string, error) {
 	rows, err := a.appDB.QueryContext(ctx, `SELECT game_id,current_revision FROM content_projects WHERE user_id=?`, a.userID)
 	if err != nil {
 		return nil, err
@@ -752,7 +751,7 @@ func (a *App) projectRevisions(ctx context.Context) (map[string]string, error) {
 	return out, rows.Err()
 }
 
-func (a *App) addPackIssue(issue PackIssue) {
+func (a *Service) addPackIssue(issue PackIssue) {
 	a.packsMu.Lock()
 	defer a.packsMu.Unlock()
 	a.packErrors = append(a.packErrors, issue)

@@ -5,39 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
-	"gameagent/backend/internal/wire"
 )
-
-func validateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) error {
-	if p == nil {
-		return nil
-	}
-	if def.Summary.Mode != "open" || wire.Clean(p.Scope) == "" || p.MaxActive < 1 || p.MaxActive > 3 || p.CooldownTurns < 2 || p.CooldownTurns > 20 || len(p.Locations) == 0 {
-		return fmt.Errorf("story.json: invalid event_generation policy")
-	}
-	seen := map[string]bool{}
-	for _, id := range p.Locations {
-		if seen[id] || !slices.ContainsFunc(def.Locations, func(l story.Location) bool { return l.ID == id }) {
-			return fmt.Errorf("story.json: invalid event_generation location")
-		}
-		seen[id] = true
-	}
-	seen = map[string]bool{}
-	for _, id := range p.Participants {
-		if _, ok := story.CharacterByID(def, id); !ok || seen[id] {
-			return fmt.Errorf("story.json: invalid event_generation participant")
-		}
-		seen[id] = true
-	}
-	return nil
-}
 
 func readGeneratedEvents(ctx context.Context, store *storage.WorldStore, def story.Definition) (turn.GeneratedEventState, error) {
 	s := turn.GeneratedEventState{Active: []turn.GeneratedEvent{}}

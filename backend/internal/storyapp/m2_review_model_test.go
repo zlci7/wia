@@ -28,7 +28,7 @@ func TestM2ReviewRealActionAndWait(t *testing.T) {
 	ctx := context.Background()
 	logger := &recordingLogger{}
 	a.logger = logger
-	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: a.packs["orbital-repair"].Definition.Revision, RequestKey: "review", Activate: true})
+	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: testPack(a, "orbital-repair").Definition.Revision, RequestKey: "review", Activate: true})
 	if err != nil {
 		t.Fatal(err)
 	}

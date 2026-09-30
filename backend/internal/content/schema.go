@@ -1,4 +1,4 @@
-package storyapp
+package content
 
 import (
 	"bytes"

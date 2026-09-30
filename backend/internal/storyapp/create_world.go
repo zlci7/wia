@@ -29,7 +29,7 @@ type CreateWorldRequest struct {
 }
 
 func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) (wiaworld.WorldSummary, error) {
-	if !packID.MatchString(request.GameID) || !packID.MatchString(request.ExpectedRevision) || strings.TrimSpace(request.RequestKey) == "" || len(request.RequestKey) > 200 {
+	if !runtimeID.MatchString(request.GameID) || !runtimeID.MatchString(request.ExpectedRevision) || strings.TrimSpace(request.RequestKey) == "" || len(request.RequestKey) > 200 {
 		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
 	a.copyMu.Lock()
@@ -56,7 +56,7 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 	if !errors.Is(err, sql.ErrNoRows) {
 		return wiaworld.WorldSummary{}, err
 	}
-	pack, ok := a.pack(request.GameID)
+	pack, ok := a.Pack(request.GameID)
 	if !ok {
 		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
@@ -69,7 +69,7 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 // CreateWorld is a convenience for local callers; the public HTTP API requires
 // the selected game and revision. The author-owned mode cannot be overridden.
 func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (wiaworld.WorldSummary, error) {
-	p, ok := a.pack(GameID)
+	p, ok := a.Pack(GameID)
 	if !ok {
 		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
@@ -79,7 +79,7 @@ func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerPro
 	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
 }
 
-func (a *App) createWorldFromPack(ctx context.Context, pack loadedPack, request CreateWorldRequest, hash string) (wiaworld.WorldSummary, error) {
+func (a *App) createWorldFromPack(ctx context.Context, pack content.LoadedPack, request CreateWorldRequest, hash string) (wiaworld.WorldSummary, error) {
 	def := pack.Definition
 	name := wire.Clean(request.Name)
 	if name == "" {
