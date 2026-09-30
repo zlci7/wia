@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -372,7 +373,7 @@ var ErrGenerationFailed = errors.New("generation failed")
 
 // ErrContextSourceMissing marks stored provenance that cannot be resolved to its
 // committed source. Scene and progression validation share this boundary.
-var ErrContextSourceMissing = errors.New("context source is missing")
+var ErrContextSourceMissing = memory.ErrContextSourceMissing
 
 // GenerationError says which part of the generated JSON was rejected. A failure code and
 // field are taken from the local schema, never from the response text.

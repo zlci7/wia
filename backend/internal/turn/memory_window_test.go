@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 )
 
@@ -13,23 +13,23 @@ import (
 func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	// Small enough that the character-count rule keeps every group, so the token budget
 	// is what has to reduce the window.
-	groups := [][]memorymodel.MemorySource{}
-	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
-		record := memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("已发生的经历", 100)}
-		groups = append(groups, []memorymodel.MemorySource{record})
+	groups := [][]memory.MemorySource{}
+	for i := 0; i < memory.TargetRecentGroups; i++ {
+		record := memory.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("已发生的经历", 100)}
+		groups = append(groups, []memory.MemorySource{record})
 	}
-	tail := memorymodel.FlattenGroups(groups)
-	if len(memorymodel.MemoryGroups(tail)) != memorymodel.TargetRecentGroups {
-		t.Fatalf("fixture groups: %d", len(memorymodel.MemoryGroups(tail)))
+	tail := memory.FlattenGroups(groups)
+	if len(memory.MemoryGroups(tail)) != memory.TargetRecentGroups {
+		t.Fatalf("fixture groups: %d", len(memory.MemoryGroups(tail)))
 	}
-	if got := len(memorymodel.MemoryRecordsText(tail)); got > memorymodel.RecentWindowChars {
+	if got := len(memory.MemoryRecordsText(tail)); got > memory.RecentWindowChars {
 		t.Fatalf("fixture must fit the size rule so the budget is what binds: %d", got)
 	}
 	// A budget that fits the base prompt and every group, measured rather than
 	// estimated, so the initial window is the whole recent history.
 	base := FramedContextTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
-	testBudget := base + FramedContextTokens(model.TextRequest{Input: memorymodel.MemoryRecordsText(tail)}) + 2*budgetHeadroomTokens
-	material := WithLongMemory(Material{
+	testBudget := base + FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(tail)}) + 2*budgetHeadroomTokens
+	material := withLongMemory(Material{
 		Required: "本轮职责与刺激：玩家输入",
 		System:   "规则",
 	}, Snapshot{InputBudgetTokens: testBudget, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
@@ -47,7 +47,7 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 		}
 		return count
 	}
-	if groupsIn(material) != memorymodel.TargetRecentGroups {
+	if groupsIn(material) != memory.TargetRecentGroups {
 		t.Fatalf("the initial window should carry every group, got %d", groupsIn(material))
 	}
 	// Through the composer with a window that cannot hold every group: the projection
@@ -72,12 +72,12 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 // A smaller budget must produce a strictly smaller window, and a material with a single
 // group must report failure rather than silently dropping the newest context.
 func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
-	tail := []memorymodel.MemorySource{}
-	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
-		tail = append(tail, memorymodel.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
+	tail := []memory.MemorySource{}
+	for i := 0; i < memory.TargetRecentGroups; i++ {
+		tail = append(tail, memory.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run-" + string(rune('a'+i)), Content: strings.Repeat("经历记录", 60)})
 	}
 	groupsIn := func(budget int) int {
-		material := WithLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: budget, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
+		material := withLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: budget, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
 		count := 0
 		for _, id := range material.RequiredSources {
 			if strings.HasPrefix(id, "memory:") {
@@ -88,7 +88,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	generous := groupsIn(20000)
 	tight := groupsIn(1200)
-	if generous != memorymodel.TargetRecentGroups {
+	if generous != memory.TargetRecentGroups {
 		t.Fatalf("a generous budget must keep every group, got %d", generous)
 	}
 	if tight >= generous {
@@ -99,7 +99,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	}
 	// Shrinking must render from the parts: the digest header appears once and the source
 	// list describes what was included.
-	shrunk := WithLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
+	shrunk := withLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
 	reduced, changed := shrunk.Bounded(recentWindowMinTokens + 200)
 	if !changed {
 		t.Fatal("the window did not shrink")
@@ -122,7 +122,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 		}
 	}
 	long := strings.Repeat("唯一的一组", 4000)
-	single := WithLongMemory(Material{Required: "本轮职责与刺激：玩家输入"}, Snapshot{LongMemory: map[string]MemoryContext{"player": {Tail: []memorymodel.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
+	single := withLongMemory(Material{Required: "本轮职责与刺激：玩家输入"}, Snapshot{LongMemory: map[string]MemoryContext{"player": {Tail: []memory.MemorySource{{ID: "memory:only", Content: long}}}}}, "player", "")
 	if single.Bounded == nil {
 		t.Fatal("expected a bounding hook")
 	}
@@ -132,16 +132,16 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 }
 
 func TestBoundedMemoryRebuildRecomputesRecall(t *testing.T) {
-	archive := []memorymodel.MemorySource{{ID: "memory:old", Seq: 1, RunID: "run-old", Content: "copper key"}}
-	for i := 0; i < memorymodel.TargetRecentGroups; i++ {
-		archive = append(archive, memorymodel.MemorySource{
+	archive := []memory.MemorySource{{ID: "memory:old", Seq: 1, RunID: "run-old", Content: "copper key"}}
+	for i := 0; i < memory.TargetRecentGroups; i++ {
+		archive = append(archive, memory.MemorySource{
 			ID:      "memory:recent-" + string(rune('a'+i)),
 			Seq:     int64(i + 2),
 			RunID:   "run-recent-" + string(rune('a'+i)),
 			Content: strings.Repeat("recent experience", 80),
 		})
 	}
-	material := WithLongMemory(
+	material := withLongMemory(
 		Material{Required: "current turn", System: "rules"},
 		Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Archive: archive, Tail: archive[1:]}}},
 		"player",

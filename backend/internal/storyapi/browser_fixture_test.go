@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
+	wiaapp "gameagent/backend/internal/app"
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/storyapp"
 )
 
 type browserGenerator struct{ apiGenerator }
@@ -43,7 +43,7 @@ func TestBrowserFixture(t *testing.T) {
 		t.Skip("interactive browser fixture")
 	}
 	root := t.TempDir()
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
+	app, err := wiaapp.Open(context.Background(), wiaapp.Options{DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestBrowserFixture(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		db, err := sql.Open("sqlite", filepath.Join(root, "story-app", "worlds", storyapp.LocalUserID, storyapp.GameID, world.WorldID, "world.db"))
+		db, err := sql.Open("sqlite", filepath.Join(root, "story-app", "worlds", wiaapp.LocalUserID, wiaapp.GameID, world.WorldID, "world.db"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +163,7 @@ func TestBrowserFixture(t *testing.T) {
 					writeError(w, 404, "fixture", "unknown fixture world")
 					return
 				}
-				db, err := sql.Open("sqlite", filepath.Join(root, "story-app", "worlds", storyapp.LocalUserID, storyapp.GameID, request.WorldID, "world.db"))
+				db, err := sql.Open("sqlite", filepath.Join(root, "story-app", "worlds", wiaapp.LocalUserID, wiaapp.GameID, request.WorldID, "world.db"))
 				if err != nil {
 					writeError(w, 500, "fixture", err.Error())
 					return

@@ -5,20 +5,20 @@ import (
 	"strings"
 	"testing"
 
-	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/memory"
 )
 
 func TestWithRecallFiltersSuppliedGroupsBeforeTakingFive(t *testing.T) {
-	archive := make([]memorymodel.MemorySource, 0, 10)
+	archive := make([]memory.MemorySource, 0, 10)
 	supplied := map[string]bool{}
 	for i := 1; i <= 10; i++ {
 		id := fmt.Sprintf("source:%02d", i)
-		archive = append(archive, memorymodel.MemorySource{ID: id, Seq: int64(i), RunID: fmt.Sprintf("run:%02d", i), Content: "copper key"})
+		archive = append(archive, memory.MemorySource{ID: id, Seq: int64(i), RunID: fmt.Sprintf("run:%02d", i), Content: "copper key"})
 		if i > 5 {
 			supplied[id] = true
 		}
 	}
-	material := WithRecall(Material{}, MemoryProjection{Context: MemoryContext{Archive: archive}, Supplied: supplied}, "copper")
+	material := withRecall(Material{}, memoryProjection{Context: MemoryContext{Archive: archive}, Supplied: supplied}, "copper")
 	if len(material.Optional) != 5 || len(material.RecallSources) != 5 {
 		t.Fatalf("recall groups/sources = %d/%d, want 5/5", len(material.Optional), len(material.RecallSources))
 	}
@@ -31,7 +31,7 @@ func TestWithRecallFiltersSuppliedGroupsBeforeTakingFive(t *testing.T) {
 
 func TestWithRecallKeepsRetrievalLimitsVisible(t *testing.T) {
 	t.Run("oversized group is excluded whole", func(t *testing.T) {
-		archive := make([]memorymodel.MemorySource, 0, 513)
+		archive := make([]memory.MemorySource, 0, 513)
 		for i := 0; i < 513; i++ {
 			content := "ordinary memory"
 			if i == 0 {
@@ -40,10 +40,10 @@ func TestWithRecallKeepsRetrievalLimitsVisible(t *testing.T) {
 			if i == 512 {
 				content = "copper key"
 			}
-			archive = append(archive, memorymodel.MemorySource{ID: fmt.Sprintf("source:%03d", i), Seq: int64(i + 1), RunID: "run:one", Content: content})
+			archive = append(archive, memory.MemorySource{ID: fmt.Sprintf("source:%03d", i), Seq: int64(i + 1), RunID: "run:one", Content: content})
 		}
 
-		material := WithRecall(Material{}, MemoryProjection{Context: MemoryContext{Archive: archive}}, "copper")
+		material := withRecall(Material{}, memoryProjection{Context: MemoryContext{Archive: archive}}, "copper")
 		if len(material.Optional) != 0 || len(material.RecallSources) != 0 {
 			t.Fatalf("partial oversized group escaped: sections=%d sources=%d", len(material.Optional), len(material.RecallSources))
 		}
@@ -53,11 +53,11 @@ func TestWithRecallKeepsRetrievalLimitsVisible(t *testing.T) {
 	})
 
 	t.Run("candidate window is reported with no hits", func(t *testing.T) {
-		archive := make([]memorymodel.MemorySource, 513)
+		archive := make([]memory.MemorySource, 513)
 		for i := range archive {
-			archive[i] = memorymodel.MemorySource{ID: fmt.Sprintf("source:%03d", i), Seq: int64(i + 1), RunID: fmt.Sprintf("run:%03d", i), Content: "ordinary memory"}
+			archive[i] = memory.MemorySource{ID: fmt.Sprintf("source:%03d", i), Seq: int64(i + 1), RunID: fmt.Sprintf("run:%03d", i), Content: "ordinary memory"}
 		}
-		material := WithRecall(Material{Required: "本轮事实"}, MemoryProjection{Context: MemoryContext{Archive: archive}}, "copper")
+		material := withRecall(Material{Required: "本轮事实"}, memoryProjection{Context: MemoryContext{Archive: archive}}, "copper")
 		if !material.RecallLimited {
 			t.Fatal("candidate window did not report a limited search")
 		}

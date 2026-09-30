@@ -19,23 +19,23 @@ import (
 	"sync"
 	"time"
 
+	"gameagent/backend/internal/app"
 	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/memorymodel"
-	"gameagent/backend/internal/storyapp"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
 type Options struct {
 	Addr    string
-	App     *storyapp.App
+	App     *app.App
 	Assets  fs.FS
 	Version string
 	Logger  *log.Logger
 }
 
 type Server struct {
-	app      *storyapp.App
+	app      *app.App
 	assets   fs.FS
 	listener net.Listener
 	http     *http.Server
@@ -177,7 +177,7 @@ func (s *Server) modelProfiles(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, map[string]any{"model": status.Model, "model_error": status.ModelError, "providers": []map[string]string{{"provider": "deepseek", "model": "deepseek-v4-flash"}, {"provider": "openai", "model": "gpt-5-mini"}}})
 	case "POST":
-		var request storyapp.ModelConfigRequest
+		var request app.ModelConfigRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}
@@ -202,7 +202,7 @@ func (s *Server) worlds(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, map[string]any{"worlds": worlds})
 	case "POST":
-		var request storyapp.CreateWorldRequest
+		var request app.CreateWorldRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}
@@ -376,7 +376,7 @@ func (s *Server) memory(w http.ResponseWriter, r *http.Request, id, route string
 	if route == "corrections" {
 		switch r.Method {
 		case "POST":
-			var request memorymodel.CorrectionRequest
+			var request memory.CorrectionRequest
 			if !decodeJSON(w, r, &request) {
 				return
 			}
@@ -411,7 +411,7 @@ func (s *Server) memory(w http.ResponseWriter, r *http.Request, id, route string
 		var err error
 		before, err = strconv.ParseInt(raw, 10, 64)
 		if err != nil || before < 1 {
-			writeAppError(w, storyapp.ErrInvalidRequest)
+			writeAppError(w, app.ErrInvalidRequest)
 			return
 		}
 	}
@@ -428,7 +428,7 @@ func (s *Server) agentSettings(w http.ResponseWriter, r *http.Request, id string
 		writeError(w, 405, "method_not_allowed", "agent settings use PUT")
 		return
 	}
-	var request storyapp.UpdateNarrativeSettingsRequest
+	var request app.UpdateNarrativeSettingsRequest
 	if !decodeJSON(w, r, &request) {
 		return
 	}
@@ -446,7 +446,7 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	query := r.URL.Query()
-	request := storyapp.MessagePageRequest{Limit: 100}
+	request := app.MessagePageRequest{Limit: 100}
 	if query.Has("limit") {
 		n, err := strconv.Atoi(query.Get("limit"))
 		if err != nil || n < 1 || n > 200 {
@@ -555,7 +555,7 @@ func (s *Server) runs(w http.ResponseWriter, r *http.Request, id string) {
 		writeError(w, 405, "method_not_allowed", "runs use GET or POST")
 		return
 	}
-	var request storyapp.RunRequest
+	var request app.RunRequest
 	if !decodeJSON(w, r, &request) {
 		return
 	}
@@ -704,52 +704,52 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeAppError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "storage_unavailable"
 	switch {
-	case errors.Is(err, storyapp.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings), errors.Is(err, turn.ErrInvalidRequest), errors.Is(err, content.ErrInvalidRequest):
+	case errors.Is(err, app.ErrInvalidRequest), errors.Is(err, wiaworld.ErrInvalidNarrativeSettings), errors.Is(err, turn.ErrInvalidRequest), errors.Is(err, content.ErrInvalidRequest):
 		status = 400
 		code = "invalid_request"
-	case errors.Is(err, storyapp.ErrUnauthorized):
+	case errors.Is(err, app.ErrUnauthorized):
 		status = 401
 		code = "unauthorized"
-	case errors.Is(err, storyapp.ErrForbidden):
+	case errors.Is(err, app.ErrForbidden):
 		status = 403
 		code = "forbidden"
-	case errors.Is(err, storyapp.ErrWorldNotFound):
+	case errors.Is(err, app.ErrWorldNotFound):
 		status = 404
 		code = "world_not_found"
-	case errors.Is(err, storyapp.ErrRunNotFound):
+	case errors.Is(err, app.ErrRunNotFound):
 		status = 404
 		code = "run_not_found"
-	case errors.Is(err, storyapp.ErrWorldNotReady):
+	case errors.Is(err, app.ErrWorldNotReady):
 		status = 409
 		code = "world_not_ready"
-	case errors.Is(err, storyapp.ErrWorldBusy):
+	case errors.Is(err, app.ErrWorldBusy):
 		status = 409
 		code = "world_busy"
-	case errors.Is(err, storyapp.ErrMemoryRebuilding):
+	case errors.Is(err, app.ErrMemoryRebuilding):
 		status = 409
 		code = "memory_rebuilding"
-	case errors.Is(err, storyapp.ErrStoryEnded):
+	case errors.Is(err, app.ErrStoryEnded):
 		status = 409
 		code = "story_ended"
-	case errors.Is(err, storyapp.ErrAppBusy):
+	case errors.Is(err, app.ErrAppBusy):
 		status = 409
 		code = "app_busy"
-	case errors.Is(err, storyapp.ErrVersionConflict), errors.Is(err, content.ErrVersionConflict):
+	case errors.Is(err, app.ErrVersionConflict), errors.Is(err, content.ErrVersionConflict):
 		status = 409
 		code = "version_conflict"
-	case errors.Is(err, storyapp.ErrIdempotencyConflict), errors.Is(err, content.ErrIdempotencyConflict):
+	case errors.Is(err, app.ErrIdempotencyConflict), errors.Is(err, content.ErrIdempotencyConflict):
 		status = 409
 		code = "idempotency_conflict"
-	case errors.Is(err, storyapp.ErrModelNotConfigured), errors.Is(err, turn.ErrModelNotConfigured):
+	case errors.Is(err, app.ErrModelNotConfigured), errors.Is(err, turn.ErrModelNotConfigured):
 		status = 409
 		code = "model_not_configured"
 	case strings.HasPrefix(err.Error(), "model_not_configured:"):
 		status = 409
 		code = "model_not_configured"
-	case errors.Is(err, storyapp.ErrSaveFailed):
+	case errors.Is(err, app.ErrSaveFailed):
 		status = 409
 		code = "save_failed"
-	case errors.Is(err, storyapp.ErrPersonaNotFound):
+	case errors.Is(err, app.ErrPersonaNotFound):
 		status = 404
 		code = "persona_not_found"
 	case errors.Is(err, content.ErrContentNotFound):

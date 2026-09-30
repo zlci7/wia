@@ -14,7 +14,7 @@ import (
 //
 // story exists to be a shape: the frozen definition a world is started from. The
 // moment it gains a service, a loader, a repository or a turn helper, it becomes a
-// second storyapp and the boundary it was created for is gone.
+// second application service and the boundary it was created for is gone.
 //
 // It may name domain vocabulary from world and progression rules from plot. It may
 // not reach for content — the external file format is compiled into these types by

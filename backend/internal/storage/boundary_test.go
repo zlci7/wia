@@ -14,7 +14,7 @@ import (
 // establishing for persistence.
 //
 // storage answers questions about persisted facts; the modules above it decide what
-// those facts mean. If storage ever imports storyapp, turn or content, the arrow has
+// those facts mean. If storage ever imports app, turn or content, the arrow has
 // reversed and the persistence layer has started to know about the narrative that
 // uses it — a failure that shows up as no test failure at all.
 //

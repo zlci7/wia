@@ -11,14 +11,13 @@ import (
 //
 // The budget exists because Host is the one place where this extraction can fail while
 // still compiling. It started at six stage operations; the intent, character and
-// narration, coordination and progression stages now live in this package, so only the
-// two operations the application genuinely owns are left: observing a turn and reading
-// its frozen input.
+// narration, coordination, progression and frozen input now live in this package, so
+// only the operation the application genuinely owns is left: observing a turn.
 //
 // So the number only falls. Raising it is a decision to be argued for, not a step to take
 // to make something compile: if a change needs a fourth method, the right move is usually
 // to move another stage into this package rather than to widen the door.
-const hostMethodBudget = 2
+const hostMethodBudget = 1
 
 // TestHostStaysSmall fails when the turn service starts asking the application for more
 // than the budget allows.

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/app"
 	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/storyapp"
 )
 
-func contentTestServer(t *testing.T) (*Server, *storyapp.App) {
+func contentTestServer(t *testing.T) (*Server, *app.App) {
 	t.Helper()
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	app, err := app.Open(context.Background(), app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

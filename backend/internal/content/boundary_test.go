@@ -15,7 +15,7 @@ import (
 //
 // It may validate a pack against plot's rules (plot is the authority on what a legal
 // story line is) and compile it into story and world domain values. It may not import
-// storyapp or turn: the engine reads what the tool produced, not the other way around, and the
+// app or turn: the engine reads what the tool produced, not the other way around, and the
 // architecture requires that deleting the whole content tool still leaves a playable
 // game.
 func TestContentDoesNotDependOnTheApplication(t *testing.T) {

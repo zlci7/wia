@@ -8,7 +8,7 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-func InitialSceneViews(snapshot Snapshot) []SceneView {
+func initialSceneViews(snapshot Snapshot) []SceneView {
 	recipients := []string{"player"}
 	for _, c := range snapshot.Characters {
 		recipients = append(recipients, c.EntityID)
@@ -154,7 +154,7 @@ func containsID(ids []string, id string) bool {
 	return false
 }
 
-func ValidateSceneViews(snapshot Snapshot) error {
+func validateSceneViews(snapshot Snapshot) error {
 	valid := map[string]bool{"player": true}
 	for _, c := range snapshot.Characters {
 		valid[c.EntityID] = true

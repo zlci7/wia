@@ -223,7 +223,7 @@ func (s *Service) coordinateTurn(ctx context.Context, generator model.TextGenera
 	var result hostResult
 	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer callCancel()
-	repairCount, err := GenerateJSONMetrics(callCtx, generator, material.System, input, &result, StructuredTurnOutputTokens, "time_minutes", "scene", "scene_characters", "outcomes", "scene_updates")
+	repairCount, err := GenerateJSONMetrics(callCtx, generator, material.System, input, &result, structuredTurnOutputTokens, "time_minutes", "scene", "scene_characters", "outcomes", "scene_updates")
 	if err != nil {
 		return hostResult{}, repairCount, err
 	}

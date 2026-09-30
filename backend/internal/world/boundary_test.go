@@ -14,7 +14,7 @@ import (
 // whole extraction depends on.
 //
 // Every other narrative package may import world, so world must import none of
-// them. If it ever imports storyapp, storage, model or api, the arrow has turned
+// them. If it ever imports app, storage, model or api, the arrow has turned
 // around and the module can no longer be extracted without a cycle — and that
 // failure would not show up as a test failure anywhere else. The rule is enforced
 // more strictly than the four named packages: only the standard library is

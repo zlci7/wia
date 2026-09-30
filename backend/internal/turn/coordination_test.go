@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -19,10 +18,6 @@ import (
 type coordinationTestHost struct{}
 
 func (coordinationTestHost) LogStage(string, wiaworld.Run, Stage, string, string, int, string, []string, string, int, time.Duration) {
-}
-
-func (coordinationTestHost) LoadInput(context.Context, *storage.WorldStore, wiaworld.Run, model.TextGenerator, int) (Snapshot, error) {
-	return Snapshot{}, errors.New("unused")
 }
 
 type coordinationResultGenerator struct{ result hostResult }
@@ -220,7 +215,7 @@ func TestPlotReferencesRetainedViewsOutsideEventWindow(t *testing.T) {
 
 func TestInitialSceneViewsKeepRecipientLocations(t *testing.T) {
 	snapshot := Snapshot{SceneVersion: 1, Definition: story.Definition{Scene: "大厅", Locations: []story.Location{{ID: "counter", Name: "柜台", Description: "一盏灯"}}, InitialLocations: map[string]string{"npc:a": "counter"}}, Characters: []wiaworld.Character{{EntityID: "npc:a"}}}
-	views := InitialSceneViews(snapshot)
+	views := initialSceneViews(snapshot)
 	if len(views) != 2 || views[0].Recipient != "player" || views[1].Recipient != "npc:a" || views[1].Content != "柜台：一盏灯" {
 		t.Fatalf("unexpected initial views: %+v", views)
 	}
@@ -280,8 +275,8 @@ func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
 		Summary:    wiaworld.WorldSummary{WorldID: "w"},
 		Characters: []wiaworld.Character{character},
 		LongMemory: map[string]MemoryContext{
-			"npc:a": {Archive: []memorymodel.MemorySource{{ID: "personal-old", Seq: 1, Content: "铜钥匙须在柜台归还"}}},
-			"npc:b": {Archive: []memorymodel.MemorySource{{ID: "other-secret", Seq: 1, Content: "他人的铜钥匙秘密"}}},
+			"npc:a": {Archive: []memory.MemorySource{{ID: "personal-old", Seq: 1, Content: "铜钥匙须在柜台归还"}}},
+			"npc:b": {Archive: []memory.MemorySource{{ID: "other-secret", Seq: 1, Content: "他人的铜钥匙秘密"}}},
 		},
 		Perceptions: map[string][]wiaworld.Perception{"npc:a": {{SourceEventID: "current-done", Content: "此前已完成添茶，不是新提案。", SourceType: "action_result"}}},
 		Sources:     map[string]SourceMetadata{"current-done": {ID: "current-done", Actor: "npc:a", Kind: "npc_action_result"}},

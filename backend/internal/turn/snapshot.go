@@ -7,7 +7,7 @@
 package turn
 
 import (
-	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
 	wiaworld "gameagent/backend/internal/world"
@@ -72,9 +72,9 @@ type SourceMetadata struct {
 // plus the sources it does not yet cover, split into the part still inside the recent
 // window and the part already archived.
 type MemoryContext struct {
-	Digest  memorymodel.MemoryDigest
-	Tail    []memorymodel.MemorySource
-	Archive []memorymodel.MemorySource
+	Digest  memory.MemoryDigest
+	Tail    []memory.MemorySource
+	Archive []memory.MemorySource
 }
 
 // GeneratedEventState is the world's own open events and how far the world has got in

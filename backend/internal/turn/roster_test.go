@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/storage"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -18,17 +17,6 @@ type rosterHost struct {
 }
 
 func (h *rosterHost) LogStage(string, wiaworld.Run, Stage, string, string, int, string, []string, string, int, time.Duration) {
-}
-
-func (h *rosterHost) LoadInput(context.Context, *storage.WorldStore, wiaworld.Run, model.TextGenerator, int) (Snapshot, error) {
-	return Snapshot{
-		Summary: wiaworld.WorldSummary{WorldID: "w1", GameID: "harbor", Clock: "第 1 日 08:00"},
-		Characters: []wiaworld.Character{
-			{EntityID: "npc:a", Name: "甲", Role: "掌柜", InScene: true},
-			{EntityID: "npc:b", Name: "乙", Role: "船夫", InScene: true},
-			{EntityID: "npc:c", Name: "丙", Role: "旅人", InScene: false},
-		},
-	}, nil
 }
 
 // stageGenerator answers each stage of a turn with the smallest valid response, so a test
@@ -61,7 +49,15 @@ func (stageGenerator) GenerateText(_ context.Context, req model.TextRequest) (mo
 func TestPlayerExperienceUsesTheOpeningRoster(t *testing.T) {
 	host := &rosterHost{}
 	service := New(host, Deps{})
-	output, err := service.Execute(context.Background(), nil, wiaworld.Run{RunID: "run1", Input: "我说给大家听"}, stageGenerator{})
+	snapshot := Snapshot{
+		Summary: wiaworld.WorldSummary{WorldID: "w1", GameID: "harbor", Clock: "第 1 日 08:00"},
+		Characters: []wiaworld.Character{
+			{EntityID: "npc:a", Name: "甲", Role: "掌柜", InScene: true},
+			{EntityID: "npc:b", Name: "乙", Role: "船夫", InScene: true},
+			{EntityID: "npc:c", Name: "丙", Role: "旅人", InScene: false},
+		},
+	}
+	output, err := service.executeSnapshot(context.Background(), stageGenerator{}, snapshot, wiaworld.Run{RunID: "run1", Input: "我说给大家听"})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}

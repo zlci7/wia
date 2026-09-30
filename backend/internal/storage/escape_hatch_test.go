@@ -10,7 +10,7 @@ import (
 )
 
 // databaseCallBaseline is how many uses of the temporary escape hatch exist in
-// storyapp when this count was taken.
+// app when this count was taken.
 //
 // The escape hatch exists because part of the migration is staged: some call sites
 // still carry a raw *sql.DB through their own signatures, and they move to memory,
@@ -18,8 +18,8 @@ import (
 // allowed to fall and must never rise — a new call is new coupling in the direction
 // the refactor is removing, and nothing else in the build would notice.
 const (
-	databaseProductionBaseline = 24
-	databaseTestBaseline       = 104
+	databaseProductionBaseline = 23
+	databaseTestBaseline       = 103
 )
 
 // TestDatabaseEscapeHatchDoesNotSpread counts `Database()` in the narrative package.
@@ -27,10 +27,10 @@ const (
 // It reads the source rather than the compiled package because there is no API to
 // observe from the outside: the point is to catch the call as it is written.
 func TestDatabaseEscapeHatchDoesNotSpread(t *testing.T) {
-	dir := filepath.Join("..", "storyapp")
+	dir := filepath.Join("..", "app")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Skipf("storyapp is not present: %v", err)
+		t.Fatalf("app is not present: %v", err)
 	}
 	fset := token.NewFileSet()
 	production, tests := 0, 0

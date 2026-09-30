@@ -17,22 +17,14 @@ import (
 // compiles, because a wide Host is just the application hidden behind an interface.
 //
 // The rule for adding a method: it must name an operation a turn performs, not a
-// capability of the application. Observing a turn and reading its frozen input are the
-// two that legitimately stay; `GetStore` or `AppConfig` would be the application leaking
-// in.
+// capability of the application. Observing a turn is the one operation that stays;
+// `GetStore` or `AppConfig` would be the application leaking in.
 type Host interface {
 	// LogStage records one stage of a turn: what it was for, which model version it used,
 	// which events it read, who it resolved to, how many repairs it needed and how long
 	// it took. It is the one member that may stay — observing a turn is the application's
 	// business, not the turn's.
 	LogStage(worldID string, run wiaworld.Run, stage Stage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration)
-
-	// LoadInput reads the turn's frozen input: the world snapshot, the long-memory
-	// material and the coordination evidence, all taken at one moment so every later
-	// stage sees one world. It goes when the loader and the memory material it gathers
-	// move: reading a turn's input means assembling memory, which is the memory module's
-	// work first.
-	LoadInput(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator, limit int) (Snapshot, error)
 }
 
 // Service runs one
@@ -61,6 +53,10 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err != nil {
 		return Output{}, err
 	}
+	return s.executeSnapshot(ctx, generator, snapshot, run)
+}
+
+func (s *Service) executeSnapshot(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (Output, error) {
 	intent, output, err := s.resolveIntent(ctx, generator, snapshot, run)
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)
@@ -90,7 +86,7 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 // load reads the turn's frozen input and records how long it took.
 func (s *Service) load(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Snapshot, error) {
 	started := time.Now()
-	snapshot, err := s.host.LoadInput(ctx, store, run, generator, LoadSnapshotLimit)
+	snapshot, err := s.loadInput(ctx, store, run, generator, LoadSnapshotLimit)
 	if err != nil {
 		return Snapshot{}, AtStage(StageLoad, err)
 	}

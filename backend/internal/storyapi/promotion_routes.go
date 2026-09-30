@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gameagent/backend/internal/storyapp"
+	"gameagent/backend/internal/app"
 )
 
 // Promotion routes keep the same split the service enforces: the ordinary preview
@@ -33,7 +33,7 @@ func (s *Server) characterPromotions(w http.ResponseWriter, r *http.Request, wor
 		}
 		writeJSON(w, 200, map[string]any{"promotion": preview})
 	case "POST":
-		var request storyapp.PromotionRequest
+		var request app.PromotionRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}

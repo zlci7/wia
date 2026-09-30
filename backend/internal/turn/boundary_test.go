@@ -16,7 +16,7 @@ import (
 // came from, how a player-visible projection is rendered, and what one model call was
 // allowed to see. It may depend on what is already below it — world, wire, model,
 // storage, plot, story, the memory types, and token estimation, which is arithmetic over
-// text and knows nothing of this domain — but not on storyapp or storyapi, which are the
+// text and knows nothing of this domain — but not on app or storyapi, which are the
 // application around it. An import in that direction would mean the module was extracted
 // while still being called from the code above it, and the only symptom would be a build
 // that keeps working while the boundary stops meaning anything.
@@ -28,7 +28,7 @@ func TestTurnDoesNotDependOnTheApplication(t *testing.T) {
 		"gameagent/backend/internal/storage":       true,
 		"gameagent/backend/internal/plot":          true,
 		"gameagent/backend/internal/story":         true,
-		"gameagent/backend/internal/memorymodel":   true,
+		"gameagent/backend/internal/memory":        true,
 		"gameagent/backend/internal/tokenestimate": true,
 	}
 	entries, err := os.ReadDir(".")
@@ -57,7 +57,7 @@ func TestTurnDoesNotDependOnTheApplication(t *testing.T) {
 			}
 			if !allowed[path] {
 				t.Errorf("%s imports %q: turn may depend only on what is below it — world, wire, model, "+
-					"storage, plot, story, memorymodel and tokenestimate — never on storyapp or storyapi", name, path)
+					"storage, plot, story, memory and tokenestimate — never on app or storyapi", name, path)
 			}
 		}
 	}

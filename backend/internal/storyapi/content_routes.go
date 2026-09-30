@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"gameagent/backend/internal/app"
 	"gameagent/backend/internal/content"
-	"gameagent/backend/internal/storyapp"
 )
 
 // Author-facing routes: lead-character templates, the current world's lead profile,
@@ -21,7 +21,7 @@ func (s *Server) personas(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, map[string]any{"personas": list})
 	case "POST":
-		var request storyapp.PersonaRequest
+		var request app.PersonaRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}
@@ -50,7 +50,7 @@ func (s *Server) personaRoute(w http.ResponseWriter, r *http.Request, personaID 
 		}
 		writeJSON(w, 200, map[string]any{"persona": persona})
 	case "PUT":
-		var request storyapp.PersonaRequest
+		var request app.PersonaRequest
 		if !decodeJSON(w, r, &request) {
 			return
 		}
@@ -76,7 +76,7 @@ func (s *Server) playerProfile(w http.ResponseWriter, r *http.Request, world str
 		writeError(w, 405, "method_not_allowed", "the lead profile is written with PUT")
 		return
 	}
-	var request storyapp.UpdatePlayerProfileRequest
+	var request app.UpdatePlayerProfileRequest
 	if !decodeJSON(w, r, &request) {
 		return
 	}

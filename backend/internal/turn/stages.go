@@ -5,7 +5,7 @@ package turn
 // stage is a turn operation — it composes material, sends it, validates the answer and
 // hands the result to the next stage through Output. What a stage still needs from the
 // application is one logger line per stage (Host.LogStage) and the turn's frozen input
-// (Host.LoadInput), which is why those two stay on Host.
+// before the stages begin; only application-owned stage logging stays on Host.
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-func NormalizeNPCActionIntent(value string) string {
+func normalizeNPCActionIntent(value string) string {
 	action := wire.Clean(value)
 	if action == "" {
 		return ""
@@ -43,7 +43,7 @@ func NormalizeNPCActionIntent(value string) string {
 // The output budget and prompt versions of the stages that live here. A prompt version
 // changes when the prompt does, so it belongs with the stage that sends it.
 const (
-	StructuredTurnOutputTokens = 4096
+	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion    = "story.intent.v7"
 	npcPromptVersion       = "story.npc.v13"
@@ -147,7 +147,7 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 		}
 		return nil
 	}
-	repairCount, err := GenerateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, StructuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
+	repairCount, err := GenerateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
 	if err != nil {
 		return TurnIntent{}, repairCount, err
 	}
@@ -309,25 +309,25 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			material := ComposeNPC(snapshot, def, character, recipient, intentType, stageInput, priorTurn[character.EntityID], stage)
+			material := composeNPC(snapshot, def, character, recipient, intentType, stageInput, priorTurn[character.EntityID], stage)
 			callGenerator := a.generator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 			input := material.Required
 			var decision NPCDecision
 			started := time.Now()
 			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
 			defer callCancel()
-			repairCount, err := GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, StructuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+			repairCount, err := GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
 			for recall := 0; err == nil && wire.Clean(decision.RecallQuery) != ""; recall++ {
 				if recall >= 2 || len([]rune(decision.RecallQuery)) > 256 {
 					err = ErrGenerationFailed
 					break
 				}
-				material = WithRecall(material, MemoryProjection{Context: snapshot.LongMemory[character.EntityID]}, decision.RecallQuery)
+				material = withRecall(material, memoryProjection{Context: snapshot.LongMemory[character.EntityID]}, decision.RecallQuery)
 				material.Required += fmt.Sprintf("\n已完成第%d次只读检索；命中材料按因果组纳入预算，已在近期经历或此前检索中的内容不重复添加。参考检索预算说明，缺少材料不等于事情未发生。最多两次，随后根据已获准资料完成决定。", recall+1)
 				callGenerator = a.generator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 				decision = NPCDecision{}
 				var repairs int
-				repairs, err = GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, StructuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+				repairs, err = GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
 				repairCount += repairs
 			}
 			if err != nil {
@@ -340,7 +340,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 				return
 			}
 			decision.Speech = wire.Clean(decision.Speech)
-			decision.ActionIntent = NormalizeNPCActionIntent(decision.ActionIntent)
+			decision.ActionIntent = normalizeNPCActionIntent(decision.ActionIntent)
 			decision.Memory = wire.Clean(decision.Memory)
 			if decision.Speech == "" {
 				decision.Silent = true

@@ -1,7 +1,7 @@
 package storyapi
 
 import (
-	"gameagent/backend/internal/storyapp"
+	"gameagent/backend/internal/app"
 	"net/http"
 )
 
@@ -19,7 +19,7 @@ func (s *Server) suggestions(w http.ResponseWriter, r *http.Request, world strin
 		writeError(w, 405, "method_not_allowed", "use GET, POST or PUT")
 		return
 	}
-	var req storyapp.SuggestionRequest
+	var req app.SuggestionRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}

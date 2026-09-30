@@ -13,8 +13,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	wiaapp "gameagent/backend/internal/app"
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/storyapp"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -48,7 +48,7 @@ func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest)
 }
 
 func TestLocalSessionAndStoryRoutes(t *testing.T) {
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	app, err := wiaapp.Open(context.Background(), wiaapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", response.StatusCode, body)
 	}
 	var statusEnvelope struct {
-		Status storyapp.Status `json:"status"`
+		Status wiaapp.Status `json:"status"`
 	}
 	decodeJSONBody(t, body, &statusEnvelope)
 	if !statusEnvelope.Status.Ready || statusEnvelope.Status.ActiveWorld != nil {
@@ -160,7 +160,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		}
 	}
 	response, body = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/worlds/"+url.PathEscape(world.WorldID)+"/messages?after_seq=0&limit=1", nil)
-	var messagePage storyapp.MessagePage
+	var messagePage wiaapp.MessagePage
 	decodeJSONBody(t, body, &messagePage)
 	if response.StatusCode != http.StatusOK || len(messagePage.Messages) != 1 || messagePage.Messages[0].Seq != 1 || messagePage.HasMore {
 		t.Fatalf("message page: %d %s", response.StatusCode, body)
@@ -291,7 +291,7 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 		t.Fatalf("save as = %d, body = %s", response.StatusCode, body)
 	}
 	var operationEnvelope struct {
-		Operation storyapp.SaveOperation `json:"operation"`
+		Operation wiaapp.SaveOperation `json:"operation"`
 	}
 	decodeJSONBody(t, body, &operationEnvelope)
 	operation := operationEnvelope.Operation

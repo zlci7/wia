@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"gameagent/backend/internal/app"
 	"gameagent/backend/internal/browser"
 	"gameagent/backend/internal/dataroot"
 	"gameagent/backend/internal/storyapi"
-	"gameagent/backend/internal/storyapp"
 	"gameagent/backend/internal/webdist"
 )
 
@@ -29,12 +29,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve data root: %v", err)
 	}
-	diagnostics, err := storyapp.OpenDiagnosticLog(root)
+	diagnostics, err := app.OpenDiagnosticLog(root)
 	if err != nil {
 		log.Fatal("open diagnostic log failed")
 	}
 	defer diagnostics.Close()
-	app, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: root, ModelConfigPath: *modelConfig, StoryPacksPath: *storyPacks, UserID: storyapp.LocalUserID, Logger: diagnostics.Logger(os.Stderr)})
+	app, err := app.Open(context.Background(), app.Options{DataRoot: root, ModelConfigPath: *modelConfig, StoryPacksPath: *storyPacks, UserID: app.LocalUserID, Logger: diagnostics.Logger(os.Stderr)})
 	if err != nil {
 		log.Fatalf("open World Is Agent: %v", err)
 	}

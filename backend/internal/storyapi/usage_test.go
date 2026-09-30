@@ -2,13 +2,13 @@ package storyapi
 
 import (
 	"context"
-	"gameagent/backend/internal/storyapp"
+	"gameagent/backend/internal/app"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestUsageRouteValidation(t *testing.T) {
-	a, err := storyapp.Open(context.Background(), storyapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	a, err := app.Open(context.Background(), app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

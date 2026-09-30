@@ -97,7 +97,7 @@ func (s *Service) advanceGeneratedEvents(ctx context.Context, generator model.Te
 	var response struct {
 		Candidates []eventCandidate `json:"candidates"`
 	}
-	if err = GenerateJSON(callCtx, call, material.System, material.Required, &response, StructuredTurnOutputTokens, "candidates"); err != nil {
+	if err = GenerateJSON(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, "candidates"); err != nil {
 		return nil, err
 	}
 	if response.Candidates == nil || len(response.Candidates) > 1 {
@@ -203,7 +203,7 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
-	if err = GenerateJSON(callCtx, call, material.System, material.Required, &result, StructuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
+	if err = GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
 		return nil, err
 	}
 	if err = validatePlotResolution(snapshot, node, *output, result); err != nil {
@@ -455,7 +455,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			SceneUpdates []sceneUpdate      `json:"scene_updates"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, StructuredTurnOutputTokens, "outcomes", "scene_updates")
+		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
 		cancel()
 		if err != nil {
 			return nil, err

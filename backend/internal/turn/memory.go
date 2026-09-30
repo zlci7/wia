@@ -3,12 +3,12 @@ package turn
 // This file owns how much memory one model call may see and how it is fitted into the
 // material. Choosing a window against the request's real input budget, shrinking it
 // whole-group by whole-group, and appending retrieval results are all decisions about
-// this call, not about what a character remembers — that part lives in memorymodel.
+// this call, not about what a character remembers — that part lives in memory.
 
 import (
 	"fmt"
 
-	"gameagent/backend/internal/memorymodel"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 )
 
@@ -25,10 +25,10 @@ const budgetHeadroomTokens = 256
 // complete group.
 const recentWindowMinTokens = 512
 
-// WithLongMemory fits a scope's committed memory into the material: the standing digest,
+// withLongMemory fits a scope's committed memory into the material: the standing digest,
 // the newest complete groups, and whatever the request's own input budget still allows
 // after the base prompt. It never advances the digest watermark.
-func WithLongMemory(material Material, snapshot Snapshot, scope, query string) Material {
+func withLongMemory(material Material, snapshot Snapshot, scope, query string) Material {
 	m, ok := snapshot.LongMemory[scope]
 	if !ok {
 		return material
@@ -52,7 +52,7 @@ func WithLongMemory(material Material, snapshot Snapshot, scope, query string) M
 	// is untouched either way.
 	full := material
 	material.Bounded = func(inputLimit int) (Material, bool) {
-		groups := memorymodel.MemoryGroups(block)
+		groups := memory.MemoryGroups(block)
 		if len(groups) <= 1 {
 			return full, false
 		}
@@ -66,7 +66,7 @@ func WithLongMemory(material Material, snapshot Snapshot, scope, query string) M
 		if len(kept) >= len(groups) {
 			return full, false
 		}
-		return renderMemoryWindow(full, base, m, scope, memorymodel.FlattenGroups(kept), query), true
+		return renderMemoryWindow(full, base, m, scope, memory.FlattenGroups(kept), query), true
 	}
 	return material
 }
@@ -74,14 +74,14 @@ func WithLongMemory(material Material, snapshot Snapshot, scope, query string) M
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material Material, base string, m MemoryContext, scope string, block []memorymodel.MemorySource, query string) Material {
+func renderMemoryWindow(material Material, base string, m MemoryContext, scope string, block []memory.MemorySource, query string) Material {
 	material.Required = base
 	material.RequiredSources = nil
 	material.DeclinedSources = nil
 	material.RecallSources = nil
 	material.RecallLimited = false
 	material.Optional = nil
-	groups := memorymodel.MemoryGroups(block)
+	groups := memory.MemoryGroups(block)
 	included := map[string]bool{}
 	for _, record := range block {
 		included[record.ID] = true
@@ -91,8 +91,8 @@ func renderMemoryWindow(material Material, base string, m MemoryContext, scope s
 	if declinedCount > 0 {
 		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(groups), declinedCount)
 	}
-	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + memorymodel.DigestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memorymodel.MemoryRecordsText(block) + "\n本轮职责与刺激：\n" + material.Required
-	material.RequiredSources = append(material.RequiredSources, memorymodel.RetainedStateSources(m.Digest)...)
+	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + memory.DigestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memory.MemoryRecordsText(block) + "\n本轮职责与刺激：\n" + material.Required
+	material.RequiredSources = append(material.RequiredSources, memory.RetainedStateSources(m.Digest)...)
 	if m.Digest.Revision > 0 {
 		material.RequiredSources = append(material.RequiredSources, fmt.Sprintf("digest:%s:%d", scope, m.Digest.Revision))
 	}
@@ -101,14 +101,14 @@ func renderMemoryWindow(material Material, base string, m MemoryContext, scope s
 	}
 	// Groups that did not fit stay retrievable: they remain in the archive and are
 	// reported as declined rather than as already retrieved.
-	backlog := [][]memorymodel.MemorySource{}
-	for _, group := range memorymodel.MemoryGroups(m.Tail) {
+	backlog := [][]memory.MemorySource{}
+	for _, group := range memory.MemoryGroups(m.Tail) {
 		if len(group) > 0 && !included[group[0].ID] {
 			backlog = append(backlog, group)
 		}
 	}
 	for i := len(backlog) - 1; i >= 0; i-- {
-		section := Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memorymodel.MemoryRecordsText(backlog[i])}
+		section := Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memory.MemoryRecordsText(backlog[i])}
 		for _, record := range backlog[i] {
 			section.Sources = append(section.Sources, record.ID)
 			material.DeclinedSources = append(material.DeclinedSources, record.ID)
@@ -119,22 +119,22 @@ func renderMemoryWindow(material Material, base string, m MemoryContext, scope s
 	for _, record := range block {
 		supplied[record.ID] = true
 	}
-	return WithRecall(material, MemoryProjection{Context: m, Supplied: supplied}, query)
+	return withRecall(material, memoryProjection{Context: m, Supplied: supplied}, query)
 }
 
-// MemoryProjection is what this request already supplies, so retrieval does not offer the
-// same committed group twice. It stays exported while storyapp tests exercise this boundary.
-type MemoryProjection struct {
+// memoryProjection is what this request already supplies, so retrieval does not offer the
+// same committed group twice.
+type memoryProjection struct {
 	Context MemoryContext
 	// Supplied marks the records this request already provides; anything else the
 	// receiver may lawfully recall stays eligible for retrieval.
 	Supplied map[string]bool
 }
 
-// WithRecall appends authorized retrieval hits to the material as optional sections, one
+// withRecall appends authorized retrieval hits to the material as optional sections, one
 // whole committed group per hit, lowest-ranked first when the composer has to drop
 // something.
-func WithRecall(material Material, projection MemoryProjection, query string) Material {
+func withRecall(material Material, projection memoryProjection, query string) Material {
 	m := projection.Context
 	excluded := make(map[string]bool, len(projection.Supplied)+len(material.RecallSources))
 	for id := range projection.Supplied {
@@ -143,13 +143,13 @@ func WithRecall(material Material, projection MemoryProjection, query string) Ma
 	for _, id := range material.RecallSources {
 		excluded[id] = true
 	}
-	search := memorymodel.SearchMemoryGroups(m.Archive, query, excluded, 5)
+	search := memory.SearchMemoryGroups(m.Archive, query, excluded, 5)
 	material.RecallLimited = material.RecallLimited || search.Limited
 	var selected []Section
 	// Lowest-ranked matches are removed first by the shared budgeter. Search returns
 	// complete committed groups so attempts keep their outcomes.
 	for _, group := range search.Groups {
-		section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memorymodel.MemoryRecordsText(group)}
+		section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memory.MemoryRecordsText(group)}
 		for _, record := range group {
 			section.Sources = append(section.Sources, record.ID)
 			material.RecallSources = append(material.RecallSources, record.ID)
@@ -164,13 +164,13 @@ func WithRecall(material Material, projection MemoryProjection, query string) Ma
 
 // groupsWithinBudget keeps the newest complete groups that fit, and always keeps the
 // newest one so a turn never loses its own most recent context.
-func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]memorymodel.MemorySource {
+func groupsWithinBudget(groups [][]memory.MemorySource, budget int) [][]memory.MemorySource {
 	if len(groups) == 0 {
 		return nil
 	}
 	for start := 0; start < len(groups); start++ {
 		candidate := groups[start:]
-		if FramedContextTokens(model.TextRequest{Input: memorymodel.MemoryRecordsText(memorymodel.FlattenGroups(candidate))}) <= budget || start == len(groups)-1 {
+		if FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(memory.FlattenGroups(candidate))}) <= budget || start == len(groups)-1 {
 			return candidate
 		}
 	}
@@ -181,17 +181,17 @@ func groupsWithinBudget(groups [][]memorymodel.MemorySource, budget int) [][]mem
 // remaining input budget. It falls back to the size-based rule when no budget is known,
 // always keeps the newest group, and never advances the digest watermark: supplying
 // fewer groups must not claim they were summarized.
-func selectRecentWindow(items []memorymodel.MemorySource, available int) (block []memorymodel.MemorySource, backlog [][]memorymodel.MemorySource, supplied map[string]bool) {
+func selectRecentWindow(items []memory.MemorySource, available int) (block []memory.MemorySource, backlog [][]memory.MemorySource, supplied map[string]bool) {
 	supplied = map[string]bool{}
-	groups := memorymodel.MemoryGroups(items)
+	groups := memory.MemoryGroups(items)
 	if len(groups) == 0 {
 		return nil, nil, supplied
 	}
 	if available <= 0 {
-		block, backlog, supplied = memorymodel.ProjectRecentExperience(items)
+		block, backlog, supplied = memory.ProjectRecentExperience(items)
 		return block, backlog, supplied
 	}
-	start := len(groups) - memorymodel.TargetRecentGroups
+	start := len(groups) - memory.TargetRecentGroups
 	if start < 0 {
 		start = 0
 	}
@@ -199,13 +199,13 @@ func selectRecentWindow(items []memorymodel.MemorySource, available int) (block 
 	// when it is larger than the size rule allows.
 	for start < len(groups)-1 {
 		candidate := groups[start:]
-		if FramedContextTokens(model.TextRequest{Input: memorymodel.MemoryRecordsText(memorymodel.FlattenGroups(candidate))}) <= available &&
-			len(memorymodel.MemoryRecordsText(memorymodel.FlattenGroups(candidate))) <= memorymodel.RecentWindowChars {
+		if FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(memory.FlattenGroups(candidate))}) <= available &&
+			len(memory.MemoryRecordsText(memory.FlattenGroups(candidate))) <= memory.RecentWindowChars {
 			break
 		}
 		start++
 	}
-	block = memorymodel.FlattenGroups(groups[start:])
+	block = memory.FlattenGroups(groups[start:])
 	for _, record := range block {
 		supplied[record.ID] = true
 	}
