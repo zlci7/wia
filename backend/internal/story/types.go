@@ -14,9 +14,43 @@
 package story
 
 import (
+	"strings"
+
 	"gameagent/backend/internal/plot"
 	wiaworld "gameagent/backend/internal/world"
 )
+
+// CharacterByID finds one frozen runtime character by its stable entity ID.
+func CharacterByID(definition Definition, id string) (wiaworld.Character, bool) {
+	id = strings.TrimSpace(id)
+	for _, character := range definition.Characters {
+		if character.EntityID == id {
+			return character, true
+		}
+	}
+	return wiaworld.Character{}, false
+}
+
+// LocationIDFor maps a stored scene description back to its frozen location.
+// Scene text may add detail after the location name, so exact and prefix matches
+// are both accepted.
+func LocationIDFor(definition Definition, scene string) string {
+	scene = strings.TrimSpace(scene)
+	if scene == "" {
+		return ""
+	}
+	for _, location := range definition.Locations {
+		if location.Name == scene {
+			return location.ID
+		}
+	}
+	for _, location := range definition.Locations {
+		if location.Name != "" && strings.HasPrefix(scene, location.Name) {
+			return location.ID
+		}
+	}
+	return ""
+}
 
 // Location is a place a story starts in and the places reachable from it, after
 // validation and normalization. The pack format has its own representation of this.

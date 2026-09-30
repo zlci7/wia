@@ -26,24 +26,6 @@ type plotTestGenerator struct {
 	intervene     bool
 }
 
-func TestPlotReferencesRetainedViewsOutsideEventWindow(t *testing.T) {
-	s := turn.Snapshot{Plot: lanternPlotDefinition(), Sources: map[string]turn.SourceMetadata{"old-result": {ID: "old-result", Kind: "player_action_result"}, "old-plot": {ID: "old-plot", Kind: "plot_result"}}, PlotProgress: plot.Progress{Nodes: map[string]plot.NodeState{"dock_warning": {Status: "occurred", EventID: "old-plot", Content: "铃已响"}}}}
-	out := turn.Output{SceneViews: []turn.SceneView{{Recipient: "player", Content: "信使已安全上船", SourceIDs: []string{"old-result"}, Version: 1}}}
-	r := plotResolution{Status: "occurred", Content: "机会结束", SourceIDs: []string{"old-result", "old-plot"}, Projections: []plotProjection{}, DecisionRequests: []string{}}
-	if err := validatePlotResolution(s, s.Plot.Nodes[2], out, r); err != nil {
-		t.Fatal("retained sourced material rejected", err)
-	}
-	r.SourceIDs = []string{"unprovided-other-world"}
-	if !errors.Is(validatePlotResolution(s, s.Plot.Nodes[2], out, r), ErrContextSourceMissing) {
-		t.Fatal("unknown reference accepted")
-	}
-	delete(s.Sources, "old-result")
-	r.SourceIDs = []string{"old-result"}
-	if !errors.Is(validatePlotResolution(s, s.Plot.Nodes[2], out, r), ErrContextSourceMissing) {
-		t.Fatal("view ID grants nonexistent source")
-	}
-}
-
 func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
 	g.mu.Lock()
 	g.requests = append(g.requests, req)
@@ -327,24 +309,6 @@ func TestPlotOffSceneDecisionAndPlayerProjection(t *testing.T) {
 	}
 }
 
-func TestPlotSceneSourcesPreserveAudience(t *testing.T) {
-	output := turn.Output{SceneVersion: 1, SceneViews: []turn.SceneView{{Recipient: "player", Content: "客栈", Version: 1}, {Recipient: "npc:innkeeper", Content: "柜台", Version: 1}}, Events: []wiaworld.Event{{EventID: "author", Content: "隐藏答案"}}, Perceptions: []wiaworld.Perception{{RecipientID: "npc:innkeeper", SourceEventID: "private", Content: "私人结果", Stage: 4}, {RecipientID: "player", SourceEventID: "public", Content: "铃声", Stage: 4}, {RecipientID: "npc:innkeeper", SourceEventID: "old", Content: "早前私聊", Stage: 1}}}
-	sources := plotSceneSources(output, nil)
-	for _, id := range []string{"author", "private", "old", "view:npc:innkeeper", "future"} {
-		candidate := output
-		err := applyPlotSceneUpdates(&candidate, sources, []sceneUpdate{{Content: "不应成立", SourceIDs: []string{id}, Recipients: []string{"player"}}})
-		if err == nil || candidate.SceneVersion != 1 {
-			t.Fatalf("unauthorized view source=%s", id)
-		}
-	}
-	if err := applyPlotSceneUpdates(&output, sources, []sceneUpdate{{Content: "客栈传来铃声", SourceIDs: []string{"public"}, Recipients: []string{"player"}}}); err != nil {
-		t.Fatal(err)
-	}
-	if output.Scene != "客栈传来铃声" || output.SceneVersion != 2 {
-		t.Fatal("valid view not applied")
-	}
-}
-
 func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 	ctx := context.Background()
 	app := newTestApp(t, &plotTestGenerator{})
@@ -387,35 +351,6 @@ func TestPlotCopyAndLegacyReadDoNotAdvanceOrInject(t *testing.T) {
 	}
 	if legacy.Plot != nil || legacy.Summary.Clock != "第 1 日 19:05" {
 		t.Fatal("legacy changed")
-	}
-}
-
-func TestPlotResolutionReferencesAndAudience(t *testing.T) {
-	s := turn.Snapshot{Plot: lanternPlotDefinition(), Characters: lanternDefinition().Characters}
-	node := s.Plot.Nodes[0]
-	base := plotResolution{Status: "occurred", Content: "结果", SourceIDs: []string{"definition:" + s.Plot.Revision + ":" + node.ID}, Projections: []plotProjection{}, DecisionRequests: []string{}}
-	if err := validatePlotResolution(s, node, turn.Output{}, base); err != nil {
-		t.Fatal(err)
-	}
-	bad := base
-	bad.SourceIDs = []string{"other-world:event"}
-	if err := validatePlotResolution(s, node, turn.Output{}, bad); !errors.Is(err, ErrContextSourceMissing) {
-		t.Fatal(err)
-	}
-	bad = base
-	bad.Projections = []plotProjection{{Recipient: "unknown", Content: "秘密"}}
-	if err := validatePlotResolution(s, node, turn.Output{}, bad); err == nil {
-		t.Fatal("expanded audience")
-	}
-	bad = base
-	bad.Ending = "强制结束"
-	if err := validatePlotResolution(s, node, turn.Output{}, bad); err == nil {
-		t.Fatal("nonterminal ending")
-	}
-	bad = base
-	bad.DecisionRequests = []string{"npc:mercenary"}
-	if err := validatePlotResolution(s, node, turn.Output{}, bad); err == nil {
-		t.Fatal("wake without perception")
 	}
 }
 

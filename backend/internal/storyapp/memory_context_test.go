@@ -19,51 +19,6 @@ type digestGenerator struct {
 	fail     bool
 }
 
-type recallProbe struct {
-	requests []model.TextRequest
-	always   bool
-}
-
-func (g *recallProbe) GenerateText(_ context.Context, r model.TextRequest) (model.TextResponse, error) {
-	g.requests = append(g.requests, r)
-	if len(g.requests) == 1 || g.always {
-		return model.TextResponse{Text: `{"speech":"","action_intent":"","silent":true,"memory":"","recall_query":"铜钥匙"}`}, nil
-	}
-	return model.TextResponse{Text: `{"speech":"我记得这件事。","action_intent":"","silent":false,"memory":"重新想起约定。"}`}, nil
-}
-
-func TestNPCRecallRoundTripAndStageFiveMemory(t *testing.T) {
-	ctx := context.Background()
-	a := newTestApp(t, &scriptedGenerator{})
-	w, err := a.createFixtureWorld(ctx, "检索", "open", "旅人", "", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := readContextSnapshot(t, a, w.WorldID)
-	s.LongMemory = map[string]turn.MemoryContext{
-		"npc:innkeeper": {Archive: []memorymodel.MemorySource{{ID: "personal-old", Seq: 1, Content: "铜钥匙须在柜台归还"}}},
-		"npc:mercenary": {Archive: []memorymodel.MemorySource{{ID: "other-secret", Seq: 1, Content: "他人的铜钥匙秘密"}}},
-	}
-	s.Perceptions["npc:innkeeper"] = []wiaworld.Perception{{SourceEventID: "current-done", Content: "此前已完成添茶，不是新提案。", SourceType: "action_result"}}
-	s.Sources["current-done"] = turn.SourceMetadata{ID: "current-done", Actor: "npc:innkeeper", Kind: "npc_action_result"}
-	input := map[string]turn.StageInput{"npc:innkeeper": {NewStimulus: "新的铃声"}}
-	g := &recallProbe{}
-	decisions := map[string]turn.NPCDecision{}
-	if err = a.turnService().DecideNPCs(ctx, g, s, lanternDefinition(), wiaworld.Run{RunID: "probe", BaseContextEpoch: w.ContextEpoch}, "npc:innkeeper", "speak", input, nil, decisions, 5); err != nil {
-		t.Fatal(err)
-	}
-	if len(g.requests) != 2 || strings.Contains(g.requests[0].Input, "柜台归还") || !strings.Contains(g.requests[1].Input, "柜台归还") || strings.Contains(g.requests[1].Input, "他人的铜钥匙秘密") {
-		t.Fatal("retrieval scope or execution incorrect")
-	}
-	if !strings.Contains(g.requests[1].Input, "此前已完成添茶") {
-		t.Fatal("stage five lost current results")
-	}
-	g = &recallProbe{always: true}
-	if err = a.turnService().DecideNPCs(ctx, g, s, lanternDefinition(), wiaworld.Run{RunID: "bounded", BaseContextEpoch: w.ContextEpoch}, "npc:innkeeper", "speak", input, nil, map[string]turn.NPCDecision{}, 5); err == nil || len(g.requests) != 3 {
-		t.Fatal("unbounded recall", err, len(g.requests))
-	}
-}
-
 func (g *digestGenerator) GenerateText(_ context.Context, r model.TextRequest) (model.TextResponse, error) {
 	g.requests = append(g.requests, r)
 	if g.fail {

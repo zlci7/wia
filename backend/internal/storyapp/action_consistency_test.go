@@ -113,16 +113,6 @@ func TestPlotActionPresencePersistsAndControlsNextRound(t *testing.T) {
 	}
 }
 
-func TestPlotPresenceRejectsUnresolvedMovement(t *testing.T) {
-	p := false
-	events := []wiaworld.Event{{EventID: "a", ActorID: "npc:a", EventType: "npc_action_intent"}}
-	for _, status := range []string{"failed", "not_executed"} {
-		if _, err := plotActionPresence([]string{"npc:a"}, events, []plotActionResult{{hostActionResult: hostActionResult{ActionID: "a", Status: status}, ActorInScene: &p}}); err == nil {
-			t.Fatal("unresolved movement accepted")
-		}
-	}
-}
-
 type actionConsistencyGenerator struct{ status string }
 
 func TestArrivalSharesOnlyNewOutcomeWithEnteringNPC(t *testing.T) {

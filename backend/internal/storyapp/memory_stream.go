@@ -36,7 +36,7 @@ func indexMemorySources(ctx context.Context, store *storage.WorldStore) error {
 				return err
 			}
 			if missing > 0 {
-				return ErrContextSourceMissing
+				return turn.ErrContextSourceMissing
 			}
 		}
 		records, err := tx.MemoryProjectionCandidates(ctx)

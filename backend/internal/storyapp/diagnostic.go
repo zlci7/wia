@@ -15,8 +15,6 @@ import (
 // the same as when this switch held every case itself.
 func safeTurnErrorCode(err error) string {
 	switch {
-	case errors.Is(err, ErrContextSourceMissing):
-		return "context_source_missing"
 	case errors.Is(err, ErrVersionConflict):
 		return "version_conflict"
 	}

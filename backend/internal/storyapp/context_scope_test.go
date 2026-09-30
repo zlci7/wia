@@ -19,7 +19,7 @@ import (
 
 func contextFixture() turn.Snapshot {
 	s := turn.Snapshot{Summary: wiaworld.WorldSummary{GameID: GameID, WorldID: "fixture", Scene: "不应共享的全知旧场景"}, SceneVersion: 1, Characters: lanternDefinition().Characters, Perceptions: map[string][]wiaworld.Perception{}, Memories: map[string][]wiaworld.Memory{}, Sources: map[string]turn.SourceMetadata{}}
-	s.SceneViews = initialSceneViews(s)
+	s.SceneViews = turn.InitialSceneViews(s)
 	return s
 }
 
@@ -39,41 +39,6 @@ func readContextSnapshot(t *testing.T, a *App, id string) turn.Snapshot {
 		t.Fatal(err)
 	}
 	return s
-}
-
-func TestSceneUpdatesEnforceEverySourceRecipient(t *testing.T) {
-	s := contextFixture()
-	run := wiaworld.Run{RunID: "run"}
-	intent := turn.TurnIntent{Visibility: "private", AddresseeID: "npc:innkeeper"}
-	output := turn.Output{Events: []wiaworld.Event{{EventID: "run:input", RunID: "run", Stage: 1, EventType: "player_attempt", ActorID: "player", Content: "私密信件位置"}}}
-	for _, test := range []struct {
-		name            string
-		ids, recipients []string
-		valid           bool
-	}{
-		{"player", []string{"run:input"}, []string{"player"}, true},
-		{"recipient", []string{"run:input"}, []string{"npc:innkeeper"}, true},
-		{"observer", []string{"run:input"}, []string{"npc:mercenary"}, false},
-		{"mixed sources", []string{"view:npc:mercenary", "run:input"}, []string{"npc:mercenary"}, false},
-		{"other world", []string{"another:input"}, []string{"player"}, false},
-		{"other personal view", []string{"view:npc:innkeeper"}, []string{"npc:mercenary"}, false},
-		{"invalid recipient", []string{"run:input"}, []string{"npc:unknown"}, false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			host := hostResult{SceneUpdates: []sceneUpdate{{Content: "私密信件位置", SourceIDs: test.ids, Recipients: test.recipients}}}
-			views, err := applySceneUpdates(s, run, intent, output, host)
-			if (err == nil) != test.valid {
-				t.Fatalf("err=%v", err)
-			}
-			if err == nil {
-				next := s
-				next.SceneViews = views
-				if strings.Contains(turn.SceneFor(next, "npc:mercenary"), "私密") {
-					t.Fatal("private scene broadcast")
-				}
-			}
-		})
-	}
 }
 
 func TestScopedRequestsIgnoreLegacyOmniscientSceneAndForeignMemory(t *testing.T) {
@@ -129,7 +94,7 @@ func TestSourceMetadataSurvivesGlobalWindowAndRejectsMissing(t *testing.T) {
 		t.Fatal("fixture did not push event outside window")
 	}
 	s.Perceptions["npc:mercenary"] = append(s.Perceptions["npc:mercenary"], wiaworld.Perception{SourceEventID: "missing"})
-	if _, err := loadSourceMetadata(context.Background(), store.Database(), s); !errors.Is(err, ErrContextSourceMissing) {
+	if _, err := loadSourceMetadata(context.Background(), store.Database(), s); !errors.Is(err, turn.ErrContextSourceMissing) {
 		t.Fatalf("missing=%v", err)
 	}
 }
@@ -151,7 +116,7 @@ func (g sceneUpdateGenerator) GenerateText(ctx context.Context, req model.TextRe
 		}
 		start := strings.Index(req.Input, "场景来源(JSON)：") + len("场景来源(JSON)：")
 		end := strings.Index(req.Input[start:], "\n")
-		var sources []turn.SceneSource
+		var sources []sceneSource
 		_ = json.Unmarshal([]byte(req.Input[start:start+end]), &sources)
 		for _, source := range sources {
 			if strings.HasSuffix(source.ID, ":input") {
@@ -199,7 +164,7 @@ func TestLegacySceneViewsUseOnlyAuthorizedRecords(t *testing.T) {
 	s.Summary.TurnSeq = 10
 	s.Events = []wiaworld.Event{{EventID: "public-result", EventType: "turn_settled", Content: "茶在桌上。"}, {EventID: "secret", EventType: "npc_action_result", Content: "隐藏信件。"}}
 	s.Perceptions["npc:mercenary"] = []wiaworld.Perception{{SourceEventID: "public-result", SourceType: "action_succeeded", Content: "茶在桌上。"}}
-	s.SceneViews = initialSceneViews(s)
+	s.SceneViews = turn.InitialSceneViews(s)
 	for _, id := range []string{"player", "npc:mercenary"} {
 		if turn.SceneFor(s, id) != "茶在桌上。" {
 			t.Fatalf("%s: %s", id, turn.SceneFor(s, id))
@@ -238,28 +203,6 @@ func TestMissingContextSourceBlocksGenerationNotReadingHistory(t *testing.T) {
 	defer g.mu.Unlock()
 	if len(g.requests) != 0 {
 		t.Fatal("model called with incomplete sources")
-	}
-}
-
-func TestSceneSourcesRejectForeignRunAndFutureStage(t *testing.T) {
-	s := contextFixture()
-	events := []wiaworld.Event{
-		{EventID: "valid", RunID: "current", Stage: 1, EventType: "player_attempt"},
-		{EventID: "foreign", RunID: "foreign", Stage: 1, EventType: "player_attempt"},
-		{EventID: "future", RunID: "current", Stage: 9, EventType: "npc_dialogue"},
-	}
-	sources := turn.SceneSources(s, wiaworld.Run{RunID: "current"}, turn.TurnIntent{Visibility: "public"}, events)
-	var valid bool
-	for _, source := range sources {
-		if source.ID == "foreign" || source.ID == "future" {
-			t.Fatal("invalid stage/run source admitted")
-		}
-		if source.ID == "valid" {
-			valid = true
-		}
-	}
-	if !valid {
-		t.Fatal("current source missing")
 	}
 }
 

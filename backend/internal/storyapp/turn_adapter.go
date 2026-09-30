@@ -35,13 +35,3 @@ func (h *turnHost) LogStage(worldID string, run wiaworld.Run, stage turn.Stage, 
 func (h *turnHost) LoadInput(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator, limit int) (turn.Snapshot, error) {
 	return h.app.loadTurn(ctx, store, run, generator, limit)
 }
-
-func (h *turnHost) Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output *turn.Output) error {
-	participants := turn.InScene(snapshot.Characters)
-	host, visibleEvents, err := h.app.coordinateStage(ctx, generator, snapshot, run, intent, participants, intent.AddresseeID, intent.Private(), output)
-	if err != nil {
-		return err
-	}
-	output.VisibleEvents = append(output.VisibleEvents, visibleEvents...)
-	return h.app.resolveSceneResult(ctx, generator, snapshot, run, intent, host, participants, output)
-}

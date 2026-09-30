@@ -370,6 +370,10 @@ func walkJSON(decoder *json.Decoder) error {
 // one repair attempt.
 var ErrGenerationFailed = errors.New("generation failed")
 
+// ErrContextSourceMissing marks stored provenance that cannot be resolved to its
+// committed source. Scene and progression validation share this boundary.
+var ErrContextSourceMissing = errors.New("context source is missing")
+
 // GenerationError says which part of the generated JSON was rejected. A failure code and
 // field are taken from the local schema, never from the response text.
 type GenerationError struct {
@@ -400,6 +404,8 @@ func ErrorCode(err error) string {
 		return "generated_content_invalid"
 	case errors.Is(err, ErrContextCapacity):
 		return "context_capacity"
+	case errors.Is(err, ErrContextSourceMissing):
+		return "context_source_missing"
 	default:
 		return "internal_error"
 	}

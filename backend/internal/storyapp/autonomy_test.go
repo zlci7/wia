@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -20,7 +21,7 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 	}
 	s := readContextSnapshot(t, a, w.WorldID)
 	for _, c := range s.Characters {
-		initial, _ := turn.CharacterByID(lanternDefinition(), c.EntityID)
+		initial, _ := story.CharacterByID(lanternDefinition(), c.EntityID)
 		if c.InitialConcerns == "" || c.InitialConcerns != initial.InitialConcerns {
 			t.Fatal("initial concern not copied")
 		}
@@ -55,22 +56,7 @@ func TestInitialConcernsAreSnapshotDataAndPrivate(t *testing.T) {
 }
 
 func TestAutonomousSilentActionHasIndependentChannel(t *testing.T) {
-	var out turn.Output
-	run := wiaworld.Run{RunID: "autonomy"}
 	actor := lanternDefinition().Characters[0]
-	turn.AppendNPCDecisionOutput(&out, run, actor, turn.NPCDecision{Silent: true, ActionIntent: "检查门闩", Memory: "我准备检查门闩"}, lanternDefinition().Characters, "autonomy:input", 1, 1)
-	var actions int
-	for _, e := range out.Events {
-		if e.EventType == "npc_dialogue" {
-			t.Fatal("silent action invented speech")
-		}
-		if e.EventType == "npc_action_intent" {
-			actions++
-		}
-	}
-	if actions != 1 {
-		t.Fatalf("actions=%d", actions)
-	}
 	s := contextFixture()
 	m := turn.ComposeNPC(s, lanternDefinition(), actor, "", "act", turn.StageInput{PlayerPerception: "我沉默片刻，不回复"}, "", 1)
 	if strings.Contains(m.Required, "基于玩家本轮输入作出一次自然决定") || !strings.Contains(m.Required, "处理自己的事务") {

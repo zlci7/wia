@@ -294,7 +294,7 @@ func loadTurnSnapshot(ctx context.Context, store *storage.WorldStore, limit int)
 	}
 	raw, sceneErr := get("scene_views")
 	if errors.Is(sceneErr, sql.ErrNoRows) {
-		out.SceneViews = initialSceneViews(out)
+		out.SceneViews = turn.InitialSceneViews(out)
 	} else {
 		if sceneErr != nil {
 			return out, sceneErr
@@ -302,7 +302,7 @@ func loadTurnSnapshot(ctx context.Context, store *storage.WorldStore, limit int)
 		if err = json.Unmarshal([]byte(raw), &out.SceneViews); err != nil {
 			return out, err
 		}
-		if err = validateSceneViews(out); err != nil {
+		if err = turn.ValidateSceneViews(out); err != nil {
 			return out, err
 		}
 	}

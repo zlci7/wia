@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -95,17 +94,5 @@ func TestPendingActionsAndNotExecutedResultsSurviveAtomicTurn(t *testing.T) {
 	}
 	if !observed {
 		t.Fatal("actor lost own result")
-	}
-}
-
-func TestNotExecutedStillRequiresEveryActionAndValidRecipients(t *testing.T) {
-	run := wiaworld.Run{RunID: "r"}
-	actor := lanternDefinition().Characters[0]
-	out := turn.Output{Events: []wiaworld.Event{{EventID: "action", ActorID: actor.EntityID, EventType: "npc_action_intent", RunID: "r", Stage: 1}}}
-	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, nil); err == nil {
-		t.Fatal("missing outcome accepted")
-	}
-	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}); err == nil {
-		t.Fatal("unknown recipient accepted")
 	}
 }

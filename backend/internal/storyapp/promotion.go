@@ -514,27 +514,7 @@ func sceneIDFor(snapshot turn.Snapshot) string {
 	if snapshot.SceneLocation != "" {
 		return snapshot.SceneLocation
 	}
-	return locationIDFor(snapshot.Definition, snapshot.Summary.Scene)
-}
-
-// locationIDFor finds the location a scene text belongs to. A scene description may
-// be rewritten with extra detail, so an exact match is not enough.
-func locationIDFor(definition story.Definition, scene string) string {
-	scene = strings.TrimSpace(scene)
-	if scene == "" {
-		return ""
-	}
-	for _, location := range definition.Locations {
-		if location.Name == scene {
-			return location.ID
-		}
-	}
-	for _, location := range definition.Locations {
-		if location.Name != "" && strings.HasPrefix(scene, location.Name) {
-			return location.ID
-		}
-	}
-	return ""
+	return story.LocationIDFor(snapshot.Definition, snapshot.Summary.Scene)
 }
 
 // promotionIdentity gives the promoted character its own identity, derived from the

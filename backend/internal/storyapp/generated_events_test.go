@@ -214,13 +214,6 @@ func TestGeneratedEventsEmptyChoiceAndInvalidScope(t *testing.T) {
 			t.Fatal("invalid author boundary admitted")
 		}
 	}
-	for _, opportunity := range []eventOpportunity{{Kind: "arrival", Location: "workshop", ActionID: "nonexistent"}, {Kind: "arrival", Location: "outside", ActionID: "x"}, {Kind: "refresh", Location: "workshop", ActionID: "x"}} {
-		s.Summary.TurnSeq = 10
-		out := turn.Output{Clock: s.Summary.Clock}
-		if _, err := a.advanceGeneratedEvents(context.Background(), g, s, wiaworld.Run{RunID: "r"}, &opportunity, &out); err == nil {
-			t.Fatal("invalid opportunity accepted")
-		}
-	}
 }
 
 func TestGeneratedEventSettlementFailureIsAtomic(t *testing.T) {
@@ -268,18 +261,6 @@ func TestOpenAuthoredLinesAreIndependent(t *testing.T) {
 	n, _, _ = turn.NextPlotNode(s)
 	if n.ID != "freight_result" {
 		t.Fatal("freight depends on inspection", n)
-	}
-}
-
-func TestDeferredAuthoredEventConsumesWorldRound(t *testing.T) {
-	g := &generatedTestGenerator{}
-	a := newTestApp(t, g)
-	w := createPackWorld(t, a, "orbital-repair")
-	s := readContextSnapshot(t, a, w.WorldID)
-	out := turn.Output{Clock: "第 1 日 09:05", PlotProgress: &plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{"inspection_notice": {Status: "deferred", NextCheck: 560}}}}
-	_, err := a.advanceGeneratedEvents(context.Background(), g, s, wiaworld.Run{RunID: "deferred"}, &eventOpportunity{Kind: "arrival", Location: "workshop", ActionID: "not-evaluated"}, &out)
-	if err != nil || len(g.requests) != 0 || out.GeneratedEvents.LastOfferTurn != 0 {
-		t.Fatal("authored deferral started a second world-event round", err)
 	}
 }
 

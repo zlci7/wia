@@ -44,7 +44,7 @@ func TestIntentRecipientUsesBoundedRepair(t *testing.T) {
 	} {
 		g := &intentEnumGenerator{first: first}
 		service := New(&rosterHost{}, Deps{})
-		intent, repairs, err := service.ResolveTurnIntent(context.Background(), g, intentScene(), wiaworld.Run{RunID: "recipient", Input: "请船夫帮伤者上船"})
+		intent, repairs, err := service.resolveTurnIntent(context.Background(), g, intentScene(), wiaworld.Run{RunID: "recipient", Input: "请船夫帮伤者上船"})
 		if err != nil || repairs != 1 || len(g.requests) != 2 || intent.AddresseeID != "" {
 			t.Fatalf("repairs=%d calls=%d err=%v", repairs, len(g.requests), err)
 		}

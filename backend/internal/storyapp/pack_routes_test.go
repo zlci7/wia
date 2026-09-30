@@ -206,15 +206,7 @@ func TestM2RealGuidedRoutes(t *testing.T) {
 func TestM2RealWaitIntent(t *testing.T) {
 	a := closeoutRealApp(t)
 	w := createPackWorld(t, a, "orbital-repair")
-	s := readContextSnapshot(t, a, w.WorldID)
-	s.SceneViews[0].Content = "你在设备检修间，工程师正在核对一把已隔离的扳手，未安排你操作设备。"
-	for i := range s.Characters {
-		s.Characters[i].InScene = s.Characters[i].EntityID == "npc:innkeeper"
-	}
 	for i := 0; i < 2; i++ {
-		_, _, err := a.turnService().ResolveTurnIntent(context.Background(), a.generator, s, wiaworld.Run{RunID: fmt.Sprint("wait-probe", i), Input: "我在安全位置等待半小时，不参加维修，也不替任何人签字。"})
-		if err != nil {
-			t.Error(err)
-		}
+		realPackTurn(t, a, w.WorldID, "我在安全位置等待半小时，不参加维修，也不替任何人签字。", i)
 	}
 }

@@ -27,17 +27,6 @@ type Host interface {
 	// business, not the turn's.
 	LogStage(worldID string, run wiaworld.Run, stage Stage, purpose, actorID string, stageIndex int, promptVersion string, sourceEventIDs []string, resolvedAddressee string, repairCount int, elapsed time.Duration)
 
-	// Coordinate resolves what actually happened: time, roster, action outcomes, the
-	// scene views, and the world's own progress for this turn — the plot advancing and
-	// the world opening events of its own. It goes when the coordination evidence, the
-	// scene projection and the progression rules move here.
-	//
-	// Those are one step rather than two because that is what they are in the running
-	// engine: the world's progress is resolved from the same outcome the scene is, and
-	// splitting them into separate host calls would have narration run before the events
-	// it renders existed.
-	Coordinate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error
-
 	// LoadInput reads the turn's frozen input: the world snapshot, the long-memory
 	// material and the coordination evidence, all taken at one moment so every later
 	// stage sees one world. It goes when the loader and the memory material it gathers
@@ -88,7 +77,7 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 		return Output{}, AtStage(StageNPC, err)
 	}
 	notePlayerAction(&output, run, intent)
-	if err := s.host.Coordinate(ctx, generator, &snapshot, run, intent, &output); err != nil {
+	if err := s.coordinate(ctx, generator, &snapshot, run, intent, &output); err != nil {
 		return Output{}, AtStage(StageCoordination, err)
 	}
 	if err := s.narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {

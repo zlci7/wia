@@ -117,10 +117,9 @@ func parseNarrativeText(text string) (string, error) {
 	return text, nil
 }
 
-// ResolveTurnIntent decides what the player is trying to do and who it addresses, with one
-// bounded repair. It is exported for the real-model intent probe that still lives in
-// storyapp; A3 moves the remaining stages here and takes this back to package-private.
-func (a *Service) ResolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (TurnIntent, int, error) {
+// resolveTurnIntent decides what the player is trying to do and who it addresses, with one
+// bounded repair.
+func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (TurnIntent, int, error) {
 	participants := InScene(snapshot.Characters)
 	explicitRecipient := wire.Clean(run.AddresseeID)
 	if explicitRecipient != "" {
@@ -175,7 +174,7 @@ func definitionFor(snapshot *Snapshot) story.Definition {
 // resolveIntentStage decides what the player is trying to do and who it addresses.
 func (a *Service) resolveIntentStage(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (TurnIntent, error) {
 	intentStarted := time.Now()
-	intent, intentRepairs, err := a.ResolveTurnIntent(ctx, generator, snapshot, run)
+	intent, intentRepairs, err := a.resolveTurnIntent(ctx, generator, snapshot, run)
 	if err != nil {
 		return TurnIntent{}, AtStage(StageIntent, err)
 	}
@@ -190,13 +189,13 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 
 	playerEventID := run.RunID + ":input"
 	decisions := make(map[string]NPCDecision)
-	if err := a.DecideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
+	if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
 		return AtStage(StageNPC, err)
 	}
 	var publicReplyLog []string
 	for _, character := range participants {
 		decision := decisions[character.EntityID]
-		if reply := AppendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
+		if reply := appendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
 			publicReplyLog = append(publicReplyLog, reply)
 		}
 	}
@@ -209,7 +208,7 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 			priorTurn[characterID] = fmt.Sprintf("第一阶段自己的决定：%s", FormatSelfDecision(decisions[characterID]))
 		}
 		followDecisions := make(map[string]NPCDecision)
-		if err := a.DecideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageTwoInputs, priorTurn, followDecisions, 2); err != nil {
+		if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageTwoInputs, priorTurn, followDecisions, 2); err != nil {
 			return AtStage(StageNPC, err)
 		}
 		for _, character := range participants {
@@ -222,7 +221,7 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 			if len(input.SourceEventIDs) > 0 {
 				sourceEventID = input.SourceEventIDs[0]
 			}
-			if reply := AppendNPCDecisionOutput(output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2); reply != "" {
+			if reply := appendNPCDecisionOutput(output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2); reply != "" {
 				publicReplyLog = append(publicReplyLog, reply)
 			}
 			decisions[character.EntityID] = MergeNPCDecision(decisions[character.EntityID], decision)
@@ -245,7 +244,7 @@ func (a *Service) narrateStage(ctx context.Context, generator model.TextGenerato
 
 	playerProjection := RenderVisibleProjection(visibleEvents, snapshot.Characters)
 	narrationStarted := time.Now()
-	result, narrationRepairs, err := a.NarrateVisible(ctx, generator, *snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
+	result, narrationRepairs, err := a.narrateVisible(ctx, generator, *snapshot, run, def, recipient, intent.IntentType, visibleEvents, private, output.Clock, output.Scene, output.SceneCharacters)
 	if err != nil {
 		return AtStage(StageNarration, err)
 	}
@@ -261,11 +260,9 @@ func (a *Service) narrateStage(ctx context.Context, generator model.TextGenerato
 	return nil
 }
 
-// AppendNPCDecisionOutput turns one character's decision into the events, perceptions,
-// memories and public reply the rest of the turn reads. It is exported for the plot's own
-// reaction round, which still lives in storyapp; A3 moves that round here and takes this
-// back to package-private.
-func AppendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
+// appendNPCDecisionOutput turns one character's decision into the events, perceptions,
+// memories and public reply the rest of the turn reads.
+func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
@@ -292,10 +289,8 @@ func AppendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworl
 	return reply
 }
 
-// DecideNPCs runs one bounded round of character decisions. It is exported for the plot's
-// own reaction round, which still lives in storyapp; A3 moves that round here and takes
-// this back to package-private.
-func (a *Service) DecideNPCs(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]StageInput, priorTurn map[string]string, decisions map[string]NPCDecision, stage int) error {
+// decideNPCs runs one bounded round of character decisions.
+func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, def story.Definition, run wiaworld.Run, recipient, intentType string, inputs map[string]StageInput, priorTurn map[string]string, decisions map[string]NPCDecision, stage int) error {
 	if generator == nil {
 		return ErrModelNotConfigured
 	}
@@ -363,10 +358,9 @@ func (a *Service) DecideNPCs(ctx context.Context, generator model.TextGenerator,
 	return firstErr
 }
 
-// NarrateVisible composes the narration material for the player-visible events and asks
-// the model for the text. It is exported for the pacing replay that still lives in
-// storyapp; A3 moves the coordination replay here and takes this back to package-private.
-func (a *Service) NarrateVisible(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
+// narrateVisible composes the narration material for the player-visible events and asks
+// the model for the text.
+func (a *Service) narrateVisible(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, def story.Definition, recipient, intentType string, visibleEvents []wiaworld.Event, private bool, clock, scene string, sceneCharacters []string) (narrativeResult, int, error) {
 	if generator == nil {
 		return narrativeResult{}, 0, ErrModelNotConfigured
 	}

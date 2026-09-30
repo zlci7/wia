@@ -31,12 +31,6 @@ func (h *rosterHost) LoadInput(context.Context, *storage.WorldStore, wiaworld.Ru
 	}, nil
 }
 
-// Coordinate ends the turn with a different roster than it started with.
-func (h *rosterHost) Coordinate(_ context.Context, _ model.TextGenerator, _ *Snapshot, _ wiaworld.Run, _ TurnIntent, output *Output) error {
-	output.SceneCharacters = []string{"npc:a", "npc:c"}
-	return nil
-}
-
 // stageGenerator answers each stage of a turn with the smallest valid response, so a test
 // can run the real pipeline — intent, character decisions, narration — without a model.
 type stageGenerator struct{}
@@ -47,6 +41,8 @@ func (stageGenerator) GenerateText(_ context.Context, req model.TextRequest) (mo
 		return model.TextResponse{Text: `{"intent_type":"speak","addressee_id":"","visibility":"public"}`}, nil
 	case strings.Contains(req.System, "你是一个重要 NPC"):
 		return model.TextResponse{Text: `{"speech":"","action_intent":"","silent":true,"memory":""}`}, nil
+	case strings.Contains(req.System, "场景协调 Agent"):
+		return model.TextResponse{Text: `{"time_minutes":0,"scene":"大厅","scene_characters":["npc:a","npc:c"],"outcomes":[{"action_id":"run1:player-action","status":"succeeded","content":"话已经说出。","recipients":["player","npc:a"]}],"scene_updates":[]}`}, nil
 	default:
 		return model.TextResponse{Text: "旅人把话说给众人听。"}, nil
 	}

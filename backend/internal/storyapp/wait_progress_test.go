@@ -7,10 +7,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/plot"
-	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
-	wiaworld "gameagent/backend/internal/world"
 )
 
 type waitResultGenerator struct{ host hostResult }
@@ -59,41 +56,5 @@ func TestExcessWaitRollsBackWholeTurnWithoutPlot(t *testing.T) {
 	after := readContextSnapshot(t, app, w.WorldID)
 	if before.Summary.Clock != after.Summary.Clock || before.Summary.EventHead != after.Summary.EventHead || wire.MarshalJSON(before.Messages) != wire.MarshalJSON(after.Messages) {
 		t.Fatal("failed wait partially committed")
-	}
-}
-
-func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
-	s := turn.Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: lanternPlotDefinition(), PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
-	s.Events = []wiaworld.Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
-	events := []wiaworld.Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
-	for _, tc := range []struct {
-		name    string
-		minutes int
-		ids     []string
-		valid   bool
-	}{
-		{"boundary", 5, nil, true}, {"shortened", 1, nil, false}, {"wrong source", 1, []string{"another-run"}, false}, {"interrupted", 1, []string{"current-danger"}, true},
-		{"existing danger", 1, []string{"committed-danger"}, true}, {"future plan", 1, []string{"definition:lantern-dusk.plot.v2:courier_window"}, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := waitResultGenerator{hostResult{TimeMinutes: tc.minutes, Scene: "客栈", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}, InterruptSources: tc.ids}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "run"}, turn.TurnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
-			if (err == nil) != tc.valid {
-				t.Fatalf("valid=%t error=%v", tc.valid, err)
-			}
-		})
-	}
-}
-
-func TestRequestedWaitIsAnUpperBound(t *testing.T) {
-	for _, definition := range []*plot.Definition{nil, lanternPlotDefinition()} {
-		s := turn.Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: definition, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
-		for _, minutes := range []int{5, 30} {
-			g := waitResultGenerator{hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}}
-			_, _, err := newTestApp(t, g).coordinateTurn(context.Background(), g, s, wiaworld.Run{RunID: "wait"}, turn.TurnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
-			if (err == nil) != (minutes == 5) {
-				t.Fatalf("plot=%t minutes=%d err=%v", definition != nil, minutes, err)
-			}
-		}
 	}
 }

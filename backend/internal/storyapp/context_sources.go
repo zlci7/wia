@@ -3,15 +3,12 @@ package storyapp
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/turn"
 )
-
-var ErrContextSourceMissing = errors.New("context source is missing")
 
 // No event body crosses this metadata lookup. Perception content remains authoritative.
 
@@ -73,7 +70,7 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot turn.Snapshot)
 		}
 	}
 	if len(result) != len(ids) {
-		return nil, fmt.Errorf("%w: %d references unresolved", ErrContextSourceMissing, len(ids)-len(result))
+		return nil, fmt.Errorf("%w: %d references unresolved", turn.ErrContextSourceMissing, len(ids)-len(result))
 	}
 	return result, nil
 }

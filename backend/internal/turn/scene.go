@@ -1,30 +1,21 @@
-package storyapp
+package turn
 
 import (
 	"fmt"
 	"strings"
 
-	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
-// Scene views are recipient-specific, committed state, not narrator prose.
-
-type sceneUpdate struct {
-	Content    string   `json:"content"`
-	SourceIDs  []string `json:"source_ids"`
-	Recipients []string `json:"recipients"`
-}
-
-func initialSceneViews(snapshot turn.Snapshot) []turn.SceneView {
+func InitialSceneViews(snapshot Snapshot) []SceneView {
 	recipients := []string{"player"}
 	for _, c := range snapshot.Characters {
 		recipients = append(recipients, c.EntityID)
 	}
-	var views []turn.SceneView
+	var views []SceneView
 	for _, id := range recipients {
-		view := turn.SceneView{Recipient: id, Version: snapshot.SceneVersion, SourceIDs: []string{}}
+		view := SceneView{Recipient: id, Version: snapshot.SceneVersion, SourceIDs: []string{}}
 		if snapshot.Summary.TurnSeq == 0 {
 			view.Content = snapshot.Definition.Scene
 			if location := snapshot.Definition.InitialLocations[id]; location != "" {
@@ -58,28 +49,28 @@ func initialSceneViews(snapshot turn.Snapshot) []turn.SceneView {
 	return views
 }
 
-func applySceneUpdates(snapshot turn.Snapshot, run wiaworld.Run, intent turn.TurnIntent, output turn.Output, host hostResult) ([]turn.SceneView, error) {
-	byID := map[string]turn.SceneSource{}
-	for _, source := range turn.SceneSources(snapshot, run, intent, output.Events) {
+func applySceneUpdates(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, output Output, host hostResult) ([]SceneView, error) {
+	byID := map[string]sceneSource{}
+	for _, source := range sceneSources(snapshot, run, intent, output.Events) {
 		byID[source.ID] = source
 	}
 	for i, outcome := range host.Outcomes {
-		action, ok := turn.EventByID(output.Events, outcome.ActionID)
+		action, ok := EventByID(output.Events, outcome.ActionID)
 		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
-			return nil, turn.ErrGenerationFailed
+			return nil, ErrGenerationFailed
 		}
 		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)
-		byID[outcome.ActionID] = turn.SceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
+		byID[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
 	}
 	return mergeSceneUpdates(snapshot.SceneViews, snapshot.SceneVersion+1, byID, host.SceneUpdates)
 }
 
-func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string]turn.SceneSource, updates []sceneUpdate) ([]turn.SceneView, error) {
-	views := append([]turn.SceneView{}, previous...)
+func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]sceneSource, updates []sceneUpdate) ([]SceneView, error) {
+	views := append([]SceneView{}, previous...)
 	seen := map[string]bool{}
 	for _, update := range updates {
 		if wire.Clean(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
-			return nil, fmt.Errorf("%w: incomplete scene update", turn.ErrGenerationFailed)
+			return nil, fmt.Errorf("%w: incomplete scene update", ErrGenerationFailed)
 		}
 		for _, recipient := range update.Recipients {
 			index := -1
@@ -90,14 +81,14 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 				}
 			}
 			if index < 0 || seen[recipient] {
-				return nil, fmt.Errorf("%w: invalid scene recipient", turn.ErrGenerationFailed)
+				return nil, fmt.Errorf("%w: invalid scene recipient", ErrGenerationFailed)
 			}
 			seen[recipient] = true
 			var canonical []string
 			for _, id := range update.SourceIDs {
 				source, ok := byID[id]
 				if !ok || !containsID(source.Recipients, recipient) {
-					return nil, fmt.Errorf("%w: scene source is unavailable to recipient", turn.ErrGenerationFailed)
+					return nil, fmt.Errorf("%w: scene source is unavailable to recipient", ErrGenerationFailed)
 				}
 				for _, sid := range source.Canonical {
 					if !containsID(canonical, sid) {
@@ -105,7 +96,7 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 					}
 				}
 			}
-			views[index] = turn.SceneView{Recipient: recipient, Content: wire.Clean(update.Content), SourceIDs: canonical, Version: version}
+			views[index] = SceneView{Recipient: recipient, Content: wire.Clean(update.Content), SourceIDs: canonical, Version: version}
 		}
 	}
 	return views, nil
@@ -113,10 +104,10 @@ func mergeSceneUpdates(previous []turn.SceneView, version int64, byID map[string
 
 // Later stages read only committed views and the projections already granted in
 // this workspace. An author's plot result is never a scene source for a player.
-func plotSceneSources(output turn.Output, visible []wiaworld.Event) map[string]turn.SceneSource {
-	sources := map[string]turn.SceneSource{}
+func plotSceneSources(output Output, visible []wiaworld.Event) map[string]sceneSource {
+	sources := map[string]sceneSource{}
 	for _, view := range output.SceneViews {
-		sources["view:"+view.Recipient] = turn.SceneSource{ID: "view:" + view.Recipient, Content: view.Content, Recipients: []string{view.Recipient}, Canonical: view.SourceIDs}
+		sources["view:"+view.Recipient] = sceneSource{ID: "view:" + view.Recipient, Content: view.Content, Recipients: []string{view.Recipient}, Canonical: view.SourceIDs}
 	}
 	for _, p := range output.Perceptions {
 		if p.Stage < 4 {
@@ -140,7 +131,7 @@ func plotSceneSources(output turn.Output, visible []wiaworld.Event) map[string]t
 	return sources
 }
 
-func applyPlotSceneUpdates(output *turn.Output, sources map[string]turn.SceneSource, updates []sceneUpdate) error {
+func applyPlotSceneUpdates(output *Output, sources map[string]sceneSource, updates []sceneUpdate) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -150,7 +141,7 @@ func applyPlotSceneUpdates(output *turn.Output, sources map[string]turn.SceneSou
 	}
 	output.SceneVersion++
 	output.SceneViews = views
-	output.Scene = turn.SceneFor(turn.Snapshot{SceneViews: views}, "player")
+	output.Scene = SceneFor(Snapshot{SceneViews: views}, "player")
 	return nil
 }
 
@@ -163,7 +154,7 @@ func containsID(ids []string, id string) bool {
 	return false
 }
 
-func validateSceneViews(snapshot turn.Snapshot) error {
+func ValidateSceneViews(snapshot Snapshot) error {
 	valid := map[string]bool{"player": true}
 	for _, c := range snapshot.Characters {
 		valid[c.EntityID] = true

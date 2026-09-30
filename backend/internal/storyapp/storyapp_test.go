@@ -16,6 +16,7 @@ import (
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/secret"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -124,7 +125,7 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		}
 		updates := []sceneUpdate{}
 		if g.scene != "" {
-			var sources []turn.SceneSource
+			var sources []sceneSource
 			start := strings.Index(req.Input, "场景来源(JSON)：") + len("场景来源(JSON)：")
 			end := strings.Index(req.Input[start:], "\n")
 			if end >= 0 && json.Unmarshal([]byte(req.Input[start:start+end]), &sources) == nil {
@@ -410,7 +411,7 @@ func TestPublicAddressKeepsNPCAttribution(t *testing.T) {
 
 func TestUnaddressedNPCUsesContextualInitiativeAndPassiveIntentIsDropped(t *testing.T) {
 	def := lanternDefinition()
-	character, ok := turn.CharacterByID(def, "npc:mercenary")
+	character, ok := story.CharacterByID(def, "npc:mercenary")
 	if !ok {
 		t.Fatal("mercenary definition missing")
 	}
@@ -1209,17 +1210,6 @@ func TestSceneHostProposalAndSceneVersionAreCommitted(t *testing.T) {
 	}
 	if !strings.Contains(host, "NPC 协调提案") || !strings.Contains(host, "action_intent") || !strings.Contains(host, "主角共创边界：当前模式为自然共创") || strings.Contains(host, "玩家主动向我提供了消息") {
 		t.Fatalf("scene host did not receive the full context: %s", host)
-	}
-}
-
-func TestSceneRosterTreatsPlayerAsImplicit(t *testing.T) {
-	characters := lanternDefinition().Characters
-	ids := turn.NormalizeSceneCharacters([]string{"player", "npc:innkeeper", "npc:mercenary"})
-	if err := validateSceneCharacters(ids, characters); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(ids, ",") != "npc:innkeeper,npc:mercenary" {
-		t.Fatalf("normalized scene roster = %v", ids)
 	}
 }
 
