@@ -137,7 +137,7 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 
 	input += "\n本轮场景协调策略：\n" + policy + "\n"
 	input += "\nscene_characters 专指与玩家在回合结束时处于同一现场、之后能接收玩家普通交谈的重要NPC。分接收者场景包含场外人物资料，不代表他们与玩家在一起。玩家离开原地点而人物留在原地点时，从这个名单移出相应人物；人物依自己的已确认行动跟随抵达时才保留。只更新名单不自动移动人物，各人的 scene_updates 仍分别保留其实际位置。"
-	input += "\n作者层世界规则：" + snapshot.Definition.Rules + "\n作者事实（不是全场共享知识）：" + snapshot.Definition.Secret + "\n地点资料（不是人物已经到达的结果）：" + contextJSON(snapshot.Definition.Locations)
+	input += "\n作者层世界规则：" + snapshot.Definition.Rules + "\n作者事实（不是全场共享知识）：" + snapshot.Definition.Secret + "\n地点资料（不是人物已经到达的结果）：" + wire.MarshalJSON(snapshot.Definition.Locations)
 	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。重要NPC的对白仅取本人已确定的公开对白，不从行动提案中补造其问话、承诺或回应。\n"
 	input += sceneSourcePrompt(snapshot, run, intent, events)
 	input += PlotContext(snapshot)
