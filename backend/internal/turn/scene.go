@@ -57,7 +57,7 @@ func applySceneUpdates(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, o
 	for i, outcome := range host.Outcomes {
 		action, ok := EventByID(output.Events, outcome.ActionID)
 		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
-			return nil, ErrGenerationFailed
+			return nil, coordinationInvalid("action_source_invalid", fmt.Sprintf("outcomes[%d].action_id", i), "current-stage-1-or-2-action-id")
 		}
 		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)
 		byID[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
@@ -68,11 +68,18 @@ func applySceneUpdates(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, o
 func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]sceneSource, updates []sceneUpdate) ([]SceneView, error) {
 	views := append([]SceneView{}, previous...)
 	seen := map[string]bool{}
-	for _, update := range updates {
-		if wire.Clean(update.Content) == "" || len(update.SourceIDs) == 0 || len(update.Recipients) == 0 {
-			return nil, fmt.Errorf("%w: incomplete scene update", ErrGenerationFailed)
+	for u, update := range updates {
+		field := fmt.Sprintf("scene_updates[%d]", u)
+		if wire.Clean(update.Content) == "" {
+			return nil, coordinationInvalid("scene_update_incomplete", field+".content", "nonempty-string")
 		}
-		for _, recipient := range update.Recipients {
+		if len(update.SourceIDs) == 0 {
+			return nil, coordinationInvalid("scene_update_incomplete", field+".source_ids", "nonempty-source-id-array")
+		}
+		if len(update.Recipients) == 0 {
+			return nil, coordinationInvalid("scene_update_incomplete", field+".recipients", "nonempty-recipient-id-array")
+		}
+		for r, recipient := range update.Recipients {
 			index := -1
 			for i, v := range views {
 				if v.Recipient == recipient {
@@ -80,15 +87,21 @@ func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]scen
 					break
 				}
 			}
-			if index < 0 || seen[recipient] {
-				return nil, fmt.Errorf("%w: invalid scene recipient", ErrGenerationFailed)
+			if index < 0 {
+				return nil, coordinationInvalid("scene_recipient_unknown", fmt.Sprintf("%s.recipients[%d]", field, r), "listed-scene-view-recipient")
+			}
+			if seen[recipient] {
+				return nil, coordinationInvalid("scene_recipient_duplicate", fmt.Sprintf("%s.recipients[%d]", field, r), "at-most-one-update-per-recipient")
 			}
 			seen[recipient] = true
 			var canonical []string
-			for _, id := range update.SourceIDs {
+			for j, id := range update.SourceIDs {
 				source, ok := byID[id]
-				if !ok || !containsID(source.Recipients, recipient) {
-					return nil, fmt.Errorf("%w: scene source is unavailable to recipient", ErrGenerationFailed)
+				if !ok {
+					return nil, coordinationInvalid("scene_source_unknown", fmt.Sprintf("%s.source_ids[%d]", field, j), "listed-scene-source-id-or-current-outcome-action-id")
+				}
+				if !containsID(source.Recipients, recipient) {
+					return nil, coordinationInvalid("scene_source_forbidden", fmt.Sprintf("%s.source_ids[%d]", field, j), fmt.Sprintf("source-readable-by-recipients[%d]-including-own-view-only", r))
 				}
 				for _, sid := range source.Canonical {
 					if !containsID(canonical, sid) {

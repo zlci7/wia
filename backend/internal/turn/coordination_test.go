@@ -128,7 +128,7 @@ func TestGeneratedEventOpportunityRejectsInvalidScope(t *testing.T) {
 func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 	snapshot := Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: &plot.Definition{}, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
 	snapshot.Events = []wiaworld.Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}
-	events := []wiaworld.Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_action_intent"}}
+	events := []wiaworld.Event{{EventID: "current-danger", RunID: "run", Stage: 1, EventType: "npc_dialogue"}}
 	for _, test := range []struct {
 		name    string
 		minutes int
@@ -144,7 +144,7 @@ func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			result := hostResult{TimeMinutes: test.minutes, Scene: "客栈", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}, InterruptSources: test.ids}
 			service := New(coordinationTestHost{}, Deps{})
-			_, _, err := service.coordinateTurn(context.Background(), coordinationResultGenerator{result}, snapshot, wiaworld.Run{RunID: "run"}, TurnIntent{IntentType: "act", WaitMinutes: 60}, nil, events, "")
+			_, _, err := service.coordinateTurn(context.Background(), coordinationResultGenerator{result}, snapshot, wiaworld.Run{RunID: "run"}, TurnIntent{IntentType: "act", WaitMinutes: 60}, Output{Events: events})
 			if (err == nil) != test.valid {
 				t.Fatalf("valid=%t err=%v", test.valid, err)
 			}
@@ -157,7 +157,7 @@ func TestRequestedWaitIsAnUpperBound(t *testing.T) {
 	for _, minutes := range []int{5, 30} {
 		result := hostResult{TimeMinutes: minutes, Scene: "原地", SceneCharacters: []string{}, Outcomes: []hostActionResult{}, SceneUpdates: []sceneUpdate{}}
 		service := New(coordinationTestHost{}, Deps{})
-		_, _, err := service.coordinateTurn(context.Background(), coordinationResultGenerator{result}, snapshot, wiaworld.Run{RunID: "wait"}, TurnIntent{IntentType: "act", WaitMinutes: 5}, nil, nil, "")
+		_, _, err := service.coordinateTurn(context.Background(), coordinationResultGenerator{result}, snapshot, wiaworld.Run{RunID: "wait"}, TurnIntent{IntentType: "act", WaitMinutes: 5}, Output{})
 		if (err == nil) != (minutes == 5) {
 			t.Fatalf("minutes=%d err=%v", minutes, err)
 		}

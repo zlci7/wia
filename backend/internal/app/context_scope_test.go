@@ -123,7 +123,8 @@ func (g sceneUpdateGenerator) GenerateText(ctx context.Context, req model.TextRe
 }
 
 func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
-	a := newTestApp(t, sceneUpdateGenerator{base: &scriptedGenerator{}})
+	g := &scriptedGenerator{}
+	a := newTestApp(t, sceneUpdateGenerator{base: g})
 	w, err := a.createFixtureWorld(context.Background(), "私密场景", "guided", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
@@ -132,11 +133,12 @@ func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	beforeSnapshot := readContextSnapshot(t, a, w.WorldID)
 	r, err := a.SubmitRun(context.Background(), w.WorldID, RunRequest{RequestKey: "private", Input: "私下对老板说隐藏原文"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done := waitRun(t, a, w.WorldID, r.RunID); done.Status != "failed" {
+	if done := waitRun(t, a, w.WorldID, r.RunID); done.Status != "failed" || done.Reason != "coordination_generation_failed" {
 		t.Fatalf("%+v", done)
 	}
 	after, err := a.ReadWorld(context.Background(), w.WorldID, 100)
@@ -145,6 +147,21 @@ func TestUnauthorizedSceneUpdateFailsWithoutPartialCommit(t *testing.T) {
 	}
 	if !reflect.DeepEqual(before.Events, after.Events) || !reflect.DeepEqual(before.Memories, after.Memories) {
 		t.Fatal("partial commit")
+	}
+	afterSnapshot := readContextSnapshot(t, a, w.WorldID)
+	if !reflect.DeepEqual(beforeSnapshot.Perceptions, afterSnapshot.Perceptions) || !reflect.DeepEqual(beforeSnapshot.SceneViews, afterSnapshot.SceneViews) || beforeSnapshot.Summary.Clock != afterSnapshot.Summary.Clock || beforeSnapshot.Summary.TurnSeq != afterSnapshot.Summary.TurnSeq || beforeSnapshot.SceneVersion != afterSnapshot.SceneVersion {
+		t.Fatal("failed repair advanced world state")
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	coordinationCalls := 0
+	for _, req := range g.requests {
+		if strings.Contains(req, "场景协调 Agent") {
+			coordinationCalls++
+		}
+	}
+	if coordinationCalls != 2 {
+		t.Fatalf("coordination calls=%d", coordinationCalls)
 	}
 }
 
