@@ -159,35 +159,30 @@ func SearchMemoryGroups(items []MemorySource, query string, excluded map[string]
 	}
 	candidates, budget := searchMemoryCandidates(items, query)
 	result := MemoryGroupSearchResult{}
-	seenRuns := map[string]bool{}
-	selected := map[string]bool{}
+	visited := map[string]bool{}
 	for _, candidate := range candidates {
 		if len(result.Groups) >= limit {
 			break
 		}
 		hit := items[candidate.index]
-		if excluded[hit.ID] || selected[hit.ID] || seenRuns[hit.RunID] {
+		if excluded[hit.ID] || visited[hit.ID] {
 			continue
 		}
-		seenRuns[hit.RunID] = true
 		group, complete := memoryGroupWithinBudget(items, candidate.index, budget)
 		if !complete {
 			continue
 		}
 		overlap := false
 		for _, record := range group {
+			visited[record.ID] = true
 			if excluded[record.ID] {
 				overlap = true
-				break
 			}
 		}
 		if overlap {
 			continue
 		}
 		result.Groups = append(result.Groups, group)
-		for _, record := range group {
-			selected[record.ID] = true
-		}
 	}
 	result.Limited = budget.limited
 	return result

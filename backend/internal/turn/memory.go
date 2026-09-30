@@ -17,14 +17,6 @@ import (
 // it so both say the same thing.
 const MemoryCorrectionRule = "\n记录类型 correction:* 是对本人资料已经生效的纠正，优先于此前关于同一内容的解释、回忆或自己的旧对白。保留曾经说过旧话这一历史，但后续判断使用纠正后的内容；纠正本身不是故事里新发生的对话，也不授予其他人物这些知识。"
 
-// budgetHeadroomTokens covers the labels, digest and framing the projection adds on top
-// of the raw records it measures.
-const budgetHeadroomTokens = 256
-
-// recentWindowMinTokens is the smallest recent window a request may be reduced to: one
-// complete group.
-const recentWindowMinTokens = 512
-
 // withLongMemory fits a scope's committed memory into the material: the standing digest,
 // the newest complete groups, and whatever the request's own input budget still allows
 // after the base prompt. It never advances the digest watermark.
@@ -35,38 +27,30 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 	}
 	material.Optional = nil
 	material.System += MemoryCorrectionRule
-	// The window is chosen against the request's real input budget, not a fixed size:
-	// a large base prompt must shrink the window instead of failing the turn.
-	baseTokens := FramedContextTokens(model.TextRequest{System: material.System, Input: material.Required})
+	base := material
+	base.RequiredSources = append([]string(nil), material.RequiredSources...)
 	budget := snapshot.InputBudgetTokens
 	if budget <= 0 {
 		budget = 12000
 	}
-	available := budget - baseTokens - budgetHeadroomTokens
-	block, _, _ := selectRecentWindow(m.Tail, available)
-	base := material.Required
-	material = renderMemoryWindow(material, base, m, scope, block, query)
-	// The window is chosen against the known budget first; if the assembled request still
-	// does not fit, this material rebuilds itself from its parts with fewer complete
-	// groups rather than failing. The newest group always stays and the digest watermark
-	// is untouched either way.
-	full := material
-	material.Bounded = func(inputLimit int) (Material, bool) {
-		groups := memory.MemoryGroups(block)
-		if len(groups) <= 1 {
-			return full, false
+	block, _, _ := memory.ProjectRecentExperience(m.Tail)
+	groups := memory.MemoryGroups(block)
+	// Measure the full digest, framing and retrieval notice. The actual system prompt
+	// can grow when the generation contract or repair instruction is appended.
+	fit := func(inputLimit int, system string, start int) (Material, int) {
+		for {
+			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query)
+			input, _, _ := contextInput(candidate, nil)
+			if FramedContextTokens(model.TextRequest{System: system, Input: input}) <= inputLimit || len(groups)-start <= 1 {
+				return candidate, start
+			}
+			start++
 		}
-		// Reserve room for the system prompt and everything that is not the window.
-		baseTokens := FramedContextTokens(model.TextRequest{System: full.System, Input: base})
-		budget := inputLimit - baseTokens - budgetHeadroomTokens
-		if budget < recentWindowMinTokens {
-			budget = recentWindowMinTokens
-		}
-		kept := groupsWithinBudget(groups, budget)
-		if len(kept) >= len(groups) {
-			return full, false
-		}
-		return renderMemoryWindow(full, base, m, scope, memory.FlattenGroups(kept), query), true
+	}
+	material, start := fit(budget, base.System, 0)
+	material.Bounded = func(inputLimit int, system string) (Material, bool) {
+		bounded, keptStart := fit(inputLimit, system, start)
+		return bounded, keptStart > start
 	}
 	return material
 }
@@ -74,9 +58,8 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material Material, base string, m MemoryContext, scope string, block []memory.MemorySource, query string) Material {
-	material.Required = base
-	material.RequiredSources = nil
+func renderMemoryWindow(material Material, m MemoryContext, scope string, block []memory.MemorySource, query string) Material {
+	material.RequiredSources = append([]string(nil), material.RequiredSources...)
 	material.DeclinedSources = nil
 	material.RecallSources = nil
 	material.RecallLimited = false
@@ -160,55 +143,4 @@ func withRecall(material Material, projection memoryProjection, query string) Ma
 		material.Optional = append(material.Optional, selected[i])
 	}
 	return material
-}
-
-// groupsWithinBudget keeps the newest complete groups that fit, and always keeps the
-// newest one so a turn never loses its own most recent context.
-func groupsWithinBudget(groups [][]memory.MemorySource, budget int) [][]memory.MemorySource {
-	if len(groups) == 0 {
-		return nil
-	}
-	for start := 0; start < len(groups); start++ {
-		candidate := groups[start:]
-		if FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(memory.FlattenGroups(candidate))}) <= budget || start == len(groups)-1 {
-			return candidate
-		}
-	}
-	return groups[len(groups)-1:]
-}
-
-// selectRecentWindow keeps the newest complete experience groups that fit the request's
-// remaining input budget. It falls back to the size-based rule when no budget is known,
-// always keeps the newest group, and never advances the digest watermark: supplying
-// fewer groups must not claim they were summarized.
-func selectRecentWindow(items []memory.MemorySource, available int) (block []memory.MemorySource, backlog [][]memory.MemorySource, supplied map[string]bool) {
-	supplied = map[string]bool{}
-	groups := memory.MemoryGroups(items)
-	if len(groups) == 0 {
-		return nil, nil, supplied
-	}
-	if available <= 0 {
-		block, backlog, supplied = memory.ProjectRecentExperience(items)
-		return block, backlog, supplied
-	}
-	start := len(groups) - memory.TargetRecentGroups
-	if start < 0 {
-		start = 0
-	}
-	// Drop older groups while the window does not fit the budget, and drop it entirely
-	// when it is larger than the size rule allows.
-	for start < len(groups)-1 {
-		candidate := groups[start:]
-		if FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(memory.FlattenGroups(candidate))}) <= available &&
-			len(memory.MemoryRecordsText(memory.FlattenGroups(candidate))) <= memory.RecentWindowChars {
-			break
-		}
-		start++
-	}
-	block = memory.FlattenGroups(groups[start:])
-	for _, record := range block {
-		supplied[record.ID] = true
-	}
-	backlog = groups[:start]
-	return block, backlog, supplied
 }

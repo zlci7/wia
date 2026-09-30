@@ -1,12 +1,52 @@
 package turn
 
 import (
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 )
+
+func TestMemoryWindowFitsDigestAndActualSystemPreservingSources(t *testing.T) {
+	tail := []memory.MemorySource{}
+	for i := 0; i < 6; i++ {
+		tail = append(tail, memory.MemorySource{ID: "memory:" + string(rune('a'+i)), RunID: "run:" + string(rune('a'+i)), Content: strings.Repeat("一段完整的旧经历", 70)})
+	}
+	m := MemoryContext{Digest: memory.MemoryDigest{Scope: "player", Revision: 2, Content: strings.Repeat("已确认的长期约定", 150)}, Tail: tail, Archive: tail}
+	base := Material{System: "本轮规则", Required: "本轮事件正文与场景来源", RequiredSources: []string{"current:event", "scene:source"}}
+	material := withLongMemory(base, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": m}}, "player", "")
+	actualSystem := material.System + strings.Repeat("附加字段合同与修复要求", 120)
+	minimal := renderMemoryWindow(base, m, "player", tail[len(tail)-1:], "")
+	input, _, _ := contextInput(minimal, nil)
+	limit := FramedContextTokens(model.TextRequest{System: actualSystem, Input: input}) + 50
+	composer := ContextComposer{Window: model.WindowLimits{ContextTokens: limit + 512, OutputTokens: 512}}
+	req, report, err := composer.Build(material, actualSystem, 512)
+	if err != nil {
+		t.Fatalf("digest plus newest group fits, but request failed: %v", err)
+	}
+	if !report.WindowShrunk || !report.RequiredComplete || report.InputTokens > limit {
+		t.Fatalf("window was not fitted: %+v", report)
+	}
+	for _, id := range []string{"current:event", "scene:source", "digest:player:2", "memory:f"} {
+		if !slices.Contains(report.SelectedSources, id) {
+			t.Errorf("missing required provenance %q: %v", id, report.SelectedSources)
+		}
+	}
+	if !strings.Contains(req.Input, m.Digest.Content) || !strings.Contains(req.Input, base.Required) {
+		t.Fatal("required digest or current-turn facts were truncated")
+	}
+	if len(base.RequiredSources) != 2 || base.RequiredSources[0] != "current:event" {
+		t.Fatal("window fitting mutated base provenance")
+	}
+	// If the digest and newest group cannot fit, the request must fail explicitly.
+	_, _, err = (ContextComposer{Window: model.WindowLimits{ContextTokens: 1024, OutputTokens: 512}}).Build(material, actualSystem, 512)
+	if !errors.Is(err, ErrContextCapacity) {
+		t.Fatalf("irreducible required context: %v", err)
+	}
+}
 
 // R14: when the whole request does not fit, the recent-experience window must fall back
 // to fewer complete groups instead of failing the turn.
@@ -28,7 +68,7 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	// A budget that fits the base prompt and every group, measured rather than
 	// estimated, so the initial window is the whole recent history.
 	base := FramedContextTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
-	testBudget := base + FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(tail)}) + 2*budgetHeadroomTokens
+	testBudget := base + FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(tail)}) + 1024
 	material := withLongMemory(Material{
 		Required: "本轮职责与刺激：玩家输入",
 		System:   "规则",
@@ -100,7 +140,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	// Shrinking must render from the parts: the digest header appears once and the source
 	// list describes what was included.
 	shrunk := withLongMemory(Material{Required: "本轮", System: "规则"}, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": {Tail: tail}}}, "player", "")
-	reduced, changed := shrunk.Bounded(recentWindowMinTokens + 200)
+	reduced, changed := shrunk.Bounded(712, shrunk.System)
 	if !changed {
 		t.Fatal("the window did not shrink")
 	}
@@ -126,7 +166,7 @@ func TestWindowBudgetIsWhatReducesTheGroups(t *testing.T) {
 	if single.Bounded == nil {
 		t.Fatal("expected a bounding hook")
 	}
-	if _, changed := single.Bounded(100); changed {
+	if _, changed := single.Bounded(100, single.System); changed {
 		t.Fatal("a single group must not be reported as reduced")
 	}
 }
@@ -147,7 +187,7 @@ func TestBoundedMemoryRebuildRecomputesRecall(t *testing.T) {
 		"player",
 		"copper",
 	)
-	reduced, changed := material.Bounded(recentWindowMinTokens + 200)
+	reduced, changed := material.Bounded(712, material.System)
 	if !changed {
 		t.Fatal("the recent window did not shrink")
 	}

@@ -2,11 +2,37 @@ package turn
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
 	"gameagent/backend/internal/memory"
 )
+
+func TestRecallKeepsSeparateCorrectionGroups(t *testing.T) {
+	archive := []memory.MemorySource{
+		{ID: "correction:1", Seq: 1, Content: "铜钥匙应当交给甲"},
+		{ID: "event:2", Seq: 2, RunID: "run:between", Content: "普通经历"},
+		{ID: "correction:3", Seq: 3, Content: "铜钥匙应当放在柜台"},
+		{ID: "correction:4", Seq: 4, Content: "柜台在门边"},
+	}
+	for _, overlap := range []bool{false, true} {
+		supplied := map[string]bool{}
+		if overlap {
+			supplied["correction:4"] = true
+		}
+		material := withRecall(Material{}, memoryProjection{Context: MemoryContext{Archive: archive}, Supplied: supplied}, "铜钥匙")
+		if !slices.Contains(material.RecallSources, "correction:1") {
+			t.Fatalf("overlap=%t: older independent correction lost: %v", overlap, material.RecallSources)
+		}
+		if slices.Contains(material.RecallSources, "correction:3") == overlap {
+			t.Fatalf("overlap=%t: complete group exclusion failed: %v", overlap, material.RecallSources)
+		}
+		if material.RecallLimited {
+			t.Fatal("fixture must fit retrieval budgets")
+		}
+	}
+}
 
 func TestWithRecallFiltersSuppliedGroupsBeforeTakingFive(t *testing.T) {
 	archive := make([]memory.MemorySource, 0, 10)

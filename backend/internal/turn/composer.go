@@ -61,7 +61,7 @@ type Material struct {
 	// Bounded rebuilds this material to fit an input budget. It reports changed=false
 	// when it is already as small as it can be, so a caller can tell "does not fit"
 	// from "was reduced".
-	Bounded func(inputLimit int) (Material, bool)
+	Bounded func(inputLimit int, system string) (Material, bool)
 }
 
 type ContextScope struct {
@@ -128,7 +128,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 	// A material that knows the whole request's input budget can shrink its own recent
 	// window before the composer has to give up.
 	if material.Bounded != nil {
-		if bounded, changed := material.Bounded(limit); changed {
+		if bounded, changed := material.Bounded(limit, system); changed {
 			material = bounded
 			report.WindowShrunk = true
 		}
@@ -165,32 +165,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 		sections[left], sections[right] = sections[right], sections[left]
 	}
 	for {
-		parts := make([]string, 0, len(sections)+1)
-		for _, section := range sections {
-			parts = append(parts, section.Text)
-		}
-		parts = append(parts, material.Required)
-		if len(material.RecallSources) > 0 || len(material.DeclinedSources) > 0 || material.RecallLimited {
-			selected := map[string]bool{}
-			for _, section := range sections {
-				for _, id := range section.Sources {
-					selected[id] = true
-				}
-			}
-			report.RecallIncluded = 0
-			for _, id := range material.RecallSources {
-				if selected[id] {
-					report.RecallIncluded++
-				}
-			}
-			report.RecallExcluded = len(material.RecallSources) - report.RecallIncluded + len(material.DeclinedSources)
-			note := fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources)+len(material.DeclinedSources), report.RecallIncluded, report.RecallExcluded)
-			if material.RecallLimited {
-				note += " 本次检索受近期候选窗口或检索预算限制；未命中不代表更早经历不存在。"
-			}
-			parts = append(parts, note)
-		}
-		req.Input = strings.Join(parts, "\n")
+		req.Input, report.RecallIncluded, report.RecallExcluded = contextInput(material, sections)
 		if _, err := model.ValidateTextRequest(req); err == nil {
 			break
 		} else if !errors.Is(err, model.ErrTextInputTooLarge) {
@@ -222,6 +197,34 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 	report.Sources = len(report.SelectedSources)
 	report.InputTokens = FramedContextTokens(req)
 	return req, report, nil
+}
+
+// contextInput includes the retrieval notice in both window sizing and final assembly.
+func contextInput(material Material, sections []Section) (string, int, int) {
+	parts := make([]string, 0, len(sections)+2)
+	selected := map[string]bool{}
+	for _, section := range sections {
+		parts = append(parts, section.Text)
+		for _, id := range section.Sources {
+			selected[id] = true
+		}
+	}
+	parts = append(parts, material.Required)
+	included, excluded := 0, 0
+	if len(material.RecallSources) > 0 || len(material.DeclinedSources) > 0 || material.RecallLimited {
+		for _, id := range material.RecallSources {
+			if selected[id] {
+				included++
+			}
+		}
+		excluded = len(material.RecallSources) - included + len(material.DeclinedSources)
+		note := fmt.Sprintf("检索预算说明：匹配记录%d条，纳入%d条，因预算排除%d条。未纳入不代表没有历史或事情未发生；只依据已提供材料作判断。", len(material.RecallSources)+len(material.DeclinedSources), included, excluded)
+		if material.RecallLimited {
+			note += " 本次检索受近期候选窗口或检索预算限制；未命中不代表更早经历不存在。"
+		}
+		parts = append(parts, note)
+	}
+	return strings.Join(parts, "\n"), included, excluded
 }
 
 func FramedContextTokens(req model.TextRequest) int {
