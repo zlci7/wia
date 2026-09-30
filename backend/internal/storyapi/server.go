@@ -249,7 +249,7 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 5 && parts[4] == "character-promotions" {
-		s.characterPromotions(w, r, worldID)
+		writeError(w, http.StatusNotFound, "not_found", "no such API route")
 		return
 	}
 	if len(parts) == 6 && parts[4] == "entities" && parts[5] != "" {
