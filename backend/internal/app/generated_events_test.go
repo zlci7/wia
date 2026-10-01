@@ -24,6 +24,8 @@ type generatedTestGenerator struct {
 	failNarration bool
 	noCandidate   bool
 	elapsed       int
+	invalidOffers int
+	offerCalls    int
 }
 
 type backgroundTalkGenerator struct{ actionConsistencyGenerator }
@@ -70,6 +72,10 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 	fail, noCandidate, elapsed := g.failNarration, g.noCandidate, g.elapsed
 	g.mu.Unlock()
 	if strings.Contains(req.System, "开放世界事件协调器") {
+		g.mu.Lock()
+		g.offerCalls++
+		invalid := g.offerCalls <= g.invalidOffers
+		g.mu.Unlock()
 		if noCandidate {
 			return model.TextResponse{Text: `{"candidates":[]}`}, nil
 		}
@@ -80,6 +86,9 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 		}
 		c := eventCandidate{Condition: "五分钟后核对窗口结束", Development: "有核对则登记结果，没有则暂存待查；不替玩家接受任务。", AfterMinutes: 5,
 			Initial: plotResolution{Status: "occurred", Content: "一个配送标签待核对，编号为蓝三。", SourceIDs: []string{trigger.EventID}, Projections: []plotProjection{{Recipient: "player", Content: "值班员请你核对一张配送标签。", Scene: "你在设备检修间，看见待核对的标签。"}}, DecisionRequests: []string{}}}
+		if invalid {
+			c.Initial.Projections = append(c.Initial.Projections, c.Initial.Projections[0])
+		}
 		return model.TextResponse{Text: wire.MarshalJSON(map[string]any{"candidates": []eventCandidate{c}})}, nil
 	}
 	if strings.Contains(req.System, "世界剧情协调器") {
@@ -109,6 +118,39 @@ func (g *generatedTestGenerator) GenerateText(ctx context.Context, req model.Tex
 		return model.TextResponse{}, errors.New("injected narration failure")
 	}
 	return (actionConsistencyGenerator{status: "succeeded"}).GenerateText(ctx, req)
+}
+
+func TestGeneratedEventAudienceRepairIsBoundedAndAtomic(t *testing.T) {
+	for _, invalidOffers := range []int{1, 2} {
+		t.Run(fmt.Sprint(invalidOffers), func(t *testing.T) {
+			g := &generatedTestGenerator{invalidOffers: invalidOffers}
+			a, w := eventTestWorld(t, g)
+			before := readContextSnapshot(t, a, w.WorldID)
+			r := generatedTurn(t, a, w, "audience-repair")
+			g.mu.Lock()
+			calls := g.offerCalls
+			requests := append([]model.TextRequest{}, g.requests...)
+			g.mu.Unlock()
+			if calls != 2 {
+				t.Fatalf("event calls=%d, want exactly one repair", calls)
+			}
+			feedback := false
+			for _, request := range requests {
+				feedback = feedback || strings.Contains(request.System, "plot_projection_audience")
+			}
+			if !feedback {
+				t.Fatal("repair omitted the local audience validation feedback")
+			}
+			after := readContextSnapshot(t, a, w.WorldID)
+			if invalidOffers == 1 {
+				if r.Status != "completed" || len(after.GeneratedEvents.Active) != 1 {
+					t.Fatalf("repaired event not committed: %+v", r)
+				}
+			} else if r.Status != "failed" || after.Summary.EventHead != before.Summary.EventHead || len(after.GeneratedEvents.Active) != 0 || after.GeneratedEvents.LastOfferTurn != 0 {
+				t.Fatalf("invalid event changed the world: %+v", r)
+			}
+		})
+	}
 }
 
 func eventTestWorld(t *testing.T, g *generatedTestGenerator) (*App, wiaworld.WorldSummary) {

@@ -194,6 +194,9 @@ func (g *offsceneCapabilityGenerator) GenerateText(ctx context.Context, request 
 	if strings.Contains(request.System, "重要 NPC") {
 		body["relationship_proposals"] = []any{}
 	} else {
+		if strings.Contains(request.Input, "recipients只能取对应允许集合") || !strings.Contains(request.Input, "有效移动后的到达同场") {
+			g.t.Error("spatial coordination contract excludes authorized arrival witnesses")
+		}
 		for _, needed := range []string{`"npc:clock":"clockshop"`, `"connections":["road"]`, "state_definitions", "strain", "token-1", "from_holder_id", "proposal_source_id", "relationship_proposals"} {
 			if !strings.Contains(request.Input, needed) {
 				g.t.Errorf("offscene material missing %s", needed)
@@ -223,5 +226,47 @@ func TestOffsceneCallReceivesFullCapabilityContract(t *testing.T) {
 	}
 	if !generator.seen || output.Positions["npc:clock"] != "clinic" {
 		t.Fatal("offscene flow not exercised")
+	}
+}
+
+func TestNarrationReceivesFinalWorldCapabilityProjection(t *testing.T) {
+	snapshot, output, _ := mechanicsFixture()
+	snapshot.Definition.StateDefinitions[0].Projection = "public"
+	snapshot.Definition.ItemDefinitions[0].Projection = "public"
+	snapshot.Definition.Capabilities["spatial"] = 1
+	snapshot.Definition.Locations = []story.Location{{ID: "hall", Kind: "place", Name: "Hall"}, {ID: "street", Kind: "place", Name: "Street"}}
+	output.Positions = map[string]string{"player": "street", "npc:warden": "street"}
+	state := output.States["npc:warden"]["ritual_stability"]
+	state.Value.Integer, state.SourceEvent = 42, "later:public"
+	output.States["npc:warden"]["ritual_stability"] = state
+	item := output.Items["token-1"]
+	item.HolderID, item.SourceEvent = "npc:warden", "later:public"
+	output.Items[item.InstanceID] = item
+	output.Perceptions = []wiaworld.Perception{
+		{RecipientID: "player", SourceEventID: "later:public", Stage: 6},
+		{RecipientID: "npc:warden", SourceEventID: "later:private", Stage: 6},
+	}
+	output.Clock = "第 1 日 10:00"
+	if err := New(&rosterHost{}, Deps{}).resolveSceneResult(context.Background(), nil, &snapshot, wiaworld.Run{RunID: "run"}, hostResult{}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Positions["player"] != "street" || !snapshot.Characters[0].InScene {
+		t.Fatal("narration retained the earlier roster or position")
+	}
+	projection := MechanicsContext(snapshot, "player")
+	if !strings.Contains(projection, `"integer":42`) || !strings.Contains(projection, `"holder_id":"npc:warden"`) {
+		t.Fatalf("narration did not receive final visible mechanics: %s", projection)
+	}
+	if perceivedSource(snapshot, "player", "later:private") {
+		t.Fatal("private world-event projection reached the player")
+	}
+	count := 0
+	for _, perception := range snapshot.Perceptions["player"] {
+		if perception.SourceEventID == "later:public" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("final public source included %d times", count)
 	}
 }

@@ -64,7 +64,7 @@ type hostActionResult struct {
 }
 
 const (
-	coordinationPromptVersion = "story.coordination.v17"
+	coordinationPromptVersion = "story.coordination.v19"
 )
 
 // coordinateStage resolves the scene: time, roster, action outcomes and the
@@ -127,6 +127,18 @@ type coordinatedTurn struct {
 // Each response is resolved against the same input. Rejected candidates never
 // share writable event or perception storage with the accepted turn.
 func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, original Output, host hostResult) (coordinatedTurn, error) {
+	if intent.Private() {
+		for index, outcome := range host.Outcomes {
+			if outcome.ActionID != run.RunID+":player-action" {
+				continue
+			}
+			for _, recipient := range outcome.Recipients {
+				if recipient != "player" && recipient != intent.AddresseeID {
+					return coordinatedTurn{}, coordinationInvalid("private_player_outcome_recipient", fmt.Sprintf("outcomes[%d].recipients", index), "player-or-private-addressee")
+				}
+			}
+		}
+	}
 	output := original
 	output.Events = slices.Clone(original.Events)
 	output.Perceptions = slices.Clone(original.Perceptions)
@@ -301,6 +313,29 @@ func (s *Service) resolveSceneResult(ctx context.Context, generator model.TextGe
 	}
 	output.VisibleEvents = append(output.VisibleEvents, generatedVisible...)
 	snapshot.SceneViews, snapshot.SceneVersion = output.SceneViews, output.SceneVersion
+	snapshot.States = cloneStates(output.States)
+	snapshot.Relationships = slices.Clone(output.Relationships)
+	snapshot.Items = cloneItems(output.Items)
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		if err := applySpatialOutput(snapshot, *output); err != nil {
+			return AtStage(StageCoordination, err)
+		}
+	}
+	// Narration sees the final workspace, including knowledge granted by later
+	// world events. Other recipients' private projections remain outside this view.
+	if snapshot.Perceptions == nil {
+		snapshot.Perceptions = map[string][]wiaworld.Perception{}
+	}
+	known := map[string]bool{}
+	for _, perception := range snapshot.Perceptions["player"] {
+		known[perception.SourceEventID] = true
+	}
+	for _, perception := range output.Perceptions {
+		if perception.RecipientID == "player" && !known[perception.SourceEventID] {
+			snapshot.Perceptions["player"] = append(snapshot.Perceptions["player"], perception)
+			known[perception.SourceEventID] = true
+		}
+	}
 	return nil
 }
 

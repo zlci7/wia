@@ -7,10 +7,13 @@ import (
 // Both coordination purposes use these contracts; each model call is independent.
 func coordinationCapabilityContext(snapshot Snapshot, decisions map[string]NPCDecision) string {
 	input := "\n作者世界规则：" + snapshot.Definition.Rules + "\n作者事实（按实际感知分发）：" + snapshot.Definition.Secret
+	input += "\nNPC 协调提案（本人公开对白、行动、沉默与关系提案，不含个人记忆）：\n" + CoordinationDecisionContext(decisions, snapshot.Characters)
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		input += "\n地点与有向连接(JSON)：" + wire.MarshalJSON(snapshot.Definition.Locations) + "\n当前位置(JSON)：" + wire.MarshalJSON(snapshot.Positions)
 		input += "\n已定义背景实体(JSON)：" + wire.MarshalJSON(snapshot.Definition.BystanderRefs)
 		input += "\nmovements 必须为数组；每项包含 entity_id、from、to、route、action_id。route 是 from 到 to 的有向地点 ID 序列。行动来源属于移动者本人且结果为 succeeded 或 partial；每位移动者有引用 action_id 且交给本人的 scene_updates。位置决定结束时的同场名单；失败或未执行的行动不产生移动。无移动返回 []。"
+	} else {
+		input += "\n地点资料（不是人物已经到达的结果）：" + wire.MarshalJSON(snapshot.Definition.Locations)
 	}
 	if snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 {
 		input += "\n权威人物状态、关系与物品(JSON)：" + HostMechanicsContext(snapshot)
@@ -20,7 +23,6 @@ func coordinationCapabilityContext(snapshot Snapshot, decisions map[string]NPCDe
 		input += stateCoordinationContract()
 	}
 	if snapshot.Definition.Capabilities["relations"] == 1 {
-		input += "\n人物本人协调提案(JSON)：" + CoordinationDecisionContext(decisions, snapshot.Characters)
 		input += relationshipCoordinationContract()
 	}
 	if snapshot.Definition.Capabilities["items"] == 1 {

@@ -154,11 +154,10 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	}
 	actionJSON, _ := json.Marshal(actionCandidates)
 	publicCharacters := PublicCharacterContext(snapshot.Characters, wiaworld.CharacterIDs(InScene(snapshot.Characters)))
-	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\nNPC 协调提案（只包含公开对白、行动尝试与沉默状态，不含个人记忆）：\n%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial、not_executed；not_executed 表示重复、已覆盖或前置条件未成立而未另行执行，不代表动作成功；每项仍保留自己的 action_id 和结果；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", snapshot.Summary.GameID, CoordinationScene(snapshot), snapshot.Summary.Clock, publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, PlayerElaborationLabel(snapshot.Narrative), publicReplies, CoordinationDecisionContext(decisions, snapshot.Characters), actionJSON, AvailableCharacterIDs(snapshot.Characters), strings.Join(wiaworld.CharacterIDs(InScene(snapshot.Characters)), ","))
+	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial、not_executed；not_executed 表示重复、已覆盖或前置条件未成立而未另行执行，不代表动作成功；每项仍保留自己的 action_id 和结果；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", snapshot.Summary.GameID, CoordinationScene(snapshot), snapshot.Summary.Clock, publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, PlayerElaborationLabel(snapshot.Narrative), publicReplies, actionJSON, AvailableCharacterIDs(snapshot.Characters), strings.Join(wiaworld.CharacterIDs(InScene(snapshot.Characters)), ","))
 
 	input += "\n本轮场景协调策略：\n" + policy + "\n"
 	input += "\nscene_characters 专指与玩家在回合结束时处于同一现场、之后能接收玩家普通交谈的重要NPC。分接收者场景包含场外人物资料，不代表他们与玩家在一起。玩家离开原地点而人物留在原地点时，从这个名单移出相应人物；人物依自己的已确认行动跟随抵达时才保留。只更新名单不自动移动人物，各人的 scene_updates 仍分别保留其实际位置。"
-	input += "\n作者层世界规则：" + snapshot.Definition.Rules + "\n作者事实（不是全场共享知识）：" + snapshot.Definition.Secret + "\n地点资料（不是人物已经到达的结果）：" + wire.MarshalJSON(snapshot.Definition.Locations)
 	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。重要NPC的对白仅取本人已确定的公开对白，不从行动提案中补造其问话、承诺或回应。\n"
 	input += sceneSourcePrompt(snapshot, run, intent, events)
 	input += PlotContext(snapshot)
@@ -167,6 +166,9 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 		input += "\n中断依据也可引用提供的已提交历史事件，但只有其影响仍在当前情境中成立时才用于中断；事件发生过不等于危险一直持续。引用真实 event_id，不使用人物ID、view别名或未来 definition 节点作为已经发生的证据。"
 	}
 	input += "\n清单内 player_action_intent 是玩家已经选择的尝试，也必须裁定实际结果，不能仅因玩家说已成功就确认成功；受已知条件、人物决定和本轮时间边界约束。等待仅执行到实际时点。清单外的玩家表达不新增 outcome。"
+	if intent.Private() {
+		input += "\n玩家私密输入对应 outcome 的 recipients 只允许 player 与明确交谈对象，不把私密内容或其结果交给其他人物；NPC 本人选择公开说出的对白仍按公开范围处理。"
+	}
 	if actionResolution != nil {
 		input += "\n程序已固定的行动判定(JSON)：" + wire.MarshalJSON(actionResolution) + "\n对应 action_id 的 outcome.status 必须逐字采用程序状态；不得重掷、改阈值或用叙事推翻结果。content 只描述该固定结果在当前情境中的具体表现，规则结果与数值后果由程序另行结算。"
 	}

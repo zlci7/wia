@@ -6,20 +6,15 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-// notePlayerAction records the player's attempt as an event of its own.
-//
-// A spoken address is already carried by the dialogue events the character stages
-// produce, so only a non-spoken or unattributed action needs its own intent event.
-// Deciding this here rather than in a stage keeps the rule in one place: every stage
-// that appends player-derived events asks this, not its own copy of the condition.
+// notePlayerAction gives coordination the complete chosen input to resolve.
 func notePlayerAction(output *Output, run wiaworld.Run, intent TurnIntent) {
-	if intent.IntentType != "speak" || intent.AddresseeID == "" {
-		output.Events = append(output.Events, wiaworld.Event{
-			EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", TargetID: intent.AddresseeID,
-			Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion,
-			SourceType: "player_attempt", CreatedAt: time.Now().UTC(),
-		})
-	}
+	// Intent classification selects the interaction; the full input still needs
+	// resolution because speech can include movement or other world consequences.
+	output.Events = append(output.Events, wiaworld.Event{
+		EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", TargetID: intent.AddresseeID,
+		Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion,
+		SourceType: "player_attempt", CreatedAt: time.Now().UTC(),
+	})
 }
 
 // recordPlayerExperience gives every character named by the caller a memory of what the

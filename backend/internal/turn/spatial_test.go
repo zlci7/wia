@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -28,6 +30,59 @@ func spatialFixture() Snapshot {
 		Characters:      []wiaworld.Character{{EntityID: "npc:reporter", InScene: true}, {EntityID: "npc:watcher"}},
 		Bystanders:      []string{"书记员"},
 		BystanderRefs:   []story.Bystander{{BystanderID: "bystander:clerk", Name: "书记员"}},
+	}
+}
+
+func TestAddressedSpeechRetainsItsMovementAttempt(t *testing.T) {
+	snapshot := spatialFixture()
+	snapshot.Summary.Clock = "第 1 日 09:00"
+	snapshot.SceneViews = []SceneView{{Recipient: "player", Content: "office"}, {Recipient: "npc:reporter", Content: "office"}, {Recipient: "npc:watcher", Content: "clinic"}}
+	run := wiaworld.Run{RunID: "run", Input: "我拒绝委托，然后告别记者，走到街上。"}
+	intent := TurnIntent{IntentType: "speak", AddresseeID: "npc:reporter", Visibility: "public"}
+	output := Output{SceneVersion: 1, Positions: clonePositions(snapshot.Positions)}
+	notePlayerAction(&output, run, intent)
+	host := hostResult{TimeMinutes: 5, Scene: "street", Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "succeeded", Content: "玩家拒绝委托，离开办公室抵达街上。", Recipients: []string{"player", "npc:reporter"}}}, Movements: []movementResult{{EntityID: "player", From: "office", To: "street", Route: []string{"office", "street"}, ActionID: "run:player-action"}}, SceneUpdates: []sceneUpdate{{Content: "street", SourceIDs: []string{"run:player-action"}, Recipients: []string{"player"}}}}
+	resolved, err := prepareCoordination(snapshot, run, intent, output, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.output.Positions["player"] != "street" || len(resolved.output.SceneCharacters) != 0 || len(resolved.output.PositionChanges) != 1 {
+		t.Fatalf("spoken input lost its physical consequence: %+v", resolved.output)
+	}
+	if resolved.output.Events[0].Content != run.Input {
+		t.Fatal("complete input was not retained")
+	}
+}
+
+func TestPrivatePlayerResolutionPreservesRecipientBoundary(t *testing.T) {
+	snapshot := spatialFixture()
+	run := wiaworld.Run{RunID: "run", Input: "我私下告诉记者一个秘密。"}
+	intent := TurnIntent{IntentType: "speak", AddresseeID: "npc:reporter", Visibility: "private"}
+	output := Output{SceneVersion: 1}
+	notePlayerAction(&output, run, intent)
+	host := hostResult{Outcomes: []hostActionResult{{ActionID: "run:player-action", Recipients: []string{"npc:watcher"}}}}
+	if _, err := prepareCoordination(snapshot, run, intent, output, host); err == nil || !strings.Contains(err.Error(), "private_player_outcome_recipient") {
+		t.Fatalf("private resolution was allowed outside its recipient scope: %v", err)
+	}
+}
+
+func TestWorldEventUsesCurrentPositionsRatherThanRetainedSceneText(t *testing.T) {
+	snapshot := spatialFixture()
+	snapshot.Plot = &plot.Definition{Revision: "revision"}
+	snapshot.SceneViews = []SceneView{{Recipient: "npc:reporter", Content: "旧情境：记者还在事务所。"}}
+	output := Output{Positions: clonePositions(snapshot.Positions), SceneViews: snapshot.SceneViews}
+	output.Positions["npc:reporter"] = "clinic"
+	context := worldEventSpatialContext(snapshot, output)
+	if !strings.Contains(context, wire.MarshalJSON(output.Positions)) || !strings.Contains(context, "不能为了让其目击而将其移到事件地点") {
+		t.Fatal("world event omitted the current position and decision contract")
+	}
+	material := composePlot(snapshot, wiaworld.Run{}, plot.Node{}, &output)
+	if !strings.Contains(material.Required, context) {
+		t.Fatal("authored event omitted the shared spatial contract")
+	}
+	snapshot.Definition.Capabilities = nil
+	if worldEventSpatialContext(snapshot, output) != "" {
+		t.Fatal("legacy event acquired spatial semantics")
 	}
 }
 

@@ -106,36 +106,52 @@ func (s *Service) advanceGeneratedEvents(ctx context.Context, generator model.Te
 		Required:        fmt.Sprintf("世界规则：%s\n作者事实：%s\n生成范围：%s\n地点目录：%s\n机会：%s\n已确认触发结果：%s\n游戏内时间：%s\n在场人物：%s\n接收者场景：%s\n当前已有事件：%s\n作者剧情：%s\n返回candidates数组，0或1项。每项condition(何时可收束)、development(有干预与不参与时的后续可能及结束条件)、after_minutes(1到120)、initial对象。initial字段status必须occurred，content为本次外部事实，source_ids只能引用触发结果ID，projections按接收者给出content及可选scene，decision_requests只含本次确实得到新刺激且需要本人决定的NPC，ending为空。不得新增重要NPC、地图地点、强迫玩家承诺、覆写作者主线、把计划写成已发生事实。后续发展须可通过等待、参与或拒绝自然结算。只向真实目击或有来源获知者投影，不广播作者秘密。参与者上限=%s加player。背景人物可有符合设定的日常反应。所有数组使用[]，不使用null。", snapshot.Definition.Rules, snapshot.Definition.Secret, p.Scope, wire.MarshalJSON(snapshot.Definition.Locations), wire.MarshalJSON(opportunity), wire.MarshalJSON(trigger), output.Clock, wire.MarshalJSON(output.SceneCharacters), wire.MarshalJSON(output.SceneViews), wire.MarshalJSON(state.Active), wire.MarshalJSON(snapshot.Plot), wire.MarshalJSON(p.Participants)),
 		RequiredSources: []string{trigger.EventID}, Optional: plotEvidenceSections(snapshot.Events),
 	}
-	call := s.generator(generator, material, snapshot, run, "event_generation", "coordinator", 4, "story.events.v1")
+	material.Required += "\n每个 projection 的 recipient 最多出现一次，只能使用上述参与者上限中的重要NPC ID或player。背景人物只出现在事件描述中。"
+	material.Required += worldEventSpatialContext(snapshot, *output)
+	call := s.generator(generator, material, snapshot, run, "event_generation", "coordinator", 4, "story.events.v3")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var response struct {
 		Candidates []eventCandidate `json:"candidates"`
 	}
-	if err = GenerateJSON(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, "candidates"); err != nil {
-		return nil, err
+	validate := func() error {
+		if response.Candidates == nil || len(response.Candidates) > 1 {
+			return fmt.Errorf("%w: event_candidate_count", ErrGenerationFailed)
+		}
+		if len(response.Candidates) == 0 {
+			return nil
+		}
+		c := response.Candidates[0]
+		if wire.Clean(c.Condition) == "" || wire.Clean(c.Development) == "" || len([]rune(c.Initial.Content+c.Condition+c.Development)) > 4000 || c.AfterMinutes < 1 || c.AfterMinutes > 120 || c.Initial.Status != "occurred" || c.Initial.Ending != "" || len(c.Initial.SourceIDs) != 1 || c.Initial.SourceIDs[0] != trigger.EventID {
+			return fmt.Errorf("%w: event_candidate_fields", ErrGenerationFailed)
+		}
+		base := snapshot
+		base.Plot = &plot.Definition{Revision: "generated.v1"}
+		node := plot.Node{Audience: append([]string{"player"}, p.Participants...)}
+		return validatePlotResolution(base, node, *output, c.Initial)
 	}
-	if response.Candidates == nil || len(response.Candidates) > 1 {
-		return nil, fmt.Errorf("%w: event_candidate_count", ErrGenerationFailed)
+	_, err = GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &response, structuredTurnOutputTokens, nil, []string{"candidates"}, func() error {
+		if validationErr := validate(); validationErr != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Printf("story event_generation validation failed: world_id=%q run_id=%q boundary=%q", snapshot.Summary.WorldID, run.RunID, validationErr.Error())
+			}
+			return &GenerationError{Code: "event_candidate_invalid", Field: "candidates", Expected: validationErr.Error(), Cause: validationErr}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	if len(response.Candidates) == 0 {
 		return nil, nil
 	}
 	c := response.Candidates[0]
-	if wire.Clean(c.Condition) == "" || wire.Clean(c.Development) == "" || len([]rune(c.Initial.Content+c.Condition+c.Development)) > 4000 || c.AfterMinutes < 1 || c.AfterMinutes > 120 || c.Initial.Status != "occurred" || c.Initial.Ending != "" || len(c.Initial.SourceIDs) != 1 || c.Initial.SourceIDs[0] != trigger.EventID {
-		return nil, fmt.Errorf("%w: event_candidate_fields", ErrGenerationFailed)
-	}
 	key := run.InputID
 	if key == "" {
 		key = run.RunID
 	}
 	root := "generated:" + key
 	node := plot.Node{ID: key, AtMinute: current + c.AfterMinutes, After: []string{}, Condition: c.Condition, Development: c.Development, Audience: append([]string{"player"}, p.Participants...)}
-	base := snapshot
-	base.Plot = &plot.Definition{Revision: "generated.v1"}
-	if err = validatePlotResolution(base, node, *output, c.Initial); err != nil {
-		return nil, err
-	}
 	visible, err := s.publishPlotResolution(ctx, generator, snapshot, run, root, c.Initial, output)
 	if err != nil {
 		return nil, err
@@ -224,7 +240,7 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 		}
 		material.Required += fmt.Sprintf("\n程序条件结论：met=%t，evidence=%s。条件成立时依据作者条件继续判断；条件不成立时 status 必须为 %s，source_ids 必须包含全部 evidence。程序条件结论不可被自然语言覆盖。", requirementsMet, wire.MarshalJSON(requirementEvidence), onUnmet)
 	}
-	call := s.generator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v3")
+	call := s.generator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v4")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var result plotResolution
@@ -331,6 +347,7 @@ func composePlot(snapshot Snapshot, run wiaworld.Run, node plot.Node, output *Ou
 	}
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
 	material.Required += "\n接收与唤醒合同：每个 recipient 最多出现一次，只选当前节点 audience 中的ID。decision_requests 只选本次 projections 已提供刺激的重要NPC ID，最多一次；player、背景人物、信使等没有独立Agent的角色不放入 decision_requests。没有符合条件的人物时返回[]。"
+	material.Required += worldEventSpatialContext(snapshot, *output)
 	material.Required += "\n保留场景与已提交节点的来源ID也可以引用，但仅用于这些已提供状态，不据ID猜测未提供的原文。definition引用仅限本次当前节点；其他节点的发生依据使用其event_id，不使用其未来计划。"
 	material.RequiredSources = append(material.RequiredSources, SceneViewSources(snapshot, "")...)
 	for _, state := range snapshot.PlotProgress.Nodes {
@@ -339,6 +356,13 @@ func composePlot(snapshot Snapshot, run wiaworld.Run, node plot.Node, output *Ou
 		}
 	}
 	return material
+}
+
+func worldEventSpatialContext(snapshot Snapshot, output Output) string {
+	if snapshot.Definition.Capabilities["spatial"] != 1 {
+		return ""
+	}
+	return "\n事件发生时的权威位置(JSON)：" + wire.MarshalJSON(output.Positions) + "\n人物当前位置以此表为准，分接收者场景中的旧文字不改变位置。外部事件的 content、projections 和 scene 保持这些位置；重要NPC的新对白、移动、交付和其他自主行动由本人在 decision_requests 后决定，再由行动协调结算。本阶段只提供外部刺激，不把这些待决定行动写成已发生。接收者须在自己当前位置真实感知或通过明确来源获知，不能为了让其目击而将其移到事件地点。"
 }
 
 func plotEvidenceSections(events []wiaworld.Event) []Section {
@@ -397,8 +421,14 @@ func validatePlotResolution(snapshot Snapshot, node plot.Node, output Output, re
 	}
 	seen := map[string]bool{}
 	for _, p := range result.Projections {
-		if seen[p.Recipient] || !slices.Contains(node.Audience, p.Recipient) || wire.Clean(p.Content) == "" {
-			return fmt.Errorf("%w: plot_projection_audience", ErrGenerationFailed)
+		if seen[p.Recipient] {
+			return fmt.Errorf("%w: plot_projection_audience_duplicate", ErrGenerationFailed)
+		}
+		if !slices.Contains(node.Audience, p.Recipient) {
+			return fmt.Errorf("%w: plot_projection_audience_out_of_scope", ErrGenerationFailed)
+		}
+		if wire.Clean(p.Content) == "" {
+			return fmt.Errorf("%w: plot_projection_content_empty", ErrGenerationFailed)
 		}
 		if p.Recipient != "player" {
 			if _, ok := story.CharacterByID(story.Definition{Characters: snapshot.Characters}, p.Recipient); !ok {
@@ -519,17 +549,22 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 	}
 	if len(allowed) > 0 {
+		audienceContract := "recipients只能取对应允许集合；行动者自动获知。"
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
+		}
 		material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed)), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
-		material.Required += plotActionSceneContract(*output, allowed)
+			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
+		material.Required += plotActionSceneContract(*output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
 		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
 		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			material.Required += "\n上方每个行动的允许集合描述执行前的同场人物。移动结果的 recipients 还可以包含该行动者实际抵达终点时的同场人物；根据当前位置和本轮有效 movements 推导，不能把其他行动者的移动或整轮最终名单当成本行动的见证资格。"
 			material.Required += "\n本世界的位置只由结构化移动改变。movements 必须是数组；实际移动只含 entity_id、from、to、route、action_id，route 是完整有向地点 ID 序列，action_id 必须是该人物本人的成功或部分成功行动。每个移动者必须有以 action_id 为来源并交给本人的 scene_update。没有移动返回[]。outcome 必须省略 actor_in_scene；程序从权威位置派生玩家同场名单和感知资格。"
 		} else {
 			material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 		}
 		material.Required += coordinationCapabilityContext(base, decisions)
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v6")
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v7")
 		var resolved struct {
 			Outcomes            []plotActionResult   `json:"outcomes"`
 			SceneUpdates        []sceneUpdate        `json:"scene_updates"`
@@ -649,11 +684,15 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	return visible, nil
 }
 
-func plotActionSceneContract(output Output, allowed map[string][]string) string {
+func plotActionSceneContract(output Output, allowed map[string][]string, spatial bool) string {
 	sources := map[string]sceneSource{}
 	for _, v := range output.SceneViews {
 		id := "view:" + v.Recipient
 		sources[id] = sceneSource{ID: id, Content: v.Content, Recipients: []string{v.Recipient}}
 	}
-	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + wire.MarshalJSON(sources) + "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）：" + wire.MarshalJSON(allowed)
+	label := "\n本轮行动引用及接收者上限（以最终outcome实际范围为准）："
+	if spatial {
+		label = "\n本轮行动引用及执行前同场人物（移动后的到达见证人按实际位置推导）："
+	}
+	return "\nscene_updates 为数组，每人至多一项，每项只含content字符串、source_ids字符串数组、recipients字符串数组。content是此人行动后的完整简明情境。可引用的旧情境仅限下面目录的id，目录中每个view只属于它自己的recipient；其他view不能联合引用，也不能引用作者节点ID、目录外历史event_id或自行构造result ID。新结果仅以本次outcomes的action_id为引用，接收者必须实际列在该outcome.recipients中或为行动者。分别为每个人组织自己的更新，无变化返回[]。\n旧情境来源目录：" + wire.MarshalJSON(sources) + label + wire.MarshalJSON(allowed)
 }
