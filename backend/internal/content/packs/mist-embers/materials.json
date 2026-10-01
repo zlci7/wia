@@ -161,7 +161,7 @@
       "visibility": "owner",
       "owner_id": "npc:tailor",
       "delivery": "core",
-      "summary": "委托人掌握的家庭争执与收据线索。",
+      "summary": "马丁掌握的家庭争执与收据线索。",
       "file": "npcs/tailor/knowledge.md"
     },
     {
@@ -170,7 +170,7 @@
       "visibility": "owner",
       "owner_id": "npc:missing-woman",
       "delivery": "core",
-      "summary": "女孩自己的经历及对银镜的不完整理解。",
+      "summary": "诺拉自己的经历及对银镜的不完整理解。",
       "file": "npcs/missing-woman/knowledge.md"
     },
     {
@@ -197,7 +197,7 @@
       "visibility": "owner",
       "owner_id": "npc:missing-woman",
       "delivery": "on_demand",
-      "summary": "失踪女孩的身份、性格与说话方式。",
+      "summary": "诺拉·维尔的生活背景、动机与说话方式。",
       "file": "npcs/missing-woman/profile.md"
     },
     {
@@ -206,7 +206,7 @@
       "visibility": "owner",
       "owner_id": "npc:tailor",
       "delivery": "on_demand",
-      "summary": "裁缝店老板的身份、性格与说话方式。",
+      "summary": "马丁·维尔的生活背景、动机与说话方式。",
       "file": "npcs/tailor/profile.md"
     }
   ]

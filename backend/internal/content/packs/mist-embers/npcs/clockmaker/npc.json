@@ -1,6 +1,6 @@
 {
   "definition_id": "clockmaker.v1",
-  "revision": "clockmaker.v2",
+  "revision": "clockmaker.v3",
   "entity_id": "npc:clockmaker",
   "name": "亚瑟·格兰特",
   "role": "钟表匠",
