@@ -24,10 +24,10 @@
 ## 剧本配置与世界能力
 
 - [开放世界闭环执行方案](stages/开放世界闭环-10小时执行方案.md)：世界推进、个人感知、玩家工作台与真实游玩闭环的连续交付安排。
-- [开发者剧本编写规范与模板](stages/开发者剧本编写规范与模板.md)：v4 分目录配置、材料索引与渐进披露合同提案。
-- [Story Pack v4 完整文件模板](templates/story-pack-v4/README.md)：入口、地图、人物、分类材料与初始计划；格式 v4 尚未接入运行时。当前可加载模板为 [Story Pack v3](templates/story-pack/story.json)。
-- [渐进材料与持续世界技术方案](stages/渐进材料与持续世界-技术方案.md)：世界推进、个人感知两个完整交付模块，待 CR。
-- [《雾都余烬》分类材料](templates/mist-embers-materials/README.md)：背景、异常物品、人物知识与计划草案；未加入正式目录。
+- [开发者剧本编写规范与模板](stages/开发者剧本编写规范与模板.md)：v4 分目录配置、材料索引与渐进披露合同。
+- [Story Pack v4 完整文件模板](templates/story-pack-v4/README.md)：入口、地图、人物、分类材料与初始计划；[Story Pack v3](templates/story-pack/story.json)保留旧格式示例。
+- [渐进材料与持续世界技术方案](stages/渐进材料与持续世界-技术方案.md)：世界推进、个人感知两个完整交付模块。
+- [《雾都余烬》分类材料](templates/mist-embers-materials/README.md)：背景、异常物品、人物知识与计划的作者参考。
 - [诡秘世界作者参考资料](reference/诡秘世界/README.md)：人物、时代、社会、教会、货币、封印物与历史节点；与运行材料分别保存。
 - [模型主导的可选能力模块](stages/模型主导的可选能力模块.md)：状态、物品与投掷的接入合同和本轮整体验收范围。
 - [Story Pack v3 与基础世界能力](Story-Pack-v3-技术方案.md)：阶段 A、B、C 已通过工程 CR；真实模型连续游玩与默认内容切换仍待人工验收和单独授权。

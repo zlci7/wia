@@ -1,0 +1,22 @@
+{
+  "bystanders": [
+    {
+      "bystander_id": "bystander:clerk",
+      "name": "事务所书记员",
+      "description": "负责登记委托和整理来访记录。",
+      "initial_location": "office"
+    },
+    {
+      "bystander_id": "bystander:printer",
+      "name": "报社排字工",
+      "description": "忙着处理当天版面，只知道公开流传的消息。",
+      "initial_location": "newspaper-office"
+    },
+    {
+      "bystander_id": "bystander:coachman",
+      "name": "东区车夫",
+      "description": "在红烟囱街等客，见过来往车辆。",
+      "initial_location": "red-chimney-street"
+    }
+  ]
+}

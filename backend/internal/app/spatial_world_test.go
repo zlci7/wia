@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -61,7 +62,7 @@ func (spatialWorldGenerator) GenerateText(_ context.Context, request model.TextR
 func TestV3SpatialWorldMovesAndSurvivesSaveAndRestart(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	app, err := Open(ctx, Options{DataRoot: root, UserID: LocalUserID, Generator: spatialWorldGenerator{}})
+	app, err := Open(ctx, Options{DataRoot: root, UserID: LocalUserID, Generator: spatialWorldGenerator{}, StoryPacksPath: filepath.Join("testdata", "mist-v3")})
 	if err != nil {
 		t.Fatal(err)
 	}

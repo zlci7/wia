@@ -1,21 +1,19 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "requires": {
     "spatial": 1,
     "state": 1,
     "relations": 1,
     "items": 1,
-    "rules": 1
+    "rules": 1,
+    "progression": 1
   },
   "game_id": "mist-embers",
-  "revision": "mist-embers.pack.v4",
+  "revision": "mist-embers.pack.v5",
   "mode": "open",
   "title": "雾都余烬",
-  "description": "贝克兰德的一宗普通失踪案，把一名新晋调查员带向红烟囱街与一面来历不明的裂纹银镜。",
+  "description": "第一部结束后的贝克兰德，一宗失踪案把新晋调查员带向红烟囱街与一面裂纹银镜。人物各有打算，城市不会因你离开而停下。",
   "gameplay": "从调查事务所开始，自由走访报社、钟表铺、裁缝店和东区。与各自掌握不同事实的人交谈，决定是否接受委托、让谁参与，以及何时进入废弃诊所。",
-  "background": "战争结束后的贝克兰德仍被雾、煤烟和生活压力笼罩。乔伍德区的报社与私人事务所照常营业，桥区的工匠谨慎谋生，东区的人们更关心下一顿饭。教会、警察与隐秘组织都真实存在，但普通人大多只接触到它们公开的一面。",
-  "rules": "地点通过明确道路相连，人物只会感知自己实际在场或通过可靠来源获知的事情。玩家是普通的新晋调查员，不预先知道非凡力量真实存在。重要人物独立决定是否帮助、跟随、透露事实或采取行动；玩家的命令和叙述不能替他们同意。自然语言是主要行动方式，行动结果以已提交的结构化世界事实为准。",
-  "author_facts": "裁缝店老板正在寻找离家数日的女儿。他隐瞒了双方最后一次争执，也没有说女儿曾收到一张来自红烟囱街的收据。失踪女孩主动接触过一面有裂纹的小型银镜，并不认为自己只是受害者。亚瑟以钟表匠身份掩护自己调查银镜来源的任务；艾琳只知道近期有人在打听红烟囱街和旧诊所。银镜在特定条件下映出目标最强烈的愿望，并逐渐扰乱使用者对自我与镜像的认知。模型结合使用方式、持续时间、人物经历与当前状态判断银镜表现、精神影响和物品归属；疲劳与调查负荷随行动强度、休息和遭遇变化。接受或拒绝委托由玩家表达及人物本人回应确定，并保存在经历中。明确匹配潜入检定时采用程序提供的骰子结果，具体表现与状态后果结合情境判断。",
   "player": {
     "name": "调查员",
     "profile": "贝克兰德一家私人调查事务所的新晋调查员，尚未接触过真实的非凡世界。",
@@ -30,333 +28,20 @@
   "opening": "上午的雾贴在调查事务所窗外。裁缝店老板坐在访客椅上，帽子被他攥得变了形。他说女儿已经失踪三天，愿意付三镑请人把她找回来；说到两人最后一次见面时，他明显停顿了一下。桌上放着女孩的近照和一张写着住址的纸条。",
   "initial_location": "office",
   "clock": "第 1 日 09:00",
-  "locations": [
-    {
-      "id": "charwood",
-      "kind": "region",
-      "name": "乔伍德区",
-      "description": "事务所、报社与体面商铺集中的城区。",
-      "connections": []
-    },
-    {
-      "id": "bridge",
-      "kind": "region",
-      "name": "桥区",
-      "description": "车站、工匠铺和市场交错的城区。",
-      "connections": []
-    },
-    {
-      "id": "east",
-      "kind": "region",
-      "name": "东区",
-      "description": "工厂、拥挤住房和廉价店铺之间布满煤烟。",
-      "connections": []
-    },
-    {
-      "id": "office",
-      "kind": "place",
-      "parent": "charwood",
-      "name": "调查事务所",
-      "description": "两间临街办公室，委托记录、城区地图和一部公用电话都在这里。",
-      "connections": [
-        "cafe",
-        "tailor-shop"
-      ],
-      "public": true
-    },
-    {
-      "id": "cafe",
-      "kind": "place",
-      "parent": "charwood",
-      "name": "街角咖啡馆",
-      "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
-      "connections": [
-        "office",
-        "newspaper-office",
-        "clock-shop"
-      ],
-      "public": true
-    },
-    {
-      "id": "newspaper-office",
-      "kind": "place",
-      "parent": "charwood",
-      "name": "报社分部",
-      "description": "印刷机声从后间传来，地方新闻和零散线索在记者之间流动。",
-      "connections": [
-        "cafe"
-      ],
-      "public": true
-    },
-    {
-      "id": "clock-shop",
-      "kind": "place",
-      "parent": "bridge",
-      "name": "格兰特钟表铺",
-      "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。",
-      "connections": [
-        "cafe",
-        "red-chimney-street"
-      ],
-      "public": true
-    },
-    {
-      "id": "tailor-shop",
-      "kind": "place",
-      "parent": "charwood",
-      "name": "维尔裁缝店",
-      "description": "店面整洁，楼上是老板与女儿的住所；订单簿能说明女孩失踪前几日的行程。",
-      "connections": [
-        "office",
-        "red-chimney-street"
-      ],
-      "public": true
-    },
-    {
-      "id": "red-chimney-street",
-      "kind": "place",
-      "parent": "east",
-      "name": "红烟囱街",
-      "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。",
-      "connections": [
-        "tailor-shop",
-        "clock-shop",
-        "abandoned-clinic"
-      ],
-      "public": true
-    },
-    {
-      "id": "abandoned-clinic",
-      "kind": "place",
-      "parent": "east",
-      "name": "废弃诊所",
-      "description": "红烟囱街尽头的旧诊所，窗板松动，地下室入口藏在落满灰尘的诊疗室后。",
-      "connections": [
-        "red-chimney-street"
-      ],
-      "public": true
-    }
-  ],
   "npcs": [
-    "npcs/reporter.json",
-    "npcs/clockmaker.json",
-    "npcs/missing-woman.json",
-    "npcs/tailor.json"
+    "npcs/reporter/npc.json",
+    "npcs/clockmaker/npc.json",
+    "npcs/missing-woman/npc.json",
+    "npcs/tailor/npc.json"
   ],
-  "bystanders": [
-    {
-      "bystander_id": "bystander:clerk",
-      "name": "事务所书记员",
-      "description": "负责登记委托和整理来访记录。",
-      "initial_location": "office"
-    },
-    {
-      "bystander_id": "bystander:printer",
-      "name": "报社排字工",
-      "description": "忙着处理当天版面，只知道公开流传的消息。",
-      "initial_location": "newspaper-office"
-    },
-    {
-      "bystander_id": "bystander:coachman",
-      "name": "东区车夫",
-      "description": "在红烟囱街等客，见过来往车辆。",
-      "initial_location": "red-chimney-street"
-    }
-  ],
-  "state_definitions": [
-    {
-      "id": "fatigue",
-      "name": "疲劳",
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 100,
-      "default": 18,
-      "scope": "player",
-      "projection": "self",
-      "knowledge": "owner",
-      "update_policy": {
-        "kind": "model"
-      },
-      "description": "日常行动、休息和持续压力造成的身体负担。"
-    },
-    {
-      "id": "investigation_strain",
-      "name": "调查负荷",
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 100,
-      "default": 0,
-      "scope": "player",
-      "projection": "self",
-      "knowledge": "owner",
-      "update_policy": {
-        "kind": "model"
-      },
-      "description": "高风险调查行动累积的身体与注意力负荷。"
-    },
-    {
-      "id": "mirror_dissonance",
-      "name": "镜像失谐",
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 100,
-      "default": 0,
-      "scope": "player",
-      "projection": "self",
-      "knowledge": "owner",
-      "update_policy": {
-        "kind": "model"
-      },
-      "description": "接触裂纹银镜后，对镜中自我与现实自我的混淆程度。"
-    }
-  ],
-  "relation_definitions": [
-    {
-      "id": "trust",
-      "name": "信任",
-      "minimum": -100,
-      "maximum": 100,
-      "default": 0,
-      "max_change_per_turn": 0,
-      "projection": "hidden",
-      "description": "关系主体依据亲历结果形成的可信程度判断。"
-    },
-    {
-      "id": "regard",
-      "name": "好感",
-      "minimum": -100,
-      "maximum": 100,
-      "default": 0,
-      "max_change_per_turn": 0,
-      "projection": "hidden",
-      "description": "关系主体对目标的个人亲近或反感程度。"
-    }
-  ],
-  "initial_relations": [
-    {
-      "subject_id": "npc:reporter",
-      "target_id": "player",
-      "relation_type": "trust",
-      "value": 5
-    },
-    {
-      "subject_id": "npc:reporter",
-      "target_id": "player",
-      "relation_type": "regard",
-      "value": 12
-    }
-  ],
-  "item_definitions": [
-    {
-      "id": "sealed-mirror-3-917",
-      "name": "裂纹银镜",
-      "description": "一面有裂痕的小型银镜，来历和作用尚未得到公开确认。",
-      "projection": "public"
-    }
-  ],
-  "item_instances": [
-    {
-      "instance_id": "mirror-3-917",
-      "definition_id": "sealed-mirror-3-917",
-      "location_id": "abandoned-clinic"
-    }
-  ],
-  "action_rules": [
-    {
-      "id": "clinic-stealth",
-      "name": "潜入废弃诊所",
-      "guidance": "玩家在废弃诊所尝试隐蔽潜入、避开注意或秘密搜查地下室。",
-      "conditions": [
-        {
-          "kind": "location_is",
-          "entity_id": "actor",
-          "location_id": "abandoned-clinic"
-        }
-      ],
-      "risk": {
-        "base_target": 55,
-        "minimum": 5,
-        "maximum": 95,
-        "modifiers": [
-          {
-            "label": "状态尚佳",
-            "amount": 5,
-            "condition": {
-              "kind": "state_at_most",
-              "entity_id": "actor",
-              "fact_id": "fatigue",
-              "value": 25
-            }
-          },
-          {
-            "label": "调查负荷",
-            "amount": -10,
-            "condition": {
-              "kind": "state_at_least",
-              "entity_id": "actor",
-              "fact_id": "investigation_strain",
-              "value": 20
-            }
-          }
-        ]
-      },
-      "success_text": "你避开了容易暴露行踪的声响与痕迹。",
-      "failure_text": "潜入惊动了附近的人，并留下了可被追查的痕迹。"
-    }
-  ],
-  "plot": {
-    "revision": "mist-embers.plot.v2",
-    "facts": "委托是否成立取决于玩家的明确选择；格兰特会独立追索银镜，但只依据自己实际获知的信息行动。",
-    "nodes": [
-      {
-        "id": "commission-window",
-        "after": [],
-        "at_minute": 720,
-        "condition": "裁缝店老板不会无限期等待；玩家接受时记者可能基于本人获知的线索跟进，拒绝或持续不回应时委托转向其他渠道。",
-        "development": "按已经发生的接受、拒绝或等待结果结算委托窗口，不替玩家作选择。",
-        "audience": [
-          "npc:tailor",
-          "npc:reporter"
-        ],
-        "requirements": [],
-        "on_unmet": "skip",
-        "terminal": false
-      },
-      {
-        "id": "mirror-recovery",
-        "after": [
-          "commission-window"
-        ],
-        "at_minute": 1260,
-        "condition": "若裂纹银镜仍在废弃诊所，格兰特会按自己的计划尝试回收；若已经被取走，原计划失去前提。",
-        "development": "依据银镜的实际归属及格兰特本人获知的线索，结算回收计划或确认计划落空。",
-        "audience": [
-          "npc:clockmaker"
-        ],
-        "requirements": [
-          {
-            "kind": "item_at",
-            "fact_id": "mirror-3-917",
-            "location_id": "abandoned-clinic"
-          }
-        ],
-        "on_unmet": "skip",
-        "terminal": false
-      }
-    ]
-  },
-  "event_generation": {
-    "scope": "只生成失踪案调查期间的小型外部动静，不新增重要人物，不替玩家接受委托。",
-    "locations": [
-      "cafe",
-      "red-chimney-street",
-      "abandoned-clinic"
-    ],
-    "participants": [
-      "npc:reporter",
-      "npc:clockmaker"
-    ],
-    "max_active": 1,
-    "cooldown_turns": 4
+  "materials_file": "materials.json",
+  "data_files": {
+    "locations": "world/locations.json",
+    "state": "world/state.json",
+    "relations": "world/relations.json",
+    "items": "world/items.json",
+    "rules": "world/rules.json",
+    "bystanders": "world/bystanders.json",
+    "progression": "narrative/progression.json"
   }
 }

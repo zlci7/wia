@@ -456,6 +456,9 @@ func (a *Service) buildPackage(ctx context.Context, draft ContentDraft, project 
 	if err := validateDraftPayload(payload); err != nil {
 		return "", nil, "", err
 	}
+	if payload.SchemaVersion == SchemaV4 {
+		return a.buildV4Package(ctx, draft, project)
+	}
 	npcFiles, err := DraftNPCFiles(payload)
 	if err != nil {
 		return "", nil, "", err

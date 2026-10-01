@@ -17,6 +17,7 @@ type NPCDecision struct {
 	Silent                bool                   `json:"silent"`
 	Memory                string                 `json:"memory"`
 	RelationshipProposals []relationshipProposal `json:"relationship_proposals,omitempty"`
+	PlanUpdates           []planUpdate           `json:"plan_updates,omitempty"`
 }
 
 type relationshipProposal struct {
@@ -111,6 +112,9 @@ func MergeNPCDecision(previous, current NPCDecision) NPCDecision {
 	}
 	if len(previous.RelationshipProposals) > 0 {
 		current.RelationshipProposals = append(append([]relationshipProposal(nil), previous.RelationshipProposals...), current.RelationshipProposals...)
+	}
+	if len(current.PlanUpdates) == 0 {
+		current.PlanUpdates = previous.PlanUpdates
 	}
 	current.Silent = current.Speech == ""
 	return current

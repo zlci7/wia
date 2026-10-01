@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gameagent/backend/internal/plot"
@@ -87,9 +88,18 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 	values["settings_origin"] = def.SettingsSource
 	values["definition_snapshot"] = wire.MarshalJSON(def)
 	values["capability_manifest"] = wire.MarshalJSON(def.Capabilities)
+	progress, err := turn.InitialOpenProgress(def)
+	if err != nil {
+		return err
+	}
 	// A world is either created whole or not at all: the headers, the characters, the
 	// opening message and the opening event together are what "this world exists" means.
 	return store.InTx(ctx, func(tx *storage.WorldTx) error {
+		if progress != nil {
+			if err := tx.SetOpenProgress(ctx, progress); err != nil {
+				return err
+			}
+		}
 		for key, value := range values {
 			if err := tx.SetMeta(ctx, key, value); err != nil {
 				return err
@@ -189,7 +199,7 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 // A promoted or authored character can carry its own avatar; the world copy is
 // recorded separately under the world's assets.
 
-func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []turn.SceneView, positionChanges []turn.PositionChange, stateChanges []turn.StateChange, relationshipChanges []turn.RelationshipChange, itemTransfers []turn.ItemTransfer, actionResolution *turn.ActionResolution, plotState *plot.Progress, generated ...*turn.GeneratedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []turn.SceneView, positionChanges []turn.PositionChange, stateChanges []turn.StateChange, relationshipChanges []turn.RelationshipChange, itemTransfers []turn.ItemTransfer, actionResolution *turn.ActionResolution, plotState *plot.Progress, progress *wiaworld.OpenProgress, generated ...*turn.GeneratedEventState) (int64, error) {
 	var messageHead int64
 	var eventHead int64
 	var turnSeq int64
@@ -235,6 +245,24 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 			if e.ProjectionParentID != "" {
 				if err := tx.InsertEventDependency(ctx, e.EventID, e.ProjectionParentID); err != nil {
 					return err
+				}
+			}
+		}
+		if progress != nil {
+			for _, event := range events {
+				if event.EventType != "npc_plan_updated" {
+					continue
+				}
+				var plan wiaworld.PersonalPlan
+				if err := json.Unmarshal([]byte(event.Content), &plan); err != nil {
+					return err
+				}
+				for _, source := range plan.SourceIDs {
+					if !strings.HasPrefix(source, "material:") && source != event.EventID {
+						if err := tx.InsertEventDependency(ctx, event.EventID, source); err != nil {
+							return err
+						}
+					}
 				}
 			}
 		}
@@ -333,6 +361,11 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 		}
 		if plotState != nil {
 			if err := tx.SetMeta(ctx, "plot_progress", wire.MarshalJSON(plotState)); err != nil {
+				return err
+			}
+		}
+		if progress != nil {
+			if err := tx.SetOpenProgress(ctx, progress); err != nil {
 				return err
 			}
 		}

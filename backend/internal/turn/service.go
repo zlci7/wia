@@ -58,6 +58,7 @@ func (s *Service) executeSnapshot(ctx context.Context, generator model.TextGener
 }
 
 func (s *Service) executeSnapshotWithStore(ctx context.Context, store *storage.WorldStore, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (Output, error) {
+	snapshot.materialReads = newMaterialReadBudget()
 	intent, output, err := s.resolveIntent(ctx, generator, snapshot, run)
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)

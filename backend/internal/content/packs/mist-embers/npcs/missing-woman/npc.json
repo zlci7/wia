@@ -1,0 +1,14 @@
+{
+  "definition_id": "missing-woman.v1",
+  "revision": "missing-woman.v2",
+  "entity_id": "npc:missing-woman",
+  "name": "失踪女孩",
+  "role": "裁缝店学徒",
+  "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+  "initial_location": "abandoned-clinic",
+  "speaking_examples": [
+    "是我自己来的。你可以不赞成，但别先替我决定。",
+    "找到我不等于你已经知道发生了什么。"
+  ],
+  "profile": "有自己的判断和选择，不愿只被当成等待营救的目标。经济压力和与父亲的冲突让她主动寻找改变生活的办法。"
+}

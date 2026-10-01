@@ -17,11 +17,13 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -54,7 +56,55 @@ func validateTurnIntent(intent *TurnIntent) error {
 }
 
 func (g *ContextGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
+	response, err := g.generateText(ctx, request)
+	if err != nil || len(g.availableMaterials) == 0 {
+		return response, err
+	}
+	ids, requested, err := materialRequest(response.Text)
+	if err != nil || !requested {
+		return response, err
+	}
+	if g.requestedMaterials {
+		return model.TextResponse{}, coordinationInvalid("material_request_limit", "needs_material", "one-request-per-purpose")
+	}
+	g.requestedMaterials = true
+	for _, id := range ids {
+		if _, ok := g.availableMaterials[id]; !ok {
+			return model.TextResponse{}, coordinationInvalid("material_request_unauthorized", "needs_material", "authorized-listed-material-id")
+		}
+	}
+	allowed, err := g.materialReads.request(ctx, g.composer.Scope, g.materialGroup)
+	if err != nil {
+		return model.TextResponse{}, err
+	}
+	if allowed {
+		for _, id := range ids {
+			m := g.availableMaterials[id]
+			if !slices.Contains(g.providedSources, m.SourceID(g.materialRevision)) {
+				g.material = appendRequiredMaterial(g.material, materialSection(m, g.materialRevision))
+			}
+		}
+	} else {
+		g.material = appendRequiredMaterial(g.material, Section{Name: "material_read_limit", Text: "材料补充额度已用尽。依据本次实际提供的正文完成最终输出；尚缺依据时选择暂缓或不执行。"})
+	}
+	request.System += "\n材料读取已完成。现在仅返回最终输出合同，依据实际提供的材料作答。"
+	response, err = g.generateText(ctx, request)
+	if err == nil {
+		_, again, readErr := materialRequest(response.Text)
+		if readErr != nil {
+			return model.TextResponse{}, readErr
+		}
+		if again {
+			return model.TextResponse{}, coordinationInvalid("material_request_limit", "needs_material", "final-output-after-one-read")
+		}
+	}
+	return response, err
+}
+
+func (g *ContextGenerator) generateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
+	request.System += g.systemSuffix
 	req, report, err := g.composer.Build(g.material, request.System, request.MaxOutputTokens)
+	g.providedSources = slices.Clone(report.SelectedSources)
 	if g.logger != nil {
 		s := report.Scope
 		g.logger.Printf("story context recall: world_id=%q run_id=%q purpose=%q recipient=%q included=%d excluded=%d limited=%t", s.World, s.Run, s.Purpose, s.Recipient, report.RecallIncluded, report.RecallExcluded, report.RecallLimited)
@@ -94,12 +144,19 @@ type ContextGenerator struct {
 	//
 	// It is the only thing this type ever needed from the application, and holding the
 	// whole application for it is what kept the context assemblers from moving anywhere.
-	metered       MeteredText
-	TextGenerator model.TextGenerator
-	composer      ContextComposer
-	material      Material
-	logger        Logger
-	calls         int
+	metered            MeteredText
+	TextGenerator      model.TextGenerator
+	composer           ContextComposer
+	material           Material
+	logger             Logger
+	calls              int
+	availableMaterials map[string]story.Material
+	materialRevision   string
+	materialReads      *materialReadBudget
+	materialGroup      *materialReadGroup
+	requestedMaterials bool
+	providedSources    []string
+	systemSuffix       string
 }
 
 // NewContextGenerator wraps a model generator so that every call this turn makes is
@@ -107,6 +164,8 @@ type ContextGenerator struct {
 // one scope. owner is the account the world belongs to; it is part of the scope a
 // composed request is recorded under.
 func NewContextGenerator(deps Deps, owner string, generator model.TextGenerator, material Material, snapshot Snapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
+	originalSystem := material.System
+	material, available := selectStoryMaterials(snapshot, purpose, recipient, material)
 	window := model.WindowLimits{}
 	if provider, ok := generator.(model.WindowProvider); ok {
 		window = provider.ModelWindow()
@@ -115,7 +174,7 @@ func NewContextGenerator(deps Deps, owner string, generator model.TextGenerator,
 	if provider, ok := generator.(model.TextReasoningProvider); ok {
 		reasoning = provider.TextReasoningReserve()
 	}
-	return &ContextGenerator{metered: deps.Meter, TextGenerator: generator, material: material, logger: deps.Logger, composer: ContextComposer{Scope: ContextScope{Owner: owner, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
+	return &ContextGenerator{metered: deps.Meter, TextGenerator: generator, material: material, logger: deps.Logger, systemSuffix: strings.TrimPrefix(material.System, originalSystem), availableMaterials: available, materialRevision: snapshot.Definition.Revision, materialReads: snapshot.materialReads, materialGroup: snapshot.materialGroup, composer: ContextComposer{Scope: ContextScope{Owner: owner, Game: snapshot.Summary.GameID, World: snapshot.Summary.WorldID, Run: run.RunID, Attempt: run.Attempt, Stage: stage, Epoch: run.BaseContextEpoch, SceneVersion: snapshot.SceneVersion, Purpose: purpose, Recipient: recipient, Template: template, PolicyRevision: material.PolicyRevision}, Window: window, ReasoningReserve: reasoning}}
 }
 
 // Field and Expected are taken from the local schema, never response values.

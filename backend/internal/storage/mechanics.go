@@ -120,7 +120,19 @@ func (s *WorldStore) LoadStructuredFactSources(ctx context.Context) ([]string, e
 		}
 		result = append(result, id)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	progress, err := s.LoadOpenProgress(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if progress != nil {
+		for _, plan := range progress.Plans {
+			result = append(result, plan.SourceIDs...)
+		}
+	}
+	return result, nil
 }
 
 type StateChangeWrite struct {

@@ -164,4 +164,6 @@ type Definition struct {
 	ItemDefinitions     []ItemDefinition                          `json:"item_definitions,omitempty"`
 	InitialItems        []InitialItem                             `json:"initial_items,omitempty"`
 	ActionRules         []ActionRule                              `json:"action_rules,omitempty"`
+	Materials           []Material                                `json:"materials,omitempty"`
+	Progression         *plot.OpenDefinition                      `json:"progression,omitempty"`
 }

@@ -101,6 +101,7 @@ type ContentDraftPayload struct {
 	ItemDefinitions     []PackItemDefinition        `json:"item_definitions,omitempty"`
 	ItemInstances       []PackItemInstance          `json:"item_instances,omitempty"`
 	ActionRules         []story.ActionRule          `json:"action_rules,omitempty"`
+	PackageFiles        map[string][]byte           `json:"package_files,omitempty"`
 }
 
 const payloadTooLarge = "payload is too large"
@@ -160,6 +161,9 @@ func (a *Service) PreviewContentDraft(ctx context.Context, draftID string, autho
 		return ContentDraftPreview{}, err
 	}
 	payload := draft.Payload
+	if payload.SchemaVersion == SchemaV4 {
+		return ContentDraftPreview{}, fmt.Errorf("%w: v4 file packages require source-file preview; publish to play in an independent world", ErrContentInvalid)
+	}
 	publicPlayer := payload.Player
 	publicPlayer.InitialState = nil
 	preview := ContentDraftPreview{
@@ -350,6 +354,13 @@ func (a *Service) SaveContentDraft(ctx context.Context, draftID string, payload 
 	if expectedVersion < 1 {
 		return ContentDraft{}, ErrInvalidRequest
 	}
+	stored, err := a.ReadContentDraft(ctx, draftID)
+	if err != nil {
+		return ContentDraft{}, err
+	}
+	if stored.Payload.SchemaVersion == SchemaV4 || payload.SchemaVersion == SchemaV4 {
+		return ContentDraft{}, fmt.Errorf("%w: v4 file packages support import and publish; edit their source files and import a new revision", ErrContentInvalid)
+	}
 	// The author names things; the program owns the internal identifiers.
 	if err := normalizeDraftIdentities(&payload); err != nil {
 		return ContentDraft{}, err
@@ -402,6 +413,12 @@ func (a *Service) DeleteContentDraft(ctx context.Context, draftID string) error 
 // The draft stays a package candidate: identity and required fields are checked
 // here, while publication applies the full strict package schema.
 func validateDraftPayload(payload ContentDraftPayload) error {
+	if payload.SchemaVersion == SchemaV4 {
+		return validateV4DraftFiles(payload.PackageFiles)
+	}
+	if len(payload.PackageFiles) != 0 {
+		return fmt.Errorf("%w: package files require schema v4", ErrContentInvalid)
+	}
 	if payload.GameID != "" && !packID.MatchString(payload.GameID) {
 		return fmt.Errorf("%w: game_id", ErrContentInvalid)
 	}
@@ -668,7 +685,8 @@ func (a *Service) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (Co
 		NPCs: []ContentDraftNPC{}, Defaults: story.Defaults,
 		StateDefinitions: story.StateDefinitions, RelationDefinitions: story.RelationDefinitions,
 		InitialRelations: story.InitialRelations, ItemDefinitions: story.ItemDefinitions, ItemInstances: story.ItemInstances,
-		ActionRules: story.ActionRules,
+		ActionRules:  story.ActionRules,
+		PackageFiles: clonePackageFiles(pack.PackageFiles),
 	}
 	// Each character's own file travels with the package under its recorded path, so
 	// the editor gets the real avatar and examples whatever the file is called.

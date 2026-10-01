@@ -85,6 +85,9 @@ func PlotTimeLimit(snapshot Snapshot) int {
 }
 
 func PlotContext(snapshot Snapshot) string {
+	if snapshot.Definition.Progression != nil {
+		return "\n游戏时间合同：本轮最多经过120分钟；按行动实际耗时或明确等待推进。持续发展和计划检查由本轮行动结算后的世界阶段处理。当前阶段只裁定已经提交的行动，不将人物的计划检查时间写成预定成功时间。"
+	}
 	if snapshot.Plot == nil && len(snapshot.GeneratedEvents.Active) == 0 {
 		return ""
 	}

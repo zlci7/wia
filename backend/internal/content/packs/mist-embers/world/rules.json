@@ -1,0 +1,45 @@
+{
+  "action_rules": [
+    {
+      "id": "clinic-stealth",
+      "name": "潜入废弃诊所",
+      "guidance": "玩家在废弃诊所尝试隐蔽潜入、避开注意或秘密搜查地下室。",
+      "conditions": [
+        {
+          "kind": "location_is",
+          "entity_id": "actor",
+          "location_id": "abandoned-clinic"
+        }
+      ],
+      "risk": {
+        "base_target": 55,
+        "minimum": 5,
+        "maximum": 95,
+        "modifiers": [
+          {
+            "label": "状态尚佳",
+            "amount": 5,
+            "condition": {
+              "kind": "state_at_most",
+              "entity_id": "actor",
+              "fact_id": "fatigue",
+              "value": 25
+            }
+          },
+          {
+            "label": "调查负荷",
+            "amount": -10,
+            "condition": {
+              "kind": "state_at_least",
+              "entity_id": "actor",
+              "fact_id": "investigation_strain",
+              "value": 20
+            }
+          }
+        ]
+      },
+      "success_text": "你避开了容易暴露行踪的声响与痕迹。",
+      "failure_text": "潜入惊动了附近的人，并留下了可被追查的痕迹。"
+    }
+  ]
+}

@@ -99,6 +99,16 @@ func LoadSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (Sn
 		return out, err
 	}
 	out.Summary.GameTitle = out.Definition.Summary.Title
+	out.OpenProgress, err = store.LoadOpenProgress(ctx)
+	if err != nil {
+		return out, err
+	}
+	if out.Definition.Progression != nil && out.OpenProgress == nil {
+		return out, fmt.Errorf("open progression state is missing")
+	}
+	if err := validateOpenProgress(out.OpenProgress, out.Definition, out.Summary.ContextEpoch); err != nil {
+		return out, err
+	}
 	out.Summary.Revision = out.Definition.Revision
 	out.BystanderRefs = append([]story.Bystander(nil), out.Definition.BystanderRefs...)
 	if err = validateCapabilityManifest(ctx, store, out.Definition); err != nil {
@@ -228,7 +238,7 @@ func validateCapabilityManifest(ctx context.Context, store *storage.WorldStore, 
 		return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
 	}
 	for name, version := range definition.Capabilities {
-		if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules") {
+		if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(definition.SchemaVersion == 4 && name == "progression")) {
 			return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
 		}
 	}

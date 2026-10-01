@@ -19,6 +19,9 @@ type stageCRiskGenerator struct {
 }
 
 func (g *stageCRiskGenerator) GenerateText(_ context.Context, request model.TextRequest) (model.TextResponse, error) {
+	if strings.Contains(request.System, "持续世界协调器") {
+		return deferredOpenWorldResponse(request)
+	}
 	switch {
 	case strings.Contains(request.System, "结构化回合意图"):
 		return model.TextResponse{Text: `{"intent_type":"act","addressee_id":"","visibility":"public","action_rule_id":"clinic-stealth"}`}, nil

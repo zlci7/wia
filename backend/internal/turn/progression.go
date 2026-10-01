@@ -108,6 +108,9 @@ func (s *Service) advanceGeneratedEvents(ctx context.Context, generator model.Te
 	}
 	material.Required += "\n每个 projection 的 recipient 最多出现一次，只能使用上述参与者上限中的重要NPC ID或player。背景人物只出现在事件描述中。"
 	material.Required += worldEventSpatialContext(snapshot, *output)
+	working := snapshot
+	working.Positions, working.States, working.Relationships, working.Items = output.Positions, output.States, output.Relationships, output.Items
+	material.Required += "\n最新权威状态、关系、物品及定义（初始材料不覆盖当前事实）：" + HostMechanicsContext(working)
 	call := s.generator(generator, material, snapshot, run, "event_generation", "coordinator", 4, "story.events.v3")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -214,6 +217,9 @@ type plotResolution struct {
 // A single node is settled per  The clock stops at that node; a subsequent
 // input can continue waiting against the newly committed consequences.
 func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, output *Output) ([]wiaworld.Event, error) {
+	if snapshot.Definition.Progression != nil {
+		return s.advanceOpenWorld(ctx, generator, snapshot, run, output)
+	}
 	if snapshot.Plot == nil {
 		return nil, nil
 	}
@@ -348,6 +354,10 @@ func composePlot(snapshot Snapshot, run wiaworld.Run, node plot.Node, output *Ou
 	material.Required += "\n每个 projection 另可含 scene 字符串：只依据此人的旧视图与本次获准感知，写其事件后的完整简明情境；无状态变化可留空。它只交给对应 recipient，作者真相不进入其中，NPC待决定行动保持未执行。程序绑定该人物和投影来源，无须输出另一个场景更新表。"
 	material.Required += "\n接收与唤醒合同：每个 recipient 最多出现一次，只选当前节点 audience 中的ID。decision_requests 只选本次 projections 已提供刺激的重要NPC ID，最多一次；player、背景人物、信使等没有独立Agent的角色不放入 decision_requests。没有符合条件的人物时返回[]。"
 	material.Required += worldEventSpatialContext(snapshot, *output)
+	working := snapshot
+	working.Positions, working.States, working.Relationships, working.Items = output.Positions, output.States, output.Relationships, output.Items
+	material.Required += "\n最新权威状态、关系、物品及定义（初始材料不覆盖当前事实）：" + HostMechanicsContext(working)
+	material.RequiredSources = append(material.RequiredSources, currentFactSources(working)...)
 	material.Required += "\n保留场景与已提交节点的来源ID也可以引用，但仅用于这些已提供状态，不据ID猜测未提供的原文。definition引用仅限本次当前节点；其他节点的发生依据使用其event_id，不使用其未来计划。"
 	material.RequiredSources = append(material.RequiredSources, SceneViewSources(snapshot, "")...)
 	for _, state := range snapshot.PlotProgress.Nodes {
@@ -396,6 +406,11 @@ func validatePlotResolution(snapshot Snapshot, node plot.Node, output Output, re
 		return fmt.Errorf("%w: plot_deferred_effects", ErrGenerationFailed)
 	}
 	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
+	working := snapshot
+	working.Positions, working.States, working.Relationships, working.Items = output.Positions, output.States, output.Relationships, output.Items
+	for _, id := range currentFactSources(working) {
+		known[id] = true
+	}
 	_, factEvidence := evaluateFactConditions(snapshot, output, node.Requirements, "")
 	for _, id := range factEvidence {
 		known[id] = true
@@ -455,6 +470,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	base.States = cloneStates(output.States)
 	base.Relationships = slices.Clone(output.Relationships)
 	base.Items = cloneItems(output.Items)
+	base.OpenProgress = cloneOpenProgress(output.OpenProgress)
 	base.AppliedRelationshipSources = map[string]bool{}
 	for key, applied := range snapshot.AppliedRelationshipSources {
 		base.AppliedRelationshipSources[key] = applied
@@ -495,10 +511,10 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		base.Characters[i].InScene = inputs[base.Characters[i].EntityID].NewStimulus != ""
 	}
 	decisions := map[string]NPCDecision{}
-	if err := s.decideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
+	if err := s.decideNPCs(ctx, generator, base, definitionFor(&base), run, "", "world_event", inputs, nil, decisions, 5); err != nil {
 		return nil, err
 	}
-	extra := Output{SceneVersion: output.SceneVersion, Positions: clonePositions(base.Positions), States: cloneStates(base.States), StateChanges: slices.Clone(output.StateChanges), Relationships: slices.Clone(base.Relationships), RelationshipChanges: slices.Clone(output.RelationshipChanges), Items: cloneItems(base.Items), ItemTransfers: slices.Clone(output.ItemTransfers), Decisions: decisions}
+	extra := Output{Clock: output.Clock, OpenProgress: cloneOpenProgress(output.OpenProgress), SceneVersion: output.SceneVersion, Positions: clonePositions(base.Positions), States: cloneStates(base.States), StateChanges: slices.Clone(output.StateChanges), Relationships: slices.Clone(base.Relationships), RelationshipChanges: slices.Clone(output.RelationshipChanges), Items: cloneItems(base.Items), ItemTransfers: slices.Clone(output.ItemTransfers), Decisions: decisions}
 	allowed := map[string][]string{}
 	var visible []wiaworld.Event
 	for _, c := range snapshot.Characters {
@@ -548,7 +564,11 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			}
 		}
 	}
-	if len(allowed) > 0 {
+	needsCoordination := len(allowed) > 0
+	for _, d := range decisions {
+		needsCoordination = needsCoordination || len(d.RelationshipProposals) > 0
+	}
+	if needsCoordination {
 		audienceContract := "recipients只能取对应允许集合；行动者自动获知。"
 		if snapshot.Definition.Capabilities["spatial"] == 1 {
 			audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
@@ -564,8 +584,14 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 		}
 		material.Required += coordinationCapabilityContext(base, decisions)
+		remainingMinutes := 120
+		if snapshot.Definition.Progression != nil {
+			remainingMinutes = max(0, 120-output.elapsedMinutes)
+			material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
+		}
 		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v7")
 		var resolved struct {
+			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
 			SceneUpdates        []sceneUpdate        `json:"scene_updates"`
 			StateEffects        []stateEffect        `json:"state_effects,omitempty"`
@@ -575,11 +601,17 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		required := []string{"outcomes", "scene_updates"}
+		if snapshot.Definition.Progression != nil {
+			required = append(required, "time_minutes")
+		}
 		required = append(required, coordinationCapabilityFields(base)...)
 		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, required...)
 		cancel()
 		if err != nil {
 			return nil, err
+		}
+		if snapshot.Definition.Progression != nil && (resolved.TimeMinutes < 0 || resolved.TimeMinutes > remainingMinutes || len(resolved.Movements) > 0 && resolved.TimeMinutes == 0) {
+			return nil, coordinationInvalid("world_action_time_invalid", "time_minutes", "bounded-actual-time-with-positive-movement-cost")
 		}
 		if snapshot.Definition.Capabilities["spatial"] == 1 {
 			for _, outcome := range resolved.Outcomes {
@@ -629,7 +661,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 				}
 			}
 		}
-		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.BystanderRefs, outcomes)
+		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.Definition.BystanderRefs, outcomes)
 		if err != nil {
 			if s.deps.Logger != nil {
 				s.deps.Logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)
@@ -650,7 +682,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 				extra.Perceptions[i].Stage = 6
 			}
 		}
-		if err = applyMechanicEffects(base, &extra, hostResult{Outcomes: outcomes, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}); err != nil {
+		if err = applyMechanicEffects(base, &extra, hostResult{Outcomes: outcomes, Movements: resolved.Movements, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}); err != nil {
 			return nil, err
 		}
 		sources := plotSceneSources(*output, nil)
@@ -669,8 +701,16 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			output.SceneVersion++
 		}
 		output.SceneCharacters = finalCharacters
+		if snapshot.Definition.Progression != nil && resolved.TimeMinutes > 0 {
+			output.elapsedMinutes += resolved.TimeMinutes
+			output.Clock = AdvanceClock(output.Clock, resolved.TimeMinutes)
+			elapsed := wiaworld.Event{EventID: rootID + ":action-clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("随后实际经过%d分钟，当前游戏时间为%s。", resolved.TimeMinutes, output.Clock), RunID: run.RunID, Stage: 6, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
+			extra.Events = append(extra.Events, elapsed)
+			visible = append(visible, elapsed)
+		}
 	}
 	output.Events = append(output.Events, extra.Events...)
+	output.OpenProgress = extra.OpenProgress
 	output.Perceptions = append(output.Perceptions, extra.Perceptions...)
 	output.Memories = append(output.Memories, extra.Memories...)
 	output.States, output.Relationships, output.Items = extra.States, extra.Relationships, extra.Items

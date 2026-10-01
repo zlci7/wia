@@ -215,6 +215,7 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 			publicReplyLog = append(publicReplyLog, reply)
 		}
 	}
+	snapshot.OpenProgress = cloneOpenProgress(output.OpenProgress)
 
 	// Only public replies from other characters are new stage-two stimuli.
 	stageTwoInputs := PublicReplyStageInputs(output.Perceptions, perceptText, 1)
@@ -279,6 +280,7 @@ func (a *Service) narrateStage(ctx context.Context, generator model.TextGenerato
 // appendNPCDecisionOutput turns one character's decision into the events, perceptions,
 // memories and public reply the rest of the turn reads.
 func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
+	applyPlanUpdates(output, run, character.EntityID, decision, stage)
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
@@ -316,6 +318,13 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 	var firstErr error
 	var errMu sync.Mutex
 	var decisionMu sync.Mutex
+	readers := []string{}
+	for _, character := range InScene(snapshot.Characters) {
+		if _, ok := inputs[character.EntityID]; ok {
+			readers = append(readers, character.EntityID)
+		}
+	}
+	snapshot.materialGroup = newMaterialReadGroup(readers)
 	for _, character := range InScene(snapshot.Characters) {
 		character := character
 		stageInput, present := inputs[character.EntityID]
@@ -325,6 +334,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer snapshot.materialGroup.finish(character.EntityID)
 			material := composeNPC(snapshot, def, character, recipient, intentType, stageInput, priorTurn[character.EntityID], stage)
 			callGenerator := a.generator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 			input := material.Required
@@ -346,6 +356,9 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 					if !found {
 						return coordinationInvalid("npc_action_target_invalid", "action_target_id", "defined-important-character-or-player")
 					}
+				}
+				if err := validatePlanUpdates(snapshot, character.EntityID, stageInput, decision, callGenerator.(*ContextGenerator)); err != nil {
+					return err
 				}
 				return validateRelationshipProposals(snapshot, character.EntityID, &decision)
 			}

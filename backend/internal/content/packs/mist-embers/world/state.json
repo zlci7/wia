@@ -1,0 +1,49 @@
+{
+  "state_definitions": [
+    {
+      "id": "fatigue",
+      "name": "疲劳",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 18,
+      "scope": "player",
+      "projection": "self",
+      "knowledge": "owner",
+      "update_policy": {
+        "kind": "model"
+      },
+      "description": "日常行动、休息和持续压力造成的身体负担。"
+    },
+    {
+      "id": "investigation_strain",
+      "name": "调查负荷",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "scope": "player",
+      "projection": "self",
+      "knowledge": "owner",
+      "update_policy": {
+        "kind": "model"
+      },
+      "description": "高风险调查行动累积的身体与注意力负荷。"
+    },
+    {
+      "id": "mirror_dissonance",
+      "name": "镜像失谐",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "scope": "player",
+      "projection": "self",
+      "knowledge": "owner",
+      "update_policy": {
+        "kind": "model"
+      },
+      "description": "接触裂纹银镜后，对镜中自我与现实自我的混淆程度。"
+    }
+  ]
+}

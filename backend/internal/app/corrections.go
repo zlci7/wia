@@ -106,7 +106,7 @@ func (a *App) Correct(ctx context.Context, worldID string, request memory.Correc
 			}
 		}
 	}
-	if c.Kind == "event" && (snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 || len(snapshot.Definition.ActionRules) > 0) {
+	if c.Kind == "event" && (snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 || snapshot.OpenProgress != nil || len(snapshot.Definition.ActionRules) > 0) {
 		sources, sourceErr := store.LoadStructuredFactSources(ctx)
 		if sourceErr != nil {
 			return c, sourceErr

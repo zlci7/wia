@@ -45,7 +45,7 @@ func validateMechanicCapabilities(snapshot Snapshot, host hostResult) error {
 	for _, module := range []struct {
 		capability, field string
 		count             int
-	}{{"state", "state_effects", len(host.StateEffects)}, {"relations", "relationship_effects", len(host.RelationshipEffects)}, {"items", "item_transfers", len(host.ItemTransfers)}} {
+	}{{"spatial", "movements", len(host.Movements)}, {"state", "state_effects", len(host.StateEffects)}, {"relations", "relationship_effects", len(host.RelationshipEffects)}, {"items", "item_transfers", len(host.ItemTransfers)}} {
 		if snapshot.Definition.Capabilities[module.capability] != 1 && module.count > 0 {
 			return coordinationInvalid(module.field+"_unsupported", module.field, "empty-or-omitted")
 		}

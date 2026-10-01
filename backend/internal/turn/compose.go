@@ -221,8 +221,7 @@ func composeNPC(snapshot Snapshot, def story.Definition, character wiaworld.Char
 		}
 		for _, p := range snapshot.Perceptions[character.EntityID] {
 			if !committed[p.SourceEventID] {
-				material.Required += "\n本轮前阶段已确认的个人经历（不是新的待执行行动）：" + JoinPerceptions(snapshot, []wiaworld.Perception{p})
-				material.RequiredSources = append(material.RequiredSources, p.SourceEventID)
+				material = appendRequiredMaterial(material, Section{Name: "confirmed_perception:" + p.SourceEventID, Text: "本轮前阶段已确认的个人经历（不是新的待执行行动）：" + JoinPerceptions(snapshot, []wiaworld.Perception{p}), Sources: []string{p.SourceEventID}})
 			}
 		}
 		material.System += "\n需要查找较早经历时，可额外输出 recall_query 字符串（最多256字），其他字段保留空值与silent=true；程序仅检索你自己的获准经历，每次最多五条，最多两次。完成决定时省略recall_query或置为空字符串。"

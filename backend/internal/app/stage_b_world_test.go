@@ -21,6 +21,9 @@ type stageBGenerator struct {
 }
 
 func (g *stageBGenerator) GenerateText(_ context.Context, request model.TextRequest) (model.TextResponse, error) {
+	if strings.Contains(request.System, "持续世界协调器") {
+		return deferredOpenWorldResponse(request)
+	}
 	g.mu.Lock()
 	g.requests = append(g.requests, request)
 	g.mu.Unlock()
@@ -260,6 +263,9 @@ func TestStageBStateRelationshipPersistenceAndSaveAs(t *testing.T) {
 type stageBItemGenerator struct{}
 
 func (stageBItemGenerator) GenerateText(_ context.Context, request model.TextRequest) (model.TextResponse, error) {
+	if strings.Contains(request.System, "持续世界协调器") {
+		return deferredOpenWorldResponse(request)
+	}
 	switch {
 	case strings.Contains(request.System, "结构化回合意图"):
 		if strings.Contains(request.Input, "交给裁缝") {

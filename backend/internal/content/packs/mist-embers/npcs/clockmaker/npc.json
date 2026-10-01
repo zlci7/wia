@@ -1,0 +1,14 @@
+{
+  "definition_id": "clockmaker.v1",
+  "revision": "clockmaker.v2",
+  "entity_id": "npc:clockmaker",
+  "name": "亚瑟·格兰特",
+  "role": "钟表匠",
+  "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+  "initial_location": "clock-shop",
+  "speaking_examples": [
+    "把你亲眼看到的说清楚，猜测先放在一边。",
+    "有些东西知道得太早并不是好事。先离它远一点。"
+  ],
+  "profile": "谨慎、有责任感的钟表匠，习惯核实亲眼所见的事实，不愿让普通人冒险。"
+}

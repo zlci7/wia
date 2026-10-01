@@ -1,0 +1,17 @@
+{
+  "item_definitions": [
+    {
+      "id": "sealed-mirror-3-917",
+      "name": "裂纹银镜",
+      "description": "一面有裂痕的小型银镜，来历和作用尚未得到公开确认。",
+      "projection": "public"
+    }
+  ],
+  "item_instances": [
+    {
+      "instance_id": "mirror-3-917",
+      "definition_id": "sealed-mirror-3-917",
+      "location_id": "abandoned-clinic"
+    }
+  ]
+}

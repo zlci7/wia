@@ -1,6 +1,6 @@
 # Story Pack v4 作者模板
 
-状态：配套[编写合同](../../stages/开发者剧本编写规范与模板.md)的完整文件模板，格式 v4 尚未接入运行时。当前可加载模板为 [Story Pack v3](../story-pack/story.json)。
+配套[编写合同](../../stages/开发者剧本编写规范与模板.md)的 Story Pack v4 完整文件模板。加载和验证状态见[开发状态](../../开发状态.md)；[Story Pack v3](../story-pack/story.json)保留旧格式示例。
 
 [story.json](story.json)引用两个地点、一个固定人物、分类材料和持续推进初始配置。复制整个目录后填写世界与人物内容，修改剧本和人物 revision。能力按需配置，现有字段见[编写规范](../../stages/开发者剧本编写规范与模板.md)。
 

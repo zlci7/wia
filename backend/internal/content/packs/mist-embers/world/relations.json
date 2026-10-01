@@ -1,0 +1,38 @@
+{
+  "relation_definitions": [
+    {
+      "id": "trust",
+      "name": "信任",
+      "minimum": -100,
+      "maximum": 100,
+      "default": 0,
+      "max_change_per_turn": 0,
+      "projection": "hidden",
+      "description": "关系主体依据亲历结果形成的可信程度判断。"
+    },
+    {
+      "id": "regard",
+      "name": "好感",
+      "minimum": -100,
+      "maximum": 100,
+      "default": 0,
+      "max_change_per_turn": 0,
+      "projection": "hidden",
+      "description": "关系主体对目标的个人亲近或反感程度。"
+    }
+  ],
+  "initial_relations": [
+    {
+      "subject_id": "npc:reporter",
+      "target_id": "player",
+      "relation_type": "trust",
+      "value": 5
+    },
+    {
+      "subject_id": "npc:reporter",
+      "target_id": "player",
+      "relation_type": "regard",
+      "value": 12
+    }
+  ]
+}

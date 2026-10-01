@@ -50,8 +50,8 @@ func TestMistEmbersStageCRulesAreCompiledAsData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pack.Definition.Capabilities["rules"] != 1 || len(pack.Definition.ActionRules) != 1 || pack.Definition.Plot == nil || len(pack.Definition.Plot.Nodes) != 2 {
-		t.Fatalf("stage C definition was not compiled: %+v", pack.Definition)
+	if pack.Definition.Capabilities["rules"] != 1 || len(pack.Definition.ActionRules) != 1 || pack.Definition.Progression == nil || len(pack.Definition.Progression.InitialPlans) != 2 {
+		t.Fatal("fixed risk rules and independent personal plans were not compiled")
 	}
 	for _, id := range []string{"investigation_strain", "mirror_dissonance"} {
 		definition, ok := stateByID(pack.Definition.StateDefinitions, id)

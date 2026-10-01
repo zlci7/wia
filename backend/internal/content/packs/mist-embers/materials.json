@@ -1,0 +1,213 @@
+{
+  "materials": [
+    {
+      "id": "era-anchor",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "core",
+      "summary": "第一部结束后、愚者教会已经存在的世界起点。",
+      "file": "world/background/era.md"
+    },
+    {
+      "id": "church-background",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "战后教会背景、外围线索联系与地方知情范围。",
+      "entity_ids": [
+        "npc:clockmaker"
+      ],
+      "file": "world/background/churches.md"
+    },
+    {
+      "id": "local-currency",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "on_demand",
+      "summary": "报价、报酬与支出涉及的鲁恩币制。",
+      "file": "world/background/currency.md",
+      "known_to": [
+        "npc:tailor",
+        "npc:reporter",
+        "npc:clockmaker",
+        "npc:missing-woman"
+      ]
+    },
+    {
+      "id": "world-core",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "core",
+      "summary": "战后城市的日常环境与调查员起点。",
+      "file": "world/background/core.md"
+    },
+    {
+      "id": "city-life",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "on_demand",
+      "summary": "乔伍德、桥区、东区及本地生活。",
+      "location_ids": [
+        "charwood",
+        "bridge",
+        "east"
+      ],
+      "file": "world/background/city.md",
+      "known_to": [
+        "npc:tailor",
+        "npc:reporter",
+        "npc:clockmaker",
+        "npc:missing-woman"
+      ]
+    },
+    {
+      "id": "anomaly-rules",
+      "purpose": "world_rules",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "非凡与异常物品的共同边界。",
+      "item_ids": [
+        "mirror-3-917"
+      ],
+      "file": "world/rules/anomalies.md"
+    },
+    {
+      "id": "mirror-truth",
+      "purpose": "item_lore",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "银镜真实能力、代价、限制与信息分布。",
+      "item_ids": [
+        "mirror-3-917"
+      ],
+      "file": "world/items/sealed-mirror.md"
+    },
+    {
+      "id": "missing-case-truth",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "失踪案已经成立的事实与各人的知识边界。",
+      "entity_ids": [
+        "npc:tailor",
+        "npc:missing-woman",
+        "npc:clockmaker",
+        "npc:reporter"
+      ],
+      "location_ids": [
+        "office",
+        "tailor-shop",
+        "red-chimney-street",
+        "abandoned-clinic"
+      ],
+      "file": "world/facts/missing-case.md"
+    },
+    {
+      "id": "case-development",
+      "purpose": "development",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "家庭、采访、调查和异常接触的持续压力。",
+      "entity_ids": [
+        "npc:tailor",
+        "npc:missing-woman",
+        "npc:clockmaker",
+        "npc:reporter"
+      ],
+      "item_ids": [
+        "mirror-3-917"
+      ],
+      "file": "narrative/developments.md"
+    },
+    {
+      "id": "clockmaker-knowledge",
+      "purpose": "npc_knowledge",
+      "visibility": "owner",
+      "owner_id": "npc:clockmaker",
+      "delivery": "core",
+      "summary": "亚瑟的身份、线索与未知部分。",
+      "file": "npcs/clockmaker/knowledge.md"
+    },
+    {
+      "id": "clockmaker-plan",
+      "purpose": "npc_plan",
+      "visibility": "owner",
+      "owner_id": "npc:clockmaker",
+      "delivery": "on_demand",
+      "summary": "依据本人线索核查银镜去向。",
+      "file": "npcs/clockmaker/plans.md"
+    },
+    {
+      "id": "reporter-knowledge",
+      "purpose": "npc_knowledge",
+      "visibility": "owner",
+      "owner_id": "npc:reporter",
+      "delivery": "core",
+      "summary": "艾琳的采访线索及尚未知晓的内容。",
+      "file": "npcs/reporter/knowledge.md"
+    },
+    {
+      "id": "reporter-plan",
+      "purpose": "npc_plan",
+      "visibility": "owner",
+      "owner_id": "npc:reporter",
+      "delivery": "on_demand",
+      "summary": "核实红烟囱街传闻与报道价值。",
+      "file": "npcs/reporter/plans.md"
+    },
+    {
+      "id": "tailor-knowledge",
+      "purpose": "npc_knowledge",
+      "visibility": "owner",
+      "owner_id": "npc:tailor",
+      "delivery": "core",
+      "summary": "委托人掌握的家庭争执与收据线索。",
+      "file": "npcs/tailor/knowledge.md"
+    },
+    {
+      "id": "missing-woman-knowledge",
+      "purpose": "npc_knowledge",
+      "visibility": "owner",
+      "owner_id": "npc:missing-woman",
+      "delivery": "core",
+      "summary": "女孩自己的经历及对银镜的不完整理解。",
+      "file": "npcs/missing-woman/knowledge.md"
+    },
+    {
+      "id": "reporter-profile",
+      "purpose": "npc_profile",
+      "visibility": "owner",
+      "owner_id": "npc:reporter",
+      "delivery": "on_demand",
+      "summary": "艾琳·维克的身份、性格与说话方式。",
+      "file": "npcs/reporter/profile.md"
+    },
+    {
+      "id": "clockmaker-profile",
+      "purpose": "npc_profile",
+      "visibility": "owner",
+      "owner_id": "npc:clockmaker",
+      "delivery": "on_demand",
+      "summary": "亚瑟·格兰特的身份、性格与说话方式。",
+      "file": "npcs/clockmaker/profile.md"
+    },
+    {
+      "id": "missing-woman-profile",
+      "purpose": "npc_profile",
+      "visibility": "owner",
+      "owner_id": "npc:missing-woman",
+      "delivery": "on_demand",
+      "summary": "失踪女孩的身份、性格与说话方式。",
+      "file": "npcs/missing-woman/profile.md"
+    },
+    {
+      "id": "tailor-profile",
+      "purpose": "npc_profile",
+      "visibility": "owner",
+      "owner_id": "npc:tailor",
+      "delivery": "on_demand",
+      "summary": "裁缝店老板的身份、性格与说话方式。",
+      "file": "npcs/tailor/profile.md"
+    }
+  ]
+}

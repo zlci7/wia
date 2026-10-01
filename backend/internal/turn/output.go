@@ -36,6 +36,7 @@ func (i TurnIntent) Private() bool { return i.Visibility == "private" }
 // nothing outside a turn has business reading them.
 type Output struct {
 	GeneratedEvents *GeneratedEventState
+	OpenProgress    *wiaworld.OpenProgress
 	Narrative       string
 	Clock           string
 	Scene           string
@@ -79,6 +80,7 @@ type Output struct {
 	// memories recorded at the end of the turn can point at what they are memories of.
 	PlayerEventID    string            `json:"-"`
 	ActionResolution *ActionResolution `json:"-"`
+	elapsedMinutes   int
 }
 
 // PositionChange is a validated movement that the commit transaction applies with
@@ -106,7 +108,8 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 	now := time.Now().UTC()
 	playerEventID := run.RunID + ":input"
 	output := Output{
-		Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
+		OpenProgress: cloneOpenProgress(snapshot.OpenProgress),
+		Clock:        snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
 		SceneCharacters: CharacterIDs(participants),
 		Events: []wiaworld.Event{{
 			EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient,

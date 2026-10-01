@@ -132,6 +132,9 @@ func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 			if outcome.ActionID != run.RunID+":player-action" {
 				continue
 			}
+			if len(outcome.Bystanders) > 0 {
+				return coordinatedTurn{}, coordinationInvalid("private_player_outcome_bystander", fmt.Sprintf("outcomes[%d].bystanders", index), "empty-for-private-player-action")
+			}
 			for _, recipient := range outcome.Recipients {
 				if recipient != "player" && recipient != intent.AddresseeID {
 					return coordinatedTurn{}, coordinationInvalid("private_player_outcome_recipient", fmt.Sprintf("outcomes[%d].recipients", index), "player-or-private-addressee")
@@ -143,6 +146,7 @@ func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	output.Events = slices.Clone(original.Events)
 	output.Perceptions = slices.Clone(original.Perceptions)
 	output.Clock = AdvanceClock(snapshot.Summary.Clock, host.TimeMinutes)
+	output.elapsedMinutes += host.TimeMinutes
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		var err error
@@ -297,7 +301,7 @@ func validateSpatialOutcomeAudiences(snapshot Snapshot, finalPositions map[strin
 // reads them and a return value would have to be carried across a stage boundary by
 // whoever calls what is in between.
 func (s *Service) resolveSceneResult(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, host hostResult, output *Output) error {
-	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil {
+	if snapshot.Plot != nil || snapshot.Definition.EventGeneration != nil || snapshot.Definition.Progression != nil {
 		elapsed := wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过 %d 分钟，从%s到%s。更长的等待请求仅执行到这个时点，剩余时段尚未发生。", host.TimeMinutes, snapshot.Summary.Clock, output.Clock), RunID: run.RunID, Stage: 3, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, elapsed)
 		output.VisibleEvents = append(output.VisibleEvents, elapsed)
@@ -547,6 +551,9 @@ func validateCoordination(result *hostResult, snapshot Snapshot, run wiaworld.Ru
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		if result.Movements == nil {
 			return coordinationInvalid("movements_required", "movements", "array")
+		}
+		if snapshot.Definition.Progression != nil && len(result.Movements) > 0 && result.TimeMinutes == 0 {
+			return coordinationInvalid("movement_time_invalid", "time_minutes", "positive-elapsed-time-for-movement")
 		}
 		return nil
 	}

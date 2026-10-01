@@ -58,6 +58,9 @@ type Snapshot struct {
 	Plot             *plot.Definition
 	PlotProgress     plot.Progress
 	LongMemory       map[string]MemoryContext
+	OpenProgress     *wiaworld.OpenProgress
+	materialReads    *materialReadBudget
+	materialGroup    *materialReadGroup
 }
 
 // SceneView is one character's picture of where they are: what they last understood

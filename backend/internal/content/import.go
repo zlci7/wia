@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gameagent/backend/internal/wire"
@@ -26,7 +27,7 @@ const (
 	importTextLimit  = 1 * 1024 * 1024
 	importZIPLimit   = 8 * 1024 * 1024
 	importUnzipLimit = 16 * 1024 * 1024
-	importZipEntries = 128
+	importZipEntries = 256
 	importZipDepth   = 8
 	importSourceName = "import-source"
 	// Imported cards carry no world structure, so a draft starts with one usable place
@@ -245,6 +246,9 @@ func (a *Service) importWIAPackage(ctx context.Context, project ContentProject, 
 	if _, ok := files["story.json"]; !ok {
 		return ContentDraft{}, ImportReport{}, nil, fmt.Errorf("%w: story.json is missing", ErrContentInvalid)
 	}
+	if err := os.MkdirAll(a.contentRoot(), 0o755); err != nil {
+		return ContentDraft{}, ImportReport{}, nil, err
+	}
 	staging, err := os.MkdirTemp(a.contentRoot(), "import-")
 	if err != nil {
 		return ContentDraft{}, ImportReport{}, nil, err
@@ -285,6 +289,10 @@ func (a *Service) importWIAPackage(ctx context.Context, project ContentProject, 
 	}
 	if len(pack.Definition.BystanderRefs) > 0 {
 		report.Mappings = append(report.Mappings, ImportMapping{Field: "bystanders", Source: "story.json", Target: "路人稳定身份", Confidence: "high"})
+	}
+	if payload.SchemaVersion == SchemaV4 {
+		report.Mappings = append(report.Mappings, ImportMapping{Field: "materials/data_files", Source: "referenced package files", Target: "分类材料与持续推进配置", Confidence: "high"})
+		report.Unsupported = append(report.Unsupported, "v4 文件包保留原始引用并支持发布；详细内容在源文件中编辑后重新导入")
 	}
 	_ = ctx
 	return ContentDraft{ContentDraftSummary: ContentDraftSummary{DraftID: wire.NewID("draft"), ProjectID: project.ProjectID, Version: 1, Status: draftStatusPreview, UpdatedAt: wire.NowText()}, Payload: payload}, report, pack.Assets, nil
@@ -475,16 +483,14 @@ func (a *Service) ExportContentRevision(ctx context.Context, gameID, revision st
 		_, err = entry.Write(body)
 		return err
 	}
-	if err := write("story.json", mustJSON(pack.Story)); err != nil {
-		return nil, "", err
+	files := exportPackageFiles(pack)
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
 	}
-	for name, body := range pack.NPCFiles {
-		if err := write(name, body); err != nil {
-			return nil, "", err
-		}
-	}
-	for name, body := range pack.Assets {
-		if err := write(name, body); err != nil {
+	sort.Strings(names)
+	for _, name := range names {
+		if err := write(name, files[name]); err != nil {
 			return nil, "", err
 		}
 	}

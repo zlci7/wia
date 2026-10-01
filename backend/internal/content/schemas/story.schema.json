@@ -7,7 +7,8 @@
       "enum": [
         1,
         2,
-        3
+        3,
+        4
       ]
     },
     "requires": {
@@ -28,9 +29,31 @@
         },
         "rules": {
           "const": 1
+        },
+        "progression": {
+          "const": 1
         }
       },
       "minProperties": 1
+    },
+    "materials_file": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "data_files": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locations": {"type": "string", "minLength": 1, "maxLength": 240},
+        "progression": {"type": "string", "minLength": 1, "maxLength": 240},
+        "state": {"type": "string", "minLength": 1, "maxLength": 240},
+        "relations": {"type": "string", "minLength": 1, "maxLength": 240},
+        "items": {"type": "string", "minLength": 1, "maxLength": 240},
+        "rules": {"type": "string", "minLength": 1, "maxLength": 240},
+        "bystanders": {"type": "string", "minLength": 1, "maxLength": 240}
+      },
+      "required": ["locations"]
     },
     "game_id": {
       "type": "string",
@@ -1002,7 +1025,26 @@
     "opening",
     "initial_location",
     "clock",
-    "locations",
     "npcs"
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": 4}}, "required": ["schema_version"]},
+      "then": {
+        "required": ["materials_file", "data_files", "requires"],
+        "properties": {"mode": {"const": "open"}},
+        "not": {"anyOf": [
+          {"required": ["background"]}, {"required": ["rules"]}, {"required": ["author_facts"]},
+          {"required": ["locations"]}, {"required": ["bystanders"]}, {"required": ["plot"]},
+          {"required": ["event_generation"]}, {"required": ["state_definitions"]},
+          {"required": ["relation_definitions"]}, {"required": ["initial_relations"]},
+          {"required": ["item_definitions"]}, {"required": ["item_instances"]}, {"required": ["action_rules"]}
+        ]}
+      },
+      "else": {
+        "required": ["locations"],
+        "not": {"anyOf": [{"required": ["materials_file"]}, {"required": ["data_files"]}]}
+      }
+    }
   ]
 }

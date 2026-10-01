@@ -1,0 +1,14 @@
+{
+  "definition_id": "tailor.v1",
+  "revision": "tailor.v2",
+  "entity_id": "npc:tailor",
+  "name": "裁缝店老板",
+  "role": "委托人",
+  "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+  "initial_location": "office",
+  "speaking_examples": [
+    "三镑，我可以先付一部分。只要把她平安带回来。",
+    "我们只是争了几句，那和她失踪没有关系。"
+  ],
+  "profile": "真心担心女儿，也习惯替她安排生活。店铺经营压力和控制欲让他在委托中隐瞒了不利于自己的部分。"
+}

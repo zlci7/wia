@@ -19,6 +19,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
@@ -59,6 +60,8 @@ type StoryPack struct {
 	ItemDefinitions     []PackItemDefinition        `json:"item_definitions,omitempty"`
 	ItemInstances       []PackItemInstance          `json:"item_instances,omitempty"`
 	ActionRules         []story.ActionRule          `json:"action_rules,omitempty"`
+	MaterialsFile       string                      `json:"materials_file,omitempty"`
+	DataFiles           map[string]string           `json:"data_files,omitempty"`
 }
 
 type PackNPC struct {
@@ -154,6 +157,9 @@ type LoadedPack struct {
 	NPCFiles map[string][]byte
 	// Assets maps package-relative asset paths to their bytes.
 	Assets map[string][]byte
+	// PackageFiles contains all explicitly referenced v4 data and text files.
+	// Export and publication preserve these files rather than flattening them.
+	PackageFiles map[string][]byte
 }
 
 type loadedPack = LoadedPack
@@ -172,7 +178,7 @@ func storyLocations(items []PackLocation, schemaVersion int) []story.Location {
 	out := make([]story.Location, 0, len(items))
 	for _, item := range items {
 		kind, public := item.Kind, false
-		if schemaVersion == SchemaV3 {
+		if schemaVersion >= SchemaV3 {
 			public = true
 			if item.Public != nil {
 				public = *item.Public
@@ -268,6 +274,9 @@ var packID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
 var entityID = regexp.MustCompile(`^npc:[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
 
 func strictPackJSON(data []byte, target any) error {
+	if !utf8.Valid(data) {
+		return errors.New("JSON text must be UTF-8")
+	}
 	// Reject duplicate keys as well as unknown execution options.
 	if err := validatePackJSONKeys(data); err != nil {
 		return err
@@ -376,11 +385,20 @@ func loadPack(root string) (loadedPack, error) {
 	if err := strictPackJSON(data, &p); err != nil {
 		return result, invalidPackSchema("story.json", err)
 	}
+	var materials []story.Material
+	var progression *plot.OpenDefinition
+	if p.SchemaVersion == SchemaV4 {
+		result.PackageFiles = map[string][]byte{"story.json": data}
+		materials, progression, err = loadV4Data(root, &p, result.PackageFiles)
+		if err != nil {
+			return result, err
+		}
+	}
 	bad := func(field string) (loadedPack, error) {
 		code, expected := "field_invalid", "valid value"
 		switch {
 		case field == "schema_version":
-			code, expected = "schema_version_unsupported", "1, 2, or 3"
+			code, expected = "schema_version_unsupported", "1, 2, 3, or 4"
 		case strings.HasPrefix(field, "requires"):
 			code, expected = "capability_manifest_unsupported", "supported schema v3 capability versions"
 		case strings.Contains(field, "initial_location"), strings.Contains(field, "connections"), strings.Contains(field, "parent"), strings.Contains(field, "audience"):
@@ -388,15 +406,15 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		return result, invalidPack("story.json", field, code, expected)
 	}
-	if p.SchemaVersion != SchemaV1 && p.SchemaVersion != SchemaV2 && p.SchemaVersion != SchemaV3 {
+	if p.SchemaVersion != SchemaV1 && p.SchemaVersion != SchemaV2 && p.SchemaVersion != SchemaV3 && p.SchemaVersion != SchemaV4 {
 		return bad("schema_version")
 	}
-	if p.SchemaVersion == SchemaV3 {
+	if p.SchemaVersion >= SchemaV3 {
 		if p.Requires["spatial"] != 1 {
 			return bad("requires.spatial")
 		}
 		for name, version := range p.Requires {
-			if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules") {
+			if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(p.SchemaVersion == SchemaV4 && name == "progression")) {
 				return bad("requires." + name)
 			}
 		}
@@ -431,7 +449,7 @@ func loadPack(root string) (loadedPack, error) {
 		if !packID.MatchString(loc.ID) || loc.Name == "" || locations[loc.ID].ID != "" {
 			return bad("locations.id/name")
 		}
-		if p.SchemaVersion == SchemaV3 && loc.Kind != "place" && loc.Kind != "region" {
+		if p.SchemaVersion >= SchemaV3 && loc.Kind != "place" && loc.Kind != "region" {
 			return bad("locations.kind")
 		}
 		if p.SchemaVersion < SchemaV3 && (loc.Kind != "" || loc.Parent != "" || loc.Public != nil) {
@@ -439,11 +457,11 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		locations[loc.ID] = loc
 	}
-	if locations[p.InitialLocation].ID == "" || (p.SchemaVersion == SchemaV3 && locations[p.InitialLocation].Kind != "place") {
+	if locations[p.InitialLocation].ID == "" || (p.SchemaVersion >= SchemaV3 && locations[p.InitialLocation].Kind != "place") {
 		return bad("initial_location")
 	}
 	for _, loc := range p.Locations {
-		if p.SchemaVersion == SchemaV3 {
+		if p.SchemaVersion >= SchemaV3 {
 			if loc.Kind == "region" && (loc.Parent != "" || len(loc.Connections) != 0) {
 				return bad("locations region")
 			}
@@ -455,7 +473,7 @@ func loadPack(root string) (loadedPack, error) {
 			}
 		}
 		for _, id := range loc.Connections {
-			if locations[id].ID == "" || (p.SchemaVersion == SchemaV3 && (loc.Kind != "place" || locations[id].Kind != "place")) {
+			if locations[id].ID == "" || (p.SchemaVersion >= SchemaV3 && (loc.Kind != "place" || locations[id].Kind != "place")) {
 				return bad("locations.connections")
 			}
 		}
@@ -467,7 +485,7 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return bad("bystanders")
 	}
-	if p.SchemaVersion == SchemaV3 {
+	if p.SchemaVersion >= SchemaV3 {
 		for _, bystander := range bystanders {
 			if bystander.InitialLocation == "" || locations[bystander.InitialLocation].Kind != "place" {
 				return bad("bystanders.initial_location")
@@ -494,13 +512,13 @@ func loadPack(root string) (loadedPack, error) {
 		return bad("defaults")
 	}
 	initialLocations := map[string]string{}
-	if p.SchemaVersion == SchemaV3 {
+	if p.SchemaVersion >= SchemaV3 {
 		initialLocations["player"] = p.InitialLocation
 		for _, bystander := range bystanders {
 			initialLocations[bystander.BystanderID] = bystander.InitialLocation
 		}
 	}
-	def := story.Definition{SchemaVersion: p.SchemaVersion, Capabilities: p.Requires, Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: storyLocations(p.Locations, p.SchemaVersion), InitialLocations: initialLocations, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: storyBystanders(bystanders)}
+	def := story.Definition{SchemaVersion: p.SchemaVersion, Capabilities: p.Requires, Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: storyLocations(p.Locations, p.SchemaVersion), InitialLocations: initialLocations, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: storyBystanders(bystanders), Materials: materials, Progression: progression}
 	result.CoverRelative = p.Cover
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
@@ -528,11 +546,17 @@ func loadPack(root string) (loadedPack, error) {
 		if err := strictPackJSON(body, &npc); err != nil {
 			return result, invalidPackSchema(file, err)
 		}
+		if p.SchemaVersion == SchemaV4 {
+			if npc.Knowledge != "" || npc.InitialConcerns != "" {
+				return result, invalidPack(file, "knowledge/initial_concerns", "field_invalid", "v4 indexed materials")
+			}
+			result.PackageFiles[file] = body
+		}
 		var normalized any
 		_ = json.Unmarshal(body, &normalized)
 		canonicalNPC, _ := json.Marshal(normalized)
 		npcBodies = append(npcBodies, canonicalNPC)
-		if !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.DefinitionID) || !packID.MatchString(npc.Revision) || seen[npc.EntityID] || definitions[npc.DefinitionID] || strings.TrimSpace(npc.Name) == "" || strings.TrimSpace(npc.Role) == "" || strings.TrimSpace(npc.Profile) == "" || locations[npc.InitialLocation].ID == "" || (p.SchemaVersion == SchemaV3 && locations[npc.InitialLocation].Kind != "place") {
+		if !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.DefinitionID) || !packID.MatchString(npc.Revision) || seen[npc.EntityID] || definitions[npc.DefinitionID] || strings.TrimSpace(npc.Name) == "" || strings.TrimSpace(npc.Role) == "" || strings.TrimSpace(npc.Profile) == "" || locations[npc.InitialLocation].ID == "" || (p.SchemaVersion >= SchemaV3 && locations[npc.InitialLocation].Kind != "place") {
 			return result, invalidPack(file, "identity/profile/initial_location", "field_invalid", "unique valid identity, profile, and existing place")
 		}
 		seen[npc.EntityID], definitions[npc.DefinitionID] = true, true
@@ -565,6 +589,11 @@ func loadPack(root string) (loadedPack, error) {
 	def.ActionRules, err = compileActionRules(p, def, seen)
 	if err != nil {
 		return bad("action_rules: " + err.Error())
+	}
+	if p.SchemaVersion == SchemaV4 {
+		if err := validateV4Definition(def); err != nil {
+			return result, invalidPack(p.MaterialsFile, "materials/progression", "reference_invalid", err.Error())
+		}
 	}
 	if p.Plot != nil {
 		if err := plot.ValidateDefinition(*p.Plot); err != nil {
@@ -609,6 +638,13 @@ func loadPack(root string) (loadedPack, error) {
 		Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay,
 		Background: p.Background, Player: catalogPlayer, CoverAlt: p.CoverAlt,
 	}
+	if p.SchemaVersion == SchemaV4 {
+		for _, material := range materials {
+			if material.Purpose == "background" && material.Visibility == "public" && material.Delivery == "core" {
+				result.Catalog.Background += material.Body + "\n"
+			}
+		}
+	}
 	if p.Cover != "" {
 		result.Catalog.CoverURL = "/api/v1/games/" + p.GameID + "/cover?revision=" + p.Revision
 	}
@@ -640,6 +676,10 @@ func loadPack(root string) (loadedPack, error) {
 		assetList = append(assetList, assetDigestEntry{Name: name, Body: result.Assets[name]})
 	}
 	result.Digest = packDigest(packDigestCurrent, p, npcBodies, result.Cover, assetList)
+	if p.SchemaVersion == SchemaV4 {
+		result.Digest = v4PackageDigest(result.PackageFiles, result.Assets)
+		return result, nil
+	}
 	// Historical encodings identify unchanged content registered by older releases.
 	result.LegacyDigest = packDigest(packDigestAssetsExcluded, p, npcBodies, result.Cover, assetList)
 	result.legacyStringDigest = legacyStringPackDigest(data, npcBodies, result.Cover)

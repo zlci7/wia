@@ -1,0 +1,109 @@
+{
+  "locations": [
+    {
+      "id": "charwood",
+      "kind": "region",
+      "name": "乔伍德区",
+      "description": "事务所、报社与体面商铺集中的城区。",
+      "connections": []
+    },
+    {
+      "id": "bridge",
+      "kind": "region",
+      "name": "桥区",
+      "description": "车站、工匠铺和市场交错的城区。",
+      "connections": []
+    },
+    {
+      "id": "east",
+      "kind": "region",
+      "name": "东区",
+      "description": "工厂、拥挤住房和廉价店铺之间布满煤烟。",
+      "connections": []
+    },
+    {
+      "id": "office",
+      "kind": "place",
+      "parent": "charwood",
+      "name": "调查事务所",
+      "description": "两间临街办公室，委托记录、城区地图与访客留言保存在这里。",
+      "connections": [
+        "cafe",
+        "tailor-shop"
+      ],
+      "public": true
+    },
+    {
+      "id": "cafe",
+      "kind": "place",
+      "parent": "charwood",
+      "name": "街角咖啡馆",
+      "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
+      "connections": [
+        "office",
+        "newspaper-office",
+        "clock-shop"
+      ],
+      "public": true
+    },
+    {
+      "id": "newspaper-office",
+      "kind": "place",
+      "parent": "charwood",
+      "name": "报社分部",
+      "description": "印刷机声从后间传来，地方新闻和零散线索在记者之间流动。",
+      "connections": [
+        "cafe"
+      ],
+      "public": true
+    },
+    {
+      "id": "clock-shop",
+      "kind": "place",
+      "parent": "bridge",
+      "name": "格兰特钟表铺",
+      "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。",
+      "connections": [
+        "cafe",
+        "red-chimney-street"
+      ],
+      "public": true
+    },
+    {
+      "id": "tailor-shop",
+      "kind": "place",
+      "parent": "charwood",
+      "name": "维尔裁缝店",
+      "description": "一间整洁的临街裁缝店，橱窗陈列着成衣，楼上是住处。",
+      "connections": [
+        "office",
+        "red-chimney-street"
+      ],
+      "public": true
+    },
+    {
+      "id": "red-chimney-street",
+      "kind": "place",
+      "parent": "east",
+      "name": "红烟囱街",
+      "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。",
+      "connections": [
+        "tailor-shop",
+        "clock-shop",
+        "abandoned-clinic"
+      ],
+      "public": true
+    },
+    {
+      "id": "abandoned-clinic",
+      "kind": "place",
+      "parent": "east",
+      "name": "废弃诊所",
+      "description": "红烟囱街尽头的旧诊所，临街门扉紧闭，窗板松动。",
+      "connections": [
+        "red-chimney-street"
+      ],
+      "public": true
+    }
+  ]
+}

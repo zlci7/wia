@@ -1,6 +1,6 @@
 # 《雾都余烬》分类材料
 
-内容修订提案：`mist-embers.pack.v5`，配套 Story Pack v4。此目录为作者材料草案，待 CR；没有 `story.json`，未加入正式目录。当前可运行包仍为 `mist-embers.pack.v4`。
+此目录保存分类材料的作者参考。完整运行包见[《雾都余烬》入口](../../../../backend/internal/content/packs/mist-embers/story.json)，实际修订与验证状态见[开发状态](../../开发状态.md)。作者参考材料按正式包的明确引用与知情范围提供。
 
 ## 内容范围
 

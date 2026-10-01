@@ -1,0 +1,39 @@
+{
+  "developments": [
+    {
+      "id": "case-pressure",
+      "material_ids": [
+        "case-development"
+      ],
+      "entity_ids": [
+        "npc:tailor",
+        "npc:reporter",
+        "npc:clockmaker",
+        "npc:missing-woman"
+      ],
+      "location_ids": [
+        "office",
+        "tailor-shop",
+        "clock-shop",
+        "newspaper-office",
+        "red-chimney-street",
+        "abandoned-clinic"
+      ]
+    }
+  ],
+  "initial_plans": [
+    {
+      "id": "clockmaker-investigation",
+      "owner_id": "npc:clockmaker",
+      "material_id": "clockmaker-plan",
+      "review_after_minutes": 90
+    },
+    {
+      "id": "reporter-interview",
+      "owner_id": "npc:reporter",
+      "material_id": "reporter-plan",
+      "review_after_minutes": 45
+    }
+  ],
+  "external_schedules": []
+}

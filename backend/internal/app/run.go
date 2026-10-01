@@ -278,7 +278,7 @@ func (a *App) runWorker(ctx context.Context, runtime *runRuntime, run wiaworld.R
 		return
 	}
 	commitStarted := time.Now()
-	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneLocation, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PositionChanges, output.StateChanges, output.RelationshipChanges, output.ItemTransfers, output.ActionResolution, output.PlotProgress, output.GeneratedEvents); err != nil {
+	if _, err := commitTurn(ctx, store, run, output.Narrative, output.Events, output.Perceptions, output.Memories, output.Clock, output.Scene, output.SceneLocation, output.SceneVersion, output.SceneCharacters, output.SceneViews, output.PositionChanges, output.StateChanges, output.RelationshipChanges, output.ItemTransfers, output.ActionResolution, output.PlotProgress, output.OpenProgress, output.GeneratedEvents); err != nil {
 		if a.logger != nil {
 			a.logger.Printf("story commit rejected: world_id=%q run_id=%q detail=%q", runtime.WorldID, run.RunID, err.Error())
 		}

@@ -73,8 +73,8 @@ func TestMistEmbersNarrativeActionsDoNotRequireSuccessFlags(t *testing.T) {
 	if len(def.ActionRules[0].SuccessEffects)+len(def.ActionRules[0].FailureEffects) != 0 {
 		t.Fatal("ordinary consequences remain fixed")
 	}
-	if len(def.Plot.Nodes[0].Requirements) != 0 {
-		t.Fatal("commission still depends on structured success")
+	if def.Plot != nil || def.Progression == nil || len(def.Progression.Developments) != 1 || len(def.Progression.InitialPlans) != 2 {
+		t.Fatal("open-world pressure and personal plans are not configured independently")
 	}
 	for _, state := range def.StateDefinitions {
 		if state.UpdatePolicy.Kind != "model" {
