@@ -23,6 +23,7 @@ globalThis.document = {
 globalThis.window = {
   location: { hash: "" },
   innerHeight: 800,
+  scrollTo() {},
   addEventListener() {},
   removeEventListener() {},
   setInterval() {

@@ -65,6 +65,6 @@ onUnmounted(() => { generation++; });
 small { display:block; opacity:.7; overflow-wrap:anywhere; }
 .usage-table { overflow:auto; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
-th,td { text-align:left; padding:.7rem; border-bottom:1px solid #dfd4c5; min-width:5rem; vertical-align:top; }
+th,td { text-align:left; padding:.7rem; border-bottom:1px solid var(--line); min-width:5rem; vertical-align:top; }
 @media(max-width:480px) { .usage-grid { gap:.5rem; } .usage-grid article { padding:.7rem; } .usage-grid strong { font-size:1.4rem; } }
 </style>

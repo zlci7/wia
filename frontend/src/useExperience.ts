@@ -1173,6 +1173,8 @@ export function useExperience() {
     if (value === "play") {
       reader.restore();
       resizeInput();
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
   });
   onMounted(async () => {

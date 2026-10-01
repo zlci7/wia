@@ -118,7 +118,7 @@ const policyOptions = [
     <div class="app-header">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark">W</span><strong>World Is Agent</strong>
+          <span class="brand-mark">WIA</span><strong>World Is Agent</strong>
         </div>
         <nav class="topbar-actions" aria-label="主导航">
           <span
@@ -222,13 +222,11 @@ const policyOptions = [
 
     <section v-else-if="view === 'home'" class="page-content">
       <div class="page-heading">
-        <span class="eyebrow">故事首页</span>
-        <h1>今晚，故事从哪里继续？</h1>
+        <h1>你的故事，从这里继续。</h1>
         <p>继续上次旅程，或选择一个故事重新开始。</p>
       </div>
       <section v-if="currentWorld" class="continue-panel">
         <div>
-          <span class="eyebrow">继续上次故事</span>
           <h2>{{ currentWorld.name }}</h2>
           <p>{{ currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</p>
         </div>
@@ -261,15 +259,11 @@ const policyOptions = [
               :src="item.cover_url"
               :alt="item.cover_alt || item.title"
             />
-            <span v-else class="cover-placeholder" aria-hidden="true">{{
-              item.title.slice(0, 1)
-            }}</span>
+            <h2 v-else class="cover-title">{{ item.title }}</h2>
+            <span class="story-mode">{{ item.mode === "guided" ? "流程型" : "开放型" }}</span>
           </div>
           <div class="story-card-body">
-            <span class="eyebrow">{{
-              item.mode === "guided" ? "流程型" : "开放型"
-            }}</span>
-            <h2>{{ item.title }}</h2>
+            <h2 v-if="item.cover_url">{{ item.title }}</h2>
             <p>{{ item.description }}</p>
             <button class="primary-button" @click="openStory(item)">
               进入这个故事
@@ -285,10 +279,9 @@ const policyOptions = [
     <section v-else-if="view === 'story' && game" class="page-content">
       <div class="story-detail">
         <div>
-          <span class="eyebrow">选择进入方式</span>
           <h1>{{ game.title }}</h1>
           <p>{{ game.description }}</p>
-          <p class="eyebrow">
+          <p class="story-meta">
             {{ game.mode === "guided" ? "流程型" : "开放型" }} ·
             {{ game.revision }}
           </p>
@@ -321,9 +314,7 @@ const policyOptions = [
             :src="game.cover_url"
             :alt="game.cover_alt || game.title"
           />
-          <span v-else class="cover-placeholder" aria-hidden="true">{{
-            game.title.slice(0, 1)
-          }}</span>
+          <span v-else class="cover-title" aria-hidden="true">{{ game.title }}</span>
         </div>
       </div>
       <section v-if="storyWorlds.length" class="story-saves">
@@ -451,72 +442,74 @@ const policyOptions = [
           </button>
         </div>
         <form class="composer" @submit.prevent="sendInput()">
-          <SuggestionPanel v-if="currentWorld" :world="currentWorld" :active-revision="status?.active_revision ?? 0" :ready="!!status?.ready" :busy="!!activeRun || session.sending || !!pendingSubmission" :has-draft="!!session.draft.trim()" @choose="chooseSuggestion" />
-          <div class="composer-tools">
-            <label
-              >对谁说
-              <select v-model="session.addressee" aria-label="交谈对象">
-                <option value="">自动判断</option>
-                <option
-                  v-for="character in characters"
-                  :key="character.entity_id"
-                  :value="character.entity_id"
-                >
-                  {{ character.name }}
-                </option>
-              </select></label
-            ><button
-              v-if="addresseeName"
-              type="button"
-              class="recipient-chip"
-              @click="session.addressee = ''"
+          <div class="composer-body">
+            <div class="composer-tools">
+              <label
+                >对谁说
+                <select v-model="session.addressee" aria-label="交谈对象">
+                  <option value="">自动判断</option>
+                  <option
+                    v-for="character in characters"
+                    :key="character.entity_id"
+                    :value="character.entity_id"
+                  >
+                    {{ character.name }}
+                  </option>
+                </select></label
+              ><button
+                v-if="addresseeName"
+                type="button"
+                class="recipient-chip"
+                @click="session.addressee = ''"
+              >
+                对{{ addresseeName }}说 ×</button
+              ><span class="save-status">{{
+                session.sending
+                  ? "正在处理"
+                  : pendingSubmission
+                    ? "提交结果待确认"
+                    : activeRun
+                      ? `正在生成 · 已等待 ${waitingSeconds} 秒`
+                      : failedRun
+                        ? failedRun.status === "cancelled"
+                          ? "本轮已取消"
+                          : "本轮未完成"
+                        : saved
+                          ? "本轮已保存"
+                          : "进度自动保存"
+              }}</span>
+            </div>
+            <textarea
+              ref="textarea"
+              v-model="session.draft"
+              aria-label="你的行动"
+              rows="2"
+              placeholder="说出你的想法，或描述接下来要做的事…"
+              :disabled="!!activeRun || session.sending"
+              @keydown="inputKeys"
+              @input="resizeInput"
+            ></textarea>
+            <p v-if="session.suggestionBasis" class="subtle suggestion-origin">来自行动建议，可修改后提交。
+              <button type="button" class="quiet-button" @click="session.suggestionBasis = undefined; session.sendError = ''">作为自由输入</button>
+            </p>
+            <p
+              v-if="session.sendError && !pendingSubmission"
+              class="inline-error"
+              role="alert"
             >
-              对{{ addresseeName }}说 ×</button
-            ><span class="save-status">{{
-              session.sending
-                ? "正在处理"
-                : pendingSubmission
-                  ? "提交结果待确认"
-                  : activeRun
-                    ? `正在生成 · 已等待 ${waitingSeconds} 秒`
-                    : failedRun
-                      ? failedRun.status === "cancelled"
-                        ? "本轮已取消"
-                        : "本轮未完成"
-                      : saved
-                        ? "本轮已保存"
-                        : "进度自动保存"
-            }}</span>
-          </div>
-          <textarea
-            ref="textarea"
-            v-model="session.draft"
-            aria-label="你的行动"
-            rows="2"
-            placeholder="你想做什么？"
-            :disabled="!!activeRun || session.sending"
-            @keydown="inputKeys"
-            @input="resizeInput"
-          ></textarea>
-          <p v-if="session.suggestionBasis" class="subtle suggestion-origin">来自行动建议，可修改后提交。
-            <button type="button" class="quiet-button" @click="session.suggestionBasis = undefined; session.sendError = ''">作为自由输入</button>
-          </p>
-          <p
-            v-if="session.sendError && !pendingSubmission"
-            class="inline-error"
-            role="alert"
-          >
-            {{ session.sendError }}
-          </p>
-          <div
-            v-if="pendingSubmission && !session.sending"
-            class="inline-error"
-            role="status"
-          >
-            提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
-            <button type="button" class="secondary-button" @click="sendInput()">
-              确认或重发原请求
-            </button>
+              {{ session.sendError }}
+            </p>
+            <div
+              v-if="pendingSubmission && !session.sending"
+              class="inline-error"
+              role="status"
+            >
+              提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
+              <button type="button" class="secondary-button" @click="sendInput()">
+                确认或重发原请求
+              </button>
+            </div>
+            <SuggestionPanel v-if="currentWorld" :world="currentWorld" :active-revision="status?.active_revision ?? 0" :ready="!!status?.ready" :busy="!!activeRun || session.sending || !!pendingSubmission" :has-draft="!!session.draft.trim()" @choose="chooseSuggestion" />
           </div>
           <div class="composer-footer">
             <span>{{
@@ -546,7 +539,6 @@ const policyOptions = [
       </section>
       <aside class="side-column">
         <section class="side-panel">
-          <span class="eyebrow">当前场景</span>
           <h2>{{ currentWorld.location?.name ?? currentWorld.scene }}</h2>
           <p v-if="currentWorld.location?.description" class="subtle">
             {{ currentWorld.location.description }}
@@ -581,6 +573,7 @@ const policyOptions = [
             :key="character.entity_id"
             class="character-row"
             :class="{ selected: session.addressee === character.entity_id }"
+            :aria-pressed="session.addressee === character.entity_id"
             @click="chooseCharacter(character)"
           >
             <span class="avatar">{{ character.name.slice(0, 1) }}</span
@@ -1013,7 +1006,7 @@ const policyOptions = [
         </div></template
       >
       <template v-else-if="dialog === 'scene'"
-        ><span class="eyebrow">当前场景</span>
+        >
         <h3>{{ currentWorld?.location?.name ?? currentWorld?.scene }}</h3>
         <p v-if="currentWorld?.location?.description" class="subtle">
           {{ currentWorld.location.description }}
@@ -1045,6 +1038,7 @@ const policyOptions = [
           :key="character.entity_id"
           class="character-row"
           :class="{ selected: session.addressee === character.entity_id }"
+          :aria-pressed="session.addressee === character.entity_id"
           @click="chooseCharacter(character)"
         >
           <span class="avatar">{{ character.name.slice(0, 1) }}</span
