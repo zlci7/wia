@@ -2,12 +2,14 @@ package turn
 
 import (
 	"gameagent/backend/internal/wire"
+	wiaworld "gameagent/backend/internal/world"
 )
 
 // Both coordination purposes use these contracts; each model call is independent.
-func coordinationCapabilityContext(snapshot Snapshot, decisions map[string]NPCDecision) string {
+func coordinationCapabilityContext(snapshot Snapshot, decisions map[string]NPCDecision, provided []wiaworld.Event) string {
 	input := "\n作者世界规则：" + snapshot.Definition.Rules + "\n作者事实（按实际感知分发）：" + snapshot.Definition.Secret
-	input += "\nNPC 协调提案（本人对白及听众范围、行动、沉默与关系提案，不含个人记忆）：\n" + CoordinationDecisionContext(decisions, snapshot.Characters)
+	input += "\nNPC 协调提案（本人对白及听众范围、行动、沉默与关系提案，不含个人记忆）：\n" + coordinationDecisionContext(decisions, snapshot.Characters, provided)
+	input += "\nspeech_source_id 或 action_source_id 有值时，完整原文见本请求中对应事件或场景来源的 content；引用的对白不是沉默，引用的行动仍是待裁定提案。依据事件阶段处理本人的各项决定，保持 speech_visibility 与实际听众范围。"
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		input += "\n地点与有向连接(JSON)：" + wire.MarshalJSON(snapshot.Definition.Locations) + "\n当前位置(JSON)：" + wire.MarshalJSON(snapshot.Positions)
 		input += "\n已定义背景实体(JSON)：" + wire.MarshalJSON(snapshot.Definition.BystanderRefs)

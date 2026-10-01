@@ -88,16 +88,29 @@ func FormatBystanders(bystanders []story.Bystander, names []string) string {
 	return strings.Join(parts, "、")
 }
 
-// CoordinationDecisionContext reports what each character in the scene decided, so the
-// coordinator can reconcile the proposals against what the player actually did.
-func CoordinationDecisionContext(decisions map[string]NPCDecision, characters []wiaworld.Character) string {
+// A proposal can reference text already supplied in this coordination request.
+// Actor, event kind and exact content must match; otherwise the full text stays here.
+func coordinationDecisionContext(decisions map[string]NPCDecision, characters []wiaworld.Character, provided []wiaworld.Event) string {
 	var parts []string
 	for _, character := range characters {
 		decision, exists := decisions[character.EntityID]
 		if !exists {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；speech_visibility=%s；speech_recipients=%s；action_intent=%q；silent=%t；relationship_proposals=%s", character.Name, character.Role, character.EntityID, decision.Speech, decision.SpeechVisibility, wire.MarshalJSON(decision.SpeechRecipients), decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals)))
+		speech, action := decision.Speech, decision.ActionIntent
+		speechSource, actionSource := "", ""
+		for _, event := range provided {
+			if event.ActorID != character.EntityID || event.EventID == "" {
+				continue
+			}
+			if speech != "" && event.EventType == "npc_dialogue" && event.Content == speech {
+				speechSource, speech = event.EventID, ""
+			}
+			if action != "" && event.EventType == "npc_action_intent" && event.Content == action {
+				actionSource, action = event.EventID, ""
+			}
+		}
+		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；speech_source_id=%q；speech_visibility=%s；speech_recipients=%s；action_intent=%q；action_source_id=%q；silent=%t；relationship_proposals=%s", character.Name, character.Role, character.EntityID, speech, speechSource, decision.SpeechVisibility, wire.MarshalJSON(decision.SpeechRecipients), action, actionSource, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals)))
 	}
 	if len(parts) == 0 {
 		return "（暂无）"

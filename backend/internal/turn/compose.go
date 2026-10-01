@@ -147,9 +147,13 @@ func composeIntent(snapshot Snapshot, run wiaworld.Run) Material {
 func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, decisions map[string]NPCDecision, events []wiaworld.Event, actionResolution *ActionResolution) Material {
 	policy, revision := BehaviorPolicy(snapshot.Narrative, "coordination")
 	var actionCandidates []wiaworld.Event
+	var provided []wiaworld.Event
 	for _, event := range events {
 		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
 			actionCandidates = append(actionCandidates, event)
+			provided = append(provided, event)
+		} else if event.EventType == "npc_dialogue" && event.RunID == run.RunID && event.Stage >= 1 && event.Stage <= 2 {
+			provided = append(provided, event)
 		}
 	}
 	actionJSON := worldProgressionRecords(actionCandidates)
@@ -176,7 +180,7 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	}
 	input += "\n没有明确重要NPC对象的玩家交谈也列为互动尝试：若是向实际可接触的背景人物说话，可在该互动的outcome中组织背景人物基于处境的可见回应，不自动让玩家接受其请求。重要NPC名单内的人物仍只使用本人已确定的对白与行动，不能借背景互动重新决定。单纯面向大家的表达自然承接已有回应，没有新回应也可据实说明，不为了填充结果创造角色。背景人物未出现或尚未回应时，明确这是无人回应或等待确认，不推定玩家已与其达成约定。"
 	input += "\n完整字段类型：time_minutes 为整数，scene 为自然语言字符串（不是场景视图数组或对象）；scene_characters 为字符串数组；outcomes 为对象数组，每项仅含 action_id 字符串、status 字符串、content 字符串、recipients 字符串数组、bystanders 字符串数组、projections 对象数组（每项仅含 recipient 字符串、content 字符串，覆盖行动者及所有实际接收者）；scene_updates 为对象数组，每项仅含 content 字符串、source_ids 字符串数组、recipients 字符串数组。没有更新或行动时使用空数组，不使用 null。只输出合同列出的字段。"
-	input += coordinationCapabilityContext(snapshot, decisions)
+	input += coordinationCapabilityContext(snapshot, decisions, provided)
 	input += EventOpportunityContract(snapshot)
 	input += "\n历史 generated_event_plan 是作者未来计划，只有 plot_result 或行动结果才表示实际发生。"
 	return Material{PolicyRevision: revision, System: BehaviorContract + "\n你是场景协调 Agent。你可以读取本轮协调资料来裁定行动结果、时间和场景，但不要写玩家正文，也不要把 NPC 的行动尝试直接当成成功事实。\ntime_minutes 是本轮新增的游戏内分钟数，取 0 至 120 的整数，不是时钟读数或当天累计分钟。例如 19:02 经过一分钟，time_minutes 为 1，而非 1142 或 1143。" + "\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏。outcomes 与待裁定行动(JSON)一一对应，action_id 原样使用该列表中的 event_id。列表为空时 outcomes 必须为 []。清单外的输入、公开对白和此前已提交结果不另建 outcome，不编造行动 ID。", RequiredSources: append(EventIDs(events), SceneViewSources(snapshot, "")...), Required: input, Optional: CoordinationSections(snapshot.Events)}

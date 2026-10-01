@@ -35,7 +35,7 @@ func TestMistEmbersOpeningCoordinationFitsApplicationBudget(t *testing.T) {
 	decisions := map[string]NPCDecision{"npc:tailor": {Speech: "谢谢你。我把照片和住址交给你。", ActionIntent: "将照片和纸条递给调查员", ActionTargetID: "player"}}
 	material := composeCoordination(snapshot, run, TurnIntent{IntentType: "speak", AddresseeID: "npc:tailor", Visibility: "public"}, decisions, events, nil)
 	material, _ = selectStoryMaterials(snapshot, "coordination", "coordinator", material)
-	for _, text := range []string{def.Rules, def.Secret, wire.MarshalJSON(def.Locations), CoordinationDecisionContext(decisions, snapshot.Characters)} {
+	for _, text := range []string{def.Rules, def.Secret, wire.MarshalJSON(def.Locations), coordinationDecisionContext(decisions, snapshot.Characters, events)} {
 		if text == "" {
 			continue
 		}
@@ -84,13 +84,13 @@ func TestMistEmbersOpeningCoordinationFitsApplicationBudget(t *testing.T) {
 		if err != nil || !report.RequiredComplete || request.MaxInputTokens != 12000 {
 			t.Fatal("complete speech exceeds unchanged input budget", err, report)
 		}
-		for _, text := range []string{speech, private, CoordinationDecisionContext(decisions, snapshot.Characters), worldProgressionRecords(events)} {
+		for _, text := range []string{speech, private, coordinationDecisionContext(decisions, snapshot.Characters, actions), worldProgressionRecords(events)} {
 			if !strings.Contains(request.Input, text) {
 				t.Fatal("speech, scope or action identity missing")
 			}
 		}
-		if count := strings.Count(request.Input, speech); count != 2 {
-			t.Fatalf("speech must appear in its proposal and source, got %d copies", count)
+		if count := strings.Count(request.Input, speech); count != 1 {
+			t.Fatalf("speech must have one complete source, got %d copies", count)
 		}
 		for _, event := range []wiaworld.Event{speechEvent, privateEvent} {
 			if !wiaworld.ContainsID(report.SelectedSources, event.EventID) {
@@ -98,7 +98,7 @@ func TestMistEmbersOpeningCoordinationFitsApplicationBudget(t *testing.T) {
 			}
 		}
 		legacy := material
-		legacy.Required += "\nNPC 已确定的公开对白：" + speech
+		legacy.Required += "\nNPC 已确定的公开对白：" + speech + "\nNPC 提案对白：" + speech
 		_, oldReport, oldErr := composer.Build(legacy, legacy.System, structuredTurnOutputTokens)
 		t.Logf("flat-speech input=%d", oldReport.InputTokens)
 		if !errors.Is(oldErr, ErrContextCapacity) {

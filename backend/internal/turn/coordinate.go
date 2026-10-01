@@ -70,7 +70,7 @@ type actionProjection struct {
 }
 
 const (
-	coordinationPromptVersion = "story.coordination.v23"
+	coordinationPromptVersion = "story.coordination.v24"
 )
 
 func (s *Service) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, recipient string, output *Output) (hostResult, []wiaworld.Event, error) {

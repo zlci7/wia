@@ -574,7 +574,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			remainingMinutes = max(0, 120-output.elapsedMinutes)
 		}
 		material := composePlotActions(base, *output, extra, rootID, allowed, decisions, remainingMinutes)
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v10")
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v11")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
@@ -728,7 +728,7 @@ func composePlotActions(snapshot Snapshot, output Output, extra Output, rootID s
 	} else {
 		material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 	}
-	material.Required += coordinationCapabilityContext(snapshot, decisions)
+	material.Required += coordinationCapabilityContext(snapshot, decisions, extra.Events)
 	if snapshot.Definition.Progression != nil {
 		material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
 	}
