@@ -70,7 +70,7 @@ type actionProjection struct {
 }
 
 const (
-	coordinationPromptVersion = "story.coordination.v22"
+	coordinationPromptVersion = "story.coordination.v23"
 )
 
 func (s *Service) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, recipient string, output *Output) (hostResult, []wiaworld.Event, error) {
@@ -499,7 +499,7 @@ func (s *Service) coordinateTurn(ctx context.Context, generator model.TextGenera
 	if generator == nil {
 		return coordinatedTurn{}, 0, ErrModelNotConfigured
 	}
-	material := composeCoordination(snapshot, run, intent, output.Decisions, output.Events, strings.Join(output.PublicReplies, "\n"), output.ActionResolution)
+	material := composeCoordination(snapshot, run, intent, output.Decisions, output.Events, output.ActionResolution)
 	generator = s.generator(generator, material, snapshot, run, "coordination", "coordinator", 3, coordinationPromptVersion)
 	input := material.Required
 	var result hostResult

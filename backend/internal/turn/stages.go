@@ -222,16 +222,13 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 	if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
 		return AtStage(StageNPC, err)
 	}
-	var publicReplyLog []string
 	output.speechAudience = append([]string{"player"}, CharacterIDs(participants)...)
 	for _, bystander := range snapshot.BystanderRefs {
 		output.speechAudience = append(output.speechAudience, bystander.BystanderID)
 	}
 	for _, character := range participants {
 		decision := decisions[character.EntityID]
-		if reply := appendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
-			publicReplyLog = append(publicReplyLog, reply)
-		}
+		appendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1)
 	}
 	snapshot.OpenProgress = cloneOpenProgress(output.OpenProgress)
 
@@ -256,13 +253,10 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 			if len(input.SourceEventIDs) > 0 {
 				sourceEventID = input.SourceEventIDs[0]
 			}
-			if reply := appendNPCDecisionOutput(output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2); reply != "" {
-				publicReplyLog = append(publicReplyLog, reply)
-			}
+			appendNPCDecisionOutput(output, run, character, decision, participants, sourceEventID, snapshot.SceneVersion, 2)
 			decisions[character.EntityID] = MergeNPCDecision(decisions[character.EntityID], decision)
 		}
 	}
-	output.PublicReplies = publicReplyLog
 	output.Decisions = decisions
 	return nil
 }

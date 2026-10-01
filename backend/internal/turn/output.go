@@ -60,10 +60,7 @@ type Output struct {
 	Perceptions         []wiaworld.Perception
 	Memories            []wiaworld.Memory
 
-	// PublicReplies is the public speech that has been resolved so far, carried from the
-	// character stages to coordination.
-	PublicReplies []string `json:"-"`
-	// Decisions is what each character decided, carried the same way.
+	// Decisions carries each character's proposals to coordination.
 	Decisions map[string]NPCDecision `json:"-"`
 	// VisibleEvents is what the player can perceive of this turn so far, carried from
 	// scene resolution to narration, which renders it as the player's projection.

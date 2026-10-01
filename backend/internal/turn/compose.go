@@ -144,7 +144,7 @@ func composeIntent(snapshot Snapshot, run wiaworld.Run) Material {
 	return Material{System: "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", RequiredSources: append([]string{run.RunID + ":input"}, SceneViewSources(snapshot, "player")...), Required: input, Optional: DialogueSections(snapshot)}
 }
 
-func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, decisions map[string]NPCDecision, events []wiaworld.Event, publicReplies string, actionResolution *ActionResolution) Material {
+func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, decisions map[string]NPCDecision, events []wiaworld.Event, actionResolution *ActionResolution) Material {
 	policy, revision := BehaviorPolicy(snapshot.Narrative, "coordination")
 	var actionCandidates []wiaworld.Event
 	for _, event := range events {
@@ -152,9 +152,9 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 			actionCandidates = append(actionCandidates, event)
 		}
 	}
-	actionJSON, _ := json.Marshal(actionCandidates)
+	actionJSON := worldProgressionRecords(actionCandidates)
 	publicCharacters := PublicCharacterContext(snapshot.Characters, wiaworld.CharacterIDs(InScene(snapshot.Characters)))
-	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial、not_executed；not_executed 表示重复、已覆盖或前置条件未成立而未另行执行，不代表动作成功；每项仍保留自己的 action_id 和结果；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id；行动者可省略其 recipients 项，但始终需要自己的 projections 项。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", snapshot.Summary.GameID, "以场景来源中的各 view:ID 为准。", snapshot.Summary.Clock, publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, PlayerElaborationLabel(snapshot.Narrative), publicReplies, actionJSON, AvailableCharacterIDs(snapshot.Characters), strings.Join(wiaworld.CharacterIDs(InScene(snapshot.Characters)), ","))
+	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的对白与听众：见下方本人协调提案及场景来源。\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial、not_executed；not_executed 表示重复、已覆盖或前置条件未成立而未另行执行，不代表动作成功；每项仍保留自己的 action_id 和结果；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id；行动者可省略其 recipients 项，但始终需要自己的 projections 项。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", snapshot.Summary.GameID, "以场景来源中的各 view:ID 为准。", snapshot.Summary.Clock, publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, PlayerElaborationLabel(snapshot.Narrative), actionJSON, AvailableCharacterIDs(snapshot.Characters), strings.Join(wiaworld.CharacterIDs(InScene(snapshot.Characters)), ","))
 
 	input += personalProjectionContract
 	input += fmt.Sprintf("\n本输入剩余游戏时间预算：%d分钟。", PlotTimeLimit(snapshot))

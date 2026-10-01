@@ -18,7 +18,7 @@ import (
 
 func TestCoordinationProjectionContractAndRepairIdentifyMissingRecipients(t *testing.T) {
 	snapshot := spatialFixture()
-	material := composeCoordination(snapshot, wiaworld.Run{RunID: "contract", Input: "检查门口。"}, TurnIntent{}, nil, nil, "", nil)
+	material := composeCoordination(snapshot, wiaworld.Run{RunID: "contract", Input: "检查门口。"}, TurnIntent{}, nil, nil, nil)
 	fields := strings.SplitN(material.Required, "完整字段类型：", 2)
 	if len(fields) != 2 || !strings.Contains(strings.SplitN(fields[1], "scene_updates", 2)[0], "projections 对象数组") {
 		t.Fatal("the complete outcome field contract omitted personal projections")
