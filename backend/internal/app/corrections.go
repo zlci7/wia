@@ -95,6 +95,28 @@ func (a *App) Correct(ctx context.Context, worldID string, request memory.Correc
 	if err = memory.ExpandCorrection(ctx, store, &c); err != nil {
 		return c, err
 	}
+	if c.Kind == "event" && snapshot.Definition.Capabilities["spatial"] == 1 {
+		sources, sourceErr := store.LoadEntityLocationSources(ctx)
+		if sourceErr != nil {
+			return c, sourceErr
+		}
+		for _, sourceEventID := range sources {
+			if c.Affects(sourceEventID) {
+				return c, fmt.Errorf("%w: correction would invalidate a current position; position rebuilding is not available", ErrInvalidRequest)
+			}
+		}
+	}
+	if c.Kind == "event" && (snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 || len(snapshot.Definition.ActionRules) > 0) {
+		sources, sourceErr := store.LoadStructuredFactSources(ctx)
+		if sourceErr != nil {
+			return c, sourceErr
+		}
+		for _, sourceEventID := range sources {
+			if sourceEventID != "opening" && c.Affects(sourceEventID) {
+				return c, fmt.Errorf("%w: correction would invalidate a current structured fact; rebuilding is not available", ErrInvalidRequest)
+			}
+		}
+	}
 	var eventRun string
 	if c.Kind == "event" {
 		if err = store.Database().QueryRowContext(ctx, `SELECT run_id FROM events WHERE event_id=?`, c.TargetID).Scan(&eventRun); err != nil {

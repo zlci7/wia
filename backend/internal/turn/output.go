@@ -1,6 +1,7 @@
 package turn
 
 import (
+	"slices"
 	"time"
 
 	"gameagent/backend/internal/plot"
@@ -13,10 +14,11 @@ import (
 // privately to one character is a different act from speaking aloud, and every later
 // stage reads it to decide what each character was in a position to perceive.
 type TurnIntent struct {
-	WaitMinutes int    `json:"wait_minutes,omitempty"`
-	IntentType  string `json:"intent_type"`
-	AddresseeID string `json:"addressee_id"`
-	Visibility  string `json:"visibility"`
+	WaitMinutes  int    `json:"wait_minutes,omitempty"`
+	IntentType   string `json:"intent_type"`
+	AddresseeID  string `json:"addressee_id"`
+	Visibility   string `json:"visibility"`
+	ActionRuleID string `json:"action_rule_id,omitempty"`
 	// Input is the player's own words for this turn, carried with the intent because
 	// every later stage that records what the player did needs them.
 	Input string `json:"-"`
@@ -39,14 +41,22 @@ type Output struct {
 	Scene           string
 	// SceneLocation is the identifier behind Scene, so presence can be decided without
 	// comparing human-readable text.
-	SceneLocation   string
-	SceneVersion    int64
-	SceneCharacters []string
-	SceneViews      []SceneView
-	PlotProgress    *plot.Progress
-	Events          []wiaworld.Event
-	Perceptions     []wiaworld.Perception
-	Memories        []wiaworld.Memory
+	SceneLocation       string
+	SceneVersion        int64
+	SceneCharacters     []string
+	SceneViews          []SceneView
+	Positions           map[string]string
+	PositionChanges     []PositionChange
+	States              map[string]map[string]wiaworld.EntityState
+	StateChanges        []StateChange
+	Relationships       []wiaworld.Relationship
+	RelationshipChanges []RelationshipChange
+	Items               map[string]wiaworld.ItemInstance
+	ItemTransfers       []ItemTransfer
+	PlotProgress        *plot.Progress
+	Events              []wiaworld.Event
+	Perceptions         []wiaworld.Perception
+	Memories            []wiaworld.Memory
 
 	// PublicReplies is the public speech that has been resolved so far, carried from the
 	// character stages to coordination.
@@ -67,7 +77,18 @@ type Output struct {
 	StageOneInputs map[string]StageInput `json:"-"`
 	// PlayerEventID names the event that records the player's own attempt, so the
 	// memories recorded at the end of the turn can point at what they are memories of.
-	PlayerEventID string `json:"-"`
+	PlayerEventID    string            `json:"-"`
+	ActionResolution *ActionResolution `json:"-"`
+}
+
+// PositionChange is a validated movement that the commit transaction applies with
+// the outcome event that authorized it.
+type PositionChange struct {
+	EntityID              string
+	To                    string
+	ActionID              string
+	SourceEventID         string
+	PreviousSourceEventID string
 }
 
 // OpenOutput opens a turn's output: it records the player's attempt as the first event
@@ -93,6 +114,10 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 			SourceType: "player_" + intent.Visibility, CreatedAt: now,
 		}},
 		Memories: []wiaworld.Memory{}, Perceptions: []wiaworld.Perception{},
+		Positions: clonePositions(snapshot.Positions), PositionChanges: []PositionChange{},
+		States: cloneStates(snapshot.States), StateChanges: []StateChange{},
+		Relationships: slices.Clone(snapshot.Relationships), RelationshipChanges: []RelationshipChange{},
+		Items: cloneItems(snapshot.Items), ItemTransfers: []ItemTransfer{},
 		PerceptText: map[string]string{}, StageOneInputs: map[string]StageInput{},
 		PlayerEventID: playerEventID,
 	}
@@ -112,6 +137,52 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 		}
 	}
 	return output
+}
+
+type StateChange struct {
+	Before, After           wiaworld.EntityState
+	ActionID, SourceEventID string
+	Order                   int
+}
+
+type RelationshipChange struct {
+	Before, After           wiaworld.Relationship
+	ActionID, SourceEventID string
+	ProposalSourceID        string
+	Order                   int
+}
+
+type ItemTransfer struct {
+	Before, After           wiaworld.ItemInstance
+	ActionID, SourceEventID string
+	Order                   int
+}
+
+func cloneStates(input map[string]map[string]wiaworld.EntityState) map[string]map[string]wiaworld.EntityState {
+	result := make(map[string]map[string]wiaworld.EntityState, len(input))
+	for entityID, values := range input {
+		result[entityID] = make(map[string]wiaworld.EntityState, len(values))
+		for stateID, value := range values {
+			result[entityID][stateID] = value
+		}
+	}
+	return result
+}
+
+func cloneItems(input map[string]wiaworld.ItemInstance) map[string]wiaworld.ItemInstance {
+	result := make(map[string]wiaworld.ItemInstance, len(input))
+	for id, item := range input {
+		result[id] = item
+	}
+	return result
+}
+
+func clonePositions(input map[string]string) map[string]string {
+	result := make(map[string]string, len(input))
+	for entityID, locationID := range input {
+		result[entityID] = locationID
+	}
+	return result
 }
 
 // InScene is the cast present in the scene, which is who a turn gives a chance to act

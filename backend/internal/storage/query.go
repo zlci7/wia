@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"gameagent/backend/internal/wire"
@@ -53,6 +55,41 @@ func (s *WorldStore) LoadCharacters(ctx context.Context) ([]wiaworld.Character, 
 		}
 	}
 	return result, nil
+}
+
+// LoadEntityPositions reads the authoritative current place and provenance of each
+// positioned entity. Every source must still name a committed event; accepting an
+// orphan would make correction traversal and the next movement dependency diverge.
+func (s *WorldStore) LoadEntityPositions(ctx context.Context) (map[string]string, map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT p.entity_id,p.location_id,p.source_event_id,e.event_id
+FROM entity_locations p LEFT JOIN events e ON e.event_id=p.source_event_id ORDER BY p.entity_id`)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	locations := map[string]string{}
+	sources := map[string]string{}
+	for rows.Next() {
+		var entityID, locationID, sourceEventID string
+		var committedSource sql.NullString
+		if err := rows.Scan(&entityID, &locationID, &sourceEventID, &committedSource); err != nil {
+			return nil, nil, err
+		}
+		if !committedSource.Valid {
+			return nil, nil, fmt.Errorf("position source event %s is missing", sourceEventID)
+		}
+		locations[entityID] = locationID
+		sources[entityID] = sourceEventID
+	}
+	return locations, sources, rows.Err()
+}
+
+// LoadEntityLocationSources reports the committed event that last established each
+// position. Correction code uses it to avoid invalidating a position without rebuilding
+// the dependent world fact.
+func (s *WorldStore) LoadEntityLocationSources(ctx context.Context) (map[string]string, error) {
+	_, sources, err := s.LoadEntityPositions(ctx)
+	return sources, err
 }
 
 func (s *WorldStore) LoadMessages(ctx context.Context, limit int) ([]wiaworld.Message, error) {
@@ -125,6 +162,59 @@ func (s *WorldStore) LoadPerceptions(ctx context.Context, recipient string, limi
 		result[i], result[j] = result[j], result[i]
 	}
 	return result, rows.Err()
+}
+
+// LoadPerceivedSources returns durable knowledge of the source events behind
+// current structured facts. Recent perceptions remain separately bounded for
+// prompt context; authorization to see a current fact does not expire with that
+// context window.
+func (s *WorldStore) LoadPerceivedSources(ctx context.Context, sourceIDs []string) (map[string]map[string]bool, error) {
+	result := map[string]map[string]bool{}
+	unique := make([]string, 0, len(sourceIDs))
+	seen := map[string]bool{}
+	for _, id := range sourceIDs {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	committed := 0
+	for start := 0; start < len(unique); start += 200 {
+		end := min(start+200, len(unique))
+		args := make([]any, 0, end-start)
+		for _, id := range unique[start:end] {
+			args = append(args, id)
+		}
+		var chunkCommitted int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE event_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...).Scan(&chunkCommitted); err != nil {
+			return nil, err
+		}
+		committed += chunkCommitted
+		rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT p.recipient_id,p.source_event_id FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE p.source_event_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var recipient, source string
+			if err := rows.Scan(&recipient, &source); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if result[recipient] == nil {
+				result[recipient] = map[string]bool{}
+			}
+			result[recipient][source] = true
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if committed != len(unique) {
+		return nil, fmt.Errorf("current structured facts reference %d missing source events", len(unique)-committed)
+	}
+	return result, nil
 }
 
 func (s *WorldStore) LoadMemories(ctx context.Context, recipient string, limit int) ([]wiaworld.Memory, error) {

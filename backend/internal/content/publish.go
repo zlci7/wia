@@ -473,13 +473,20 @@ func (a *Service) buildPackage(ctx context.Context, draft ContentDraft, project 
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	schemaVersion := payload.SchemaVersion
+	if schemaVersion == 0 {
+		schemaVersion = SchemaV2
+	}
 	story := StoryPack{
-		SchemaVersion: SchemaV2, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
+		SchemaVersion: schemaVersion, Requires: payload.Requires, GameID: project.GameID, Revision: "", Mode: payload.Mode, Title: payload.Title,
 		Description: payload.Description, Gameplay: payload.Gameplay, Background: payload.Background, Rules: payload.Rules,
 		AuthorFacts: payload.AuthorFacts, Cover: payload.Cover, CoverAlt: payload.CoverAlt, Player: payload.Player,
 		Opening: payload.Opening, InitialLocation: payload.InitialLocation, Clock: payload.Clock, Locations: payload.Locations,
 		NPCs: names, Bystanders: payload.Bystanders, Plot: payload.Plot, EventGeneration: payload.EventGeneration,
-		Defaults: payload.Defaults,
+		Defaults:         payload.Defaults,
+		StateDefinitions: payload.StateDefinitions, RelationDefinitions: payload.RelationDefinitions,
+		InitialRelations: payload.InitialRelations, ItemDefinitions: payload.ItemDefinitions, ItemInstances: payload.ItemInstances,
+		ActionRules: payload.ActionRules,
 	}
 	revision, err := newContentRevision(story, npcFiles, assets)
 	if err != nil {
@@ -718,7 +725,7 @@ func (a *Service) loadPublishedRevisions(ctx context.Context) error {
 	for _, item := range list {
 		pack, err := loadPack(item.path)
 		if err != nil || pack.Definition.Revision != item.revision {
-			a.addPackIssue(PackIssue{item.gameID, "已发布修订无法读取，请重新发布"})
+			a.addPackIssue(PackIssue{File: item.gameID, Code: "published_revision_unavailable", Message: "已发布修订无法读取，请重新发布"})
 			continue
 		}
 		if wanted, known := current[item.gameID]; known && wanted != "" && wanted != item.revision {

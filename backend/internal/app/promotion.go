@@ -84,6 +84,9 @@ func (a *App) PreviewCharacterPromotion(ctx context.Context, worldID, bystanderI
 	if err != nil {
 		return PromotionPreview{}, err
 	}
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		return PromotionPreview{}, fmt.Errorf("%w: character promotion is unavailable in spatial worlds", content.ErrContentInvalid)
+	}
 	bystander, ok := bystanderByID(snapshot.Definition.BystanderRefs, bystanderID)
 	if !ok {
 		return PromotionPreview{}, content.ErrContentNotFound
@@ -156,6 +159,9 @@ func (a *App) PromoteCharacter(ctx context.Context, worldID string, request Prom
 	snapshot, err := turn.LoadSnapshot(ctx, store, 1)
 	if err != nil {
 		return wiaworld.Character{}, err
+	}
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		return wiaworld.Character{}, fmt.Errorf("%w: character promotion is unavailable in spatial worlds", content.ErrContentInvalid)
 	}
 	// A repeat request returns the character this world already created for that
 	// passer-by. The comparison uses the normalized request, so blanks or spacing in the

@@ -1,6 +1,8 @@
 // Package content owns the author's material: the story packs a world is started from, and the shape a pack has to have.
 package content
 
+import "encoding/json"
+
 type GameSummary struct {
 	ID          string         `json:"id"`
 	Title       string         `json:"title"`
@@ -26,15 +28,19 @@ type PackBystander struct {
 }
 
 type PlayerDefaults struct {
-	Name         string `json:"name"`
-	Profile      string `json:"profile"`
-	Requirements string `json:"requirements"`
-	Editable     bool   `json:"editable"`
+	Name         string                     `json:"name"`
+	Profile      string                     `json:"profile"`
+	Requirements string                     `json:"requirements"`
+	Editable     bool                       `json:"editable"`
+	InitialState map[string]json.RawMessage `json:"initial_state,omitempty"`
 }
 
 type PackLocation struct {
 	ID          string   `json:"id"`
+	Kind        string   `json:"kind,omitempty"`
+	Parent      string   `json:"parent,omitempty"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Connections []string `json:"connections"`
+	Public      *bool    `json:"public,omitempty"`
 }

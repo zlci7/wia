@@ -72,6 +72,13 @@
       },
       "minItems": 0,
       "maxItems": 12
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [{"type":"integer"},{"type":"boolean"},{"type":"string"}]
+      },
+      "maxProperties": 32
     }
   },
   "required": [

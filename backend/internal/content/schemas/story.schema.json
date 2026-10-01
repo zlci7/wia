@@ -6,8 +6,31 @@
     "schema_version": {
       "enum": [
         1,
-        2
+        2,
+        3
       ]
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spatial": {
+          "const": 1
+        },
+        "state": {
+          "const": 1
+        },
+        "relations": {
+          "const": 1
+        },
+        "items": {
+          "const": 1
+        },
+        "rules": {
+          "const": 1
+        }
+      },
+      "minProperties": 1
     },
     "game_id": {
       "type": "string",
@@ -90,6 +113,23 @@
         },
         "editable": {
           "type": "boolean"
+        },
+        "initial_state": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "maxProperties": 32
         }
       },
       "required": []
@@ -123,6 +163,19 @@
             "maxLength": 80,
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "region",
+              "place"
+            ]
+          },
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -143,6 +196,9 @@
             },
             "minItems": 0,
             "maxItems": 32
+          },
+          "public": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -282,6 +338,19 @@
               },
               "terminal": {
                 "type": "boolean"
+              },
+              "requirements": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "$ref": "#/$defs/factCondition"
+                }
+              },
+              "on_unmet": {
+                "enum": [
+                  "defer",
+                  "skip"
+                ]
               }
             },
             "required": [
@@ -304,13 +373,342 @@
     "event_generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope", "locations", "participants", "max_active", "cooldown_turns"],
+      "required": [
+        "scope",
+        "locations",
+        "participants",
+        "max_active",
+        "cooldown_turns"
+      ],
       "properties": {
-        "scope": {"type":"string", "minLength":1, "maxLength":4000},
-        "locations": {"type":"array", "minItems":1, "maxItems":32, "items":{"type":"string", "minLength":1, "maxLength":80}},
-        "participants": {"type":"array", "minItems":0, "maxItems":16, "items":{"type":"string", "minLength":1, "maxLength":84}},
-        "max_active": {"type":"integer", "minimum":1, "maximum":3},
-        "cooldown_turns": {"type":"integer", "minimum":2, "maximum":20}
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "locations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "participants": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 84
+          }
+        },
+        "max_active": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "cooldown_turns": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 20
+        }
+      }
+    },
+    "state_definitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "type": {
+            "enum": [
+              "integer",
+              "boolean",
+              "enum"
+            ]
+          },
+          "minimum": {
+            "type": "integer"
+          },
+          "maximum": {
+            "type": "integer"
+          },
+          "enum_values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "scope": {
+            "enum": [
+              "player",
+              "npc",
+              "all"
+            ]
+          },
+          "projection": {
+            "enum": [
+              "self",
+              "public",
+              "hidden"
+            ]
+          },
+          "knowledge": {
+            "enum": [
+              "owner",
+              "public",
+              "host_only"
+            ]
+          },
+          "update_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "readonly",
+                  "model",
+                  "bounded_proposal",
+                  "rule_only"
+                ]
+              },
+              "max_change_per_turn": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "default",
+          "scope",
+          "projection",
+          "knowledge",
+          "update_policy"
+        ]
+      }
+    },
+    "relation_definitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "minimum": {
+            "type": "integer"
+          },
+          "maximum": {
+            "type": "integer"
+          },
+          "default": {
+            "type": "integer"
+          },
+          "max_change_per_turn": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "projection": {
+            "enum": [
+              "self",
+              "public",
+              "hidden"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "minimum",
+          "maximum",
+          "default",
+          "max_change_per_turn",
+          "projection"
+        ]
+      }
+    },
+    "initial_relations": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subject_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 84
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 84
+          },
+          "relation_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "subject_id",
+          "target_id",
+          "relation_type",
+          "value"
+        ]
+      }
+    },
+    "item_definitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "projection": {
+            "enum": [
+              "public",
+              "holder",
+              "hidden"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "projection"
+        ]
+      }
+    },
+    "item_instances": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "definition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "holder_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 84
+          },
+          "location_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "instance_id",
+          "definition_id"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "holder_id"
+            ]
+          },
+          {
+            "required": [
+              "location_id"
+            ]
+          }
+        ]
       }
     },
     "defaults": {
@@ -386,6 +784,211 @@
         }
       },
       "required": []
+    },
+    "action_rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "guidance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "conditions": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/$defs/factCondition"
+            }
+          },
+          "risk": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "base_target": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "minimum": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "maximum": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "modifiers": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": -100,
+                      "maximum": 100,
+                      "not": {
+                        "const": 0
+                      }
+                    },
+                    "condition": {
+                      "$ref": "#/$defs/factCondition"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "amount",
+                    "condition"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "base_target",
+              "minimum",
+              "maximum"
+            ]
+          },
+          "success_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "failure_text": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "success_effects": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/$defs/ruleEffect"
+            }
+          },
+          "failure_effects": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/$defs/ruleEffect"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "guidance",
+          "success_text"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "factCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "location_is",
+            "state_at_least",
+            "state_at_most",
+            "relation_at_least",
+            "relation_at_most",
+            "item_held",
+            "item_at",
+            "rule_result",
+            "rule_result_absent"
+          ]
+        },
+        "entity_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 84
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 84
+        },
+        "fact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "location_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "value": {
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ruleEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "state_delta"
+        },
+        "entity_id": {
+          "enum": [
+            "actor",
+            "player"
+          ]
+        },
+        "state_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "delta": {
+          "type": "integer",
+          "not": {
+            "const": 0
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "entity_id",
+        "state_id",
+        "delta"
+      ]
     }
   },
   "required": [

@@ -15,7 +15,7 @@ import (
 func notePlayerAction(output *Output, run wiaworld.Run, intent TurnIntent) {
 	if intent.IntentType != "speak" || intent.AddresseeID == "" {
 		output.Events = append(output.Events, wiaworld.Event{
-			EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player",
+			EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", TargetID: intent.AddresseeID,
 			Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion,
 			SourceType: "player_attempt", CreatedAt: time.Now().UTC(),
 		})

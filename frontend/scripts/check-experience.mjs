@@ -157,7 +157,7 @@ try {
   call("press", "Control+Enter");
   await wait(`!!document.querySelector('.composer .inline-error')`);
   assert.equal(js(`document.querySelector('textarea').value`), "跟老板打招呼");
-  click(".composer button[type=submit]");
+  click('.composer .inline-error button:has-text("确认或重发原请求")');
   await wait(`!!document.querySelector('.run-card')`);
   js(`document.querySelector('.transcript').scrollTop=2000`);
   await wait(
@@ -208,15 +208,13 @@ try {
 
   for (const size of ["768x1024", "390x844", "390x420"]) {
     call("viewport", size);
+    await pause(500);
+    const layout = js(`(()=>{const box=document.querySelector('.composer').getBoundingClientRect();return {bottom:box.bottom,top:box.top,height:box.height,viewport:innerHeight,scrollY}})()`);
     assert(js(`document.body.scrollWidth<=innerWidth`));
     assert(
       js(`document.querySelector('.topbar').getBoundingClientRect().top===0`),
     );
-    assert(
-      js(
-        `document.querySelector('.composer').getBoundingClientRect().bottom<=innerHeight+1`,
-      ),
-    );
+    assert(layout.bottom <= layout.viewport + 1, `${size}: ${JSON.stringify(layout)}`);
     assert(js(`document.querySelector('.transcript').clientHeight>0`));
   }
   call("viewport", "390x844");
@@ -226,6 +224,44 @@ try {
   assert.equal(
     js(`document.activeElement.getAttribute('aria-label')`),
     "你的行动",
+  );
+  click('button:has-text("返回首页")');
+  click('.story-card:has-text("雾都余烬") button');
+  await wait(
+    `document.querySelector('.story-detail h1')?.textContent==='雾都余烬'`,
+  );
+  click('button:has-text("继续最近进度")');
+  await wait(
+    `document.querySelector('.reading-heading h1')?.textContent==='雾都机制验收'`,
+  );
+  click('button:has-text("场景与人物")');
+  assert(
+    js(`document.querySelector('[role=dialog]').textContent.includes('调查事务所')`),
+  );
+  assert(
+    js(`document.querySelector('[role=dialog]').textContent.includes('街角咖啡馆')`),
+  );
+  assert(
+    js(`document.querySelector('[role=dialog]').textContent.includes('疲劳')`),
+  );
+  assert(
+    js(`document.querySelector('[role=dialog]').textContent.includes('裂纹银镜')`),
+  );
+  assert(
+    js(`document.querySelector('[role=dialog]').textContent.includes('由裁缝店老板持有')`),
+  );
+  assert(
+    js(`document.querySelector('[role=dialog]').scrollWidth<=document.querySelector('[role=dialog]').clientWidth`),
+  );
+  click('button[aria-label="关闭"]');
+  click('button:has-text("返回首页")');
+  click('.story-card:has-text("暮灯镇的失踪信使") button');
+  await wait(
+    `document.querySelector('.story-detail h1')?.textContent==='暮灯镇的失踪信使'`,
+  );
+  click('button:has-text("继续最近进度")');
+  await wait(
+    `document.querySelector('.reading-heading h1')?.textContent==='雨夜的第一晚'`,
   );
   click('button:has-text("更多")');
   click('.menu-panel button:has-text("故事设置")');
@@ -248,7 +284,7 @@ try {
   assert(js(`!!document.querySelector('[role=dialog]')`));
   await wait(`!!document.querySelector('.modal .inline-error')`);
   assert.equal(js(`document.querySelector('.modal input').value`), "验收分支");
-  click('.modal button:has-text("创建独立存档")');
+  click('.modal button:has-text("继续确认另存")');
   await wait(
     `document.querySelector('.modal .success-note')?.textContent.includes('验收分支')`,
   );
@@ -280,7 +316,7 @@ try {
   await control({ ready: false });
   call("reload");
   await wait(`!!document.querySelector('.story-card')`);
-  click(".story-card button");
+  click('.story-card:has-text("暮灯镇的失踪信使") button');
   click('button:has-text("开始新的故事")');
   assert(js(`document.querySelector('.modal input').value.length>10`));
   fill('.modal label:has-text("主角名字") input', "测试旅人");
@@ -311,7 +347,7 @@ try {
     js(`document.querySelectorAll('.modal input')[1].value`),
     "测试旅人",
   );
-  click('.modal button:has-text("开始游玩")');
+  click('.modal button:has-text("继续确认开局")');
   await wait(
     `!!document.querySelector('.transcript') && !document.querySelector('[role=dialog]')`,
   );

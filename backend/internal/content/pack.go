@@ -13,6 +13,7 @@ import (
 const (
 	SchemaV1 = 1
 	SchemaV2 = 2
+	SchemaV3 = 3
 )
 
 // UnmarshalJSON accepts both the v1 display string and the v2 object, so one type

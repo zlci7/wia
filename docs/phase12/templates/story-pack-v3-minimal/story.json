@@ -1,0 +1,53 @@
+{
+  "schema_version": 3,
+  "requires": {
+    "spatial": 1
+  },
+  "game_id": "spatial-example",
+  "revision": "spatial-example.v1",
+  "mode": "open",
+  "title": "空间剧本最小示例",
+  "description": "可直接通过 v3 加载校验的最小空间剧本包。",
+  "gameplay": "在两个相连地点之间行动，并与固定人物交谈。",
+  "background": "一座只包含广场和书店的小镇。",
+  "rules": "人物只感知自己在场或通过明确来源获知的事情。",
+  "author_facts": "书店老板知道广场时钟每天会慢五分钟。",
+  "player": {
+    "name": "访客",
+    "profile": "第一次来到小镇的访客。",
+    "requirements": "姓名和个人经历可以自定义。",
+    "editable": true
+  },
+  "opening": "你站在镇中心广场，书店的门就在街对面。",
+  "initial_location": "square",
+  "clock": "第 1 日 09:00",
+  "locations": [
+    {
+      "id": "town",
+      "kind": "region",
+      "name": "小镇",
+      "description": "广场与相邻街道构成的小镇中心。",
+      "connections": []
+    },
+    {
+      "id": "square",
+      "kind": "place",
+      "parent": "town",
+      "name": "中心广场",
+      "description": "石板广场中央立着一座老时钟。",
+      "connections": ["bookshop"],
+      "public": true
+    },
+    {
+      "id": "bookshop",
+      "kind": "place",
+      "parent": "town",
+      "name": "旧书店",
+      "description": "窄小店面里堆着按主题分类的旧书。",
+      "connections": ["square"],
+      "public": true
+    }
+  ],
+  "npcs": ["npcs/bookseller.json"],
+  "bystanders": []
+}

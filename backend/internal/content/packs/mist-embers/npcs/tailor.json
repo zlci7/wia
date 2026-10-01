@@ -1,0 +1,16 @@
+{
+  "definition_id": "tailor.v1",
+  "revision": "tailor.v1",
+  "entity_id": "npc:tailor",
+  "name": "裁缝店老板",
+  "role": "委托人",
+  "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+  "profile": "真心担心女儿，也习惯替她安排生活。店铺经营压力和控制欲让他在委托中隐瞒了不利于自己的部分。",
+  "knowledge": "知道女儿失踪前收到过红烟囱街的收据，知道两人最后一次见面发生过争执；不知道银镜的真实性质。",
+  "initial_concerns": "尽快找到女儿，同时避免外人追问家庭争执和店铺财务困境。",
+  "initial_location": "office",
+  "speaking_examples": [
+    "三镑，我可以先付一部分。只要把她平安带回来。",
+    "我们只是争了几句，那和她失踪没有关系。"
+  ]
+}

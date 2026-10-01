@@ -86,6 +86,31 @@ func TestBrowserFixture(t *testing.T) {
 		}
 		db.Close()
 	}
+	mechanicsPack, ok := app.Pack("mist-embers")
+	if !ok {
+		t.Fatal("mist-embers fixture pack is unavailable")
+	}
+	mechanicsWorld, err := app.CreateStoryWorld(context.Background(), wiaapp.CreateWorldRequest{
+		GameID:           "mist-embers",
+		ExpectedRevision: mechanicsPack.Definition.Revision,
+		RequestKey:       "browser-mechanics-world",
+		Name:             "雾都机制验收",
+		PlayerName:       "调查员",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mechanicsDB, err := sql.Open("sqlite", filepath.Join(root, "story-app", "worlds", wiaapp.LocalUserID, "mist-embers", mechanicsWorld.WorldID, "world.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = mechanicsDB.Exec(`UPDATE item_instances SET holder_id='npc:tailor',location_id='' WHERE instance_id='mirror-3-917'`); err != nil {
+		mechanicsDB.Close()
+		t.Fatal(err)
+	}
+	if err = mechanicsDB.Close(); err != nil {
+		t.Fatal(err)
+	}
 	assets := os.DirFS(filepath.Clean("../../internal/webdist/dist"))
 	server, err := New(Options{Addr: "127.0.0.1:0", App: app, Assets: assets, Version: "browser-fixture"})
 	if err != nil {
@@ -182,7 +207,7 @@ func TestBrowserFixture(t *testing.T) {
 				}
 				for i := 1; i <= request.Append; i++ {
 					seq := head + i
-					_, err = tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative',?,'',?)`, seq, fmt.Sprintf("append-%d", seq), fmt.Sprintf("新到的故事 %d：河面上传来船笛声。", seq), time.Now().UTC().Format(time.RFC3339Nano))
+					_, err = tx.Exec(`INSERT INTO messages(seq,message_id,kind,content,run_id,created_at) VALUES(?,?,'narrative',?,?,?)`, seq, fmt.Sprintf("append-%d", seq), fmt.Sprintf("新到的故事 %d：河面上传来船笛声。", seq), fmt.Sprintf("fixture-append-%d", seq), time.Now().UTC().Format(time.RFC3339Nano))
 					if err != nil {
 						writeError(w, 500, "fixture", err.Error())
 						return

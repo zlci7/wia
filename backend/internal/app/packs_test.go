@@ -119,7 +119,7 @@ func TestPackDigestAndIsolation(t *testing.T) {
 	}
 	app := newTestApp(t, &packGenerator{})
 	ctx := context.Background()
-	if len(app.Games()) != 2 {
+	if len(app.Games()) != 3 {
 		t.Fatal(app.PackIssues())
 	}
 	if _, e = app.CreateStoryWorld(ctx, CreateWorldRequest{GameID: "orbital-repair", ExpectedRevision: "wrong", RequestKey: "wrong"}); !errors.Is(e, ErrVersionConflict) {
@@ -186,7 +186,7 @@ func TestPackSnapshotSurvivesReplacementAndRemoval(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if len(app.Games()) != 1 || len(app.PackIssues()) != 1 {
+	if len(app.Games()) != 2 || len(app.PackIssues()) != 1 {
 		t.Fatal("bad revision not isolated")
 	}
 	app.Close()

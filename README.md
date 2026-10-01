@@ -2,9 +2,9 @@
 
 World Is Agent 是一个本机运行的 AI 叙事游戏。玩家在浏览器中选择本地剧本，与有独立经历的重要人物和场景路人互动；每个世界单独保存正文、事件、人物感知与记忆。
 
-The current local build includes Phase12 M1 and M2: reliable story saves, conditional world progression, scoped long-term memory, retrieval and recoverable corrections. The browser workspace connects directly to the local Runtime; no game adapter is required. This is an internal-playtest build, not a stable release.
+The current local build includes Phase12 M1 and M2 plus Story Pack v3 Stages A, B, and C: reliable story saves, scoped long-term memory, recoverable corrections, authoritative spatial worlds, author-defined character state, directed relationships, uniquely owned items, program-settled risk, and fact-gated world progression. The browser workspace connects directly to the local Runtime; no game adapter is required. This is an internal-playtest build, not a stable release.
 
-Repository story packs include a guided investigation with conditional endings and an open station with independent event lines and bounded, persistent AI-generated incidents. Existing saves keep their pinned definitions. Use the [M2 story-pack reference](docs/phase12/stages/M2-世界剧情与长期记忆.md#10-本地剧本包参考) to select the current repository examples without replacing an existing catalog.
+Repository story packs include a guided investigation, an open station with independent event lines, and the v3 spatial sample 《雾都余烬》. V3 worlds freeze their capability manifest and derive the current location, nearby destinations, important characters, and stable bystanders from persisted positions. Existing saves keep their pinned definitions. Use the [M2 story-pack reference](docs/phase12/stages/M2-世界剧情与长期记忆.md#10-本地剧本包参考) for v1/v2 and the [v3 minimal template](docs/phase12/templates/story-pack-v3-minimal/story.json) for the spatial author contract.
 
 ## 开始使用
 
@@ -35,7 +35,9 @@ go build -o wia-runtime.exe ./backend/cmd/wia
 
 ## 可体验内容
 
-- Local JSON packs: guided 《暮灯镇的失踪信使》 and open 《远星维修站》. The author owns each story's mode. See [pack authoring](docs/phase12/stages/M2-世界剧情与长期记忆.md#10-本地剧本包参考).
+- Local JSON packs: guided 《暮灯镇的失踪信使》, open 《远星维修站》, and v3 sample 《雾都余烬》. Authors define each story's mode, supported runtime capabilities, state vocabulary, directed relationship types, and item instances.
+- V3 state values, relationship changes, and item transfers are validated against successful action results, applied to one turn working state, and committed atomically with their provenance. The play sidebar shows only server-authorized state and item projections.
+- V3 action rules use a durable stable-input preparation record for program-owned percentile results. Story-authored effects and plot gates can read current location, state, relationship, item, and committed rule facts; off-scene NPC movement still follows personal decisions and authoritative routes.
 - 两名重要 NPC：客栈老板沈岚、佣兵铁杉；开场保留十名场景路人。
 - NPC 并行决策、公开回应后的下一阶段反应、按人物分开的感知和记忆。
 - 私下交谈的旁观隔离：授权人物看到原文，其他人物只看到交谈迹象。
@@ -56,7 +58,7 @@ Full Go regression, relevant race/vet checks, frontend mechanism tests, type che
 
 已用临时世界完成桌面、平板和手机视口的浏览器交互验证；模型采用测试替身。实体手机软键盘与最终游玩体验仍待验证。
 
-M3 已交付行动建议、主角资料与面向开发者的内容工作台；**面向普通玩家的剧本创作、跨剧本主角模板库与游玩中提升路人已按范围变更移出**，写作、导入与导出保留为开发者工具。地点层级、人物当前位置与由位置推导同场尚未实现。M4 覆盖桌面打包、服务器账户与跨设备。仓库形态、Turn 主流程、owner 拆分与旧 Game Runtime 删除已完成，当前架构见 [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)。
+M3 已交付行动建议、主角资料与面向开发者的内容工作台；**面向普通玩家的剧本创作、跨剧本主角模板库与游玩中提升路人已按范围变更移出**，写作、导入与导出保留为开发者工具。Story Pack v3 阶段 A 已交付地点层级、权威位置、结构化移动与同场派生；阶段 B 已交付由剧本定义的人物状态、有向关系、物品唯一归属、授权转移、权限投影和持久化；阶段 C 已交付可选程序风险判定、结构化条件事件和有限场外推进。当前状态、物品与判定按[可选能力模块](docs/phase12/stages/模型主导的可选能力模块.md)接入；普通行动及状态变化由模型判断，程序负责一致保存，状态栏独立展示公开投影。真实模型连续游玩和默认内容切换仍待单独验收与授权。M4 覆盖桌面打包、服务器账户与跨设备。仓库形态、Turn 主流程、owner 拆分与旧 Game Runtime 删除已完成，当前架构见 [WIA 1.0 架构收敛方案](docs/ARCHITECTURE.md)。
 
 ## 相关文档
 

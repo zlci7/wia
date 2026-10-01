@@ -23,13 +23,28 @@ type Definition struct {
 // Node is one potential development, eligible once its dependencies are met and its
 // time has come.
 type Node struct {
-	ID          string   `json:"id"`
-	After       []string `json:"after"`
-	AtMinute    int      `json:"at_minute"`
-	Condition   string   `json:"condition"`
-	Development string   `json:"development"`
-	Audience    []string `json:"audience"`
-	Terminal    bool     `json:"terminal"`
+	ID           string          `json:"id"`
+	After        []string        `json:"after"`
+	AtMinute     int             `json:"at_minute"`
+	Condition    string          `json:"condition"`
+	Development  string          `json:"development"`
+	Audience     []string        `json:"audience"`
+	Terminal     bool            `json:"terminal"`
+	Requirements []FactCondition `json:"requirements,omitempty"`
+	OnUnmet      string          `json:"on_unmet,omitempty"`
+}
+
+// FactCondition is the shared, data-only vocabulary used by authored action rules
+// and plot gates. The turn projects its current working state into these facts.
+// EntityID may be "actor" only inside an ActionRule; plot nodes use concrete IDs.
+type FactCondition struct {
+	Kind       string `json:"kind"`
+	EntityID   string `json:"entity_id,omitempty"`
+	TargetID   string `json:"target_id,omitempty"`
+	FactID     string `json:"fact_id,omitempty"`
+	LocationID string `json:"location_id,omitempty"`
+	Value      int    `json:"value,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 // NodeState is what happened to one node: whether it occurred, was deferred, or was

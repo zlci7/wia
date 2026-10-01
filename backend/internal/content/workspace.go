@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -54,44 +55,52 @@ type ContentDraft struct {
 // ContentDraftNPC is one editable important character. Publication writes it back
 // into the package's npcs/<definition_id>.json file.
 type ContentDraftNPC struct {
-	DefinitionID     string   `json:"definition_id"`
-	Revision         string   `json:"revision"`
-	EntityID         string   `json:"entity_id"`
-	Name             string   `json:"name"`
-	Role             string   `json:"role"`
-	Appearance       string   `json:"appearance,omitempty"`
-	Profile          string   `json:"profile"`
-	Knowledge        string   `json:"knowledge,omitempty"`
-	InitialConcerns  string   `json:"initial_concerns,omitempty"`
-	InitialLocation  string   `json:"initial_location"`
-	Avatar           string   `json:"avatar,omitempty"`
-	SpeakingExamples []string `json:"speaking_examples,omitempty"`
+	DefinitionID     string                     `json:"definition_id"`
+	Revision         string                     `json:"revision"`
+	EntityID         string                     `json:"entity_id"`
+	Name             string                     `json:"name"`
+	Role             string                     `json:"role"`
+	Appearance       string                     `json:"appearance,omitempty"`
+	Profile          string                     `json:"profile"`
+	Knowledge        string                     `json:"knowledge,omitempty"`
+	InitialConcerns  string                     `json:"initial_concerns,omitempty"`
+	InitialLocation  string                     `json:"initial_location"`
+	Avatar           string                     `json:"avatar,omitempty"`
+	SpeakingExamples []string                   `json:"speaking_examples,omitempty"`
+	InitialState     map[string]json.RawMessage `json:"initial_state,omitempty"`
 }
 
 // ContentDraftPayload is the editable draft shape. Every field is optional so the
 // editor can save partial work; publish validates the strict package schema.
 type ContentDraftPayload struct {
-	SchemaVersion   int                         `json:"schema_version"`
-	GameID          string                      `json:"game_id"`
-	Mode            string                      `json:"mode"`
-	Title           string                      `json:"title"`
-	Description     string                      `json:"description"`
-	Gameplay        string                      `json:"gameplay"`
-	Background      string                      `json:"background"`
-	Rules           string                      `json:"rules"`
-	AuthorFacts     string                      `json:"author_facts"`
-	Cover           string                      `json:"cover,omitempty"`
-	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults              `json:"player"`
-	Opening         string                      `json:"opening"`
-	InitialLocation string                      `json:"initial_location"`
-	Clock           string                      `json:"clock"`
-	Locations       []PackLocation              `json:"locations"`
-	NPCs            []ContentDraftNPC           `json:"npcs"`
-	Bystanders      []PackBystander             `json:"bystanders"`
-	Plot            *plot.Definition            `json:"plot,omitempty"`
-	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
-	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
+	SchemaVersion       int                         `json:"schema_version"`
+	Requires            map[string]int              `json:"requires,omitempty"`
+	GameID              string                      `json:"game_id"`
+	Mode                string                      `json:"mode"`
+	Title               string                      `json:"title"`
+	Description         string                      `json:"description"`
+	Gameplay            string                      `json:"gameplay"`
+	Background          string                      `json:"background"`
+	Rules               string                      `json:"rules"`
+	AuthorFacts         string                      `json:"author_facts"`
+	Cover               string                      `json:"cover,omitempty"`
+	CoverAlt            string                      `json:"cover_alt,omitempty"`
+	Player              PlayerDefaults              `json:"player"`
+	Opening             string                      `json:"opening"`
+	InitialLocation     string                      `json:"initial_location"`
+	Clock               string                      `json:"clock"`
+	Locations           []PackLocation              `json:"locations"`
+	NPCs                []ContentDraftNPC           `json:"npcs"`
+	Bystanders          []PackBystander             `json:"bystanders"`
+	Plot                *plot.Definition            `json:"plot,omitempty"`
+	EventGeneration     *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
+	Defaults            *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
+	StateDefinitions    []PackStateDefinition       `json:"state_definitions,omitempty"`
+	RelationDefinitions []PackRelationDefinition    `json:"relation_definitions,omitempty"`
+	InitialRelations    []PackInitialRelation       `json:"initial_relations,omitempty"`
+	ItemDefinitions     []PackItemDefinition        `json:"item_definitions,omitempty"`
+	ItemInstances       []PackItemInstance          `json:"item_instances,omitempty"`
+	ActionRules         []story.ActionRule          `json:"action_rules,omitempty"`
 }
 
 const payloadTooLarge = "payload is too large"
@@ -151,10 +160,12 @@ func (a *Service) PreviewContentDraft(ctx context.Context, draftID string, autho
 		return ContentDraftPreview{}, err
 	}
 	payload := draft.Payload
+	publicPlayer := payload.Player
+	publicPlayer.InitialState = nil
 	preview := ContentDraftPreview{
 		View: "player", DraftID: draft.DraftID, Version: draft.Version, Title: payload.Title, Mode: payload.Mode,
 		Description: payload.Description, Gameplay: payload.Gameplay, Background: payload.Background,
-		Opening: payload.Opening, Clock: payload.Clock, InitialLocation: payload.InitialLocation, Player: payload.Player,
+		Opening: payload.Opening, Clock: payload.Clock, InitialLocation: payload.InitialLocation, Player: publicPlayer,
 		Locations: payload.Locations, Bystanders: payload.Bystanders, Characters: []ContentPreviewNPC{},
 	}
 	for _, npc := range payload.NPCs {
@@ -167,6 +178,7 @@ func (a *Service) PreviewContentDraft(ctx context.Context, draftID string, autho
 		return preview, nil
 	}
 	preview.View = "author"
+	preview.Player = payload.Player
 	preview.SpoilerWarning = "作者视图包含剧透与人物私密设定，仅用于创作检查。"
 	preview.AuthorRules = payload.Rules
 	preview.AuthorFacts = payload.AuthorFacts
@@ -647,13 +659,16 @@ func (a *Service) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (Co
 	// drop a field the runtime does not use.
 	story := pack.Story
 	payload := ContentDraftPayload{
-		SchemaVersion: SchemaV2, GameID: gameID, Mode: story.Mode, Title: story.Title,
+		SchemaVersion: story.SchemaVersion, Requires: story.Requires, GameID: gameID, Mode: story.Mode, Title: story.Title,
 		Description: story.Description, Gameplay: story.Gameplay, Background: story.Background,
 		Rules: story.Rules, AuthorFacts: story.AuthorFacts, Player: story.Player, Opening: story.Opening,
 		Cover: story.Cover, CoverAlt: story.CoverAlt, EventGeneration: story.EventGeneration,
 		InitialLocation: story.InitialLocation,
 		Clock:           story.Clock, Locations: story.Locations, Plot: story.Plot, Bystanders: story.Bystanders,
 		NPCs: []ContentDraftNPC{}, Defaults: story.Defaults,
+		StateDefinitions: story.StateDefinitions, RelationDefinitions: story.RelationDefinitions,
+		InitialRelations: story.InitialRelations, ItemDefinitions: story.ItemDefinitions, ItemInstances: story.ItemInstances,
+		ActionRules: story.ActionRules,
 	}
 	// Each character's own file travels with the package under its recorded path, so
 	// the editor gets the real avatar and examples whatever the file is called.
@@ -677,7 +692,7 @@ func (a *Service) draftPayloadFromLoadedPack(pack loadedPack, gameID string) (Co
 			InitialLocation: definition.InitialLocations[character.EntityID],
 		}
 		if file, ok := byDefinition[character.DefinitionID]; ok {
-			npc.Avatar, npc.SpeakingExamples = file.Avatar, file.SpeakingExamples
+			npc.Avatar, npc.SpeakingExamples, npc.InitialState = file.Avatar, file.SpeakingExamples, file.InitialState
 			if file.InitialLocation != "" {
 				npc.InitialLocation = file.InitialLocation
 			}
@@ -752,6 +767,7 @@ func DraftNPCFiles(payload ContentDraftPayload) (map[string]PackNPC, error) {
 			Role: npc.Role, Appearance: npc.Appearance, Profile: npc.Profile, Knowledge: npc.Knowledge,
 			InitialConcerns: npc.InitialConcerns, InitialLocation: npc.InitialLocation,
 			Avatar: npc.Avatar, SpeakingExamples: npc.SpeakingExamples,
+			InitialState: npc.InitialState,
 		}
 	}
 	return files, nil

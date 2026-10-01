@@ -55,12 +55,62 @@ func ValidateDefinition(def Definition) error {
 		if node.Audience == nil {
 			return fmt.Errorf("%w: node %q has no audience list", ErrInvalidDefinition, node.ID)
 		}
+		if node.OnUnmet != "" && node.OnUnmet != "defer" && node.OnUnmet != "skip" {
+			return fmt.Errorf("%w: node %q has invalid on_unmet", ErrInvalidDefinition, node.ID)
+		}
+		for _, condition := range node.Requirements {
+			if err := ValidateFactCondition(condition, false); err != nil {
+				return fmt.Errorf("%w: node %q: %v", ErrInvalidDefinition, node.ID, err)
+			}
+		}
 		for _, dep := range node.After {
 			if !known[dep] {
 				return fmt.Errorf("%w: node %q depends on %q, which is not an earlier node", ErrInvalidDefinition, node.ID, dep)
 			}
 		}
 		known[node.ID] = true
+	}
+	return nil
+}
+
+// ValidateFactCondition validates the closed v1 fact vocabulary without knowing a
+// particular story's entity catalog. Content performs those reference checks.
+func ValidateFactCondition(condition FactCondition, allowActor bool) error {
+	if condition.EntityID == "actor" && !allowActor {
+		return fmt.Errorf("actor placeholder is not allowed here")
+	}
+	switch condition.Kind {
+	case "location_is":
+		if condition.EntityID == "" || condition.LocationID == "" {
+			return fmt.Errorf("location_is requires entity_id and location_id")
+		}
+	case "state_at_least", "state_at_most":
+		if condition.EntityID == "" || condition.FactID == "" {
+			return fmt.Errorf("state condition requires entity_id and fact_id")
+		}
+	case "relation_at_least", "relation_at_most":
+		if condition.EntityID == "" || condition.TargetID == "" || condition.FactID == "" {
+			return fmt.Errorf("relation condition requires entity_id, target_id and fact_id")
+		}
+	case "item_held", "item_at":
+		if condition.FactID == "" {
+			return fmt.Errorf("item condition requires fact_id")
+		}
+		if condition.Kind == "item_held" && condition.EntityID == "" {
+			return fmt.Errorf("item_held requires entity_id")
+		}
+		if condition.Kind == "item_at" && condition.LocationID == "" {
+			return fmt.Errorf("item_at requires location_id")
+		}
+	case "rule_result", "rule_result_absent":
+		if condition.FactID == "" {
+			return fmt.Errorf("rule condition requires fact_id")
+		}
+		if condition.Status != "" && condition.Status != "succeeded" && condition.Status != "failed" {
+			return fmt.Errorf("rule condition status is invalid")
+		}
+	default:
+		return fmt.Errorf("unknown fact condition kind %q", condition.Kind)
 	}
 	return nil
 }

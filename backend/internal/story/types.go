@@ -59,9 +59,33 @@ func LocationIDFor(definition Definition, scene string) string {
 // always been stored under, so they are part of the contract with existing saves.
 type Location struct {
 	ID          string   `json:"id"`
+	Kind        string   `json:"kind,omitempty"`
+	Parent      string   `json:"parent,omitempty"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Connections []string `json:"connections"`
+	Public      bool     `json:"public"`
+}
+
+// LocationByID resolves one frozen location.
+func LocationByID(definition Definition, id string) (Location, bool) {
+	for _, location := range definition.Locations {
+		if location.ID == id {
+			return location, true
+		}
+	}
+	return Location{}, false
+}
+
+// PlaceGraph returns the directed graph of places. Regions never appear as nodes.
+func PlaceGraph(definition Definition) map[string][]string {
+	result := map[string][]string{}
+	for _, location := range definition.Locations {
+		if location.Kind == "place" || location.Kind == "" {
+			result[location.ID] = append([]string(nil), location.Connections...)
+		}
+	}
+	return result
 }
 
 // Bystander is a background person the story may place in the world: stable identity,
@@ -109,6 +133,8 @@ type Player struct {
 // author's material as the engine consumes it, not as the pack stores it. Its
 // locations and bystanders are the normalized shapes, never the pack's own.
 type Definition struct {
+	SchemaVersion    int
+	Capabilities     map[string]int
 	Revision         string
 	Background       string
 	Rules            string
@@ -126,9 +152,16 @@ type Definition struct {
 	Characters      []wiaworld.Character
 	// Bystanders are the display names; BystanderRefs carries the normalized
 	// definitions next to them so identity survives the pack boundary.
-	Bystanders      []string
-	BystanderRefs   []Bystander
-	Secret          string
-	Plot            *plot.Definition
-	EventGeneration *plot.EventGenerationPolicy
+	Bystanders          []string
+	BystanderRefs       []Bystander
+	Secret              string
+	Plot                *plot.Definition
+	EventGeneration     *plot.EventGenerationPolicy
+	StateDefinitions    []StateDefinition                         `json:"state_definitions,omitempty"`
+	InitialStates       map[string]map[string]wiaworld.StateValue `json:"initial_states,omitempty"`
+	RelationDefinitions []RelationDefinition                      `json:"relation_definitions,omitempty"`
+	InitialRelations    []InitialRelation                         `json:"initial_relations,omitempty"`
+	ItemDefinitions     []ItemDefinition                          `json:"item_definitions,omitempty"`
+	InitialItems        []InitialItem                             `json:"initial_items,omitempty"`
+	ActionRules         []ActionRule                              `json:"action_rules,omitempty"`
 }

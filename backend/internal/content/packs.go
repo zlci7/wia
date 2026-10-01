@@ -30,43 +30,99 @@ import (
 var packagedStories embed.FS
 
 type StoryPack struct {
-	SchemaVersion   int                         `json:"schema_version"`
-	GameID          string                      `json:"game_id"`
-	Revision        string                      `json:"revision"`
-	Mode            string                      `json:"mode"`
-	Title           string                      `json:"title"`
-	Description     string                      `json:"description"`
-	Gameplay        string                      `json:"gameplay"`
-	Background      string                      `json:"background"`
-	Rules           string                      `json:"rules"`
-	AuthorFacts     string                      `json:"author_facts"`
-	Cover           string                      `json:"cover,omitempty"`
-	CoverAlt        string                      `json:"cover_alt,omitempty"`
-	Player          PlayerDefaults              `json:"player"`
-	Opening         string                      `json:"opening"`
-	InitialLocation string                      `json:"initial_location"`
-	Clock           string                      `json:"clock"`
-	Locations       []PackLocation              `json:"locations"`
-	NPCs            []string                    `json:"npcs"`
-	Bystanders      []PackBystander             `json:"bystanders"`
-	Plot            *plot.Definition            `json:"plot,omitempty"`
-	EventGeneration *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
-	Defaults        *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
+	SchemaVersion       int                         `json:"schema_version"`
+	Requires            map[string]int              `json:"requires,omitempty"`
+	GameID              string                      `json:"game_id"`
+	Revision            string                      `json:"revision"`
+	Mode                string                      `json:"mode"`
+	Title               string                      `json:"title"`
+	Description         string                      `json:"description"`
+	Gameplay            string                      `json:"gameplay"`
+	Background          string                      `json:"background"`
+	Rules               string                      `json:"rules"`
+	AuthorFacts         string                      `json:"author_facts"`
+	Cover               string                      `json:"cover,omitempty"`
+	CoverAlt            string                      `json:"cover_alt,omitempty"`
+	Player              PlayerDefaults              `json:"player"`
+	Opening             string                      `json:"opening"`
+	InitialLocation     string                      `json:"initial_location"`
+	Clock               string                      `json:"clock"`
+	Locations           []PackLocation              `json:"locations"`
+	NPCs                []string                    `json:"npcs"`
+	Bystanders          []PackBystander             `json:"bystanders"`
+	Plot                *plot.Definition            `json:"plot,omitempty"`
+	EventGeneration     *plot.EventGenerationPolicy `json:"event_generation,omitempty"`
+	Defaults            *wiaworld.NarrativeSettings `json:"defaults,omitempty"`
+	StateDefinitions    []PackStateDefinition       `json:"state_definitions,omitempty"`
+	RelationDefinitions []PackRelationDefinition    `json:"relation_definitions,omitempty"`
+	InitialRelations    []PackInitialRelation       `json:"initial_relations,omitempty"`
+	ItemDefinitions     []PackItemDefinition        `json:"item_definitions,omitempty"`
+	ItemInstances       []PackItemInstance          `json:"item_instances,omitempty"`
+	ActionRules         []story.ActionRule          `json:"action_rules,omitempty"`
 }
 
 type PackNPC struct {
-	DefinitionID     string   `json:"definition_id"`
-	Revision         string   `json:"revision"`
-	EntityID         string   `json:"entity_id"`
-	Name             string   `json:"name"`
-	Role             string   `json:"role"`
-	Appearance       string   `json:"appearance"`
-	Profile          string   `json:"profile"`
-	Knowledge        string   `json:"knowledge"`
-	InitialConcerns  string   `json:"initial_concerns"`
-	InitialLocation  string   `json:"initial_location"`
-	Avatar           string   `json:"avatar,omitempty"`
-	SpeakingExamples []string `json:"speaking_examples,omitempty"`
+	DefinitionID     string                     `json:"definition_id"`
+	Revision         string                     `json:"revision"`
+	EntityID         string                     `json:"entity_id"`
+	Name             string                     `json:"name"`
+	Role             string                     `json:"role"`
+	Appearance       string                     `json:"appearance"`
+	Profile          string                     `json:"profile"`
+	Knowledge        string                     `json:"knowledge"`
+	InitialConcerns  string                     `json:"initial_concerns"`
+	InitialLocation  string                     `json:"initial_location"`
+	Avatar           string                     `json:"avatar,omitempty"`
+	SpeakingExamples []string                   `json:"speaking_examples,omitempty"`
+	InitialState     map[string]json.RawMessage `json:"initial_state,omitempty"`
+}
+
+type PackStateDefinition struct {
+	ID           string                  `json:"id"`
+	Name         string                  `json:"name"`
+	Type         string                  `json:"type"`
+	Minimum      *int                    `json:"minimum,omitempty"`
+	Maximum      *int                    `json:"maximum,omitempty"`
+	EnumValues   []string                `json:"enum_values,omitempty"`
+	Default      json.RawMessage         `json:"default"`
+	Scope        string                  `json:"scope"`
+	Projection   string                  `json:"projection"`
+	Knowledge    string                  `json:"knowledge"`
+	UpdatePolicy story.StateUpdatePolicy `json:"update_policy"`
+	Description  string                  `json:"description,omitempty"`
+	Unit         string                  `json:"unit,omitempty"`
+}
+
+type PackRelationDefinition struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Minimum          int    `json:"minimum"`
+	Maximum          int    `json:"maximum"`
+	Default          int    `json:"default"`
+	MaxChangePerTurn int    `json:"max_change_per_turn"`
+	Projection       string `json:"projection"`
+	Description      string `json:"description,omitempty"`
+}
+
+type PackInitialRelation struct {
+	SubjectID    string `json:"subject_id"`
+	TargetID     string `json:"target_id"`
+	RelationType string `json:"relation_type"`
+	Value        int    `json:"value"`
+}
+
+type PackItemDefinition struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Projection  string `json:"projection"`
+}
+
+type PackItemInstance struct {
+	InstanceID   string `json:"instance_id"`
+	DefinitionID string `json:"definition_id"`
+	HolderID     string `json:"holder_id,omitempty"`
+	LocationID   string `json:"location_id,omitempty"`
 }
 
 // Catalog is the entry the content routes serve for this pack. It is wider than the
@@ -112,10 +168,17 @@ func (p LoadedPack) ReadAsset(relative string, maxSize int64) ([]byte, error) {
 	return packFile(p.Root, relative, maxSize)
 }
 
-func storyLocations(items []PackLocation) []story.Location {
+func storyLocations(items []PackLocation, schemaVersion int) []story.Location {
 	out := make([]story.Location, 0, len(items))
 	for _, item := range items {
-		out = append(out, story.Location{ID: item.ID, Name: item.Name, Description: item.Description, Connections: item.Connections})
+		kind, public := item.Kind, false
+		if schemaVersion == SchemaV3 {
+			public = true
+			if item.Public != nil {
+				public = *item.Public
+			}
+		}
+		out = append(out, story.Location{ID: item.ID, Kind: kind, Parent: item.Parent, Name: item.Name, Description: item.Description, Connections: item.Connections, Public: public})
 	}
 	return out
 }
@@ -154,7 +217,51 @@ func ValidateEventPolicy(p *plot.EventGenerationPolicy, def story.Definition) er
 
 type PackIssue struct {
 	File    string `json:"file"`
+	Field   string `json:"field,omitempty"`
+	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+type packValidationError struct {
+	File     string
+	Field    string
+	Code     string
+	Expected string
+}
+
+func (e *packValidationError) Error() string {
+	location := e.File
+	if e.Field != "" {
+		location += ": " + e.Field
+	}
+	return fmt.Sprintf("%s: %s: expected %s", location, e.Code, e.Expected)
+}
+
+func invalidPack(file, field, code, expected string) error {
+	return &packValidationError{File: file, Field: field, Code: code, Expected: expected}
+}
+
+func invalidPackSchema(file string, err error) error {
+	message, field, code := err.Error(), "", "schema_invalid"
+	switch {
+	case strings.Contains(message, "/requires"):
+		field, code = "requires", "capability_manifest_unsupported"
+	case strings.Contains(message, "/schema_version"):
+		field, code = "schema_version", "schema_version_unsupported"
+	}
+	return invalidPack(file, field, code, message)
+}
+
+func packIssue(directory string, err error) PackIssue {
+	issue := PackIssue{File: directory, Code: "pack_invalid", Message: err.Error()}
+	var validation *packValidationError
+	if errors.As(err, &validation) {
+		issue.File = filepath.ToSlash(filepath.Join(directory, validation.File))
+		issue.Field = validation.Field
+		issue.Code = validation.Code
+		issue.Message = "expected " + validation.Expected
+	}
+	return issue
 }
 
 var packID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$`)
@@ -263,17 +370,38 @@ func loadPack(root string) (loadedPack, error) {
 	result.Root = root
 	data, err := packFile(root, "story.json", 256*1024)
 	if err != nil {
-		return result, fmt.Errorf("story.json: %w", err)
+		return result, invalidPack("story.json", "", "file_unavailable", err.Error())
 	}
 	p := StoryPack{Player: PlayerDefaults{Name: defaultPlayerName, Profile: defaultPlayerProfile, Editable: true}}
 	if err := strictPackJSON(data, &p); err != nil {
-		return result, fmt.Errorf("story.json: %w", err)
+		return result, invalidPackSchema("story.json", err)
 	}
 	bad := func(field string) (loadedPack, error) {
-		return result, fmt.Errorf("story.json: invalid or missing %s", field)
+		code, expected := "field_invalid", "valid value"
+		switch {
+		case field == "schema_version":
+			code, expected = "schema_version_unsupported", "1, 2, or 3"
+		case strings.HasPrefix(field, "requires"):
+			code, expected = "capability_manifest_unsupported", "supported schema v3 capability versions"
+		case strings.Contains(field, "initial_location"), strings.Contains(field, "connections"), strings.Contains(field, "parent"), strings.Contains(field, "audience"):
+			code, expected = "reference_invalid", "existing compatible identifier"
+		}
+		return result, invalidPack("story.json", field, code, expected)
 	}
-	if p.SchemaVersion != SchemaV1 && p.SchemaVersion != SchemaV2 {
+	if p.SchemaVersion != SchemaV1 && p.SchemaVersion != SchemaV2 && p.SchemaVersion != SchemaV3 {
 		return bad("schema_version")
+	}
+	if p.SchemaVersion == SchemaV3 {
+		if p.Requires["spatial"] != 1 {
+			return bad("requires.spatial")
+		}
+		for name, version := range p.Requires {
+			if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules") {
+				return bad("requires." + name)
+			}
+		}
+	} else if len(p.Requires) != 0 {
+		return bad("requires (only schema v3 may declare capabilities)")
 	}
 	if !packID.MatchString(p.GameID) {
 		return bad("game_id")
@@ -303,14 +431,31 @@ func loadPack(root string) (loadedPack, error) {
 		if !packID.MatchString(loc.ID) || loc.Name == "" || locations[loc.ID].ID != "" {
 			return bad("locations.id/name")
 		}
+		if p.SchemaVersion == SchemaV3 && loc.Kind != "place" && loc.Kind != "region" {
+			return bad("locations.kind")
+		}
+		if p.SchemaVersion < SchemaV3 && (loc.Kind != "" || loc.Parent != "" || loc.Public != nil) {
+			return bad("locations v3 fields")
+		}
 		locations[loc.ID] = loc
 	}
-	if locations[p.InitialLocation].ID == "" {
+	if locations[p.InitialLocation].ID == "" || (p.SchemaVersion == SchemaV3 && locations[p.InitialLocation].Kind != "place") {
 		return bad("initial_location")
 	}
 	for _, loc := range p.Locations {
+		if p.SchemaVersion == SchemaV3 {
+			if loc.Kind == "region" && (loc.Parent != "" || len(loc.Connections) != 0) {
+				return bad("locations region")
+			}
+			if loc.Parent != "" {
+				parent, ok := locations[loc.Parent]
+				if !ok || parent.Kind != "region" || loc.Kind != "place" {
+					return bad("locations.parent")
+				}
+			}
+		}
 		for _, id := range loc.Connections {
-			if locations[id].ID == "" {
+			if locations[id].ID == "" || (p.SchemaVersion == SchemaV3 && (loc.Kind != "place" || locations[id].Kind != "place")) {
 				return bad("locations.connections")
 			}
 		}
@@ -321,6 +466,13 @@ func loadPack(root string) (loadedPack, error) {
 	bystanders, err := NormalizePackBystanders(p.Bystanders, p.Revision, locations)
 	if err != nil {
 		return bad("bystanders")
+	}
+	if p.SchemaVersion == SchemaV3 {
+		for _, bystander := range bystanders {
+			if bystander.InitialLocation == "" || locations[bystander.InitialLocation].Kind != "place" {
+				return bad("bystanders.initial_location")
+			}
+		}
 	}
 	bystanderNames := make([]string, 0, len(bystanders))
 	for _, bystander := range bystanders {
@@ -341,7 +493,14 @@ func loadPack(root string) (loadedPack, error) {
 	if err != nil {
 		return bad("defaults")
 	}
-	def := story.Definition{Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: storyLocations(p.Locations), InitialLocations: map[string]string{}, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: storyBystanders(bystanders)}
+	initialLocations := map[string]string{}
+	if p.SchemaVersion == SchemaV3 {
+		initialLocations["player"] = p.InitialLocation
+		for _, bystander := range bystanders {
+			initialLocations[bystander.BystanderID] = bystander.InitialLocation
+		}
+	}
+	def := story.Definition{SchemaVersion: p.SchemaVersion, Capabilities: p.Requires, Revision: p.Revision, Background: p.Background, Rules: p.Rules, Locations: storyLocations(p.Locations, p.SchemaVersion), InitialLocations: initialLocations, Settings: settings, SettingsSource: "application", Opening: p.Opening, Scene: locations[p.InitialLocation].Name, InitialLocation: p.InitialLocation, Clock: p.Clock, Secret: p.AuthorFacts, Plot: p.Plot, Bystanders: bystanderNames, BystanderRefs: storyBystanders(bystanders)}
 	result.CoverRelative = p.Cover
 	if p.Defaults != nil {
 		def.SettingsSource = "pack:" + p.Revision
@@ -355,6 +514,7 @@ func loadPack(root string) (loadedPack, error) {
 		Player: story.Player{Name: p.Player.Name, Profile: p.Player.Profile, Editable: p.Player.Editable},
 	}
 	seen, definitions := map[string]bool{}, map[string]bool{}
+	loadedNPCs := map[string]PackNPC{}
 	npcBodies := make([]json.RawMessage, 0, len(p.NPCs))
 	for _, file := range p.NPCs {
 		if !strings.HasPrefix(file, "npcs/") || !strings.HasSuffix(file, ".json") {
@@ -362,24 +522,49 @@ func loadPack(root string) (loadedPack, error) {
 		}
 		body, err := packFile(root, file, 64*1024)
 		if err != nil {
-			return result, fmt.Errorf("%s: %w", file, err)
+			return result, invalidPack(file, "", "file_unavailable", err.Error())
 		}
 		var npc PackNPC
 		if err := strictPackJSON(body, &npc); err != nil {
-			return result, fmt.Errorf("%s: %w", file, err)
+			return result, invalidPackSchema(file, err)
 		}
 		var normalized any
 		_ = json.Unmarshal(body, &normalized)
 		canonicalNPC, _ := json.Marshal(normalized)
 		npcBodies = append(npcBodies, canonicalNPC)
-		if !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.DefinitionID) || !packID.MatchString(npc.Revision) || seen[npc.EntityID] || definitions[npc.DefinitionID] || strings.TrimSpace(npc.Name) == "" || strings.TrimSpace(npc.Role) == "" || strings.TrimSpace(npc.Profile) == "" || locations[npc.InitialLocation].ID == "" {
-			return result, fmt.Errorf("%s: invalid identity, profile or initial_location", file)
+		if !entityID.MatchString(npc.EntityID) || !packID.MatchString(npc.DefinitionID) || !packID.MatchString(npc.Revision) || seen[npc.EntityID] || definitions[npc.DefinitionID] || strings.TrimSpace(npc.Name) == "" || strings.TrimSpace(npc.Role) == "" || strings.TrimSpace(npc.Profile) == "" || locations[npc.InitialLocation].ID == "" || (p.SchemaVersion == SchemaV3 && locations[npc.InitialLocation].Kind != "place") {
+			return result, invalidPack(file, "identity/profile/initial_location", "field_invalid", "unique valid identity, profile, and existing place")
 		}
 		seen[npc.EntityID], definitions[npc.DefinitionID] = true, true
+		loadedNPCs[npc.EntityID] = npc
 		def.InitialLocations[npc.EntityID] = npc.InitialLocation
 		// The character's authored dialogue samples belong to its definition, so anything
 		// reading the loaded package sees them without a second lookup.
 		def.Characters = append(def.Characters, wiaworld.Character{EntityID: npc.EntityID, DefinitionID: npc.DefinitionID, DefinitionRevision: npc.Revision, Name: npc.Name, Role: npc.Role, Appearance: npc.Appearance, Avatar: npc.Avatar, Profile: npc.Profile, Knowledge: npc.Knowledge, InitialConcerns: npc.InitialConcerns, SpeakingExamples: npc.SpeakingExamples, InScene: npc.InitialLocation == p.InitialLocation})
+	}
+	hasStateData := len(p.StateDefinitions) > 0 || len(p.Player.InitialState) > 0
+	hasRulesData := len(p.ActionRules) > 0
+	for _, definition := range p.StateDefinitions {
+		hasRulesData = hasRulesData || definition.UpdatePolicy.Kind == "rule_only"
+	}
+	if p.Plot != nil {
+		for _, node := range p.Plot.Nodes {
+			hasRulesData = hasRulesData || len(node.Requirements) > 0
+		}
+	}
+	for _, npc := range loadedNPCs {
+		hasStateData = hasStateData || len(npc.InitialState) > 0
+	}
+	if (p.Requires["state"] == 1) != hasStateData || (p.Requires["relations"] == 1) != (len(p.RelationDefinitions) > 0) || (p.Requires["items"] == 1) != (len(p.ItemDefinitions) > 0 || len(p.ItemInstances) > 0) || (p.Requires["rules"] == 1) != hasRulesData {
+		return bad("requires capability/data mismatch")
+	}
+	def.StateDefinitions, def.InitialStates, def.RelationDefinitions, def.InitialRelations, def.ItemDefinitions, def.InitialItems, err = compileMechanics(p, loadedNPCs, locations)
+	if err != nil {
+		return bad("state/relations/items: " + err.Error())
+	}
+	def.ActionRules, err = compileActionRules(p, def, seen)
+	if err != nil {
+		return bad("action_rules: " + err.Error())
 	}
 	if p.Plot != nil {
 		if err := plot.ValidateDefinition(*p.Plot); err != nil {
@@ -389,6 +574,11 @@ func loadPack(root string) (loadedPack, error) {
 			for _, id := range node.Audience {
 				if id != "player" && !seen[id] {
 					return bad("plot audience")
+				}
+			}
+			for _, condition := range node.Requirements {
+				if err := validateFactReferences(condition, def, seen, false); err != nil {
+					return bad("plot requirements: " + err.Error())
 				}
 			}
 		}
@@ -408,14 +598,16 @@ func loadPack(root string) (loadedPack, error) {
 		result.CoverType = "image/" + format
 	}
 	if err := ValidateEventPolicy(p.EventGeneration, def); err != nil {
-		return result, err
+		return result, invalidPack("story.json", "event_generation", "field_invalid", err.Error())
 	}
 	def.EventGeneration = p.EventGeneration
 	result.Definition = def
+	catalogPlayer := p.Player
+	catalogPlayer.InitialState = nil
 	result.Catalog = GameSummary{
 		ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision,
 		Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay,
-		Background: p.Background, Player: p.Player, CoverAlt: p.CoverAlt,
+		Background: p.Background, Player: catalogPlayer, CoverAlt: p.CoverAlt,
 	}
 	if p.Cover != "" {
 		result.Catalog.CoverURL = "/api/v1/games/" + p.GameID + "/cover?revision=" + p.Revision
@@ -587,7 +779,7 @@ func (a *Service) loadPacks(ctx context.Context, path string) error {
 	a.packRoot = path
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		a.packErrors = append(a.packErrors, PackIssue{"story-packs", "剧本目录无法读取，已有存档仍可继续。"})
+		a.packErrors = append(a.packErrors, PackIssue{File: "story-packs", Code: "catalog_unavailable", Message: "剧本目录无法读取，已有存档仍可继续。"})
 		return nil
 	}
 	candidates := map[string][]loadedPack{}
@@ -597,14 +789,14 @@ func (a *Service) loadPacks(ctx context.Context, path string) error {
 		}
 		pack, e := loadPack(filepath.Join(path, entry.Name()))
 		if e != nil {
-			a.packErrors = append(a.packErrors, PackIssue{entry.Name(), e.Error()})
+			a.packErrors = append(a.packErrors, packIssue(entry.Name(), e))
 			continue
 		}
 		candidates[pack.Definition.Summary.ID] = append(candidates[pack.Definition.Summary.ID], pack)
 	}
 	for id, versions := range candidates {
 		if len(versions) != 1 {
-			a.packErrors = append(a.packErrors, PackIssue{id, "duplicate game_id"})
+			a.packErrors = append(a.packErrors, PackIssue{File: id, Field: "game_id", Code: "game_id_duplicate", Message: "duplicate game_id"})
 			continue
 		}
 		pack := versions[0]
@@ -623,7 +815,7 @@ func (a *Service) loadPacks(ctx context.Context, path string) error {
 			// making an unchanged story unplayable after an upgrade.
 			if digestVersion != packDigestAssetsExcluded || !pack.matchesLegacyDigest(digest) {
 				a.packsMu.Lock()
-				a.packErrors = append(a.packErrors, PackIssue{id, "revision 内容已变化，请使用新的 revision"})
+				a.packErrors = append(a.packErrors, PackIssue{File: id, Field: "revision", Code: "revision_content_changed", Message: "revision 内容已变化，请使用新的 revision"})
 				a.packsMu.Unlock()
 				continue
 			}

@@ -1,0 +1,16 @@
+{
+  "definition_id": "clockmaker.v1",
+  "revision": "clockmaker.v1",
+  "entity_id": "npc:clockmaker",
+  "name": "亚瑟·格兰特",
+  "role": "钟表匠",
+  "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+  "profile": "谨慎、有责任感，不喜欢无意义的牺牲。他公开经营钟表铺，私下替机械之心留意流入民间的危险物品。",
+  "knowledge": "知道一件编号为3-917的异常银镜可能流入东区，正在核查来源；不会轻易向普通人泄露非凡世界。",
+  "initial_concerns": "确认银镜是否仍在东区、谁接触过它，以及如何在不惊动普通人的情况下控制风险。",
+  "initial_location": "clock-shop",
+  "speaking_examples": [
+    "把你亲眼看到的说清楚，猜测先放在一边。",
+    "有些东西知道得太早并不是好事。先离它远一点。"
+  ]
+}

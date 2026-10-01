@@ -23,6 +23,17 @@ type Snapshot struct {
 	Definition      story.Definition
 	Summary         wiaworld.WorldSummary
 	SceneLocation   string
+	// Positions is the authoritative current place of every spatial entity. It is
+	// empty for worlds that have not entered the spatial capability contract.
+	Positions                  map[string]string
+	PositionSources            map[string]string
+	States                     map[string]map[string]wiaworld.EntityState
+	Relationships              []wiaworld.Relationship
+	AppliedRelationshipSources map[string]bool
+	Items                      map[string]wiaworld.ItemInstance
+	// RuleResults keeps the first committed event for every authored rule/status
+	// pair. Unlike Events, it is not bounded by the recent context window.
+	RuleResults map[string]map[string]string
 	// InputBudgetTokens is how many input tokens this world's requests may use; the long
 	// memory projection reads it so a small model window shrinks the recent window
 	// instead of failing the turn.
@@ -31,6 +42,7 @@ type Snapshot struct {
 	PlayerProfile     string
 	Narrative         wiaworld.NarrativeSettings
 	Bystanders        []string
+	BystanderRefs     []story.Bystander
 	SceneVersion      int64
 	Characters        []wiaworld.Character
 	Messages          []wiaworld.Message
@@ -39,10 +51,13 @@ type Snapshot struct {
 	SceneViews        []SceneView
 	Sources           map[string]SourceMetadata
 	Perceptions       map[string][]wiaworld.Perception
-	Memories          map[string][]wiaworld.Memory
-	Plot              *plot.Definition
-	PlotProgress      plot.Progress
-	LongMemory        map[string]MemoryContext
+	// PerceivedSources records durable authorization for current structured
+	// facts. It is independent from the bounded recent Perceptions prompt window.
+	PerceivedSources map[string]map[string]bool
+	Memories         map[string][]wiaworld.Memory
+	Plot             *plot.Definition
+	PlotProgress     plot.Progress
+	LongMemory       map[string]MemoryContext
 }
 
 // SceneView is one character's picture of where they are: what they last understood

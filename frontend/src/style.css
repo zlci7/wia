@@ -109,8 +109,9 @@ h2 {
 }
 .play-shell {
   height: var(--viewport-height);
-  display: flex;
-  flex-direction: column;
+  max-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
 }
 .app-header {
@@ -628,6 +629,27 @@ h2 {
     24px/1.5 Georgia,
     serif;
 }
+
+.location-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.location-list li {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.location-description {
+  color: var(--muted);
+  font-size: 1rem;
+}
 .character-row {
   display: flex;
   width: 100%;
@@ -873,6 +895,10 @@ summary {
 }
 
 @media (max-height: 600px) {
+  .transcript {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
   .composer {
     padding-top: 6px;
     padding-bottom: max(6px, env(safe-area-inset-bottom));
@@ -903,3 +929,33 @@ summary {
 .story-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cover-placeholder { display: grid; place-items: center; width: 100%; height: 100%; font-size: 4rem; color: #786857; background: #ece3d4; }
 .pack-issues { margin-bottom: 1rem; padding: 1rem; border: 1px solid #d8cbbb; border-radius: 8px; overflow-wrap: anywhere; }
+.status-list,
+.item-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.status-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.status-list dt,
+.status-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.status-list dd {
+  max-width: 50%;
+  font-weight: 700;
+  text-align: right;
+}
+.item-list li { display: grid; gap: 0.15rem; padding: 0.55rem 0; }
+.item-list strong,
+.item-list span,
+.item-list small { min-width: 0; overflow-wrap: anywhere; }
+.item-list span,
+.item-list small { color: var(--muted); }

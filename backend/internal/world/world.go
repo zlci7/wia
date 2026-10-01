@@ -34,10 +34,20 @@ type WorldSummary struct {
 	Scene        string `json:"scene"`
 	// SceneLocation is the current location's identifier. Presence is decided by
 	// identity, not by comparing human-readable scene text.
-	SceneLocation string    `json:"scene_location,omitempty"`
-	Status        string    `json:"status"`
-	StoryEnded    bool      `json:"story_ended"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	SceneLocation     string         `json:"scene_location,omitempty"`
+	Location          *LocationView  `json:"location,omitempty"`
+	AdjacentLocations []LocationView `json:"adjacent_locations,omitempty"`
+	Status            string         `json:"status"`
+	StoryEnded        bool           `json:"story_ended"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+}
+
+// LocationView is the player-visible projection of a place. It contains only places
+// the frozen story definition allows the player to discover from the current place.
+type LocationView struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 }
 
 // Character is one important person in a world, with the definition material a
@@ -124,25 +134,26 @@ type Memory struct {
 
 // Run is one attempt to advance a world by a single player input.
 type Run struct {
-	RunID            string    `json:"run_id"`
-	RequestKey       string    `json:"request_key"`
-	RequestHash      string    `json:"request_hash"`
-	Input            string    `json:"input"`
-	AddresseeID      string    `json:"addressee_id,omitempty"`
-	Attempt          int       `json:"attempt"`
-	Status           string    `json:"status"`
-	Reason           string    `json:"reason,omitempty"`
-	Error            string    `json:"error,omitempty"`
-	MessageSeq       int64     `json:"message_seq,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	InputID          string    `json:"-"`
-	InputSeq         int64     `json:"-"`
-	BaseTurnSeq      int64     `json:"-"`
-	BaseMessageHead  int64     `json:"-"`
-	BaseEventHead    int64     `json:"-"`
-	BaseContextEpoch int64     `json:"-"`
-	BaseSceneVersion int64     `json:"-"`
+	RunID                string    `json:"run_id"`
+	RequestKey           string    `json:"request_key"`
+	RequestHash          string    `json:"request_hash"`
+	Input                string    `json:"input"`
+	AddresseeID          string    `json:"addressee_id,omitempty"`
+	Attempt              int       `json:"attempt"`
+	Status               string    `json:"status"`
+	Reason               string    `json:"reason,omitempty"`
+	Error                string    `json:"error,omitempty"`
+	MessageSeq           int64     `json:"message_seq,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+	InputID              string    `json:"-"`
+	InputSeq             int64     `json:"-"`
+	BaseTurnSeq          int64     `json:"-"`
+	BaseMessageHead      int64     `json:"-"`
+	BaseEventHead        int64     `json:"-"`
+	BaseContextEpoch     int64     `json:"-"`
+	BaseSceneVersion     int64     `json:"-"`
+	PreparedActionRuleID string    `json:"-"`
 }
 
 // PublicCharacterViews projects characters for the player. Private role material

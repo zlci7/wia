@@ -46,7 +46,7 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion    = "story.intent.v7"
-	npcPromptVersion       = "story.npc.v13"
+	npcPromptVersion       = "story.npc.v14"
 	narrationPromptVersion = "story.narration.v11"
 )
 
@@ -144,6 +144,22 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 		}
 		if intent.Visibility == "private" && intent.AddresseeID == "" {
 			return &GenerationError{Code: "json_field_value", Field: "visibility", Expected: "public-when-addressee-is-empty", Cause: ErrGenerationFailed}
+		}
+		intent.ActionRuleID = wire.Clean(intent.ActionRuleID)
+		if run.PreparedActionRuleID != "" {
+			intent.ActionRuleID = run.PreparedActionRuleID
+			if intent.IntentType != "act" && intent.IntentType != "observe" {
+				intent.IntentType = "act"
+			}
+		}
+		if intent.ActionRuleID != "" {
+			rule, ok := actionRuleByID(snapshot.Definition, intent.ActionRuleID)
+			if !ok || (intent.IntentType != "act" && intent.IntentType != "observe") {
+				return &GenerationError{Code: "json_field_value", Field: "action_rule_id", Expected: "applicable-listed-action-rule-or-empty", Cause: ErrGenerationFailed}
+			}
+			if met, _ := evaluateFactConditions(snapshot, Output{Positions: snapshot.Positions, States: snapshot.States, Relationships: snapshot.Relationships, Items: snapshot.Items}, rule.Conditions, "player"); !met {
+				return &GenerationError{Code: "json_field_value", Field: "action_rule_id", Expected: "rule-with-satisfied-program-preconditions", Cause: ErrGenerationFailed}
+			}
 		}
 		return nil
 	}
@@ -266,7 +282,7 @@ func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworl
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
-		output.Events = append(output.Events, wiaworld.Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: "player", Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", CreatedAt: time.Now().UTC()})
+		output.Events = append(output.Events, wiaworld.Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: decision.ActionTargetID, Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", CreatedAt: time.Now().UTC()})
 		sourceEventID = actionEventID
 	}
 	var reply string
@@ -316,7 +332,24 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 			started := time.Now()
 			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
 			defer callCancel()
-			repairCount, err := GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+			required := []string{"speech", "action_intent", "silent", "memory"}
+			if snapshot.Definition.Capabilities["relations"] == 1 {
+				required = append(required, "relationship_proposals")
+			}
+			checkDecision := func() error {
+				decision.ActionTargetID = wire.Clean(decision.ActionTargetID)
+				if decision.ActionTargetID != "" && decision.ActionTargetID != "player" {
+					found := false
+					for _, target := range snapshot.Characters {
+						found = found || target.EntityID == decision.ActionTargetID
+					}
+					if !found {
+						return coordinationInvalid("npc_action_target_invalid", "action_target_id", "defined-important-character-or-player")
+					}
+				}
+				return validateRelationshipProposals(snapshot, character.EntityID, &decision)
+			}
+			repairCount, err := GenerateJSONCheckedMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, required, checkDecision)
 			for recall := 0; err == nil && wire.Clean(decision.RecallQuery) != ""; recall++ {
 				if recall >= 2 || len([]rune(decision.RecallQuery)) > 256 {
 					err = ErrGenerationFailed
@@ -327,7 +360,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 				callGenerator = a.generator(generator, material, snapshot, run, "npc", character.EntityID, stage, npcPromptVersion)
 				decision = NPCDecision{}
 				var repairs int
-				repairs, err = GenerateJSONWithNullableFieldsMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, "speech", "action_intent", "silent", "memory")
+				repairs, err = GenerateJSONCheckedMetrics(callCtx, callGenerator, material.System, material.Required, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, required, checkDecision)
 				repairCount += repairs
 			}
 			if err != nil {
@@ -342,6 +375,12 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 			decision.Speech = wire.Clean(decision.Speech)
 			decision.ActionIntent = normalizeNPCActionIntent(decision.ActionIntent)
 			decision.Memory = wire.Clean(decision.Memory)
+			for index := range decision.RelationshipProposals {
+				proposal := &decision.RelationshipProposals[index]
+				proposal.TargetID = wire.Clean(proposal.TargetID)
+				proposal.RelationType = wire.Clean(proposal.RelationType)
+				proposal.SourceID = wire.Clean(proposal.SourceID)
+			}
 			if decision.Speech == "" {
 				decision.Silent = true
 			}

@@ -42,6 +42,8 @@ import {
   type Run,
   type Status,
   type WorldSummary,
+  type PublicState,
+  type PublicItem,
 } from "./types";
 import { useStoryReader } from "./useStoryReader";
 
@@ -62,7 +64,11 @@ export function useExperience() {
     worlds = ref<WorldSummary[]>([]);
   const currentWorld = ref<WorldSummary | null>(null),
     characters = ref<Character[]>([]);
-  const packIssues = ref<{ file: string; message: string }[]>([]);
+  const states = ref<PublicState[]>([]),
+    items = ref<PublicItem[]>([]);
+  const packIssues = ref<
+    { file: string; field?: string; code: string; message: string }[]
+  >([]);
   const selectedGame = ref<GameSummary>();
   const newGame = ref<GameSummary>();
   const newRevisionConflict = ref(false);
@@ -408,6 +414,8 @@ export function useExperience() {
     generation++;
     currentWorld.value = null;
     characters.value = [];
+    states.value = [];
+    items.value = [];
     view.value = "story";
     void reader.select("");
     notice.value = "该存档已被删除或不可访问，请选择其他进度。";
@@ -439,6 +447,8 @@ export function useExperience() {
       if (view.value === "play" || !gameID.value)
         gameID.value = snapshot.world.game_id;
       characters.value = snapshot.characters.filter((item) => item.in_scene);
+      states.value = snapshot.states ?? [];
+      items.value = snapshot.items ?? [];
       settings.value = snapshot.narrative_settings;
       policyDefaults.value = snapshot.behavior_policy_defaults;
       await reader.select(id);
@@ -1142,9 +1152,13 @@ export function useExperience() {
     }
   }
   function resizeViewport() {
+    const viewportHeight = Math.min(
+      window.visualViewport?.height ?? window.innerHeight,
+      window.innerHeight,
+    );
     document.documentElement.style.setProperty(
       "--viewport-height",
-      `${window.visualViewport?.height ?? window.innerHeight}px`,
+      `${viewportHeight}px`,
     );
     resizeInput();
     if (session.value.bottom) reader.restore();
@@ -1207,6 +1221,8 @@ export function useExperience() {
     worlds,
     currentWorld,
     characters,
+    states,
+    items,
     view,
     game,
     gameID,

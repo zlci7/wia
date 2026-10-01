@@ -59,19 +59,29 @@ func OpenWorldDB(path string) (*WorldStore, error) {
 		db.Close()
 		return nil, err
 	}
-	for _, schema := range []string{worldSchema, memorySchema, correctionSchema} {
-		if _, err := db.Exec(schema); err != nil {
-			db.Close()
-			return nil, err
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	migrationErr := func() error {
+		for _, schema := range []string{worldSchema, memorySchema, correctionSchema} {
+			if _, err := tx.Exec(schema); err != nil {
+				return err
+			}
 		}
-	}
-	if err := ensureWorldSchema(db); err != nil {
+		if err := ensureWorldSchema(tx); err != nil {
+			return err
+		}
+		if err := ensureEventDependencies(tx); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}()
+	if migrationErr != nil {
+		_ = tx.Rollback()
 		db.Close()
-		return nil, err
-	}
-	if err := ensureEventDependencies(db); err != nil {
-		db.Close()
-		return nil, err
+		return nil, migrationErr
 	}
 	return &WorldStore{path: path, db: db}, nil
 }
@@ -143,8 +153,14 @@ func sqliteDSN(path string) string {
 	}.Encode()}).String()
 }
 
+type schemaExecutor interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 // ensureColumn adds a column when an older database does not have it yet.
-func ensureColumn(db *sql.DB, table, column, definition string) error {
+func ensureColumn(db schemaExecutor, table, column, definition string) error {
 	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
 	if err != nil {
 		return err
@@ -176,7 +192,30 @@ func ensureColumn(db *sql.DB, table, column, definition string) error {
 
 // ensureWorldSchema brings a world database written by an earlier release up to the
 // columns and indexes this one expects.
-func ensureWorldSchema(db *sql.DB) error {
+func ensureWorldSchema(db schemaExecutor) error {
+	// Ordered effects retain every step, including multiple changes from one result.
+	// The replacement indexes are created by worldSchema in this same transaction.
+	if _, err := db.Exec(`DROP INDEX IF EXISTS idx_state_change_effect; DROP INDEX IF EXISTS idx_item_transfer_effect;`); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "relationship_changes", "proposal_source_event_id", `TEXT NOT NULL DEFAULT ''`); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "action_resolutions", "status", `TEXT NOT NULL DEFAULT ''`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`UPDATE action_resolutions
+		SET status = COALESCE((SELECT CASE e.source_type
+			WHEN 'rule:' || action_resolutions.rule_id || ':succeeded' THEN 'succeeded'
+			WHEN 'rule:' || action_resolutions.rule_id || ':failed' THEN 'failed'
+			ELSE '' END
+			FROM events e WHERE e.event_id=action_resolutions.settled_event_id), '')
+		WHERE settled_event_id != '' AND status = ''`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_action_resolution_rule_status ON action_resolutions(rule_id,status) WHERE settled_event_id != ''`); err != nil {
+		return err
+	}
 	rows, err := db.Query(`PRAGMA table_info(runs)`)
 	if err != nil {
 		return err
@@ -219,6 +258,9 @@ func ensureWorldSchema(db *sql.DB) error {
 	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_runs_input_seq ON runs(input_seq); CREATE INDEX IF NOT EXISTS idx_runs_input_id ON runs(input_id);`); err != nil {
 		return err
 	}
+	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_relationship_change_proposal ON relationship_changes(proposal_source_event_id,subject_id,target_id,relation_type) WHERE proposal_source_event_id != ''`); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -231,14 +273,46 @@ func ensureWorldSchema(db *sql.DB) error {
 func (s *WorldStore) TestingDB() *sql.DB { return s.db }
 
 // Dependencies describe projections, not permissions to read the parent.
-func ensureEventDependencies(db *sql.DB) error {
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS event_dependencies (
- child_id TEXT PRIMARY KEY REFERENCES events(event_id), parent_id TEXT NOT NULL REFERENCES events(event_id));
+func ensureEventDependencies(tx *sql.Tx) error {
+	if _, err := tx.Exec(`CREATE TABLE IF NOT EXISTS event_dependencies (
+ child_id TEXT NOT NULL REFERENCES events(event_id), parent_id TEXT NOT NULL REFERENCES events(event_id),
+ PRIMARY KEY(child_id,parent_id));
  CREATE INDEX IF NOT EXISTS event_dependencies_parent ON event_dependencies(parent_id);`); err != nil {
 		return err
 	}
+	rows, err := tx.Query(`PRAGMA table_info(event_dependencies)`)
+	if err != nil {
+		return err
+	}
+	primary := map[string]int{}
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, kind string
+		var defaultValue any
+		if err = rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		primary[name] = pk
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if primary["child_id"] == 1 && primary["parent_id"] == 0 {
+		if _, err = tx.Exec(`CREATE TABLE event_dependencies_v2 (
+ child_id TEXT NOT NULL REFERENCES events(event_id), parent_id TEXT NOT NULL REFERENCES events(event_id),
+ PRIMARY KEY(child_id,parent_id));
+ INSERT INTO event_dependencies_v2(child_id,parent_id) SELECT child_id,parent_id FROM event_dependencies;
+ DROP TABLE event_dependencies;
+ ALTER TABLE event_dependencies_v2 RENAME TO event_dependencies;
+ CREATE INDEX event_dependencies_parent ON event_dependencies(parent_id);`); err != nil {
+			return err
+		}
+	}
 	var migrated int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM meta WHERE key='projection_dependencies_v1'`).Scan(&migrated); err != nil {
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM meta WHERE key='projection_dependencies_v1'`).Scan(&migrated); err != nil {
 		return err
 	}
 	if migrated > 0 {
@@ -246,7 +320,7 @@ func ensureEventDependencies(db *sql.DB) error {
 	}
 	// The legacy writer generated numeric projection suffixes in the same run
 	// and stage as a plot_result. Validate that exact contract once on upgrade.
-	rows, err := db.Query(`SELECT p.event_id,r.event_id FROM events p JOIN events r
+	rows, err = tx.Query(`SELECT p.event_id,r.event_id FROM events p JOIN events r
  ON p.run_id=r.run_id AND p.stage=r.stage AND p.scene_version=r.scene_version
  WHERE p.event_type='plot_perceived' AND p.source_type='plot_observed' AND r.event_type='plot_result'
  AND p.event_id LIKE r.event_id || ':projection:%'`)
@@ -271,11 +345,6 @@ func ensureEventDependencies(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	for _, pair := range pairs {
 		if _, err = tx.Exec(`INSERT OR IGNORE INTO event_dependencies(child_id,parent_id) VALUES(?,?)`, pair[0], pair[1]); err != nil {
 			return err
@@ -284,7 +353,7 @@ func ensureEventDependencies(db *sql.DB) error {
 	if err = MetaSetTx(context.Background(), tx, "projection_dependencies_v1", "1"); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 // Database is a temporary escape hatch for the staged migration.

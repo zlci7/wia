@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,57 +60,6 @@ CREATE TABLE IF NOT EXISTS copy_operations (
 CREATE INDEX IF NOT EXISTS idx_worlds_owner_updated ON worlds(user_id, updated_at DESC);
 `
 
-const worldSchema = `
-CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS characters (
-  entity_id TEXT PRIMARY KEY, definition_id TEXT NOT NULL, name TEXT NOT NULL,
-  role TEXT NOT NULL, profile TEXT NOT NULL, knowledge TEXT NOT NULL, in_scene INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS messages (
-  seq INTEGER PRIMARY KEY, message_id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
-  content TEXT NOT NULL, run_id TEXT NOT NULL, created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS events (
-  seq INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, event_type TEXT NOT NULL,
-  actor_id TEXT NOT NULL, target_id TEXT NOT NULL, content TEXT NOT NULL,
-  run_id TEXT NOT NULL, stage INTEGER NOT NULL, scene_version INTEGER NOT NULL,
-  source_type TEXT NOT NULL, created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS perceptions (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT, recipient_id TEXT NOT NULL,
-  source_event_id TEXT NOT NULL, source_type TEXT NOT NULL, content TEXT NOT NULL,
-  stage INTEGER NOT NULL, scene_version INTEGER NOT NULL, created_at TEXT NOT NULL,
-  UNIQUE(recipient_id, source_event_id, content)
-);
-CREATE TABLE IF NOT EXISTS memories (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT, recipient_id TEXT NOT NULL,
-  kind TEXT NOT NULL, content TEXT NOT NULL, source_event_id TEXT NOT NULL,
-  created_at TEXT NOT NULL, UNIQUE(recipient_id, kind, content, source_event_id)
-);
--- Where a character in this world came from, and which of that person's own
--- experiences were carried over when they were promoted.
-CREATE TABLE IF NOT EXISTS character_origins (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT, entity_id TEXT NOT NULL,
-  source_kind TEXT NOT NULL, source_id TEXT NOT NULL, created_at TEXT NOT NULL,
-  UNIQUE(entity_id, source_kind, source_id)
-);
-CREATE TABLE IF NOT EXISTS runs (
-  run_id TEXT PRIMARY KEY, request_key TEXT NOT NULL UNIQUE, request_hash TEXT NOT NULL,
-  input TEXT NOT NULL, addressee_id TEXT NOT NULL, attempt INTEGER NOT NULL,
-  status TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '',
-	  message_seq INTEGER NOT NULL DEFAULT 0, cancel_requested INTEGER NOT NULL DEFAULT 0,
-	  input_id TEXT NOT NULL DEFAULT '', input_seq INTEGER NOT NULL DEFAULT 0,
-	  base_turn_seq INTEGER NOT NULL DEFAULT 0, base_message_head INTEGER NOT NULL DEFAULT 0,
-  base_event_head INTEGER NOT NULL DEFAULT 0, base_context_epoch INTEGER NOT NULL DEFAULT 0,
-  base_scene_version INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_messages_seq ON messages(seq);
-CREATE INDEX IF NOT EXISTS idx_events_seq ON events(seq);
-CREATE INDEX IF NOT EXISTS idx_perceptions_recipient_seq ON perceptions(recipient_id, seq);
-CREATE INDEX IF NOT EXISTS idx_memories_recipient_seq ON memories(recipient_id, seq);
-`
-
 func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, worldID string, def story.Definition, mode, playerName, playerProfile string) error {
 	if mode != "open" && mode != "guided" {
 		return ErrInvalidRequest
@@ -136,6 +86,7 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 	values["narrative_custom_instruction"] = settings.CustomInstruction
 	values["settings_origin"] = def.SettingsSource
 	values["definition_snapshot"] = wire.MarshalJSON(def)
+	values["capability_manifest"] = wire.MarshalJSON(def.Capabilities)
 	// A world is either created whole or not at all: the headers, the characters, the
 	// opening message and the opening event together are what "this world exists" means.
 	return store.InTx(ctx, func(tx *storage.WorldTx) error {
@@ -173,6 +124,55 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 				return err
 			}
 		}
+		if def.Capabilities["spatial"] == 1 {
+			for entityID, locationID := range def.InitialLocations {
+				if err := tx.SetEntityLocation(ctx, storage.PositionWrite{EntityID: entityID, LocationID: locationID, SourceEventID: "opening", UpdatedTurn: 0}); err != nil {
+					return err
+				}
+			}
+		}
+		if def.Capabilities["state"] == 1 {
+			for entityID, values := range def.InitialStates {
+				for stateID, value := range values {
+					if err := tx.SetEntityState(ctx, wiaworld.EntityState{EntityID: entityID, StateID: stateID, Value: value, SourceEvent: "opening", UpdatedTurn: 0, Version: 1}); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		if def.Capabilities["relations"] == 1 {
+			entities := []string{"player"}
+			for _, character := range def.Characters {
+				entities = append(entities, character.EntityID)
+			}
+			overrides := map[string]int{}
+			for _, relation := range def.InitialRelations {
+				overrides[relation.SubjectID+"\x00"+relation.TargetID+"\x00"+relation.RelationType] = relation.Value
+			}
+			for _, definition := range def.RelationDefinitions {
+				for _, subject := range entities {
+					for _, target := range entities {
+						if subject == target {
+							continue
+						}
+						value := definition.Default
+						if override, ok := overrides[subject+"\x00"+target+"\x00"+definition.ID]; ok {
+							value = override
+						}
+						if err := tx.SetRelationship(ctx, wiaworld.Relationship{SubjectID: subject, TargetID: target, RelationType: definition.ID, Value: value, SourceEvent: "opening", UpdatedTurn: 0, Version: 1}); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+		if def.Capabilities["items"] == 1 {
+			for _, item := range def.InitialItems {
+				if err := tx.SetItem(ctx, wiaworld.ItemInstance{InstanceID: item.InstanceID, DefinitionID: item.DefinitionID, HolderID: item.HolderID, LocationID: item.LocationID, SourceEvent: "opening", UpdatedTurn: 0, Version: 1}); err != nil {
+					return err
+				}
+			}
+		}
 		if err := tx.InsertMessage(ctx, 1, "opening", "narrative", def.Opening, "system", now); err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func initializeWorld(ctx context.Context, store *storage.WorldStore, userID, wor
 // A promoted or authored character can carry its own avatar; the world copy is
 // recorded separately under the world's assets.
 
-func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []turn.SceneView, plotState *plot.Progress, generated ...*turn.GeneratedEventState) (int64, error) {
+func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, narrative string, events []wiaworld.Event, perceptions []wiaworld.Perception, memories []wiaworld.Memory, clock, scene, sceneLocation string, sceneVersion int64, sceneCharacters []string, sceneViews []turn.SceneView, positionChanges []turn.PositionChange, stateChanges []turn.StateChange, relationshipChanges []turn.RelationshipChange, itemTransfers []turn.ItemTransfer, actionResolution *turn.ActionResolution, plotState *plot.Progress, generated ...*turn.GeneratedEventState) (int64, error) {
 	var messageHead int64
 	var eventHead int64
 	var turnSeq int64
@@ -238,6 +238,57 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 				}
 			}
 		}
+		for _, change := range positionChanges {
+			if change.SourceEventID != "" && change.PreviousSourceEventID != "" && change.SourceEventID != change.PreviousSourceEventID {
+				if err := tx.InsertEventDependency(ctx, change.SourceEventID, change.PreviousSourceEventID); err != nil {
+					return err
+				}
+			}
+		}
+		for _, change := range stateChanges {
+			if change.Before.SourceEvent != "" && change.SourceEventID != change.Before.SourceEvent {
+				if err := tx.InsertEventDependency(ctx, change.SourceEventID, change.Before.SourceEvent); err != nil {
+					return err
+				}
+			}
+			if err := tx.InsertStateChange(ctx, storage.StateChangeWrite{ChangeID: fmt.Sprintf("%s:state:%s:%s:%d", change.SourceEventID, change.After.EntityID, change.After.StateID, change.Order), Before: change.Before, After: change.After, SourceEventID: change.SourceEventID, TurnSeq: turnSeq + 1, Order: change.Order}); err != nil {
+				return err
+			}
+			if err := tx.SetEntityState(ctx, change.After); err != nil {
+				return err
+			}
+		}
+		for _, change := range relationshipChanges {
+			if change.Before.SourceEvent != "" && change.SourceEventID != change.Before.SourceEvent {
+				if err := tx.InsertEventDependency(ctx, change.SourceEventID, change.Before.SourceEvent); err != nil {
+					return err
+				}
+			}
+			if err := tx.InsertRelationshipChange(ctx, storage.RelationshipChangeWrite{ChangeID: change.SourceEventID + ":relation:" + change.After.SubjectID + ":" + change.After.TargetID + ":" + change.After.RelationType, Before: change.Before, After: change.After, SourceEventID: change.SourceEventID, ProposalSourceEventID: change.ProposalSourceID, TurnSeq: turnSeq + 1, Order: change.Order}); err != nil {
+				return err
+			}
+			if err := tx.SetRelationship(ctx, change.After); err != nil {
+				return err
+			}
+		}
+		for _, change := range itemTransfers {
+			if change.Before.SourceEvent != "" && change.SourceEventID != change.Before.SourceEvent {
+				if err := tx.InsertEventDependency(ctx, change.SourceEventID, change.Before.SourceEvent); err != nil {
+					return err
+				}
+			}
+			if err := tx.InsertItemTransfer(ctx, storage.ItemTransferWrite{TransferID: fmt.Sprintf("%s:item:%s:%d", change.SourceEventID, change.After.InstanceID, change.Order), Before: change.Before, After: change.After, SourceEventID: change.SourceEventID, TurnSeq: turnSeq + 1, Order: change.Order}); err != nil {
+				return err
+			}
+			if err := tx.SetItem(ctx, change.After); err != nil {
+				return err
+			}
+		}
+		if actionResolution != nil {
+			if err := tx.SettleActionResolution(ctx, run.InputID, actionResolution.RuleID, actionResolution.Status, ""+run.RunID+":rule:"+actionResolution.RuleID); err != nil {
+				return err
+			}
+		}
 		for _, p := range perceptions {
 			if err := tx.InsertPerceptionIfAbsent(ctx, storage.PerceptionWrite{
 				RecipientID: p.RecipientID, SourceEventID: p.SourceEventID, SourceType: p.SourceType,
@@ -251,6 +302,11 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 				RecipientID: m.RecipientID, Kind: m.Kind, Content: m.Content,
 				SourceEventID: m.SourceEventID, CreatedAt: m.CreatedAt.Format(time.RFC3339Nano),
 			}); err != nil {
+				return err
+			}
+		}
+		for _, change := range positionChanges {
+			if err := tx.SetEntityLocation(ctx, storage.PositionWrite{EntityID: change.EntityID, LocationID: change.To, SourceEventID: change.SourceEventID, UpdatedTurn: turnSeq + 1}); err != nil {
 				return err
 			}
 		}

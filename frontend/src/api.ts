@@ -12,6 +12,8 @@ import {
   type SaveOperation,
   type Status,
   type WorldSummary,
+  type PublicState,
+  type PublicItem,
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
@@ -183,7 +185,7 @@ export async function fetchStatus(): Promise<Status> {
   return result.status
 }
 
-export async function fetchGames(): Promise<{ games: GameSummary[]; issues: { file: string; message: string }[] }> {
+export async function fetchGames(): Promise<{ games: GameSummary[]; issues: { file: string; field?: string; code: string; message: string }[] }> {
   return request('/api/v1/games')
 }
 
@@ -210,7 +212,7 @@ export async function createWorld(input: { name: string; game_id: string; expect
   return result.world
 }
 
-export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; behavior_policy_defaults: BehaviorPolicyCatalog; messages: Message[]; characters: Character[] }> {
+export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; behavior_policy_defaults: BehaviorPolicyCatalog; messages: Message[]; characters: Character[]; states: PublicState[]; items: PublicItem[] }> {
   return request(`/api/v1/worlds/${encodeURIComponent(worldID)}`)
 }
 

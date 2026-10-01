@@ -1,0 +1,16 @@
+{
+  "definition_id": "reporter.v1",
+  "revision": "reporter.v1",
+  "entity_id": "npc:reporter",
+  "name": "艾琳·维克",
+  "role": "年轻记者",
+  "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+  "profile": "活泼、好奇，有一点冒险主义，对弱者有同情心。她想找到足以上头版的新闻，也会保留自己尚未核实的线索。",
+  "knowledge": "知道近几日有人打听红烟囱街和废弃诊所；不知道亚瑟的隐秘身份，也不知道银镜的真实规则。",
+  "initial_concerns": "核实红烟囱街的传闻，判断失踪案是否值得追踪；避免把没有证据的猜测登上报纸。",
+  "initial_location": "newspaper-office",
+  "speaking_examples": [
+    "先别急着下结论，至少让我把名字和时间记清楚。",
+    "如果这只是家务事，我不会拿它当新闻；如果不是，那就更该查明白。"
+  ]
+}

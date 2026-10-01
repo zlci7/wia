@@ -125,6 +125,26 @@ func TestGeneratedEventOpportunityRejectsInvalidScope(t *testing.T) {
 	}
 }
 
+func TestSpatialArrivalOpportunityMustMatchItsMovement(t *testing.T) {
+	snapshot := Snapshot{
+		Summary: wiaworld.WorldSummary{Clock: "第 1 日 00:00", TurnSeq: 10},
+		Definition: story.Definition{
+			Capabilities:    map[string]int{"spatial": 1},
+			EventGeneration: &plot.EventGenerationPolicy{MaxActive: 1, CooldownTurns: 2, Locations: []string{"workshop", "lobby"}},
+		},
+	}
+	out := Output{
+		Clock: "第 1 日 00:00", Positions: map[string]string{"player": "workshop"},
+		PositionChanges: []PositionChange{{EntityID: "player", ActionID: "move", To: "workshop", SourceEventID: "move:result:1"}},
+		Events:          []wiaworld.Event{{EventID: "move:result:1", EventType: "player_action_result", ActorID: "player", SourceType: "action_succeeded"}},
+	}
+	service := New(coordinationTestHost{}, Deps{})
+	_, err := service.advanceGeneratedEvents(context.Background(), nil, snapshot, wiaworld.Run{RunID: "r"}, &eventOpportunity{Kind: "arrival", Location: "lobby", ActionID: "move"}, &out)
+	if err == nil || !strings.Contains(err.Error(), "event_opportunity_location") {
+		t.Fatalf("arrival opportunity was not bound to its movement: %v", err)
+	}
+}
+
 func TestWaitingRequiresAvailableInterruptionEvidence(t *testing.T) {
 	snapshot := Snapshot{Summary: wiaworld.WorldSummary{Clock: "第 1 日 19:00"}, Plot: &plot.Definition{}, PlotProgress: plot.Progress{Version: 1, Nodes: map[string]plot.NodeState{}}}
 	snapshot.Events = []wiaworld.Event{{EventID: "committed-danger", RunID: "previous", Stage: 4, EventType: "plot_result"}}

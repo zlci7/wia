@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppDialog from "./components/AppDialog.vue";
 import CreatorView from "./components/CreatorView.vue";
+import StatePanel from "./components/StatePanel.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
@@ -17,6 +18,8 @@ const {
   games,
   currentWorld,
   characters,
+  states,
+  items,
   view,
   game,
   loaded,
@@ -89,6 +92,18 @@ const {
   confirmPromotion,
   resizeInput,
 } = useExperience();
+function stateOwner(entityID: string) {
+  if (entityID === "player") return "你";
+  return characters.value.find((item) => item.entity_id === entityID)?.name ?? entityID;
+}
+function locationName(locationID: string) {
+  if (currentWorld.value?.location?.id === locationID) return currentWorld.value.location.name;
+  return currentWorld.value?.adjacent_locations?.find((item) => item.id === locationID)?.name ?? locationID;
+}
+function itemPlacement(item: (typeof items.value)[number]) {
+  if (item.holder_id) return item.holder_id === "player" ? "持有中" : `由${stateOwner(item.holder_id)}持有`;
+  return item.location_id ? `位于${locationName(item.location_id)}` : "";
+}
 const policyOptions = [
   {
     key: "coordination",
@@ -236,8 +251,8 @@ const policyOptions = [
         <summary>
           有 {{ packIssues.length }} 个剧本加载问题；已有存档可继续
         </summary>
-        <p v-for="issue in packIssues" :key="issue.file">
-          {{ issue.file }}：{{ issue.message }}
+        <p v-for="issue in packIssues" :key="`${issue.file}:${issue.field ?? ''}:${issue.code}`">
+          {{ issue.file }}<template v-if="issue.field"> · {{ issue.field }}</template> [{{ issue.code }}]：{{ issue.message }}
         </p>
       </details>
       <p v-if="!storyEntries.length" class="subtle">
@@ -360,7 +375,7 @@ const policyOptions = [
           <div>
             <h1>{{ currentWorld.name }}</h1>
             <span class="subtle"
-              >{{ currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</span
+              >{{ currentWorld.location?.name ?? currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</span
             >
           </div>
           <button
@@ -538,9 +553,32 @@ const policyOptions = [
       <aside class="side-column">
         <section class="side-panel">
           <span class="eyebrow">当前场景</span>
-          <h2>{{ currentWorld.scene }}</h2>
+          <h2>{{ currentWorld.location?.name ?? currentWorld.scene }}</h2>
+          <p v-if="currentWorld.location?.description" class="subtle">
+            {{ currentWorld.location.description }}
+          </p>
           <span class="subtle">游戏内时间</span>
           <p class="clock-value">{{ currentWorld.clock }}</p>
+          <template v-if="currentWorld.adjacent_locations?.length">
+            <span class="subtle">可前往</span>
+            <ul class="location-list">
+              <li v-for="location in currentWorld.adjacent_locations" :key="location.id">
+                <strong>{{ location.name }}</strong>
+                <span v-if="location.description" class="location-description">{{ location.description }}</span>
+              </li>
+            </ul>
+          </template>
+        </section>
+        <section v-if="states.length || items.length" class="side-panel">
+          <h2>人物与物品</h2>
+          <StatePanel :states="states" :characters="characters" />
+          <ul v-if="items.length" class="item-list">
+            <li v-for="item in items" :key="item.instance_id">
+              <strong>{{ item.name }}</strong>
+              <span v-if="item.description">{{ item.description }}</span>
+              <small>{{ itemPlacement(item) }}</small>
+            </li>
+          </ul>
         </section>
         <section class="side-panel">
           <h2>眼前的人</h2>
@@ -982,8 +1020,31 @@ const policyOptions = [
       >
       <template v-else-if="dialog === 'scene'"
         ><span class="eyebrow">当前场景</span>
-        <h3>{{ currentWorld?.scene }}</h3>
+        <h3>{{ currentWorld?.location?.name ?? currentWorld?.scene }}</h3>
+        <p v-if="currentWorld?.location?.description" class="subtle">
+          {{ currentWorld.location.description }}
+        </p>
         <p class="subtle">游戏内时间 · {{ currentWorld?.clock }}</p>
+        <template v-if="currentWorld?.adjacent_locations?.length">
+          <h3>可前往</h3>
+          <ul class="location-list">
+            <li v-for="location in currentWorld.adjacent_locations" :key="location.id">
+              <strong>{{ location.name }}</strong>
+              <span v-if="location.description" class="location-description">{{ location.description }}</span>
+            </li>
+          </ul>
+        </template>
+        <template v-if="states.length || items.length">
+          <h3>人物与物品</h3>
+          <StatePanel :states="states" :characters="characters" />
+          <ul v-if="items.length" class="item-list">
+            <li v-for="item in items" :key="item.instance_id">
+              <strong>{{ item.name }}</strong>
+              <span v-if="item.description">{{ item.description }}</span>
+              <small>{{ itemPlacement(item) }}</small>
+            </li>
+          </ul>
+        </template>
         <h3>眼前的人</h3>
         <button
           v-for="character in characters"

@@ -93,7 +93,9 @@ export function useCreator() {
     merged.player = {
       name: payload?.player?.name ?? fallback.player.name,
       profile: payload?.player?.profile ?? fallback.player.profile,
+      requirements: payload?.player?.requirements,
       editable: payload?.player?.editable ?? fallback.player.editable,
+      initial_state: payload?.player?.initial_state,
     };
     for (const key of Object.keys(form) as (keyof typeof form)[]) {
       if (!(key in merged)) {

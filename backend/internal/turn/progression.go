@@ -85,6 +85,21 @@ func (s *Service) advanceGeneratedEvents(ctx context.Context, generator model.Te
 	if trigger.EventID == "" {
 		return nil, fmt.Errorf("%w: event_opportunity_result", ErrContextSourceMissing)
 	}
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		location := output.Positions[trigger.ActorID]
+		if opportunity.Kind == "arrival" {
+			location = ""
+			for _, change := range output.PositionChanges {
+				if change.ActionID == opportunity.ActionID {
+					location = change.To
+					break
+				}
+			}
+		}
+		if location == "" || location != opportunity.Location {
+			return nil, fmt.Errorf("%w: event_opportunity_location", ErrGenerationFailed)
+		}
+	}
 	state.LastOfferTurn = nextTurn
 	material := Material{
 		System:          BehaviorContract + "\n你是开放世界事件协调器。在作者范围内，依据已确认的新情境选择是否发生一个小型外部事件。沿用现有事件优先；没有合适事件时返回空候选。重要NPC的新决定只由本人作出，玩家不自动接受任务。只返回JSON。",
@@ -199,6 +214,16 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 		return nil, nil
 	}
 	material := composePlot(snapshot, run, node, output)
+	requirementsMet, requirementEvidence := evaluateFactConditions(snapshot, *output, node.Requirements, "")
+	if len(node.Requirements) > 0 {
+		onUnmet := node.OnUnmet
+		if onUnmet == "" || onUnmet == "defer" {
+			onUnmet = "deferred"
+		} else {
+			onUnmet = "skipped"
+		}
+		material.Required += fmt.Sprintf("\n程序条件结论：met=%t，evidence=%s。条件成立时依据作者条件继续判断；条件不成立时 status 必须为 %s，source_ids 必须包含全部 evidence。程序条件结论不可被自然语言覆盖。", requirementsMet, wire.MarshalJSON(requirementEvidence), onUnmet)
+	}
 	call := s.generator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v3")
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -211,6 +236,27 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 			s.deps.Logger.Printf("story plot validation failed: world_id=%q run_id=%q error_code=%q boundary=%q", snapshot.Summary.WorldID, run.RunID, ErrorCode(err), err.Error())
 		}
 		return nil, err
+	}
+	if len(node.Requirements) > 0 && !requirementsMet {
+		expected := node.OnUnmet
+		if expected == "" {
+			expected = "deferred"
+		} else if expected == "defer" {
+			expected = "deferred"
+		} else {
+			expected = "skipped"
+		}
+		if result.Status != expected {
+			return nil, fmt.Errorf("%w: structured_plot_condition", ErrGenerationFailed)
+		}
+		if len(result.Projections) > 0 || len(result.DecisionRequests) > 0 {
+			return nil, fmt.Errorf("%w: unmet_structured_condition_projection", ErrGenerationFailed)
+		}
+		for _, id := range requirementEvidence {
+			if !slices.Contains(result.SourceIDs, id) {
+				return nil, ErrContextSourceMissing
+			}
+		}
 	}
 	state := plot.NodeState{Status: result.Status, Content: result.Content, NextCheck: current + 1, Evidence: result.SourceIDs}
 	if result.Status != "deferred" {
@@ -326,6 +372,10 @@ func validatePlotResolution(snapshot Snapshot, node plot.Node, output Output, re
 		return fmt.Errorf("%w: plot_deferred_effects", ErrGenerationFailed)
 	}
 	known := map[string]bool{"definition:" + snapshot.Plot.Revision + ":" + node.ID: true}
+	_, factEvidence := evaluateFactConditions(snapshot, output, node.Requirements, "")
+	for _, id := range factEvidence {
+		known[id] = true
+	}
 	for _, e := range append(append([]wiaworld.Event{}, snapshot.Events...), output.Events...) {
 		known[e.EventID] = true
 	}
@@ -371,6 +421,18 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	base := snapshot
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
+	base.Positions = clonePositions(output.Positions)
+	base.States = cloneStates(output.States)
+	base.Relationships = slices.Clone(output.Relationships)
+	base.Items = cloneItems(output.Items)
+	base.AppliedRelationshipSources = map[string]bool{}
+	for key, applied := range snapshot.AppliedRelationshipSources {
+		base.AppliedRelationshipSources[key] = applied
+	}
+	for _, change := range output.RelationshipChanges {
+		key := change.ProposalSourceID + "\x00" + change.After.SubjectID + "\x00" + change.After.TargetID + "\x00" + change.After.RelationType
+		base.AppliedRelationshipSources[key] = true
+	}
 	base.Characters = append([]wiaworld.Character{}, snapshot.Characters...)
 	base.Perceptions = map[string][]wiaworld.Perception{}
 	base.Sources = map[string]SourceMetadata{}
@@ -406,7 +468,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	if err := s.decideNPCs(ctx, generator, base, story.Definition{Characters: snapshot.Characters}, run, "", "world_event", inputs, nil, decisions, 5); err != nil {
 		return nil, err
 	}
-	extra := Output{SceneVersion: output.SceneVersion}
+	extra := Output{SceneVersion: output.SceneVersion, Positions: clonePositions(base.Positions), States: cloneStates(base.States), StateChanges: slices.Clone(output.StateChanges), Relationships: slices.Clone(base.Relationships), RelationshipChanges: slices.Clone(output.RelationshipChanges), Items: cloneItems(base.Items), ItemTransfers: slices.Clone(output.ItemTransfers), Decisions: decisions}
 	allowed := map[string][]string{}
 	var visible []wiaworld.Event
 	for _, c := range snapshot.Characters {
@@ -416,7 +478,19 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		observers := []wiaworld.Character{c}
 		audience := []string{c.EntityID}
-		if slices.Contains(output.SceneCharacters, c.EntityID) {
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			observers = nil
+			audience = nil
+			for _, other := range snapshot.Characters {
+				if currentlyCoLocated(base, c.EntityID, other.EntityID) {
+					observers = append(observers, other)
+					audience = append(audience, other.EntityID)
+				}
+			}
+			if currentlyCoLocated(base, c.EntityID, "player") {
+				audience = append(audience, "player")
+			}
+		} else if slices.Contains(output.SceneCharacters, c.EntityID) {
 			observers = nil
 			for _, other := range snapshot.Characters {
 				if slices.Contains(output.SceneCharacters, other.EntityID) {
@@ -448,34 +522,69 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。recipients只能取对应允许集合；行动者自动获知。场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed)), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
 		material.Required += plotActionSceneContract(*output, allowed)
-		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters) + "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v4")
+		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			material.Required += "\n本世界的位置只由结构化移动改变。movements 必须是数组；实际移动只含 entity_id、from、to、route、action_id，route 是完整有向地点 ID 序列，action_id 必须是该人物本人的成功或部分成功行动。每个移动者必须有以 action_id 为来源并交给本人的 scene_update。没有移动返回[]。outcome 必须省略 actor_in_scene；程序从权威位置派生玩家同场名单和感知资格。"
+		} else {
+			material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
+		}
+		material.Required += coordinationCapabilityContext(base, decisions)
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v6")
 		var resolved struct {
-			Outcomes     []plotActionResult `json:"outcomes"`
-			SceneUpdates []sceneUpdate      `json:"scene_updates"`
+			Outcomes            []plotActionResult   `json:"outcomes"`
+			SceneUpdates        []sceneUpdate        `json:"scene_updates"`
+			StateEffects        []stateEffect        `json:"state_effects,omitempty"`
+			RelationshipEffects []relationshipEffect `json:"relationship_effects,omitempty"`
+			ItemTransfers       []itemTransferEffect `json:"item_transfers,omitempty"`
+			Movements           []movementResult     `json:"movements,omitempty"`
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, "outcomes", "scene_updates")
+		required := []string{"outcomes", "scene_updates"}
+		required = append(required, coordinationCapabilityFields(base)...)
+		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, required...)
 		cancel()
 		if err != nil {
 			return nil, err
 		}
-		finalCharacters, err := plotActionPresence(output.SceneCharacters, extra.Events, resolved.Outcomes)
-		if err != nil {
-			return nil, err
-		}
-		if err = validateSceneCharacters(finalCharacters, snapshot.Characters); err != nil {
-			return nil, err
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			for _, outcome := range resolved.Outcomes {
+				if outcome.ActorInScene != nil {
+					return nil, coordinationInvalid("spatial_plot_presence_unsupported", "outcomes.actor_in_scene", "omitted-when-authoritative-movements-are-enabled")
+				}
+			}
 		}
 		outcomes := make([]hostActionResult, 0, len(resolved.Outcomes))
 		for _, o := range resolved.Outcomes {
 			outcomes = append(outcomes, o.hostActionResult)
-			// Only the arrival result may reach the destination audience.
-			if o.ActorInScene != nil && *o.ActorInScene {
-				allowed[o.ActionID] = append(append(allowed[o.ActionID], "player"), finalCharacters...)
+		}
+		finalCharacters := append([]string{}, output.SceneCharacters...)
+		movementHost := hostResult{Outcomes: outcomes, Movements: resolved.Movements, SceneUpdates: resolved.SceneUpdates}
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			positions, changes, derived, moveErr := applyMovements(base, extra.Events, movementHost)
+			if moveErr != nil {
+				return nil, moveErr
+			}
+			if err = validateMovementSceneUpdates(movementHost); err != nil {
+				return nil, err
+			}
+			if err = validateSpatialOutcomeAudiences(base, positions, extra.Events, movementHost); err != nil {
+				return nil, err
+			}
+			extra.Positions, extra.PositionChanges = positions, changes
+			finalCharacters = derived
+		} else {
+			finalCharacters, err = plotActionPresence(output.SceneCharacters, extra.Events, resolved.Outcomes)
+			if err != nil {
+				return nil, err
 			}
 		}
+		if err = validateSceneCharacters(finalCharacters, snapshot.Characters); err != nil {
+			return nil, err
+		}
 		for _, outcome := range resolved.Outcomes {
+			if snapshot.Definition.Capabilities["spatial"] == 1 {
+				continue
+			}
 			for _, id := range outcome.Recipients {
 				if !slices.Contains(allowed[outcome.ActionID], id) {
 					if s.deps.Logger != nil {
@@ -485,7 +594,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 				}
 			}
 		}
-		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.Definition.BystanderRefs, outcomes)
+		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.BystanderRefs, outcomes)
 		if err != nil {
 			if s.deps.Logger != nil {
 				s.deps.Logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)
@@ -505,6 +614,9 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			if extra.Perceptions[i].Stage == 3 {
 				extra.Perceptions[i].Stage = 6
 			}
+		}
+		if err = applyMechanicEffects(base, &extra, hostResult{Outcomes: outcomes, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}); err != nil {
+			return nil, err
 		}
 		sources := plotSceneSources(*output, nil)
 		for i, outcome := range resolved.Outcomes {
@@ -526,6 +638,14 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	output.Events = append(output.Events, extra.Events...)
 	output.Perceptions = append(output.Perceptions, extra.Perceptions...)
 	output.Memories = append(output.Memories, extra.Memories...)
+	output.States, output.Relationships, output.Items = extra.States, extra.Relationships, extra.Items
+	output.StateChanges = extra.StateChanges
+	output.RelationshipChanges = extra.RelationshipChanges
+	output.ItemTransfers = extra.ItemTransfers
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		output.Positions = clonePositions(extra.Positions)
+		output.PositionChanges = append(output.PositionChanges, extra.PositionChanges...)
+	}
 	return visible, nil
 }
 

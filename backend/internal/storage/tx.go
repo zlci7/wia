@@ -145,7 +145,7 @@ func (t *WorldTx) InsertEvent(ctx context.Context, event EventWrite) error {
 // InsertEventDependency records that one event is a projection of another. The edge is
 // what a correction walks to find what else stopped being valid.
 func (t *WorldTx) InsertEventDependency(ctx context.Context, childID, parentID string) error {
-	_, err := t.tx.ExecContext(ctx, `INSERT INTO event_dependencies(child_id,parent_id) VALUES(?,?)`, childID, parentID)
+	_, err := t.tx.ExecContext(ctx, `INSERT OR IGNORE INTO event_dependencies(child_id,parent_id) VALUES(?,?)`, childID, parentID)
 	return err
 }
 
@@ -237,6 +237,22 @@ func (t *WorldTx) SetScenePresence(ctx context.Context, entityID string) (bool, 
 		return false, err
 	}
 	return affected == 1, nil
+}
+
+// PositionWrite is the committed current place of one world entity.
+type PositionWrite struct {
+	EntityID      string
+	LocationID    string
+	SourceEventID string
+	UpdatedTurn   int64
+}
+
+// SetEntityLocation inserts or replaces one entity's authoritative position.
+func (t *WorldTx) SetEntityLocation(ctx context.Context, position PositionWrite) error {
+	_, err := t.tx.ExecContext(ctx, `INSERT INTO entity_locations(entity_id,location_id,source_event_id,updated_turn) VALUES(?,?,?,?)
+ON CONFLICT(entity_id) DO UPDATE SET location_id=excluded.location_id,source_event_id=excluded.source_event_id,updated_turn=excluded.updated_turn`,
+		position.EntityID, position.LocationID, position.SourceEventID, position.UpdatedTurn)
+	return err
 }
 
 // CompleteRun marks one run completed and reports whether that was still possible.

@@ -10,11 +10,20 @@ import (
 )
 
 type NPCDecision struct {
-	RecallQuery  string `json:"recall_query,omitempty"`
-	Speech       string `json:"speech"`
-	ActionIntent string `json:"action_intent"`
-	Silent       bool   `json:"silent"`
-	Memory       string `json:"memory"`
+	RecallQuery           string                 `json:"recall_query,omitempty"`
+	Speech                string                 `json:"speech"`
+	ActionIntent          string                 `json:"action_intent"`
+	ActionTargetID        string                 `json:"action_target_id,omitempty"`
+	Silent                bool                   `json:"silent"`
+	Memory                string                 `json:"memory"`
+	RelationshipProposals []relationshipProposal `json:"relationship_proposals,omitempty"`
+}
+
+type relationshipProposal struct {
+	TargetID     string `json:"target_id"`
+	RelationType string `json:"relation_type"`
+	Delta        int    `json:"delta"`
+	SourceID     string `json:"source_id"`
 }
 
 type StageInput struct {
@@ -95,9 +104,13 @@ func MergeNPCDecision(previous, current NPCDecision) NPCDecision {
 	}
 	if current.ActionIntent == "" {
 		current.ActionIntent = previous.ActionIntent
+		current.ActionTargetID = previous.ActionTargetID
 	}
 	if current.Memory == "" {
 		current.Memory = previous.Memory
+	}
+	if len(previous.RelationshipProposals) > 0 {
+		current.RelationshipProposals = append(append([]relationshipProposal(nil), previous.RelationshipProposals...), current.RelationshipProposals...)
 	}
 	current.Silent = current.Speech == ""
 	return current
@@ -132,7 +145,7 @@ func SourceTypeFor(private bool, id, recipient, intentType string) string {
 }
 
 func FormatSelfDecision(decision NPCDecision) string {
-	return fmt.Sprintf("已进入本轮交谈的本人公开对白：%q\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.ActionIntent, decision.Silent, decision.Memory)
+	return fmt.Sprintf("已进入本轮交谈的本人公开对白：%q\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本人有向关系变化提案：%s\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals), decision.Memory)
 }
 
 func EventByID(events []wiaworld.Event, id string) (wiaworld.Event, bool) {

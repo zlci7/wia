@@ -44,6 +44,9 @@ export interface WorldSummary {
   context_epoch: number
   clock: string
   scene: string
+  scene_location?: string
+  location?: { id: string; name: string; description?: string }
+  adjacent_locations?: { id: string; name: string; description?: string }[]
   status: string
   story_ended?: boolean
   updated_at: string
@@ -55,6 +58,30 @@ export interface Character {
   name: string
   role: string
   in_scene: boolean
+}
+
+export interface StateValue {
+  type: 'integer' | 'boolean' | 'enum'
+  integer?: number
+  boolean?: boolean
+  enum?: string
+}
+
+export interface PublicState {
+  entity_id: string
+  state_id: string
+  name: string
+  value: StateValue
+  unit?: string
+}
+
+export interface PublicItem {
+  instance_id: string
+  definition_id: string
+  name: string
+  description?: string
+  holder_id?: string
+  location_id?: string
 }
 
 export type NarrativePerspective = 'first_person' | 'second_person' | 'third_person'
@@ -186,15 +213,25 @@ export interface PackBystander {
 export interface ContentDraftNPC {
   definition_id: string; revision: string; entity_id: string; name: string; role: string;
   appearance?: string; profile: string; knowledge?: string; initial_concerns?: string;
-  initial_location: string; avatar?: string; speaking_examples?: string[];
+  initial_location: string; avatar?: string; speaking_examples?: string[]; initial_state?: Record<string, number | boolean | string>;
 }
+export interface DraftStateDefinition { id: string; name: string; type: 'integer' | 'boolean' | 'enum'; minimum?: number; maximum?: number; enum_values?: string[]; default: number | boolean | string; scope: 'player' | 'npc' | 'all'; projection: 'self' | 'public' | 'hidden'; knowledge: 'owner' | 'public' | 'host_only'; update_policy: { kind: 'readonly' | 'bounded_proposal' | 'rule_only'; max_change_per_turn?: number }; description?: string; unit?: string }
+export interface DraftRelationDefinition { id: string; name: string; minimum: number; maximum: number; default: number; max_change_per_turn: number; projection: 'self' | 'public' | 'hidden'; description?: string }
+export interface DraftInitialRelation { subject_id: string; target_id: string; relation_type: string; value: number }
+export interface DraftItemDefinition { id: string; name: string; description?: string; projection: 'public' | 'holder' | 'hidden' }
+export interface DraftItemInstance { instance_id: string; definition_id: string; holder_id?: string; location_id?: string }
+export interface DraftFactCondition { kind: 'location_is' | 'state_at_least' | 'state_at_most' | 'relation_at_least' | 'relation_at_most' | 'item_held' | 'item_at' | 'rule_result' | 'rule_result_absent'; entity_id?: string; target_id?: string; fact_id?: string; location_id?: string; value?: number; status?: 'succeeded' | 'failed' }
+export interface DraftRuleEffect { kind: 'state_delta'; entity_id: 'actor' | 'player'; state_id: string; delta: number }
+export interface DraftActionRule { id: string; name: string; guidance: string; conditions?: DraftFactCondition[]; risk?: { base_target: number; minimum: number; maximum: number; modifiers?: { label: string; amount: number; condition: DraftFactCondition }[] }; success_text: string; failure_text?: string; success_effects?: DraftRuleEffect[]; failure_effects?: DraftRuleEffect[] }
 export interface ContentDraftPayload {
-  schema_version: number; game_id: string; mode: string; title: string; description: string; gameplay: string;
+  schema_version: number; requires?: Record<string, number>; game_id: string; mode: string; title: string; description: string; gameplay: string;
   background: string; rules: string; author_facts: string; cover?: string; cover_alt?: string;
-  player: { name: string; profile: string; requirements?: string; editable?: boolean };
-  opening: string; initial_location: string; clock: string;  locations: { id: string; name: string; description?: string; connections: string[] }[];
+  player: { name: string; profile: string; requirements?: string; editable?: boolean; initial_state?: Record<string, number | boolean | string> };
+  opening: string; initial_location: string; clock: string;  locations: { id: string; kind?: 'region' | 'place'; parent?: string; name: string; description?: string; connections: string[]; public?: boolean }[];
   npcs: ContentDraftNPC[]; bystanders: PackBystander[];
   plot?: unknown; event_generation?: unknown; defaults?: unknown;
+  state_definitions?: DraftStateDefinition[]; relation_definitions?: DraftRelationDefinition[]; initial_relations?: DraftInitialRelation[]; item_definitions?: DraftItemDefinition[]; item_instances?: DraftItemInstance[];
+  action_rules?: DraftActionRule[];
 }
 export interface ContentDraft extends ContentDraftSummary { payload: ContentDraftPayload }
 export interface ContentOperation {

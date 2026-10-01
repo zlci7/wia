@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -91,9 +92,12 @@ func FormatBystanders(bystanders []story.Bystander, names []string) string {
 // coordinator can reconcile the proposals against what the player actually did.
 func CoordinationDecisionContext(decisions map[string]NPCDecision, characters []wiaworld.Character) string {
 	var parts []string
-	for _, character := range InScene(characters) {
-		decision := decisions[character.EntityID]
-		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；action_intent=%q；silent=%t", character.Name, character.Role, character.EntityID, decision.Speech, decision.ActionIntent, decision.Silent))
+	for _, character := range characters {
+		decision, exists := decisions[character.EntityID]
+		if !exists {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；action_intent=%q；silent=%t；relationship_proposals=%s", character.Name, character.Role, character.EntityID, decision.Speech, decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals)))
 	}
 	if len(parts) == 0 {
 		return "（暂无）"

@@ -1,0 +1,13 @@
+{
+  "definition_id": "bookseller",
+  "revision": "bookseller.v1",
+  "entity_id": "npc:bookseller",
+  "name": "书店老板",
+  "role": "旧书店经营者",
+  "appearance": "戴着圆框眼镜，袖口沾着书灰。",
+  "profile": "熟悉镇上的日常变化，对陌生访客保持礼貌。",
+  "knowledge": "知道广场时钟每天会慢五分钟。",
+  "initial_concerns": "想先确认访客为何打听时钟。",
+  "initial_location": "bookshop",
+  "speaking_examples": ["这座钟一直不太准。"]
+}

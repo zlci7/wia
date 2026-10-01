@@ -100,6 +100,74 @@ func LoadSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (Sn
 	}
 	out.Summary.GameTitle = out.Definition.Summary.Title
 	out.Summary.Revision = out.Definition.Revision
+	out.BystanderRefs = append([]story.Bystander(nil), out.Definition.BystanderRefs...)
+	if err = validateCapabilityManifest(ctx, store, out.Definition); err != nil {
+		return out, err
+	}
+	out.States, err = store.LoadEntityStates(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.Relationships, err = store.LoadRelationships(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.AppliedRelationshipSources = map[string]bool{}
+	out.Items, err = store.LoadItems(ctx)
+	if err != nil {
+		return out, err
+	}
+	settledRules, err := store.LoadSettledActionResults(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.RuleResults = map[string]map[string]string{}
+	for _, result := range settledRules {
+		if out.RuleResults[result.RuleID] == nil {
+			out.RuleResults[result.RuleID] = map[string]string{}
+		}
+		out.RuleResults[result.RuleID][result.Status] = result.EventID
+	}
+	currentSources := map[string]bool{}
+	for _, values := range out.States {
+		for _, state := range values {
+			if state.SourceEvent != "" {
+				currentSources[state.SourceEvent] = true
+			}
+		}
+	}
+	for _, relation := range out.Relationships {
+		if relation.SourceEvent != "" {
+			currentSources[relation.SourceEvent] = true
+		}
+	}
+	for _, item := range out.Items {
+		if item.SourceEvent != "" {
+			currentSources[item.SourceEvent] = true
+		}
+	}
+	sourceIDs := make([]string, 0, len(currentSources))
+	for id := range currentSources {
+		sourceIDs = append(sourceIDs, id)
+	}
+	out.PerceivedSources, err = store.LoadPerceivedSources(ctx, sourceIDs)
+	if err != nil {
+		return out, err
+	}
+	if err = validateMechanicsSnapshot(out); err != nil {
+		return out, err
+	}
+	out.Positions, out.PositionSources, err = store.LoadEntityPositions(ctx)
+	if err != nil {
+		return out, err
+	}
+	if out.Definition.Capabilities["spatial"] == 1 {
+		if err = applySpatialProjection(&out); err != nil {
+			return out, err
+		}
+	} else {
+		out.Summary.SceneLocation = out.SceneLocation
+	}
 	out.Messages, err = store.LoadMessages(ctx, limit)
 	if err != nil {
 		return out, err
@@ -114,6 +182,10 @@ func LoadSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (Sn
 	}
 	out.Perceptions = make(map[string][]wiaworld.Perception)
 	out.Memories = make(map[string][]wiaworld.Memory)
+	out.Perceptions["player"], err = store.LoadPerceptions(ctx, "player", 20)
+	if err != nil {
+		return out, err
+	}
 	for _, c := range out.Characters {
 		out.Perceptions[c.EntityID], err = store.LoadPerceptions(ctx, c.EntityID, 20)
 		if err != nil {
@@ -146,6 +218,96 @@ func LoadSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (Sn
 		return out, err
 	}
 	return out, nil
+}
+
+func validateCapabilityManifest(ctx context.Context, store *storage.WorldStore, definition story.Definition) error {
+	if len(definition.Capabilities) == 0 {
+		return nil
+	}
+	if definition.Capabilities["spatial"] != 1 {
+		return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
+	}
+	for name, version := range definition.Capabilities {
+		if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules") {
+			return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
+		}
+	}
+	raw, err := store.MetaGet(ctx, "capability_manifest")
+	if err != nil {
+		return fmt.Errorf("%w: capability manifest is missing", memory.ErrStorageUnavailable)
+	}
+	var stored map[string]int
+	if json.Unmarshal([]byte(raw), &stored) != nil || len(stored) != len(definition.Capabilities) {
+		return fmt.Errorf("%w: capability manifest is invalid", memory.ErrStorageUnavailable)
+	}
+	for name, version := range definition.Capabilities {
+		if stored[name] != version {
+			return fmt.Errorf("%w: capability manifest does not match frozen definition", memory.ErrStorageUnavailable)
+		}
+	}
+	return nil
+}
+
+func applySpatialProjection(snapshot *Snapshot) error {
+	places := story.PlaceGraph(snapshot.Definition)
+	expected := map[string]bool{"player": true}
+	for _, character := range snapshot.Characters {
+		expected[character.EntityID] = true
+	}
+	for _, bystander := range snapshot.Definition.BystanderRefs {
+		if bystander.BystanderID != "" {
+			expected[bystander.BystanderID] = true
+		}
+	}
+	for entityID := range expected {
+		locationID, ok := snapshot.Positions[entityID]
+		if !ok {
+			return fmt.Errorf("%w: spatial entity %s has no position", memory.ErrStorageUnavailable, entityID)
+		}
+		if _, ok := places[locationID]; !ok {
+			return fmt.Errorf("%w: spatial entity %s has invalid position", memory.ErrStorageUnavailable, entityID)
+		}
+		if snapshot.PositionSources[entityID] == "" {
+			return fmt.Errorf("%w: spatial entity %s has no position source", memory.ErrStorageUnavailable, entityID)
+		}
+	}
+	for entityID := range snapshot.Positions {
+		if !expected[entityID] || !wiaworld.ValidEntityRef(entityID) {
+			return fmt.Errorf("%w: unknown spatial entity %s", memory.ErrStorageUnavailable, entityID)
+		}
+	}
+	return refreshSpatialProjection(snapshot)
+}
+
+func refreshSpatialProjection(snapshot *Snapshot) error {
+	places := story.PlaceGraph(snapshot.Definition)
+	playerLocation := snapshot.Positions["player"]
+	snapshot.SceneLocation = playerLocation
+	snapshot.Summary.SceneLocation = playerLocation
+	location, ok := story.LocationByID(snapshot.Definition, playerLocation)
+	if !ok {
+		return memory.ErrStorageUnavailable
+	}
+	snapshot.Summary.Location = &wiaworld.LocationView{ID: location.ID, Name: location.Name, Description: location.Description}
+	snapshot.Summary.AdjacentLocations = nil
+	for _, id := range places[playerLocation] {
+		candidate, found := story.LocationByID(snapshot.Definition, id)
+		if found && candidate.Public {
+			snapshot.Summary.AdjacentLocations = append(snapshot.Summary.AdjacentLocations, wiaworld.LocationView{ID: candidate.ID, Name: candidate.Name, Description: candidate.Description})
+		}
+	}
+	for i := range snapshot.Characters {
+		snapshot.Characters[i].InScene = snapshot.Positions[snapshot.Characters[i].EntityID] == playerLocation
+	}
+	snapshot.Bystanders = snapshot.Bystanders[:0]
+	snapshot.BystanderRefs = snapshot.BystanderRefs[:0]
+	for _, bystander := range snapshot.Definition.BystanderRefs {
+		if snapshot.Positions[bystander.BystanderID] == playerLocation {
+			snapshot.Bystanders = append(snapshot.Bystanders, bystander.Name)
+			snapshot.BystanderRefs = append(snapshot.BystanderRefs, bystander)
+		}
+	}
+	return nil
 }
 
 // LoadNarrativeSettings reads and validates the settings stored with a world.
@@ -315,7 +477,7 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot Snapshot) (map
 	for _, node := range snapshot.PlotProgress.Nodes {
 		add(node.EventID)
 		for _, id := range node.Evidence {
-			if !strings.HasPrefix(id, "definition:") {
+			if !strings.HasPrefix(id, "definition:") && !strings.HasPrefix(id, "fact:") {
 				add(id)
 			}
 		}
@@ -358,6 +520,14 @@ func LoadInputSnapshot(ctx context.Context, store *storage.WorldStore, limit int
 		return snapshot, err
 	}
 	snapshot.Sources, err = loadSourceMetadata(ctx, store.Database(), snapshot)
+	if err != nil {
+		return snapshot, err
+	}
+	sourceIDs := make([]string, 0, len(snapshot.Sources))
+	for id := range snapshot.Sources {
+		sourceIDs = append(sourceIDs, id)
+	}
+	snapshot.AppliedRelationshipSources, err = store.LoadAppliedRelationshipSources(ctx, sourceIDs)
 	return snapshot, err
 }
 

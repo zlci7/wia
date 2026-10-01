@@ -12,6 +12,46 @@ CREATE TABLE IF NOT EXISTS characters (
   entity_id TEXT PRIMARY KEY, definition_id TEXT NOT NULL, name TEXT NOT NULL,
   role TEXT NOT NULL, profile TEXT NOT NULL, knowledge TEXT NOT NULL, in_scene INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS entity_locations (
+  entity_id TEXT PRIMARY KEY, location_id TEXT NOT NULL,
+  source_event_id TEXT NOT NULL, updated_turn INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS entity_states (
+  entity_id TEXT NOT NULL, state_id TEXT NOT NULL, value_json TEXT NOT NULL,
+  source_event_id TEXT NOT NULL, updated_turn INTEGER NOT NULL, version INTEGER NOT NULL,
+  PRIMARY KEY(entity_id,state_id)
+);
+CREATE TABLE IF NOT EXISTS state_changes (
+  change_id TEXT PRIMARY KEY, entity_id TEXT NOT NULL, state_id TEXT NOT NULL,
+  before_json TEXT NOT NULL, after_json TEXT NOT NULL, source_event_id TEXT NOT NULL,
+  turn_seq INTEGER NOT NULL, effect_order INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_state_change_order ON state_changes(source_event_id,entity_id,state_id,effect_order);
+CREATE TABLE IF NOT EXISTS relationships (
+  subject_id TEXT NOT NULL, target_id TEXT NOT NULL, relation_type TEXT NOT NULL,
+  value INTEGER NOT NULL, source_event_id TEXT NOT NULL, updated_turn INTEGER NOT NULL, version INTEGER NOT NULL,
+  PRIMARY KEY(subject_id,target_id,relation_type)
+);
+CREATE TABLE IF NOT EXISTS relationship_changes (
+  change_id TEXT PRIMARY KEY, subject_id TEXT NOT NULL, target_id TEXT NOT NULL, relation_type TEXT NOT NULL,
+  before_value INTEGER NOT NULL, after_value INTEGER NOT NULL, source_event_id TEXT NOT NULL,
+  proposal_source_event_id TEXT NOT NULL,
+  turn_seq INTEGER NOT NULL, effect_order INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_relationship_change_effect ON relationship_changes(source_event_id,subject_id,target_id,relation_type);
+CREATE TABLE IF NOT EXISTS item_instances (
+  instance_id TEXT PRIMARY KEY, definition_id TEXT NOT NULL,
+  holder_id TEXT NOT NULL DEFAULT '', location_id TEXT NOT NULL DEFAULT '',
+  source_event_id TEXT NOT NULL, updated_turn INTEGER NOT NULL, version INTEGER NOT NULL,
+  CHECK ((holder_id != '' AND location_id = '') OR (holder_id = '' AND location_id != ''))
+);
+CREATE TABLE IF NOT EXISTS item_transfers (
+  transfer_id TEXT PRIMARY KEY, instance_id TEXT NOT NULL,
+  before_holder_id TEXT NOT NULL, before_location_id TEXT NOT NULL,
+  after_holder_id TEXT NOT NULL, after_location_id TEXT NOT NULL,
+  source_event_id TEXT NOT NULL, turn_seq INTEGER NOT NULL, effect_order INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_item_transfer_order ON item_transfers(source_event_id,instance_id,effect_order);
 CREATE TABLE IF NOT EXISTS messages (
   seq INTEGER PRIMARY KEY, message_id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
   content TEXT NOT NULL, run_id TEXT NOT NULL, created_at TEXT NOT NULL
@@ -51,9 +91,16 @@ CREATE TABLE IF NOT EXISTS runs (
   base_scene_version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS action_resolutions (
+  input_id TEXT NOT NULL, rule_id TEXT NOT NULL, roll INTEGER NOT NULL,
+  target INTEGER NOT NULL, modifiers_json TEXT NOT NULL, settled_event_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, PRIMARY KEY(input_id,rule_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_action_resolution_input ON action_resolutions(input_id);
 CREATE INDEX IF NOT EXISTS idx_messages_seq ON messages(seq);
 CREATE INDEX IF NOT EXISTS idx_events_seq ON events(seq);
 CREATE INDEX IF NOT EXISTS idx_perceptions_recipient_seq ON perceptions(recipient_id, seq);
+CREATE INDEX IF NOT EXISTS idx_perceptions_source_recipient ON perceptions(source_event_id, recipient_id);
 CREATE INDEX IF NOT EXISTS idx_memories_recipient_seq ON memories(recipient_id, seq);
 `
 

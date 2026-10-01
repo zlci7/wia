@@ -41,10 +41,23 @@ func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wi
 	if err != nil {
 		return Output{}, err
 	}
-	return s.executeSnapshot(ctx, generator, snapshot, run)
+	if run.InputID != "" {
+		prepared, found, readErr := store.ReadActionResolutionForInput(ctx, run.InputID)
+		if readErr != nil {
+			return Output{}, AtStage(StageLoad, readErr)
+		}
+		if found {
+			run.PreparedActionRuleID = prepared.RuleID
+		}
+	}
+	return s.executeSnapshotWithStore(ctx, store, generator, snapshot, run)
 }
 
 func (s *Service) executeSnapshot(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (Output, error) {
+	return s.executeSnapshotWithStore(ctx, nil, generator, snapshot, run)
+}
+
+func (s *Service) executeSnapshotWithStore(ctx context.Context, store *storage.WorldStore, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (Output, error) {
 	intent, output, err := s.resolveIntent(ctx, generator, snapshot, run)
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)
@@ -52,6 +65,13 @@ func (s *Service) executeSnapshot(ctx context.Context, generator model.TextGener
 	// The player's own words travel with the intent, because every later stage that
 	// records what the player did needs them and the run is not passed that far down.
 	intent.Input = run.Input
+	if intent.ActionRuleID != "" {
+		resolution, err := prepareActionResolution(ctx, store, snapshot, run, intent.ActionRuleID)
+		if err != nil {
+			return Output{}, AtStage(StageIntent, err)
+		}
+		output.ActionResolution = &resolution
+	}
 	// Who was present when the player acted is decided here and kept, because recording
 	// what the player did must answer that question, not "who is here at the end". A
 	// character who left during the turn still perceived the input, and one who arrived
