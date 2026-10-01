@@ -35,6 +35,32 @@ const privateInput = "我悄悄告诉记者：暗号是银色渡鸦。"
 const leaveInput = "随后走到街上，再进入诊所。"
 const greetingInput = "我向看守问好。"
 
+func TestMixedIntentRetainsItsLaterPreparedRule(t *testing.T) {
+	snapshot := spatialFixture()
+	rule := ruleTestSnapshot().Definition.ActionRules[0]
+	rule.Conditions[0].LocationID = "clinic"
+	snapshot.Definition.ActionRules = []story.ActionRule{rule}
+	last := "然后尝试潜入诊所内室。"
+	run := wiaworld.Run{RunID: "retry-mixed", Input: privateInput + leaveInput + last, PreparedActionRuleID: "risk"}
+	wanted := TurnIntent{IntentType: "act", AddresseeID: "npc:reporter", Visibility: "public", ActionRuleID: "risk", Fragments: []InputFragment{
+		{Text: privateInput, ActorID: "player", IntentType: "speak", AddresseeID: "npc:reporter", Visibility: "private"},
+		{Text: leaveInput, ActorID: "player", IntentType: "act", Visibility: "public"},
+		{Text: last, ActorID: "player", IntentType: "act", Visibility: "public", ActionRuleID: "risk"},
+	}}
+	response := wire.MarshalJSON(wanted)
+	g := &materialTestGenerator{responses: []string{response, response}}
+	intent, repairs, err := New(&rosterHost{}, Deps{}).resolveTurnIntent(context.Background(), g, snapshot, run)
+	if err != nil || repairs != 0 {
+		t.Fatalf("retry evaluated a later rule against the opening position: repairs=%d err=%v", repairs, err)
+	}
+	if intent.AddresseeID != "npc:reporter" || intent.Visibility != "private" || intent.ActionRuleID != "" || intent.Fragments[2].ActionRuleID != "risk" {
+		t.Fatal("aggregate metadata displaced a later segment's prepared rule")
+	}
+	if len(g.requests) != 1 || !strings.Contains(g.requests[0].Input, `"ID":"risk"`) {
+		t.Fatal("the saved rule was absent from the retry's input")
+	}
+}
+
 type orderedPerceptionGenerator struct {
 	mu                sync.Mutex
 	npcInputs         map[string][]string

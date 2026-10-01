@@ -45,7 +45,7 @@ func normalizeNPCActionIntent(value string) string {
 const (
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion    = "story.intent.v8"
+	intentPromptVersion    = "story.intent.v9"
 	npcPromptVersion       = "story.npc.v15"
 	narrationPromptVersion = "story.narration.v12"
 )
@@ -134,6 +134,17 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	checkRecipient := func() error {
+		if len(intent.Fragments) > 0 {
+			if err := validateInputFragments(snapshot, run, &intent); err != nil {
+				return err
+			}
+			// Segment eligibility is checked against its ordered working state.
+			// Aggregate metadata describes the opening segment.
+			first := intent.Fragments[0]
+			intent.IntentType, intent.AddresseeID, intent.Visibility = first.IntentType, first.AddresseeID, first.Visibility
+			intent.WaitMinutes, intent.ActionRuleID = first.WaitMinutes, first.ActionRuleID
+			return nil
+		}
 		if explicitRecipient != "" {
 			intent.AddresseeID = explicitRecipient
 		}
