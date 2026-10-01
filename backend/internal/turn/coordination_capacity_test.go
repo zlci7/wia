@@ -45,4 +45,24 @@ func TestMistEmbersOpeningCoordinationFitsApplicationBudget(t *testing.T) {
 	if _, report, err := composer.Build(material, material.System, structuredTurnOutputTokens); err != nil {
 		t.Fatalf("opening coordination exceeds application budget: tokens=%d: %v", report.InputTokens, err)
 	}
+	t.Run("updated personal views", func(t *testing.T) {
+		for i := range snapshot.SceneViews {
+			view := &snapshot.SceneViews[i]
+			view.Content = "接收者" + view.Recipient + "当前情境：" + strings.Repeat("本人已经通过实际接触获知委托细节，旧行动已经完成；其他地点与人物隐情保持未知。", 4)
+		}
+		material := composeCoordination(snapshot, run, TurnIntent{IntentType: "speak", AddresseeID: "npc:tailor", Visibility: "public"}, decisions, events, decisions["npc:tailor"].Speech, nil)
+		material, _ = selectStoryMaterials(snapshot, "coordination", "coordinator", material)
+		request, report, err := composer.Build(material, material.System, structuredTurnOutputTokens)
+		if err != nil {
+			t.Fatalf("updated views exceed unchanged input budget: tokens=%d: %v", report.InputTokens, err)
+		}
+		for _, view := range snapshot.SceneViews {
+			if count := strings.Count(request.Input, view.Content); count != 1 {
+				t.Fatalf("scene view %s supplied %d times, want one complete copy", view.Recipient, count)
+			}
+		}
+		if !report.RequiredComplete || request.MaxInputTokens != 12000 {
+			t.Fatal("required scene contract changed", report)
+		}
+	})
 }
