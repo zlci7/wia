@@ -97,22 +97,16 @@ func personalPlanContext(snapshot Snapshot, recipient string, material Material)
 	return material
 }
 
-func validatePlanUpdates(snapshot Snapshot, owner string, stageInput StageInput, decision NPCDecision, call *ContextGenerator) error {
+func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, call *ContextGenerator) error {
 	if len(decision.PlanUpdates) == 0 {
 		return nil
 	}
 	if snapshot.OpenProgress == nil || len(decision.PlanUpdates) > 4 {
 		return coordinationInvalid("plan_updates_invalid", "plan_updates", "at-most-four-owned-plans-with-progression-enabled")
 	}
-	known := map[string]bool{}
-	for _, id := range stageInput.SourceEventIDs {
-		known[id] = true
-	}
-	for _, perception := range snapshot.Perceptions[owner] {
-		known[perception.SourceEventID] = true
-	}
+	provided := map[string]bool{}
 	for _, id := range call.providedSources {
-		known[id] = true
+		provided[id] = true
 	}
 	seen := map[string]bool{}
 	for _, update := range decision.PlanUpdates {
@@ -136,7 +130,7 @@ func validatePlanUpdates(snapshot Snapshot, owner string, stageInput StageInput,
 			return coordinationInvalid("plan_time_invalid", "plan_updates.review_after_minutes", "future-review-for-active-plan")
 		}
 		for _, id := range update.SourceIDs {
-			if !known[id] {
+			if !provided[id] {
 				return ErrContextSourceMissing
 			}
 		}

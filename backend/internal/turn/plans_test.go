@@ -40,7 +40,8 @@ func TestPlanDueSelectionIsBoundedAndDoesNotPrescribeActions(t *testing.T) {
 func TestPlanUpdateRequiresItsOwnersProvidedSources(t *testing.T) {
 	snapshot := materialTestSnapshot()
 	snapshot.OpenProgress = &wiaworld.OpenProgress{Plans: []wiaworld.PersonalPlan{{ID: "plan", OwnerID: "npc:a"}, {ID: "foreign", OwnerID: "npc:b"}}}
-	input := StageInput{SourceEventIDs: []string{"own-stimulus"}}
+	snapshot.Perceptions = map[string][]wiaworld.Perception{"npc:a": {{SourceEventID: "old-own-history", Content: "Earlier knowledge omitted from this request."}}}
+	call := &ContextGenerator{providedSources: []string{"own-stimulus", "material:revision:own-knowledge"}}
 	update := planUpdate{ID: "plan", Content: "I will review the changed clinic", SourceIDs: []string{"own-stimulus"}, Status: "active", ReviewAfterMinutes: 20}
 	for _, test := range []struct {
 		name   string
@@ -48,19 +49,25 @@ func TestPlanUpdateRequiresItsOwnersProvidedSources(t *testing.T) {
 	}{
 		{"owner", func(p *planUpdate) { p.ID = "foreign" }},
 		{"source", func(p *planUpdate) { p.SourceIDs = []string{"author-secret"} }},
+		{"unprovided-history", func(p *planUpdate) { p.SourceIDs = []string{"old-own-history"} }},
+		{"unprovided-stimulus", func(p *planUpdate) { p.SourceIDs = []string{"unprovided-stimulus"} }},
 		{"time", func(p *planUpdate) { p.ReviewAfterMinutes = 0 }},
 		{"status", func(p *planUpdate) { p.Status = "success" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			bad := update
 			test.mutate(&bad)
-			if validatePlanUpdates(snapshot, "npc:a", input, NPCDecision{PlanUpdates: []planUpdate{bad}}, &ContextGenerator{}) == nil {
+			if validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{bad}}, call) == nil {
 				t.Fatal("invalid plan update accepted")
 			}
 		})
 	}
-	if err := validatePlanUpdates(snapshot, "npc:a", input, NPCDecision{PlanUpdates: []planUpdate{update}}, &ContextGenerator{}); err != nil {
+	if err := validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
 		t.Fatal(err)
+	}
+	update.SourceIDs = []string{"material:revision:own-knowledge"}
+	if err := validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
+		t.Fatal("provided owned material was rejected:", err)
 	}
 }
 

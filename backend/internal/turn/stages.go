@@ -221,7 +221,7 @@ func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGe
 	}
 	snapshot.OpenProgress = cloneOpenProgress(output.OpenProgress)
 
-	// Only public replies from other characters are new stage-two stimuli.
+	// Replies become stage-two stimuli only for the people who heard them.
 	stageTwoInputs := PublicReplyStageInputs(output.Perceptions, perceptText, 1)
 	if len(stageTwoInputs) > 0 {
 		priorTurn := make(map[string]string, len(stageTwoInputs))
@@ -361,7 +361,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 						return coordinationInvalid("npc_action_target_invalid", "action_target_id", "defined-important-character-or-player")
 					}
 				}
-				if err := validatePlanUpdates(snapshot, character.EntityID, stageInput, decision, callGenerator.(*ContextGenerator)); err != nil {
+				if err := validatePlanUpdates(snapshot, character.EntityID, decision, callGenerator.(*ContextGenerator)); err != nil {
 					return err
 				}
 				if err := validateNPCSpeech(snapshot, character.EntityID, &decision); err != nil {

@@ -576,7 +576,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
 		}
 		material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
+			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
 		material.Required += personalProjectionContract
 		material.Required += plotActionSceneContract(*output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
 		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
@@ -592,7 +592,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			remainingMinutes = max(0, 120-output.elapsedMinutes)
 			material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
 		}
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v8")
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v9")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
