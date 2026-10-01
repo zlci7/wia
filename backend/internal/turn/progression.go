@@ -492,12 +492,10 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 	for id, items := range snapshot.Perceptions {
 		base.Perceptions[id] = append([]wiaworld.Perception{}, items...)
 	}
-	for _, p := range output.Perceptions {
-		base.Perceptions[p.RecipientID] = append(base.Perceptions[p.RecipientID], p)
-	}
+	mergePerceptions(&base, output.Perceptions)
 	for _, e := range output.Events {
 		if e.EventType == "npc_dialogue" {
-			base.Perceptions[e.ActorID] = append(base.Perceptions[e.ActorID], wiaworld.Perception{RecipientID: e.ActorID, SourceEventID: e.EventID, SourceType: "own_speech", Content: e.Content, Stage: e.Stage, SceneVersion: e.SceneVersion})
+			mergePerceptions(&base, []wiaworld.Perception{{RecipientID: e.ActorID, SourceEventID: e.EventID, SourceType: "own_speech", Content: e.Content, Stage: e.Stage, SceneVersion: e.SceneVersion}})
 		}
 	}
 	inputs := map[string]StageInput{}
@@ -571,28 +569,12 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		needsCoordination = needsCoordination || len(d.RelationshipProposals) > 0
 	}
 	if needsCoordination {
-		audienceContract := "recipients只能取对应允许集合；行动者自动获知。"
-		if snapshot.Definition.Capabilities["spatial"] == 1 {
-			audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
-		}
-		material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
-		material.Required += personalProjectionContract
-		material.Required += plotActionSceneContract(*output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
-		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
-		if snapshot.Definition.Capabilities["spatial"] == 1 {
-			material.Required += "\n上方每个行动的允许集合描述执行前的同场人物。移动结果的 recipients 还可以包含该行动者实际抵达终点时的同场人物；根据当前位置和本轮有效 movements 推导，不能把其他行动者的移动或整轮最终名单当成本行动的见证资格。"
-			material.Required += "\n本世界的位置只由结构化移动改变。movements 必须是数组；实际移动只含 entity_id、from、to、route、action_id，route 是完整有向地点 ID 序列，action_id 必须是该人物本人的成功或部分成功行动。每个移动者必须有以 action_id 为来源并交给本人的 scene_update。没有移动返回[]。outcome 必须省略 actor_in_scene；程序从权威位置派生玩家同场名单和感知资格。"
-		} else {
-			material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
-		}
-		material.Required += coordinationCapabilityContext(base, decisions)
 		remainingMinutes := 120
 		if snapshot.Definition.Progression != nil {
 			remainingMinutes = max(0, 120-output.elapsedMinutes)
-			material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
 		}
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v9")
+		material := composePlotActions(base, *output, extra, rootID, allowed, decisions, remainingMinutes)
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v10")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
@@ -728,6 +710,29 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		output.PositionChanges = append(output.PositionChanges, extra.PositionChanges...)
 	}
 	return visible, nil
+}
+
+func composePlotActions(snapshot Snapshot, output Output, extra Output, rootID string, allowed map[string][]string, decisions map[string]NPCDecision, remainingMinutes int) Material {
+	audienceContract := "recipients只能取对应允许集合；行动者自动获知。"
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
+	}
+	material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
+		Required: fmt.Sprintf("本次世界刺激的作者结果见已确认记录中的来源：%s；各人物获知的部分见对应plot_perceived记录。\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", rootID, worldProgressionRecords(output.Events), worldProgressionRecords(extra.Events), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
+	material.Required += personalProjectionContract
+	material.Required += plotActionSceneContract(output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
+	material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		material.Required += "\n上方每个行动的允许集合描述执行前的同场人物。移动结果的 recipients 还可以包含该行动者实际抵达终点时的同场人物；根据当前位置和本轮有效 movements 推导，不能把其他行动者的移动或整轮最终名单当成本行动的见证资格。"
+		material.Required += "\n本世界的位置只由结构化移动改变。movements 必须是数组；实际移动只含 entity_id、from、to、route、action_id，route 是完整有向地点 ID 序列，action_id 必须是该人物本人的成功或部分成功行动。每个移动者必须有以 action_id 为来源并交给本人的 scene_update。没有移动返回[]。outcome 必须省略 actor_in_scene；程序从权威位置派生玩家同场名单和感知资格。"
+	} else {
+		material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
+	}
+	material.Required += coordinationCapabilityContext(snapshot, decisions)
+	if snapshot.Definition.Progression != nil {
+		material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
+	}
+	return material
 }
 
 func plotActionSceneContract(output Output, allowed map[string][]string, spatial bool) string {

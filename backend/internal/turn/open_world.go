@@ -145,8 +145,8 @@ func composeOpenWorld(snapshot Snapshot, output Output, checkID string, external
 	return material, nil
 }
 
-// A world evaluation uses game time and ordered events. Persistence timestamps,
-// unassigned sequence numbers and the shared run ID are outside this purpose.
+// World evaluation and subsequent action coordination use game time and ordered events.
+// Persistence timestamps, unassigned sequence numbers and the shared run ID stay in storage.
 func worldProgressionRecords(events []wiaworld.Event) string {
 	type record struct {
 		EventID      string `json:"event_id"`

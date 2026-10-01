@@ -118,20 +118,33 @@ func mergeConfirmedInput(snapshot *Snapshot, output Output) {
 		snapshot.Events = append(snapshot.Events, event)
 		snapshot.Sources[event.EventID] = SourceMetadata{ID: event.EventID, Actor: event.ActorID, Kind: event.EventType, RunID: event.RunID, Stage: event.Stage, SceneVersion: event.SceneVersion}
 	}
-	for _, p := range output.Perceptions {
-		found := false
-		for _, old := range snapshot.Perceptions[p.RecipientID] {
-			found = found || old.SourceEventID == p.SourceEventID
-		}
-		if !found {
-			snapshot.Perceptions[p.RecipientID] = append(snapshot.Perceptions[p.RecipientID], p)
-		}
-	}
+	mergePerceptions(snapshot, output.Perceptions)
 	snapshot.OpenProgress = cloneOpenProgress(output.OpenProgress)
 	if snapshot.AppliedRelationshipSources == nil {
 		snapshot.AppliedRelationshipSources = map[string]bool{}
 	}
 	for _, change := range output.RelationshipChanges {
 		snapshot.AppliedRelationshipSources[change.ProposalSourceID+"\x00"+change.After.SubjectID+"\x00"+change.After.TargetID+"\x00"+change.After.RelationType] = true
+	}
+}
+
+// Perception identity matches persistence: each recipient, source and body is one experience.
+func mergePerceptions(snapshot *Snapshot, additions []wiaworld.Perception) {
+	if snapshot.Perceptions == nil {
+		snapshot.Perceptions = map[string][]wiaworld.Perception{}
+	}
+	type identity struct{ recipient, source, content string }
+	seen := map[identity]bool{}
+	for recipient, items := range snapshot.Perceptions {
+		for _, p := range items {
+			seen[identity{recipient, p.SourceEventID, p.Content}] = true
+		}
+	}
+	for _, p := range additions {
+		key := identity{p.RecipientID, p.SourceEventID, p.Content}
+		if !seen[key] {
+			snapshot.Perceptions[p.RecipientID] = append(snapshot.Perceptions[p.RecipientID], p)
+			seen[key] = true
+		}
 	}
 }
