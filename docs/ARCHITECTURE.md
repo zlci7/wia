@@ -52,7 +52,7 @@ wia/
 │       ├── llm/          Provider 配置与 OpenAI / DeepSeek 接入
 │       ├── storage/      世界库 schema、具名读写与事务原语
 │       ├── wire/         无领域含义的基础原语（文本规范、时间戳、JSON、标识生成）
-│       └── content/      开发者内容工具（packs/ 内置两个示例剧本）
+│       └── content/      开发者内容工具与内置剧本包
 ├── frontend/             Vue 前端（原 console/web）
 ├── docs/
 ├── scripts/
@@ -62,7 +62,7 @@ wia/
 
 - **不以包数量作为架构指标。** 判断标准是"是否对应一个稳定职责"。代码少时并入相邻模块即可。
 - 模块分三层：核心业务（`turn`、`world`、`memory`、`plot`、`story`）、基础设施（`model`、`storage`、`storyapi`）、产品外围（`content`、`app`）。人物决策与 purpose 驱动的上下文装配都属于一轮故事，代码量不足以证明需要独立 package，因此保留在 `turn`。
-- 内置示例剧本位于 `backend/internal/content/packs/lantern-dusk` 与 `orbital-repair`；开发者本地草稿、外部剧本包与已发布修订属于用户数据目录。
+- 内置剧本位于 `backend/internal/content/packs/lantern-dusk`、`orbital-repair` 与 `mist-embers`；开发者本地草稿、外部剧本包与已发布修订属于用户数据目录。
 
 ## 5. 模块职责与依赖规则
 
@@ -311,6 +311,23 @@ turn.ContextGenerator → app.meteredText → model.TextGenerator → llm Provid
 人物决策、场景主持与正文材料位于 `turn/compose.go`，共享指令位于 `turn/prompt.go`；记忆整理模型合同位于 `turn/memory_store.go`，事件生成合同位于 `turn/progression.go`。`memory` 拥有记录规则，`plot` 拥有剧情纯规则，它们均不调用模型。
 
 **不要建 `model/prompts.go` 集中堆放。** Prompt 是业务逻辑的一部分。
+
+### 6.9 渐进材料与持续世界（规划）
+
+本节为待实现的扩展。数据合同与两个交付模块见[渐进材料与持续世界技术方案](phase12/stages/渐进材料与持续世界-技术方案.md)，作者格式见[剧本编写规范](phase12/stages/开发者剧本编写规范与模板.md)。
+
+| 归属 | 扩展职责 |
+| --- | --- |
+| `content` | 读取入口、分文件配置和文字材料，校验引用、权限声明与内容摘要，编译运行定义 |
+| `story` | 持有不可变材料索引与正文、初始发展和人物计划；保持纯数据与校验边界 |
+| `turn` | 按用途、知情范围与相关性选取冻结材料，通过现有 Context 构建入口控制预算；在已有世界阶段调度到期计划、人物决定和结果投影 |
+| `world` / `plot` | 持有运行计划、事件和感知的领域词汇及纯规则；保留既有冻结节点的读取语义 |
+| `storage` | 读写冻结材料、当前计划、来源依赖及个人投影；不判断剧情 |
+| `app` | 管理运行并在原有最终事务中提交全部变化 |
+
+包解析、材料全文冻结与模型输入选择分别处理。Turn 从世界库读取冻结内容，按需装配不访问作者工作目录。材料补充请求仍属于当前用途，只有最终候选形成一次人物决定。
+
+位置、状态、关系和物品继续通过已有能力入口提供最新工作态。世界推进共用人物决策、行动协调与最终提交路径；同一回合保持有界推进，不增加后台模拟器。个人感知共用一套授权与投影合同，正文只消费玩家投影。以上扩展落在现有包内，不增加第二套 Context、事件引擎或创作系统运行依赖。
 
 ## 7. 存储
 
