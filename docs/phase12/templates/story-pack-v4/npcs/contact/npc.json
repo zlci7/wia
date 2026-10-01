@@ -1,0 +1,11 @@
+{
+  "definition_id": "contact.v1",
+  "revision": "contact.v2",
+  "entity_id": "npc:contact",
+  "name": "联系人",
+  "role": "接待员",
+  "appearance": "衣着整洁，桌上放着一册来访记录。",
+  "profile": "认真谨慎，希望做好本职工作；愿意听清来意后再作决定。",
+  "initial_location": "reception",
+  "speaking_examples": ["请先把来意说清楚，我会认真听。"]
+}

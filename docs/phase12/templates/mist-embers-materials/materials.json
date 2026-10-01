@@ -1,6 +1,31 @@
 {
   "materials": [
     {
+      "id": "era-anchor",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "core",
+      "summary": "第一部结束后、愚者教会已经存在的世界起点。",
+      "file": "world/background/era.md"
+    },
+    {
+      "id": "church-background",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "战后教会背景、外围线索联系与地方知情范围。",
+      "entity_ids": ["npc:clockmaker"],
+      "file": "world/background/churches.md"
+    },
+    {
+      "id": "local-currency",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "on_demand",
+      "summary": "报价、报酬与支出涉及的鲁恩币制。",
+      "file": "world/background/currency.md"
+    },
+    {
       "id": "world-core",
       "purpose": "background",
       "visibility": "public",

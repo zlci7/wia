@@ -1,0 +1,19 @@
+{
+  "developments": [
+    {
+      "id": "local-conflict",
+      "material_ids": ["local-development"],
+      "location_ids": ["reception"],
+      "entity_ids": ["npc:contact"]
+    }
+  ],
+  "initial_plans": [
+    {
+      "id": "contact-records",
+      "owner_id": "npc:contact",
+      "material_id": "contact-plan",
+      "review_after_minutes": 30
+    }
+  ],
+  "external_schedules": []
+}

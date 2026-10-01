@@ -1,0 +1,87 @@
+{
+  "materials": [
+    {
+      "id": "world-core",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "core",
+      "summary": "时代、公开局势和玩家身份。",
+      "file": "world/background/core.md"
+    },
+    {
+      "id": "world-society",
+      "purpose": "background",
+      "visibility": "public",
+      "delivery": "on_demand",
+      "summary": "当地生活、公共机构和社会环境。",
+      "location_ids": [
+        "reception",
+        "street"
+      ],
+      "file": "world/background/society.md"
+    },
+    {
+      "id": "world-rules",
+      "purpose": "world_rules",
+      "visibility": "public",
+      "delivery": "core",
+      "summary": "普遍可知的日常世界设定。",
+      "file": "world/rules/daily-life.md"
+    },
+    {
+      "id": "world-truth",
+      "purpose": "author_facts",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "开场事实、隐藏情况和信息分布。",
+      "location_ids": [
+        "reception"
+      ],
+      "entity_ids": [
+        "npc:contact"
+      ],
+      "file": "world/facts/current-situation.md"
+    },
+    {
+      "id": "local-development",
+      "purpose": "development",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "接待和记录整理的现实压力。",
+      "location_ids": [
+        "reception"
+      ],
+      "entity_ids": [
+        "npc:contact"
+      ],
+      "file": "narrative/conflicts.md"
+    },
+    {
+      "id": "contact-profile",
+      "purpose": "npc_profile",
+      "visibility": "owner",
+      "owner_id": "npc:contact",
+      "delivery": "on_demand",
+      "summary": "联系人本人的详细身份、经历和性格。",
+      "file": "npcs/contact/profile.md"
+    },
+    {
+      "id": "contact-knowledge",
+      "purpose": "npc_knowledge",
+      "visibility": "owner",
+      "owner_id": "npc:contact",
+      "delivery": "core",
+      "summary": "联系人本人掌握的初始情况。",
+      "file": "npcs/contact/knowledge.md"
+    },
+    {
+      "id": "contact-plan",
+      "purpose": "npc_plan",
+      "visibility": "owner",
+      "owner_id": "npc:contact",
+      "delivery": "on_demand",
+      "summary": "继续整理来访记录的时间意向。",
+      "file": "npcs/contact/plans.md"
+    }
+  ]
+}

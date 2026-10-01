@@ -1,0 +1,20 @@
+{
+  "locations": [
+    {
+      "id": "reception",
+      "kind": "place",
+      "name": "接待室",
+      "description": "一间面向街道的接待室，桌旁摆着来访记录与几把椅子。",
+      "connections": ["street"],
+      "public": true
+    },
+    {
+      "id": "street",
+      "kind": "place",
+      "name": "街道",
+      "description": "接待室外的街道，住户与行人在此经过。",
+      "connections": ["reception"],
+      "public": true
+    }
+  ]
+}
