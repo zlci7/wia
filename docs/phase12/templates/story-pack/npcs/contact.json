@@ -1,0 +1,13 @@
+{
+  "definition_id": "contact.v1",
+  "revision": "contact.v1",
+  "entity_id": "npc:contact",
+  "name": "联系人",
+  "role": "接待员",
+  "appearance": "填写玩家能够看见的外貌和衣着。",
+  "profile": "填写此人的性格、动机与行为倾向。",
+  "knowledge": "填写此人本人已知的事实，并区分亲历、听说和猜测。",
+  "initial_concerns": "填写此人正在关心的事情、想达成的目标与初始打算。",
+  "initial_location": "reception",
+  "speaking_examples": []
+}

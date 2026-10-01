@@ -1,0 +1,42 @@
+{
+  "schema_version": 3,
+  "requires": { "spatial": 1 },
+  "game_id": "story-template",
+  "revision": "story-template.v1",
+  "mode": "open",
+  "title": "填写剧本名称",
+  "description": "填写一句话介绍：玩家以什么身份进入怎样的局势。",
+  "gameplay": "填写玩家可以走访的地点、交谈对象和自由活动。",
+  "background": "填写公开世界背景、时代与当地人普遍知道的情况。",
+  "rules": "填写世界设定与能力限制。",
+  "author_facts": "填写主持需要掌握的真实情况；人物本人知道的内容分别填写在人物 knowledge 中。",
+  "player": {
+    "name": "来访者",
+    "profile": "填写主角的起始身份与个人背景。",
+    "requirements": "填写允许玩家修改的资料范围。",
+    "editable": true
+  },
+  "opening": "你走进接待室，联系人正在桌旁整理资料。门外是一条可供步行的街道。",
+  "initial_location": "reception",
+  "clock": "第 1 日 09:00",
+  "locations": [
+    {
+      "id": "reception",
+      "kind": "place",
+      "name": "接待室",
+      "description": "填写玩家能看到的房间布置与日常活动。",
+      "connections": ["street"],
+      "public": true
+    },
+    {
+      "id": "street",
+      "kind": "place",
+      "name": "街道",
+      "description": "填写公开街景与可以接触的活动。",
+      "connections": ["reception"],
+      "public": true
+    }
+  ],
+  "npcs": ["npcs/contact.json"],
+  "bystanders": []
+}
