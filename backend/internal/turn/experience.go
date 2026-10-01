@@ -11,9 +11,9 @@ func notePlayerAction(output *Output, run wiaworld.Run, intent TurnIntent) {
 	// Intent classification selects the interaction; the full input still needs
 	// resolution because speech can include movement or other world consequences.
 	output.Events = append(output.Events, wiaworld.Event{
-		EventID: run.RunID + ":player-action", EventType: "player_action_intent", ActorID: "player", TargetID: intent.AddresseeID,
+		EventID: inputPrefix(run) + ":player-action", EventType: "player_action_intent", ActorID: "player", TargetID: intent.AddresseeID,
 		Content: run.Input, RunID: run.RunID, Stage: 2, SceneVersion: output.SceneVersion,
-		SourceType: "player_attempt", CreatedAt: time.Now().UTC(),
+		SourceType: "player_attempt", ProjectionParentID: output.PlayerEventID, CreatedAt: time.Now().UTC(),
 	})
 }
 
@@ -27,9 +27,13 @@ func notePlayerAction(output *Output, run wiaworld.Run, intent TurnIntent) {
 func recordPlayerExperience(snapshot *Snapshot, output *Output, intent TurnIntent, participantIDs []string, playerEventID string) {
 	for _, characterID := range participantIDs {
 		kind, memory := playerExperienceMemory(intent, characterID, snapshot)
+		sourceID := playerEventID
+		if input, ok := output.StageOneInputs[characterID]; ok && len(input.SourceEventIDs) > 0 {
+			sourceID = input.SourceEventIDs[0]
+		}
 		output.Memories = append(output.Memories, wiaworld.Memory{
 			RecipientID: characterID, Kind: kind, Content: memory,
-			SourceEventID: playerEventID, CreatedAt: time.Now().UTC(),
+			SourceEventID: sourceID, CreatedAt: time.Now().UTC(),
 		})
 	}
 }

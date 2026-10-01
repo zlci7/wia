@@ -105,24 +105,7 @@ func applyMechanicEffects(snapshot Snapshot, output *Output, host hostResult) er
 	if err := applyItemTransfers(snapshot, &candidate, host.ItemTransfers, sources); err != nil {
 		return err
 	}
-	playerSources := map[string]bool{}
-	for _, change := range candidate.StateChanges {
-		definition, _ := stateDefinition(snapshot.Definition, change.After.StateID)
-		if change.After.EntityID != "player" && definition.Projection == "public" && sources[change.ActionID].recipients["player"] {
-			playerSources[change.SourceEventID] = true
-		}
-	}
-	for _, change := range candidate.ItemTransfers {
-		definition, _ := itemDefinition(snapshot.Definition, change.After.DefinitionID)
-		if definition.Projection == "public" && sources[change.ActionID].recipients["player"] {
-			playerSources[change.SourceEventID] = true
-		}
-	}
-	for sourceID := range playerSources {
-		if event, ok := EventByID(candidate.Events, sourceID); ok {
-			candidate.Perceptions = append(candidate.Perceptions, wiaworld.Perception{RecipientID: "player", SourceEventID: sourceID, SourceType: event.SourceType, Content: event.Content, Stage: event.Stage, SceneVersion: event.SceneVersion, CreatedAt: event.CreatedAt})
-		}
-	}
+
 	*output = candidate
 	return nil
 }

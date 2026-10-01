@@ -41,7 +41,7 @@ func TestAddressedSpeechRetainsItsMovementAttempt(t *testing.T) {
 	intent := TurnIntent{IntentType: "speak", AddresseeID: "npc:reporter", Visibility: "public"}
 	output := Output{SceneVersion: 1, Positions: clonePositions(snapshot.Positions)}
 	notePlayerAction(&output, run, intent)
-	host := hostResult{TimeMinutes: 5, Scene: "street", Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "succeeded", Content: "玩家拒绝委托，离开办公室抵达街上。", Recipients: []string{"player", "npc:reporter"}}}, Movements: []movementResult{{EntityID: "player", From: "office", To: "street", Route: []string{"office", "street"}, ActionID: "run:player-action"}}, SceneUpdates: []sceneUpdate{{Content: "street", SourceIDs: []string{"run:player-action"}, Recipients: []string{"player"}}}}
+	host := hostResult{TimeMinutes: 5, Scene: "street", Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "succeeded", Content: "玩家拒绝委托，离开办公室抵达街上。", Projections: outcomeProjectionFixture("玩家拒绝委托，离开办公室抵达街上。", []string{"player", "npc:reporter"}), Recipients: []string{"player", "npc:reporter"}}}, Movements: []movementResult{{EntityID: "player", From: "office", To: "street", Route: []string{"office", "street"}, ActionID: "run:player-action"}}, SceneUpdates: []sceneUpdate{{Content: "street", SourceIDs: []string{"run:player-action"}, Recipients: []string{"player"}}}}
 	resolved, err := prepareCoordination(snapshot, run, intent, output, host)
 	if err != nil {
 		t.Fatal(err)

@@ -27,10 +27,11 @@ func ComposeSuggestions(snapshot Snapshot) Material {
 }
 
 type sceneSource struct {
-	ID         string   `json:"id"`
-	Content    string   `json:"content"`
-	Recipients []string `json:"recipients"`
-	Canonical  []string `json:"-"`
+	ID                   string              `json:"id"`
+	Content              string              `json:"content"`
+	Recipients           []string            `json:"recipients"`
+	Canonical            []string            `json:"-"`
+	CanonicalByRecipient map[string][]string `json:"-"`
 }
 
 func sceneSources(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, events []wiaworld.Event) []sceneSource {
@@ -50,8 +51,8 @@ func sceneSources(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, events
 			if intent.Visibility == "private" {
 				recipients = []string{"player", intent.AddresseeID}
 			}
-		case "npc_dialogue":
-			recipients = public
+		case "npc_dialogue", "player_observed":
+			recipients = []string{event.TargetID}
 		default:
 			continue
 		}
@@ -104,14 +105,9 @@ func narrativeEvents(events []wiaworld.Event, characters []wiaworld.Character, p
 				break
 			}
 		}
-		speechScope := ""
-		if event.EventType == "npc_dialogue" || event.SourceType == "player_public" {
-			speechScope = "public_current_scene"
-		} else if event.SourceType == "player_private" {
-			speechScope = "private_recipient"
-		}
+		speechScope := speechScope(event)
 		outcomeStatus := ""
-		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
+		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" || event.EventType == "action_perceived" {
 			outcomeStatus = strings.TrimPrefix(event.SourceType, "action_")
 		}
 		result = append(result, narrativeEvent{OutcomeStatus: outcomeStatus, SpeechScope: speechScope, EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, ActorName: name, ActorRole: role, NarrativeReference: reference, Stage: event.Stage, Content: event.Content})
@@ -141,6 +137,7 @@ func composeIntent(snapshot Snapshot, run wiaworld.Run) Material {
 		input += "\n可选程序规则(JSON)：" + wire.MarshalJSON(options) + "\naction_rule_id 只在玩家明确尝试其中描述的同一行动时填写对应 id；普通交谈、移动、无风险观察及不匹配的行动返回空字符串。规则是否需要检定、点数和成功状态由程序确定，声明的固定效果由程序执行；具体情节与普通状态后果由后续协调结合世界资料判断。"
 	}
 
+	input += "\n混合输入：只在交談范围、对象或影响观察资格的位置变化时拆为2至4个有序 fragments；普通输入省略 fragments。每项含 text(逐字复制原文连续片段，包括标点，顺序完整覆盖全部非空白原文)、actor_id=player、intent_type、addressee_id、visibility、wait_minutes、action_rule_id。先私聊后离开分别处理，不把前段秘密放入后段。范围由程序从原文推导；最多一段选择固定规则，等待共享120分钟。后段对象可从全部已定义人物选择，执行时必须实际可接触。\n全部定义人物：" + AvailableCharacterIDs(snapshot.Characters)
 	return Material{System: "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", RequiredSources: append([]string{run.RunID + ":input"}, SceneViewSources(snapshot, "player")...), Required: input, Optional: DialogueSections(snapshot)}
 }
 
@@ -156,9 +153,11 @@ func composeCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	publicCharacters := PublicCharacterContext(snapshot.Characters, wiaworld.CharacterIDs(InScene(snapshot.Characters)))
 	input := fmt.Sprintf("世界：%s\n当前地点与情境：%s\n当前时间：%s\n当前公开人物(JSON)：%s\n当前背景人群：%s\n玩家本轮输入：%s\n结构化意图：type=%s；target=%s；visibility=%s\n主角共创边界：当前模式为%s。你只协调玩家实际输入已经表达的尝试和 NPC 已提交的行动；等价的简短台词、日常动作和表现性衔接由正文阶段处理，不在此新增玩家身份、秘密、目标、接受或拒绝、承诺、关系、关键资源处置、危险行动或移动目的地。\nNPC 已确定的公开对白：%s\n待裁定行动(JSON)：%s\n所有可用重要人物：%s\n当前在场人物 entity_id：%s\n请协调本轮事实。每个待裁定行动必须且只能产生一个 outcome，并用 action_id 精确引用；status 只能是 succeeded、failed、partial、not_executed；not_executed 表示重复、已覆盖或前置条件未成立而未另行执行，不代表动作成功；每项仍保留自己的 action_id 和结果；content 写已确定结果而不是尝试；recipients 只列实际感知结果的 player 或人物 entity_id，行动者本人可省略。scene 必须保留未被本轮事件改变的地点、在场人物和背景人群，不得凭空让人物离开；叙述人物时优先使用姓名，不根据姓名猜测代词。scene_characters 只给出回合结束后实际在场的重要 NPC entity_id，不要包含 player；人物进入或离开只影响之后的阶段，不回填此前信息。输出 JSON：time_minutes、scene、scene_characters、outcomes、scene_updates。", snapshot.Summary.GameID, CoordinationScene(snapshot), snapshot.Summary.Clock, publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), run.Input, intent.IntentType, intent.AddresseeID, intent.Visibility, PlayerElaborationLabel(snapshot.Narrative), publicReplies, actionJSON, AvailableCharacterIDs(snapshot.Characters), strings.Join(wiaworld.CharacterIDs(InScene(snapshot.Characters)), ","))
 
+	input += personalProjectionContract
+	input += fmt.Sprintf("\n本输入剩余游戏时间预算：%d分钟。", PlotTimeLimit(snapshot))
 	input += "\n本轮场景协调策略：\n" + policy + "\n"
 	input += "\nscene_characters 专指与玩家在回合结束时处于同一现场、之后能接收玩家普通交谈的重要NPC。分接收者场景包含场外人物资料，不代表他们与玩家在一起。玩家离开原地点而人物留在原地点时，从这个名单移出相应人物；人物依自己的已确认行动跟随抵达时才保留。只更新名单不自动移动人物，各人的 scene_updates 仍分别保留其实际位置。"
-	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。重要NPC的对白仅取本人已确定的公开对白，不从行动提案中补造其问话、承诺或回应。\n"
+	input += "\n行动衔接合同：待裁定清单内所有 action_intent 都是未执行提案，不因措辞使用过去时而成为事实。按阶段及依赖关系协调；后一提案依赖前一项时，先确定前项结果。重叠、重复且没有新的需要时只完成一次，对其他项返回 not_executed 并说明已被哪项覆盖或为何无须另行执行，不补造消耗、时间经过或障碍来使重复合理。重要NPC的对白仅取本人已确定且带听众范围的对白，不从行动提案中补造其问话、承诺或回应。\n"
 	input += sceneSourcePrompt(snapshot, run, intent, events)
 	input += PlotContext(snapshot)
 	if intent.WaitMinutes > 0 {
@@ -195,7 +194,7 @@ func composeNarration(snapshot Snapshot, run wiaworld.Run, def story.Definition,
 	if snapshot.Plot != nil {
 		customInstruction += "\n多阶段叙事：事件清单是可用依据，不是必须逐条复述的稿件。保留关键选择与结果，相同立场的连续对白可以合并、间接转述，省去重复环境与动作；在现有回复长度预算内完整收尾。玩家原文中的等待是请求，实际经过的时间以 time_advanced 事件为准；未处理的剩余时段尚未发生。按事件阶段先后承接，不把较晚节点的刺激写到较早行动之前。"
 	}
-	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n正文表达策略（在明确选项与固定合同内生效）：%s\n玩家可见历史正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本轮自己的完整表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人、含义和可听范围；speech_scope=public_current_scene 的玩家表达或 NPC 对白已按公开范围分发，应呈现为在场者可听见，不改成仅特定人物听见；private_recipient 的玩家表达保持私聊范围。玩家试探语气不能被正文补写成耳语，NPC 公开对白不改成私密回复，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。细节是否越界取决于含义而非动作大小；例如在邀请后推碗、点头可能表示接受，不能替未作决定的人补出这类回应。outcome_status=not_executed 表示没有另行执行，不将该提案写成发生，也不逐项播报未执行清单。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息；可以直接承接而不逐字复述，语气轻缓不等于只有特定人听见；不得通过压低声音或空间描述缩小已确定的公开可听范围。不能把一句陈述改写成多次询问，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, "", playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
+	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n正文表达策略（在明确选项与固定合同内生效）：%s\n玩家可见历史正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本轮自己的完整表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人、含义和可听范围；speech_scope=public_current_scene 的玩家表达或 NPC 对白已按公开范围分发，应呈现为在场者可听见，不改成仅特定人物听见；private_recipient 的玩家表达和 NPC 对白保持私聊范围。玩家试探语气不能被正文补写成耳语，NPC 对白保持事件声明的可听范围，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。细节是否越界取决于含义而非动作大小；例如在邀请后推碗、点头可能表示接受，不能替未作决定的人补出这类回应。outcome_status=not_executed 表示没有另行执行，不将该提案写成发生，也不逐项播报未执行清单。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息；可以直接承接而不逐字复述，语气轻缓不等于只有特定人听见；不得通过压低声音或空间描述缩小已确定的公开可听范围。不能把一句陈述改写成多次询问，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, "", playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
 	input += "\n玩家可见状态与物品(JSON)：" + MechanicsContext(snapshot, "player")
 
 	input += "\n公开世界背景：" + snapshot.Definition.Background + "\n世界规则：" + snapshot.Definition.Rules
@@ -208,7 +207,7 @@ func composeNPC(snapshot Snapshot, def story.Definition, character wiaworld.Char
 	_, revision := BehaviorPolicy(snapshot.Narrative, "npc")
 	base := snapshot
 	relationOptions := relationshipProposalOptions(snapshot, character.EntityID)
-	material := Material{PolicyRevision: revision, System: BehaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你愿意让在场者听见的公开对白；即使玩家耳语，你也只能选择公开回应或沉默，不在 speech 中声明只有玩家听见；私密信息可以不说，所有对外说出的内容必须放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), SceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, relationOptions, stage), Optional: PersonalSections(snapshot, character.EntityID)}
+	material := Material{PolicyRevision: revision, System: BehaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你选择说出的对白；speech_visibility 为 public 或 private，private 时 speech_recipients 列出实际同场接收者的 ID，public 时为空数组。你可以对玩家或其他同场人物私密回复；保密由听众范围表达，所有说出的内容放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), SceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, relationOptions, stage), Optional: PersonalSections(snapshot, character.EntityID)}
 	if snapshot.Definition.Capabilities["relations"] == 1 {
 		material.System += "\nrelationship_proposals 是你本人基于已经获准经历的已提交结果提出的有向关系变化数组，每项只含 target_id、relation_type、delta、source_id；source_id、target_id、relation_type 必须逐字复制“关系变化可用组合”中的同一项。本阶段尚未裁定的玩家输入和行动尝试不能作为关系变化来源。delta 不得为0；该类型声明正数单轮预算时遵守预算。关系属于你本人；不能替其他人物提案。没有可用组合或没有变化时返回 []。"
 	}
@@ -238,6 +237,7 @@ func buildNPCPrompt(snapshot Snapshot, def story.Definition, character wiaworld.
 	fmt.Fprintf(&builder, "你的身份：%s（%s）\n角色资料：%s\n你知道的初始背景：%s\n", character.Name, character.Role, character.Profile, character.Knowledge)
 	fmt.Fprintf(&builder, "你的初始关切（故事开始时的动机，不是固定动作脚本）：%s\n", character.InitialConcerns)
 	fmt.Fprintf(&builder, "你获准知道的当前状态、关系与物品(JSON)：%s\n", MechanicsContext(snapshot, character.EntityID))
+	fmt.Fprintf(&builder, "当前可交谈对象(JSON)：%s\n", speechContactContext(snapshot, character.EntityID))
 	fmt.Fprintf(&builder, "本阶段输入来源ID(JSON)：%s\n", wire.MarshalJSON(stageInput.SourceEventIDs))
 	fmt.Fprintf(&builder, "关系变化可用组合(JSON)：%s\n", wire.MarshalJSON(relationOptions))
 	if len(character.SpeakingExamples) > 0 {

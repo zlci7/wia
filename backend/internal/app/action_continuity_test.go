@@ -37,10 +37,10 @@ func (g *overlappingActionGenerator) GenerateText(ctx context.Context, req model
 			return model.TextResponse{}, errors.New("missing action sources")
 		}
 		out := hostResult{Scene: "客栈", SceneCharacters: []string{"npc:innkeeper", "npc:mercenary"}, SceneUpdates: []sceneUpdate{}, Outcomes: []hostActionResult{
-			{ActionID: actions[0].EventID, Status: "succeeded", Content: "沈岚把一碗热水放在桌上。", Recipients: []string{"player", "npc:mercenary"}},
-			{ActionID: actions[1].EventID, Status: "not_executed", Content: "热水刚放下，没有消耗，无须另行续水。", Recipients: []string{"player"}},
+			{ActionID: actions[0].EventID, Status: "succeeded", Content: "沈岚把一碗热水放在桌上。", Projections: outcomeProjectionFixture("沈岚把一碗热水放在桌上。", []string{"player", "npc:mercenary", actions[0].ActorID}), Recipients: []string{"player", "npc:mercenary"}},
+			{ActionID: actions[1].EventID, Status: "not_executed", Content: "热水刚放下，没有消耗，无须另行续水。", Projections: outcomeProjectionFixture("热水刚放下，没有消耗，无须另行续水。", []string{"player", actions[1].ActorID}), Recipients: []string{"player"}},
 		}}
-		out.Outcomes = append(out.Outcomes, hostActionResult{ActionID: actions[2].EventID, Status: "succeeded", Content: "你向堂内问起近来的怪事。", Recipients: []string{"player", "npc:innkeeper", "npc:mercenary"}})
+		out.Outcomes = append(out.Outcomes, hostActionResult{ActionID: actions[2].EventID, Status: "succeeded", Content: "你向堂内问起近来的怪事。", Projections: outcomeProjectionFixture("你向堂内问起近来的怪事。", []string{"player", "npc:innkeeper", "npc:mercenary"}), Recipients: []string{"player", "npc:innkeeper", "npc:mercenary"}})
 		data, _ := json.Marshal(out)
 		return model.TextResponse{Text: string(data)}, nil
 	}
@@ -65,7 +65,10 @@ func TestPendingActionsAndNotExecutedResultsSurviveAtomicTurn(t *testing.T) {
 	if r.Status != "completed" {
 		t.Fatalf("%+v", r)
 	}
-	s := readContextSnapshot(t, a, w.WorldID)
+	s, err := a.ReadWorld(context.Background(), w.WorldID, 200)
+	if err != nil {
+		t.Fatal(err)
+	}
 	actions, results, skipped := 0, 0, 0
 	for _, e := range s.Events {
 		switch e.EventType {

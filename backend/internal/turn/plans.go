@@ -161,7 +161,7 @@ func applyPlanUpdates(output *Output, run wiaworld.Run, owner string, decision N
 		if index >= 0 {
 			version = output.OpenProgress.Plans[index].Version + 1
 		}
-		eventID := fmt.Sprintf("%s:%s:plan:%d:%d", run.RunID, owner, stage, i)
+		eventID := fmt.Sprintf("%s:%s:plan:%d:%d", inputPrefix(run), owner, stage, i)
 		plan := wiaworld.PersonalPlan{ID: update.ID, OwnerID: owner, Content: update.Content, SourceIDs: slices.Clone(update.SourceIDs), NextCheck: minute + update.ReviewAfterMinutes, LastCheck: minute, Status: update.Status, Version: version, ContextEpoch: run.BaseContextEpoch}
 		if index < 0 {
 			output.OpenProgress.Plans = append(output.OpenProgress.Plans, plan)

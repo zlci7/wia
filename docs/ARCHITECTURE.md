@@ -207,14 +207,18 @@ plot.Validate(def, progress)          // 两者都要时
 `turn/service.go` 编排回合生成，顺序如下：
 
 ```text
-load → resolveIntent → runCharacters → notePlayerAction
-     → coordinate（场景协调与世界推进）→ narrate
-     → recordPlayerExperience → Output
+load → resolveIntentStage
+     → executeInput（有序片段共享一个回合工作态）
+         每片段：OpenOutput → runCharacters → notePlayerAction
+                → coordinateStage → recordPlayerExperience
+     → resolveSceneResult（一次世界推进）→ narrate → Output
 ```
 
-阶段实现位于 `load.go`、`memory_store.go`、`stages.go`、`coordinate.go`、`progression.go` 与 `experience.go`。`Execute` 成功表示产出了待提交结果；`app/run.go` 的 `runWorker` 调用 `app/store.go` 的 `commitTurn` 才完成持久化。
+阶段实现位于 `load.go`、`memory_store.go`、`stages.go`、`coordinate.go`、`progression.go` 与 `experience.go`；`input.go` 持有原文片段校验和工作态合并，`speech.go` 持有听众及个人投影合同。`Execute` 成功表示产出了待提交结果；`app/run.go` 的 `runWorker` 调用 `app/store.go` 的 `commitTurn` 才完成持久化。
 
 Story Pack v4 的不可变材料由 `content` 编译为 `story.Definition`，随世界创建冻结。`turn/materials.go` 在现有上下文入口按用途、接收者与相关性选择材料；`ContextGenerator` 执行有界补充读取，装配本身保持纯函数。人物当前计划保存在 `world.OpenProgress`，`plot` 选择到期所有者，`turn/open_world.go` 沿现有世界推进路径请求本人决定并协调结果。`storage` 保存计划记录，`app` 在同一最终事务中提交计划、经历与其他世界事实。旧节点定义和 v4 持续发展均使用原有投影、人物决定与行动结算职责。
+
+玩家完整输入保存一次，少量原文片段依次调用既有人物与协调职责，位置和能力工作态传递给下一片段；世界推进与正文各执行一次，最终回合仍由 `app` 原子提交。行动作者结果、NPC 回复及个人观察通过来源依赖连接，接收者只读取本人投影。当前结构化事实的知情资格可由个人投影证明，该资格不返回作者根结果正文。
 
 **主流程集中，不等于所有实现集中。** 把 `storyapp/run.go` 改名为 `turn/service.go` 不算解决问题。
 

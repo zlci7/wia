@@ -97,6 +97,7 @@ type Message struct {
 // phase of a turn produced it and which scene projection it belongs to.
 type Event struct {
 	ProjectionParentID string    `json:"-"`
+	BasisEventIDs      []string  `json:"-"`
 	Seq                int64     `json:"seq"`
 	EventID            string    `json:"event_id"`
 	EventType          string    `json:"event_type"`
@@ -154,6 +155,8 @@ type Run struct {
 	BaseContextEpoch     int64     `json:"-"`
 	BaseSceneVersion     int64     `json:"-"`
 	PreparedActionRuleID string    `json:"-"`
+	// InputPart identifies an ordered segment within one atomic input.
+	InputPart int `json:"-"`
 }
 
 // PublicCharacterViews projects characters for the player. Private role material

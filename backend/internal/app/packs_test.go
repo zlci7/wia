@@ -261,7 +261,7 @@ func (g *packGenerator) GenerateText(ctx context.Context, r model.TextRequest) (
 		_ = json.Unmarshal([]byte(r.Input[start:start+end]), &candidates)
 		outcomes := []hostActionResult{}
 		for _, c := range candidates {
-			outcomes = append(outcomes, hostActionResult{ActionID: c.EventID, Status: "succeeded", Content: c.Content, Recipients: []string{"player", "npc:innkeeper", "npc:mercenary"}})
+			outcomes = append(outcomes, hostActionResult{ActionID: c.EventID, Status: "succeeded", Content: c.Content, Projections: outcomeProjectionFixture(c.Content, []string{"player", "npc:innkeeper", "npc:mercenary"}), Recipients: []string{"player", "npc:innkeeper", "npc:mercenary"}})
 		}
 		scene := "维修站值班室"
 		if strings.Contains(r.Input, "旧渡口客栈") {

@@ -160,7 +160,7 @@ func (g actionConsistencyGenerator) GenerateText(ctx context.Context, req model.
 		}
 		outcomes := []hostActionResult{}
 		for _, e := range candidates {
-			outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: g.status, Content: "已裁定的设备检查结果", Recipients: []string{"player", "npc:innkeeper"}})
+			outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: g.status, Content: "已裁定的设备检查结果", Projections: outcomeProjectionFixture("已裁定的设备检查结果", []string{"player", "npc:innkeeper"}), Recipients: []string{"player", "npc:innkeeper"}})
 		}
 		return model.TextResponse{Text: wire.MarshalJSON(hostResult{TimeMinutes: 1, Scene: "值班室", SceneCharacters: []string{"npc:innkeeper", "npc:mercenary"}, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	default:

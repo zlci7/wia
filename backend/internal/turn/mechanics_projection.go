@@ -3,6 +3,7 @@ package turn
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"gameagent/backend/internal/story"
 	wiaworld "gameagent/backend/internal/world"
@@ -78,6 +79,11 @@ func perceivedSource(snapshot Snapshot, recipient, source string) bool {
 	for _, perception := range snapshot.Perceptions[recipient] {
 		if perception.SourceEventID == source {
 			return true
+		}
+		if strings.HasPrefix(perception.SourceEventID, source+":projection:") {
+			if event, ok := EventByID(snapshot.Events, perception.SourceEventID); ok && event.EventType == "action_perceived" && event.ProjectionParentID == source && event.TargetID == recipient {
+				return true
+			}
 		}
 	}
 	return false

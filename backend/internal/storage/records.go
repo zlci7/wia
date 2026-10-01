@@ -7,6 +7,17 @@ import (
 	"fmt"
 )
 
+// LoadActionProjectionRoot resolves the author fact behind an individual
+// observation without returning that fact's text.
+func (s *WorldStore) LoadActionProjectionRoot(ctx context.Context, eventID string) (string, error) {
+	var root string
+	err := s.db.QueryRowContext(ctx, `SELECT d.parent_id FROM event_dependencies d JOIN events child ON child.event_id=d.child_id JOIN events parent ON parent.event_id=d.parent_id WHERE d.child_id=? AND child.event_type='action_perceived' AND parent.event_type IN ('npc_action_result','player_action_result') ORDER BY d.parent_id LIMIT 1`, eventID).Scan(&root)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return root, err
+}
+
 // The record types below are what this package can see: rows. They carry the column
 // names and nothing else.
 //

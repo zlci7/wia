@@ -464,6 +464,7 @@ func validatePlotResolution(snapshot Snapshot, node plot.Node, output Output, re
 
 func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, rootID string, resolution plotResolution, output *Output) ([]wiaworld.Event, error) {
 	base := snapshot
+	base.speechRoster = append([]string{}, output.SceneCharacters...)
 	base.Summary.Clock = output.Clock
 	base.SceneViews, base.SceneVersion = output.SceneViews, output.SceneVersion
 	base.Positions = clonePositions(output.Positions)
@@ -546,17 +547,18 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			audience = append([]string{"player"}, wiaworld.CharacterIDs(observers)...)
 		}
 		start := len(extra.Events)
-		appendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)
-		if !slices.Contains(audience, "player") {
-			for i := start; i < len(extra.Events); i++ {
-				if extra.Events[i].EventType == "npc_dialogue" {
-					extra.Events[i].SourceType = "offscene_dialogue"
-					extra.Events[i].TargetID = c.EntityID
+		if snapshot.Definition.Capabilities["spatial"] == 1 {
+			for _, bystander := range snapshot.Definition.BystanderRefs {
+				if currentlyCoLocated(base, c.EntityID, bystander.BystanderID) {
+					audience = append(audience, bystander.BystanderID)
 				}
 			}
 		}
+		extra.speechAudience = audience
+		appendNPCDecisionOutput(&extra, run, c, d, observers, inputs[c.EntityID].SourceEventIDs[0], output.SceneVersion, 5)
+
 		for _, e := range extra.Events[start:] {
-			if e.EventType == "npc_dialogue" && slices.Contains(audience, "player") {
+			if e.EventType == "npc_dialogue" && e.TargetID == "player" && slices.Contains(audience, "player") {
 				visible = append(visible, e)
 			}
 			if e.EventType == "npc_action_intent" {
@@ -575,6 +577,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
 			Required: fmt.Sprintf("当前节点结果(作者资料)：%s\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n每个行动允许的接收者：%s\n仅返回JSON字段outcomes，数组项含action_id/status/content/recipients。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", wire.MarshalJSON(resolution), wire.MarshalJSON(output.Events), wire.MarshalJSON(extra.Events), wire.MarshalJSON(allowed), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
+		material.Required += personalProjectionContract
 		material.Required += plotActionSceneContract(*output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
 		material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
 		if snapshot.Definition.Capabilities["spatial"] == 1 {
@@ -589,7 +592,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			remainingMinutes = max(0, 120-output.elapsedMinutes)
 			material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
 		}
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v7")
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v8")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
@@ -622,6 +625,9 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		outcomes := make([]hostActionResult, 0, len(resolved.Outcomes))
 		for _, o := range resolved.Outcomes {
+			if snapshot.Definition.Progression != nil && o.Projections == nil {
+				return nil, coordinationInvalid("action_projections_required", "outcomes.projections", "explicit-personal-projections")
+			}
 			outcomes = append(outcomes, o.hostActionResult)
 		}
 		finalCharacters := append([]string{}, output.SceneCharacters...)
@@ -673,7 +679,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		visible = append(visible, results...)
 		for i := range extra.Events {
-			if extra.Events[i].EventType == "npc_action_result" {
+			if extra.Events[i].EventType == "npc_action_result" || extra.Events[i].EventType == "action_perceived" {
 				extra.Events[i].Stage = 6
 			}
 		}
@@ -688,7 +694,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		sources := plotSceneSources(*output, nil)
 		for i, outcome := range resolved.Outcomes {
 			action, _ := EventByID(extra.Events, outcome.ActionID)
-			sources[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)}}
+			sources[outcome.ActionID] = projectionSource(action, outcome.hostActionResult, i)
 		}
 		version := output.SceneVersion
 		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {

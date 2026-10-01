@@ -64,7 +64,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 			if g.intervene {
 				content, status = "你将受伤信使护送至安全处，证据交由本人保管。", "succeeded"
 			}
-			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: status, Content: content, Recipients: []string{"player"}})
+			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: status, Content: content, Projections: outcomeProjectionFixture(content, []string{"player", candidate.ActorID}), Recipients: []string{"player"}})
 		}
 		return model.TextResponse{Text: wire.MarshalJSON(hostResult{TimeMinutes: minutes, Scene: "旧渡口客栈", SceneCharacters: ids, Outcomes: outcomes, SceneUpdates: []sceneUpdate{}})}, nil
 	}
@@ -119,7 +119,7 @@ func (g *plotTestGenerator) GenerateText(ctx context.Context, req model.TextRequ
 		outcomes := []hostActionResult{}
 		for _, e := range records {
 			if e.EventType == "npc_action_intent" {
-				outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: "succeeded", Content: "门闩已经查看，锁扣完好。", Recipients: []string{e.ActorID}})
+				outcomes = append(outcomes, hostActionResult{ActionID: e.EventID, Status: "succeeded", Content: "门闩已经查看，锁扣完好。", Projections: outcomeProjectionFixture("门闩已经查看，锁扣完好。", []string{e.ActorID}), Recipients: []string{e.ActorID}})
 			}
 		}
 		updates := []sceneUpdate{}

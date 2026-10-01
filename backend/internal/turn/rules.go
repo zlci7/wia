@@ -53,7 +53,7 @@ func prepareActionResolution(ctx context.Context, store *storage.WorldStore, sna
 	if !met {
 		return ActionResolution{}, ErrInvalidRequest
 	}
-	resolution := ActionResolution{RuleID: rule.ID, RuleName: rule.Name, ActionID: run.RunID + ":player-action", Status: "succeeded", Summary: rule.SuccessText, Effects: slices.Clone(rule.SuccessEffects)}
+	resolution := ActionResolution{RuleID: rule.ID, RuleName: rule.Name, ActionID: inputPrefix(run) + ":player-action", Status: "succeeded", Summary: rule.SuccessText, Effects: slices.Clone(rule.SuccessEffects)}
 	if rule.Risk != nil {
 		resolution.Target = rule.Risk.BaseTarget
 	}

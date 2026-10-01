@@ -63,7 +63,7 @@ func TestPreparedRiskReusesRollForStableInput(t *testing.T) {
 func TestProgramRuleFailureAppliesDeclaredConsequenceOnlyOnce(t *testing.T) {
 	snapshot := ruleTestSnapshot()
 	output := Output{SceneVersion: 1, States: cloneStates(snapshot.States), Relationships: []wiaworld.Relationship{}, Items: map[string]wiaworld.ItemInstance{}, Events: []wiaworld.Event{{EventID: "run:player-action", EventType: "player_action_intent", ActorID: "player", RunID: "run", Stage: 2}}, ActionResolution: &ActionResolution{RuleID: "risk", RuleName: "风险行动", ActionID: "run:player-action", Roll: 99, Target: 60, Status: "failed", Summary: "失败", Effects: []story.RuleEffect{{Kind: "state_delta", EntityID: "actor", StateID: "strain", Delta: 9}}}}
-	host := hostResult{Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "failed", Content: "失败表现", Recipients: []string{"player"}}}}
+	host := hostResult{Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "failed", Content: "失败表现", Projections: outcomeProjectionFixture("失败表现", []string{"player"}), Recipients: []string{"player"}}}}
 	if _, err := appendHostOutcomes(&output, wiaworld.Run{RunID: "run"}, nil, nil, host.Outcomes); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestProgramRuleEffectSaturatesAtDeclaredBounds(t *testing.T) {
 	current.Value.Integer = 96
 	snapshot.States["player"]["strain"] = current
 	output := Output{SceneVersion: 1, States: cloneStates(snapshot.States), Relationships: []wiaworld.Relationship{}, Items: map[string]wiaworld.ItemInstance{}, Events: []wiaworld.Event{{EventID: "run:player-action", EventType: "player_action_intent", ActorID: "player", RunID: "run", Stage: 2}}, ActionResolution: &ActionResolution{RuleID: "risk", RuleName: "风险行动", ActionID: "run:player-action", Roll: 99, Target: 60, Status: "failed", Summary: "失败", Effects: []story.RuleEffect{{Kind: "state_delta", EntityID: "actor", StateID: "strain", Delta: 9}}}}
-	host := hostResult{Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "failed", Content: "失败表现", Recipients: []string{"player"}}}}
+	host := hostResult{Outcomes: []hostActionResult{{ActionID: "run:player-action", Status: "failed", Content: "失败表现", Projections: outcomeProjectionFixture("失败表现", []string{"player"}), Recipients: []string{"player"}}}}
 	if _, err := appendHostOutcomes(&output, wiaworld.Run{RunID: "run"}, nil, nil, host.Outcomes); err != nil {
 		t.Fatal(err)
 	}

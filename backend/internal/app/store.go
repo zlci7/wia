@@ -247,6 +247,13 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 					return err
 				}
 			}
+			for _, source := range e.BasisEventIDs {
+				if source != "" && source != e.EventID {
+					if err := tx.InsertEventDependency(ctx, e.EventID, source); err != nil {
+						return err
+					}
+				}
+			}
 		}
 		if progress != nil {
 			for _, event := range events {
@@ -313,7 +320,7 @@ func commitTurn(ctx context.Context, store *storage.WorldStore, run wiaworld.Run
 			}
 		}
 		if actionResolution != nil {
-			if err := tx.SettleActionResolution(ctx, run.InputID, actionResolution.RuleID, actionResolution.Status, ""+run.RunID+":rule:"+actionResolution.RuleID); err != nil {
+			if err := tx.SettleActionResolution(ctx, run.InputID, actionResolution.RuleID, actionResolution.Status, strings.TrimSuffix(actionResolution.ActionID, ":player-action")+":rule:"+actionResolution.RuleID); err != nil {
 				return err
 			}
 		}

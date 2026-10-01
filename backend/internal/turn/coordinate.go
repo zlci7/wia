@@ -60,23 +60,18 @@ type hostActionResult struct {
 	Recipients []string `json:"recipients"`
 	// Bystanders names the defined passers-by this outcome actually involved, so
 	// their personal experience has a real attribution instead of a guess from prose.
-	Bystanders []string `json:"bystanders,omitempty"`
+	Bystanders  []string           `json:"bystanders,omitempty"`
+	Projections []actionProjection `json:"projections,omitempty"`
+}
+
+type actionProjection struct {
+	Recipient string `json:"recipient"`
+	Content   string `json:"content"`
 }
 
 const (
-	coordinationPromptVersion = "story.coordination.v19"
+	coordinationPromptVersion = "story.coordination.v20"
 )
-
-// coordinateStage resolves the scene: time, roster, action outcomes and the
-// scene views, and returns the events the player can perceive so far.
-func (s *Service) coordinate(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, output *Output) error {
-	host, visibleEvents, err := s.coordinateStage(ctx, generator, snapshot, run, intent, intent.AddresseeID, output)
-	if err != nil {
-		return err
-	}
-	output.VisibleEvents = append(output.VisibleEvents, visibleEvents...)
-	return s.resolveSceneResult(ctx, generator, snapshot, run, host, output)
-}
 
 func (s *Service) coordinateStage(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, recipient string, output *Output) (hostResult, []wiaworld.Event, error) {
 	coordinationStarted := time.Now()
@@ -127,9 +122,16 @@ type coordinatedTurn struct {
 // Each response is resolved against the same input. Rejected candidates never
 // share writable event or perception storage with the accepted turn.
 func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, original Output, host hostResult) (coordinatedTurn, error) {
+	if snapshot.Definition.Progression != nil {
+		for _, outcome := range host.Outcomes {
+			if outcome.Projections == nil {
+				return coordinatedTurn{}, coordinationInvalid("action_projections_required", "outcomes.projections", "explicit-personal-projections")
+			}
+		}
+	}
 	if intent.Private() {
 		for index, outcome := range host.Outcomes {
-			if outcome.ActionID != run.RunID+":player-action" {
+			if outcome.ActionID != inputPrefix(run)+":player-action" {
 				continue
 			}
 			if len(outcome.Bystanders) > 0 {
@@ -398,27 +400,31 @@ func appendHostOutcomes(output *Output, run wiaworld.Run, participants []wiaworl
 			resultEvent.EventType = "player_action_result"
 		}
 		output.Events = append(output.Events, resultEvent)
-		for _, character := range participants {
-			if recipients[character.EntityID] {
-				output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
-			}
-		}
-		if recipients["player"] {
-			visible = append(visible, resultEvent)
-		}
-		// A passers-by who actually took part in the outcome keeps that as their own
-		// experience; being in the room still grants nothing.
-		involved := make(map[string]bool, len(outcome.Bystanders))
 		for i, id := range outcome.Bystanders {
-			id = wire.Clean(id)
-			if id == "" || involved[id] {
-				continue
+			if id == "" || recipients[id] || !definedBystanders[id] {
+				return nil, coordinationInvalid("action_outcome_bystander", fmt.Sprintf("%s.bystanders[%d]", field, i), "unique-defined-bystander")
 			}
-			if !definedBystanders[id] {
-				return nil, coordinationInvalid("action_outcome_bystander", fmt.Sprintf("%s.bystanders[%d]", field, i), "defined-bystander-id")
+			recipients[id] = true
+		}
+		texts, err := actionProjectionText(outcome, recipients)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0, len(recipients))
+		for id := range recipients {
+			ids = append(ids, id)
+		}
+		slices.Sort(ids)
+		for _, id := range ids {
+			projection := resultEvent
+			projection.EventID = resultID + ":projection:" + id
+			projection.EventType = "action_perceived"
+			projection.TargetID, projection.Content, projection.ProjectionParentID = id, texts[id], resultID
+			output.Events = append(output.Events, projection)
+			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: projection.EventID, SourceType: projection.SourceType, Content: projection.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: projection.CreatedAt})
+			if id == "player" {
+				visible = append(visible, projection)
 			}
-			involved[id] = true
-			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: resultID, SourceType: "action_" + outcome.Status, Content: outcome.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: time.Now().UTC()})
 		}
 	}
 	return visible, nil

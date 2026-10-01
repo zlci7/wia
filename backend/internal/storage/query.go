@@ -190,7 +190,7 @@ func (s *WorldStore) LoadPerceivedSources(ctx context.Context, sourceIDs []strin
 			return nil, err
 		}
 		committed += chunkCommitted
-		rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT p.recipient_id,p.source_event_id FROM perceptions p JOIN events e ON e.event_id=p.source_event_id WHERE p.source_event_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
+		rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT p.recipient_id,f.event_id FROM perceptions p JOIN events e ON e.event_id=p.source_event_id LEFT JOIN event_dependencies d ON d.child_id=e.event_id AND e.event_type='action_perceived' JOIN events f ON f.event_id=p.source_event_id OR f.event_id=d.parent_id WHERE f.event_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -242,9 +242,9 @@ func (s *WorldStore) LoadMemories(ctx context.Context, recipient string, limit i
 // Dialogue is sourced from committed events, never UI messages or failed inputs.
 func (s *WorldStore) LoadDialogue(ctx context.Context) ([]wiaworld.Event, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT e.event_id,e.event_type,e.actor_id,e.target_id,e.content,e.run_id,
-	CASE WHEN EXISTS(SELECT 1 FROM perceptions p WHERE p.source_event_id=e.event_id AND p.source_type IN ('direct_private_message','observed_private_conversation')) THEN 'private' ELSE 'public' END
+	CASE WHEN e.source_type='speech_private' OR EXISTS(SELECT 1 FROM perceptions p WHERE p.source_event_id=e.event_id AND p.source_type IN ('direct_private_message','observed_private_conversation')) THEN 'private' ELSE 'public' END
 	FROM events e WHERE e.run_id IN (SELECT run_id FROM runs WHERE status='completed' ORDER BY input_seq DESC,created_at DESC LIMIT 4)
-	AND e.event_type IN ('player_attempt','npc_dialogue') AND e.source_type!='offscene_dialogue' ORDER BY e.seq`)
+	AND (e.event_type='player_attempt' OR (e.event_type='npc_dialogue' AND (e.target_id='player' OR e.source_type='visible_dialogue'))) AND e.source_type!='offscene_dialogue' ORDER BY e.seq`)
 	if err != nil {
 		return nil, err
 	}

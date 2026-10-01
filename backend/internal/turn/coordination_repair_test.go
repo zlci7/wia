@@ -54,7 +54,7 @@ func TestCoordinationRepairsBusinessValidation(t *testing.T) {
 				output.Perceptions[0] = wiaworld.Perception{RecipientID: "npc:a", Content: "existing"}
 				beforeOutput, beforeSnapshot := wire.MarshalJSON(output), wire.MarshalJSON(snapshot)
 				good := hostResult{TimeMinutes: 1, Scene: "room", SceneCharacters: []string{"npc:a"},
-					Outcomes:     []hostActionResult{{ActionID: "action", Status: "succeeded", Content: "PRIVATE_OUTCOME", Recipients: []string{"player"}}},
+					Outcomes:     []hostActionResult{{ActionID: "action", Status: "succeeded", Content: "PRIVATE_OUTCOME", Projections: outcomeProjectionFixture("PRIVATE_OUTCOME", []string{"player", "npc:a"}), Recipients: []string{"player"}}},
 					SceneUpdates: []sceneUpdate{{Content: "PRIVATE_SCENE", SourceIDs: []string{"action"}, Recipients: []string{"player"}}}}
 				goodJSON := wire.MarshalJSON(good)
 				tc.change(&good)
@@ -85,10 +85,10 @@ func TestCoordinationRepairsBusinessValidation(t *testing.T) {
 					if err != nil || host.calls != 1 || host.repairs != 1 {
 						t.Fatalf("err=%v host=%+v", err, host)
 					}
-					if len(output.Events) != 2 || len(output.Perceptions) != 2 || len(visible) != 1 || output.SceneVersion != 2 {
+					if len(output.Events) != 4 || len(output.Perceptions) != 3 || len(visible) != 1 || output.SceneVersion != 2 {
 						t.Fatalf("invalid repaired output: %+v", output)
 					}
-					if !reflect.DeepEqual(output.SceneViews[0].SourceIDs, []string{"action:result:1"}) {
+					if !reflect.DeepEqual(output.SceneViews[0].SourceIDs, []string{"action:result:1:projection:player"}) {
 						t.Fatal("result provenance lost")
 					}
 				} else {

@@ -57,7 +57,7 @@ func TestHostOutcomesRequireEveryActionAndValidRecipients(t *testing.T) {
 	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, nil); err == nil {
 		t.Fatal("missing outcome accepted")
 	}
-	invalid := []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Recipients: []string{"foreign"}}}
+	invalid := []hostActionResult{{ActionID: "action", Status: "not_executed", Content: "重复", Projections: outcomeProjectionFixture("重复", []string{"foreign"}), Recipients: []string{"foreign"}}}
 	if _, err := appendHostOutcomes(&out, run, []wiaworld.Character{actor}, nil, invalid); err == nil {
 		t.Fatal("unknown recipient accepted")
 	}

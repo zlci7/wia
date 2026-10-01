@@ -12,12 +12,15 @@ import (
 type NPCDecision struct {
 	RecallQuery           string                 `json:"recall_query,omitempty"`
 	Speech                string                 `json:"speech"`
+	SpeechVisibility      string                 `json:"speech_visibility,omitempty"`
+	SpeechRecipients      []string               `json:"speech_recipients,omitempty"`
 	ActionIntent          string                 `json:"action_intent"`
 	ActionTargetID        string                 `json:"action_target_id,omitempty"`
 	Silent                bool                   `json:"silent"`
 	Memory                string                 `json:"memory"`
 	RelationshipProposals []relationshipProposal `json:"relationship_proposals,omitempty"`
 	PlanUpdates           []planUpdate           `json:"plan_updates,omitempty"`
+	sourceEventIDs        []string
 }
 
 type relationshipProposal struct {
@@ -58,7 +61,7 @@ func RenderVisibleProjection(events []wiaworld.Event, characters []wiaworld.Char
 func VisibleTurnEvents(events, visibleOutcomes []wiaworld.Event, playerNarrativeInput string) []wiaworld.Event {
 	result := make([]wiaworld.Event, 0, len(events)+len(visibleOutcomes))
 	for _, event := range events {
-		if event.EventType == "player_attempt" || event.EventType == "npc_dialogue" {
+		if event.EventType == "player_attempt" || event.EventType == "npc_dialogue" && (event.TargetID == "player" || event.SourceType == "visible_dialogue") {
 			if event.EventType == "player_attempt" {
 				event.Content = playerNarrativeInput
 			}
@@ -82,7 +85,7 @@ func PublicReplyStageInputs(perceptions []wiaworld.Perception, playerPerceptions
 	texts := make(map[string][]string)
 	sources := make(map[string][]string)
 	for _, perception := range perceptions {
-		if perception.Stage != sourceStage || perception.SourceType != "heard_public_reply" {
+		if perception.Stage != sourceStage || (perception.SourceType != "heard_public_reply" && perception.SourceType != "heard_private_reply") {
 			continue
 		}
 		texts[perception.RecipientID] = append(texts[perception.RecipientID], perception.Content)
@@ -102,6 +105,8 @@ func PublicReplyStageInputs(perceptions []wiaworld.Perception, playerPerceptions
 func MergeNPCDecision(previous, current NPCDecision) NPCDecision {
 	if current.Speech == "" {
 		current.Speech = previous.Speech
+		current.SpeechVisibility = previous.SpeechVisibility
+		current.SpeechRecipients = previous.SpeechRecipients
 	}
 	if current.ActionIntent == "" {
 		current.ActionIntent = previous.ActionIntent
@@ -149,7 +154,7 @@ func SourceTypeFor(private bool, id, recipient, intentType string) string {
 }
 
 func FormatSelfDecision(decision NPCDecision) string {
-	return fmt.Sprintf("已进入本轮交谈的本人公开对白：%q\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本人有向关系变化提案：%s\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals), decision.Memory)
+	return fmt.Sprintf("已进入本轮交谈的本人对白：%q（范围与听众：%s/%s）\n本人尚未执行、待场景协调的行动提案：%q\n是否保持沉默：%t\n本人有向关系变化提案：%s\n本轮暂存主观判断（不是执行结果）：%q", decision.Speech, decision.SpeechVisibility, wire.MarshalJSON(decision.SpeechRecipients), decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals), decision.Memory)
 }
 
 func EventByID(events []wiaworld.Event, id string) (wiaworld.Event, bool) {

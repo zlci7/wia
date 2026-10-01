@@ -7,7 +7,7 @@ import (
 // Both coordination purposes use these contracts; each model call is independent.
 func coordinationCapabilityContext(snapshot Snapshot, decisions map[string]NPCDecision) string {
 	input := "\n作者世界规则：" + snapshot.Definition.Rules + "\n作者事实（按实际感知分发）：" + snapshot.Definition.Secret
-	input += "\nNPC 协调提案（本人公开对白、行动、沉默与关系提案，不含个人记忆）：\n" + CoordinationDecisionContext(decisions, snapshot.Characters)
+	input += "\nNPC 协调提案（本人对白及听众范围、行动、沉默与关系提案，不含个人记忆）：\n" + CoordinationDecisionContext(decisions, snapshot.Characters)
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		input += "\n地点与有向连接(JSON)：" + wire.MarshalJSON(snapshot.Definition.Locations) + "\n当前位置(JSON)：" + wire.MarshalJSON(snapshot.Positions)
 		input += "\n已定义背景实体(JSON)：" + wire.MarshalJSON(snapshot.Definition.BystanderRefs)

@@ -30,7 +30,7 @@ func (stageGenerator) GenerateText(_ context.Context, req model.TextRequest) (mo
 	case strings.Contains(req.System, "你是一个重要 NPC"):
 		return model.TextResponse{Text: `{"speech":"","action_intent":"","silent":true,"memory":""}`}, nil
 	case strings.Contains(req.System, "场景协调 Agent"):
-		return model.TextResponse{Text: `{"time_minutes":0,"scene":"大厅","scene_characters":["npc:a","npc:c"],"outcomes":[{"action_id":"run1:player-action","status":"succeeded","content":"话已经说出。","recipients":["player","npc:a"]}],"scene_updates":[]}`}, nil
+		return model.TextResponse{Text: `{"time_minutes":0,"scene":"大厅","scene_characters":["npc:a","npc:c"],"outcomes":[{"action_id":"run1:player-action","status":"succeeded","content":"话已经说出。","projections":[{"recipient":"player","content":"话已经说出。"},{"recipient":"npc:a","content":"话已经说出。"}],"recipients":["player","npc:a"]}],"scene_updates":[]}`}, nil
 	default:
 		return model.TextResponse{Text: "旅人把话说给众人听。"}, nil
 	}

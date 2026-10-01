@@ -58,7 +58,7 @@ func (g *stageCRiskGenerator) GenerateText(_ context.Context, request model.Text
 		if fixed == "failed" {
 			delta = 12
 		}
-		body, _ := json.Marshal(map[string]any{"time_minutes": 5, "scene": "废弃诊所", "scene_characters": []string{}, "outcomes": []map[string]any{{"action_id": actions[0].EventID, "status": fixed, "content": "玩家完成了潜入尝试。", "recipients": []string{"player"}, "bystanders": []string{}}}, "scene_updates": []any{}, "movements": []any{}, "state_effects": []map[string]any{{"entity_id": "player", "state_id": "investigation_strain", "delta": delta, "action_id": actions[0].EventID}}, "relationship_effects": []any{}, "item_transfers": []any{}})
+		body, _ := json.Marshal(map[string]any{"time_minutes": 5, "scene": "废弃诊所", "scene_characters": []string{}, "outcomes": []map[string]any{{"action_id": actions[0].EventID, "status": fixed, "content": "玩家完成了潜入尝试。", "projections": outcomeProjectionFixture("玩家完成了潜入尝试。", []string{"player"}), "recipients": []string{"player"}, "bystanders": []string{}}}, "scene_updates": []any{}, "movements": []any{}, "state_effects": []map[string]any{{"entity_id": "player", "state_id": "investigation_strain", "delta": delta, "action_id": actions[0].EventID}}, "relationship_effects": []any{}, "item_transfers": []any{}})
 		return model.TextResponse{Text: string(body)}, nil
 	case strings.Contains(request.System, "玩家正文 Agent"):
 		return model.TextResponse{Text: "你沿着地下室入口潜入，结果已经由判定确定。"}, nil

@@ -2,10 +2,12 @@ package turn
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -59,37 +61,14 @@ func (s *Service) executeSnapshot(ctx context.Context, generator model.TextGener
 
 func (s *Service) executeSnapshotWithStore(ctx context.Context, store *storage.WorldStore, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (Output, error) {
 	snapshot.materialReads = newMaterialReadBudget()
-	intent, output, err := s.resolveIntent(ctx, generator, snapshot, run)
+	intent, err := s.resolveIntentStage(ctx, generator, snapshot, run)
 	if err != nil {
 		return Output{}, AtStage(StageIntent, err)
 	}
 	// The player's own words travel with the intent, because every later stage that
 	// records what the player did needs them and the run is not passed that far down.
 	intent.Input = run.Input
-	if intent.ActionRuleID != "" {
-		resolution, err := prepareActionResolution(ctx, store, snapshot, run, intent.ActionRuleID)
-		if err != nil {
-			return Output{}, AtStage(StageIntent, err)
-		}
-		output.ActionResolution = &resolution
-	}
-	// Who was present when the player acted is decided here and kept, because recording
-	// what the player did must answer that question, not "who is here at the end". A
-	// character who left during the turn still perceived the input, and one who arrived
-	// afterwards did not; the closing roster would get both of those wrong.
-	openingParticipants := CharacterIDs(InScene(snapshot.Characters))
-	if err := s.runCharacters(ctx, generator, &snapshot, run, intent, &output); err != nil {
-		return Output{}, AtStage(StageNPC, err)
-	}
-	notePlayerAction(&output, run, intent)
-	if err := s.coordinate(ctx, generator, &snapshot, run, intent, &output); err != nil {
-		return Output{}, AtStage(StageCoordination, err)
-	}
-	if err := s.narrate(ctx, generator, &snapshot, run, intent, &output); err != nil {
-		return Output{}, AtStage(StageNarration, err)
-	}
-	recordPlayerExperience(&snapshot, &output, intent, openingParticipants, output.PlayerEventID)
-	return output, nil
+	return s.executeInput(ctx, store, generator, snapshot, run, intent)
 }
 
 // load reads the turn's frozen input and records how long it took.
@@ -106,3 +85,101 @@ func (s *Service) load(ctx context.Context, store *storage.WorldStore, run wiawo
 // LoadSnapshotLimit is how many messages a turn reads. It is a turn concern: it decides
 // how much recent conversation a character can see.
 const LoadSnapshotLimit = 40
+
+func (s *Service) executeInput(ctx context.Context, store *storage.WorldStore, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, intent TurnIntent) (Output, error) {
+	parts := intent.Fragments
+	if len(parts) == 0 {
+		parts = []InputFragment{{Text: run.Input, ActorID: "player", IntentType: intent.IntentType, AddresseeID: intent.AddresseeID, Visibility: intent.Visibility, WaitMinutes: intent.WaitMinutes, ActionRuleID: intent.ActionRuleID}}
+	}
+	openingClock := snapshot.Summary.Clock
+	var output Output
+	var lastHost hostResult
+	stageByEvent := map[string]int{}
+	if len(parts) > 1 {
+		output.Events = []wiaworld.Event{{EventID: run.RunID + ":input", EventType: "player_input", ActorID: "player", Content: run.Input, RunID: run.RunID, SourceType: "author_input", SceneVersion: snapshot.SceneVersion, CreatedAt: time.Now().UTC()}}
+	}
+	for i, part := range parts {
+		partRun := run
+		partRun.Input = part.Text
+		if len(parts) > 1 {
+			partRun.InputPart = i + 1
+		}
+		partIntent := TurnIntent{IntentType: part.IntentType, AddresseeID: part.AddresseeID, Visibility: part.Visibility, WaitMinutes: part.WaitMinutes, ActionRuleID: part.ActionRuleID, Input: part.Text}
+		if part.AddresseeID != "" {
+			if _, ok := FindSceneCharacter(snapshot.Characters, part.AddresseeID); !ok {
+				return Output{}, AtStage(StageIntent, ErrInvalidRequest)
+			}
+		}
+		local := OpenOutput(&snapshot, partIntent, partRun)
+		local.StateChanges = slices.Clone(output.StateChanges)
+		local.RelationshipChanges = slices.Clone(output.RelationshipChanges)
+		local.ItemTransfers = slices.Clone(output.ItemTransfers)
+		local.elapsedMinutes = output.elapsedMinutes
+		if len(parts) > 1 {
+			segment := wiaworld.Event{EventID: inputPrefix(partRun) + ":segment", EventType: "player_input_segment", ActorID: "player", Content: wire.MarshalJSON(part), RunID: run.RunID, Stage: 1, SourceType: "author_input_segment", ProjectionParentID: run.RunID + ":input", SceneVersion: snapshot.SceneVersion, CreatedAt: time.Now().UTC()}
+			local.Events = append([]wiaworld.Event{segment}, local.Events...)
+			local.Events[1].ProjectionParentID = segment.EventID
+		}
+		if part.ActionRuleID != "" {
+			resolution, err := prepareActionResolution(ctx, store, snapshot, partRun, part.ActionRuleID)
+			if err != nil {
+				return Output{}, AtStage(StageIntent, err)
+			}
+			local.ActionResolution = &resolution
+		}
+		openingParticipants := CharacterIDs(InScene(snapshot.Characters))
+		if err := s.runCharacters(ctx, generator, &snapshot, partRun, partIntent, &local); err != nil {
+			return Output{}, AtStage(StageNPC, err)
+		}
+		notePlayerAction(&local, partRun, partIntent)
+		host, visible, err := s.coordinateStage(ctx, generator, &snapshot, partRun, partIntent, part.AddresseeID, &local)
+		if err != nil {
+			return Output{}, AtStage(StageCoordination, err)
+		}
+		local.VisibleEvents = visible
+		recordPlayerExperience(&snapshot, &local, partIntent, openingParticipants, local.PlayerEventID)
+		for _, e := range local.Events {
+			stageByEvent[e.EventID] = i*3 + e.Stage
+		}
+		mergeInputOutput(&output, local)
+		snapshot.Summary.Clock = local.Clock
+		snapshot.elapsedMinutes = output.elapsedMinutes
+		mergeConfirmedInput(&snapshot, local)
+		lastHost = host
+	}
+	// World progression and narration run once, after the ordered workspace is settled.
+	start := len(output.Events)
+	snapshot.Summary.Clock = openingClock
+	lastHost.TimeMinutes = output.elapsedMinutes
+	worldRun := run
+	if len(parts) > 1 {
+		worldRun.InputPart = len(parts)
+	}
+	if err := s.resolveSceneResult(ctx, generator, &snapshot, worldRun, lastHost, &output); err != nil {
+		return Output{}, AtStage(StageCoordination, err)
+	}
+	for _, e := range output.Events[start:] {
+		stageByEvent[e.EventID] = (len(parts)-1)*3 + e.Stage
+	}
+	for i := range output.VisibleEvents {
+		if stage, ok := stageByEvent[output.VisibleEvents[i].EventID]; ok {
+			output.VisibleEvents[i].Stage = stage
+		}
+	}
+	if err := s.narrate(ctx, generator, &snapshot, worldRun, intent, &output); err != nil {
+		return Output{}, AtStage(StageNarration, err)
+	}
+	for i := range output.Events {
+		if stage, ok := stageByEvent[output.Events[i].EventID]; ok {
+			output.Events[i].Stage = stage
+		} else if output.Events[i].EventType == "turn_settled" {
+			output.Events[i].Stage += (len(parts) - 1) * 3
+		}
+	}
+	for i := range output.Perceptions {
+		if stage, ok := stageByEvent[output.Perceptions[i].SourceEventID]; ok {
+			output.Perceptions[i].Stage = stage
+		}
+	}
+	return output, nil
+}

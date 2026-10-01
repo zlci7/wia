@@ -13,11 +13,12 @@ type hostResult struct {
 }
 
 type hostActionResult struct {
-	ActionID   string   `json:"action_id"`
-	Status     string   `json:"status"`
-	Content    string   `json:"content"`
-	Recipients []string `json:"recipients"`
-	Bystanders []string `json:"bystanders,omitempty"`
+	ActionID    string              `json:"action_id"`
+	Status      string              `json:"status"`
+	Content     string              `json:"content"`
+	Recipients  []string            `json:"recipients"`
+	Projections []map[string]string `json:"projections"`
+	Bystanders  []string            `json:"bystanders,omitempty"`
 }
 
 type sceneUpdate struct {
@@ -63,4 +64,17 @@ type eventCandidate struct {
 	Development  string         `json:"development"`
 	AfterMinutes int            `json:"after_minutes"`
 	Initial      plotResolution `json:"initial"`
+}
+
+func outcomeProjectionFixture(content string, recipients []string) []map[string]string {
+	result := make([]map[string]string, 0, len(recipients))
+	seen := map[string]bool{}
+	for _, id := range recipients {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		result = append(result, map[string]string{"recipient": id, "content": content})
+	}
+	return result
 }

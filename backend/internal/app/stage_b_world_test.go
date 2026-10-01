@@ -76,7 +76,7 @@ func (g *stageBGenerator) GenerateText(_ context.Context, request model.TextRequ
 				relationEffects = append(relationEffects, map[string]any{"subject_id": "npc:tailor", "target_id": "player", "relation_type": "trust", "delta": 3, "proposal_source_id": request.Input[proposalStart : proposalStart+proposalEnd]})
 			}
 		}
-		body, _ := json.Marshal(map[string]any{"time_minutes": 5, "scene": "调查事务所", "scene_characters": []string{"npc:tailor"}, "outcomes": []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家核对了委托记录，裁缝店老板认可了这种谨慎。", "recipients": []string{"player", "npc:tailor"}, "bystanders": []string{}}}, "scene_updates": []any{}, "movements": []any{}, "state_effects": []map[string]any{{"entity_id": "player", "state_id": "fatigue", "delta": 2, "action_id": id}}, "relationship_effects": relationEffects, "item_transfers": []any{}})
+		body, _ := json.Marshal(map[string]any{"time_minutes": 5, "scene": "调查事务所", "scene_characters": []string{"npc:tailor"}, "outcomes": []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家核对了委托记录，裁缝店老板认可了这种谨慎。", "projections": outcomeProjectionFixture("玩家核对了委托记录，裁缝店老板认可了这种谨慎。", []string{"player", "npc:tailor"}), "recipients": []string{"player", "npc:tailor"}, "bystanders": []string{}}}, "scene_updates": []any{}, "movements": []any{}, "state_effects": []map[string]any{{"entity_id": "player", "state_id": "fatigue", "delta": 2, "action_id": id}}, "relationship_effects": relationEffects, "item_transfers": []any{}})
 		return model.TextResponse{Text: string(body)}, nil
 	case strings.Contains(request.System, "玩家正文 Agent"):
 		return model.TextResponse{Text: "你逐项核对委托记录，裁缝店老板的回答比先前更认真。"}, nil
@@ -229,7 +229,7 @@ func TestStageBStateRelationshipPersistenceAndSaveAs(t *testing.T) {
 	if stateChanges != 2 || relationshipChanges != 1 {
 		t.Fatalf("history=%d/%d", stateChanges, relationshipChanges)
 	}
-	if proposalSource != proposalEventID || !slices.Equal(parents, []string{"opening", proposalEventID}) {
+	if proposalSource != proposalEventID+":projection:npc:tailor" || !slices.Equal(parents, []string{"opening", proposalEventID + ":projection:npc:tailor"}) {
 		t.Fatalf("relationship provenance proposal=%q parents=%v", proposalSource, parents)
 	}
 	status, err := a.Status(ctx)
@@ -285,7 +285,7 @@ func (stageBItemGenerator) GenerateText(_ context.Context, request model.TextReq
 		if strings.Contains(actions[0].Content, "交给裁缝") {
 			body, _ := json.Marshal(map[string]any{
 				"time_minutes": 1, "scene": "调查事务所", "scene_characters": []string{"npc:tailor"},
-				"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家把裂纹银镜交给裁缝店老板。", "recipients": []string{"player", "npc:tailor"}, "bystanders": []string{}}},
+				"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家把裂纹银镜交给裁缝店老板。", "projections": outcomeProjectionFixture("玩家把裂纹银镜交给裁缝店老板。", []string{"player", "npc:tailor"}), "recipients": []string{"player", "npc:tailor"}, "bystanders": []string{}}},
 				"scene_updates": []any{}, "movements": []any{}, "state_effects": []any{}, "relationship_effects": []any{},
 				"item_transfers": []map[string]any{{"instance_id": "mirror-3-917", "from_holder_id": "player", "to_holder_id": "npc:tailor", "action_id": id}},
 			})
@@ -295,7 +295,7 @@ func (stageBItemGenerator) GenerateText(_ context.Context, request model.TextReq
 			route := []string{"abandoned-clinic", "red-chimney-street", "tailor-shop", "office"}
 			body, _ := json.Marshal(map[string]any{
 				"time_minutes": 20, "scene": "调查事务所", "scene_characters": []string{"npc:tailor"},
-				"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家返回调查事务所。", "recipients": []string{"player"}, "bystanders": []string{}}},
+				"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家返回调查事务所。", "projections": outcomeProjectionFixture("玩家返回调查事务所。", []string{"player"}), "recipients": []string{"player"}, "bystanders": []string{}}},
 				"scene_updates": []map[string]any{{"content": "玩家回到调查事务所，手中拿着裂纹银镜。", "source_ids": []string{id}, "recipients": []string{"player"}}},
 				"movements":     []map[string]any{{"entity_id": "player", "from": "abandoned-clinic", "to": "office", "route": route, "action_id": id}},
 				"state_effects": []any{}, "relationship_effects": []any{},
@@ -306,7 +306,7 @@ func (stageBItemGenerator) GenerateText(_ context.Context, request model.TextReq
 		route := []string{"office", "cafe", "clock-shop", "red-chimney-street", "abandoned-clinic"}
 		body, _ := json.Marshal(map[string]any{
 			"time_minutes": 20, "scene": "废弃诊所", "scene_characters": []string{},
-			"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家抵达废弃诊所并拾起裂纹银镜。", "recipients": []string{"player"}, "bystanders": []string{}}},
+			"outcomes":      []map[string]any{{"action_id": id, "status": "succeeded", "content": "玩家抵达废弃诊所并拾起裂纹银镜。", "projections": outcomeProjectionFixture("玩家抵达废弃诊所并拾起裂纹银镜。", []string{"player"}), "recipients": []string{"player"}, "bystanders": []string{}}},
 			"scene_updates": []map[string]any{{"content": "玩家站在废弃诊所内，手中拿着裂纹银镜。", "source_ids": []string{id}, "recipients": []string{"player"}}},
 			"movements":     []map[string]any{{"entity_id": "player", "from": "office", "to": "abandoned-clinic", "route": route, "action_id": id}},
 			"state_effects": []any{}, "relationship_effects": []any{},

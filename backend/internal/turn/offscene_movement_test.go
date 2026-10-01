@@ -39,7 +39,7 @@ func (offsceneMovementGenerator) GenerateText(_ context.Context, request model.T
 		if id == "" {
 			return model.TextResponse{}, errors.New("action missing")
 		}
-		body, _ := json.Marshal(map[string]any{"outcomes": []map[string]any{{"action_id": id, "status": "succeeded", "content": "钟表匠抵达诊所。", "recipients": []string{"npc:clock"}}}, "scene_updates": []map[string]any{{"content": "钟表匠已经抵达诊所。", "source_ids": []string{id}, "recipients": []string{"npc:clock"}}}, "movements": []map[string]any{{"entity_id": "npc:clock", "from": "clockshop", "to": "clinic", "route": []string{"clockshop", "road", "clinic"}, "action_id": id}}})
+		body, _ := json.Marshal(map[string]any{"outcomes": []map[string]any{{"action_id": id, "status": "succeeded", "content": "钟表匠抵达诊所。", "projections": []map[string]string{{"recipient": "npc:clock", "content": "钟表匠抵达诊所。"}}, "recipients": []string{"npc:clock"}}}, "scene_updates": []map[string]any{{"content": "钟表匠已经抵达诊所。", "source_ids": []string{id}, "recipients": []string{"npc:clock"}}}, "movements": []map[string]any{{"entity_id": "npc:clock", "from": "clockshop", "to": "clinic", "route": []string{"clockshop", "road", "clinic"}, "action_id": id}}})
 		return model.TextResponse{Text: string(body)}, nil
 	default:
 		return model.TextResponse{}, errors.New("unexpected stage")

@@ -61,6 +61,8 @@ type Snapshot struct {
 	OpenProgress     *wiaworld.OpenProgress
 	materialReads    *materialReadBudget
 	materialGroup    *materialReadGroup
+	speechRoster     []string
+	elapsedMinutes   int
 }
 
 // SceneView is one character's picture of where they are: what they last understood

@@ -115,7 +115,7 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 			if candidate.ActorID == "player" && strings.Contains(req.Input, "visibility=private") {
 				recipients = []string{"player", candidate.TargetID}
 			}
-			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: "succeeded", Content: candidate.ActorID + "完成了行动：" + candidate.Content, Recipients: recipients})
+			outcomes = append(outcomes, hostActionResult{ActionID: candidate.EventID, Status: "succeeded", Content: candidate.ActorID + "完成了行动：" + candidate.Content, Projections: outcomeProjectionFixture(candidate.ActorID+"完成了行动："+candidate.Content, append(append([]string{}, recipients...), candidate.ActorID)), Recipients: recipients})
 		}
 		g.mu.Lock()
 		scene := g.scene

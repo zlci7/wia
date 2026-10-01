@@ -14,11 +14,12 @@ import (
 // privately to one character is a different act from speaking aloud, and every later
 // stage reads it to decide what each character was in a position to perceive.
 type TurnIntent struct {
-	WaitMinutes  int    `json:"wait_minutes,omitempty"`
-	IntentType   string `json:"intent_type"`
-	AddresseeID  string `json:"addressee_id"`
-	Visibility   string `json:"visibility"`
-	ActionRuleID string `json:"action_rule_id,omitempty"`
+	WaitMinutes  int             `json:"wait_minutes,omitempty"`
+	IntentType   string          `json:"intent_type"`
+	AddresseeID  string          `json:"addressee_id"`
+	Visibility   string          `json:"visibility"`
+	ActionRuleID string          `json:"action_rule_id,omitempty"`
+	Fragments    []InputFragment `json:"fragments,omitempty"`
 	// Input is the player's own words for this turn, carried with the intent because
 	// every later stage that records what the player did needs them.
 	Input string `json:"-"`
@@ -81,6 +82,7 @@ type Output struct {
 	PlayerEventID    string            `json:"-"`
 	ActionResolution *ActionResolution `json:"-"`
 	elapsedMinutes   int
+	speechAudience   []string
 }
 
 // PositionChange is a validated movement that the commit transaction applies with
@@ -106,7 +108,7 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 	private := intent.Private()
 
 	now := time.Now().UTC()
-	playerEventID := run.RunID + ":input"
+	playerEventID := inputPrefix(run) + ":input"
 	output := Output{
 		OpenProgress: cloneOpenProgress(snapshot.OpenProgress),
 		Clock:        snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
@@ -125,18 +127,24 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 		PlayerEventID: playerEventID,
 	}
 	for _, character := range participants {
+		sourceID := playerEventID
 		if private && character.EntityID != recipient {
 			output.PerceptText[character.EntityID] = "你看见玩家与" + CharacterDisplayName(snapshot.Characters, recipient) + "低声交谈，但听不清内容。不要猜测耳语原文。"
+			sourceID = playerEventID + ":observer:" + character.EntityID
+			projection := output.Events[0]
+			projection.EventID, projection.EventType, projection.TargetID = sourceID, "player_observed", character.EntityID
+			projection.Content, projection.SourceType, projection.ProjectionParentID = output.PerceptText[character.EntityID], "observed_private_conversation", playerEventID
+			output.Events = append(output.Events, projection)
 		} else {
 			output.PerceptText[character.EntityID] = run.Input
 		}
 		output.Perceptions = append(output.Perceptions, wiaworld.Perception{
-			RecipientID: character.EntityID, SourceEventID: playerEventID,
+			RecipientID: character.EntityID, SourceEventID: sourceID,
 			SourceType: SourceTypeFor(private, character.EntityID, recipient, intent.IntentType),
 			Content:    output.PerceptText[character.EntityID], Stage: 1, SceneVersion: snapshot.SceneVersion, CreatedAt: now,
 		})
 		output.StageOneInputs[character.EntityID] = StageInput{
-			PlayerPerception: output.PerceptText[character.EntityID], SourceEventIDs: []string{playerEventID},
+			PlayerPerception: output.PerceptText[character.EntityID], SourceEventIDs: []string{sourceID},
 		}
 	}
 	return output

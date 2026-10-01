@@ -95,24 +95,42 @@ func (a *App) Correct(ctx context.Context, worldID string, request memory.Correc
 	if err = memory.ExpandCorrection(ctx, store, &c); err != nil {
 		return c, err
 	}
-	if c.Kind == "event" && snapshot.Definition.Capabilities["spatial"] == 1 {
+	impacts := []memory.Correction{}
+	basis := correctionBasisEvents(snapshot, request)
+	for _, id := range append([]string{}, basis...) {
+		root, err := store.LoadActionProjectionRoot(ctx, id)
+		if err != nil {
+			return c, err
+		}
+		if root != "" {
+			basis = append(basis, root)
+		}
+	}
+	for _, id := range basis {
+		impact := memory.Correction{Kind: "event", TargetID: id}
+		if err := memory.ExpandCorrection(ctx, store, &impact); err != nil {
+			return c, err
+		}
+		impacts = append(impacts, impact)
+	}
+	if len(impacts) > 0 && snapshot.Definition.Capabilities["spatial"] == 1 {
 		sources, sourceErr := store.LoadEntityLocationSources(ctx)
 		if sourceErr != nil {
 			return c, sourceErr
 		}
 		for _, sourceEventID := range sources {
-			if c.Affects(sourceEventID) {
+			if correctionConsumes(impacts, sourceEventID) {
 				return c, fmt.Errorf("%w: correction would invalidate a current position; position rebuilding is not available", ErrInvalidRequest)
 			}
 		}
 	}
-	if c.Kind == "event" && (snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 || snapshot.OpenProgress != nil || len(snapshot.Definition.ActionRules) > 0) {
+	if len(impacts) > 0 && (snapshot.Definition.Capabilities["state"] == 1 || snapshot.Definition.Capabilities["relations"] == 1 || snapshot.Definition.Capabilities["items"] == 1 || snapshot.OpenProgress != nil || len(snapshot.Definition.ActionRules) > 0) {
 		sources, sourceErr := store.LoadStructuredFactSources(ctx)
 		if sourceErr != nil {
 			return c, sourceErr
 		}
 		for _, sourceEventID := range sources {
-			if sourceEventID != "opening" && c.Affects(sourceEventID) {
+			if sourceEventID != "opening" && correctionConsumes(impacts, sourceEventID) {
 				return c, fmt.Errorf("%w: correction would invalidate a current structured fact; rebuilding is not available", ErrInvalidRequest)
 			}
 		}
@@ -253,4 +271,56 @@ func correctionOriginal(ctx context.Context, store *storage.WorldStore, s turn.S
 	return "", ErrInvalidRequest
 }
 
-// correctionNotices reports the stream entries a correction writes for each scope.
+// Trace corrected personal records through their actual event basis, including
+// derived subjective states. Ordinary unconsumed text can still be corrected.
+func correctionBasisEvents(snapshot turn.Snapshot, request memory.CorrectionRequest) []string {
+	if request.Kind == "event" {
+		return []string{request.TargetID}
+	}
+	if request.Kind != "perception" && request.Kind != "subjective" && request.Kind != "digest" {
+		return nil
+	}
+	context, ok := snapshot.LongMemory[request.Scope]
+	if !ok {
+		return nil
+	}
+	basis := []string{}
+	for _, record := range context.Archive {
+		if record.ID == request.TargetID && record.EventID != "" {
+			basis = append(basis, record.EventID)
+		}
+	}
+	if request.Kind == "subjective" {
+		for i, state := range context.Digest.States {
+			if request.TargetID == fmt.Sprintf("state:%d:%d", context.Digest.Revision, i) {
+				basis = append(basis, state.Sources...)
+			}
+		}
+	}
+	if request.Kind == "digest" {
+		basis = append(basis, context.Digest.Sources...)
+	}
+	seen, events := map[string]bool{}, []string{}
+	for _, id := range basis {
+		for _, record := range context.Archive {
+			if record.ID == id {
+				id = record.EventID
+				break
+			}
+		}
+		if id != "" && !seen[id] {
+			seen[id] = true
+			events = append(events, id)
+		}
+	}
+	return events
+}
+
+func correctionConsumes(impacts []memory.Correction, id string) bool {
+	for _, impact := range impacts {
+		if impact.Affects(id) {
+			return true
+		}
+	}
+	return false
+}

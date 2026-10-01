@@ -46,7 +46,7 @@ func (spatialWorldGenerator) GenerateText(_ context.Context, request model.TextR
 			"time_minutes":     5,
 			"scene":            scene,
 			"scene_characters": []string{},
-			"outcomes":         []map[string]any{{"action_id": actionID, "status": "succeeded", "content": result, "recipients": []string{"player"}, "bystanders": []string{}}},
+			"outcomes":         []map[string]any{{"action_id": actionID, "status": "succeeded", "content": result, "projections": outcomeProjectionFixture(result, []string{"player"}), "recipients": []string{"player"}, "bystanders": []string{}}},
 			"scene_updates":    []map[string]any{{"content": scene, "source_ids": []string{actionID}, "recipients": []string{"player"}}},
 			"movements":        []map[string]any{{"entity_id": "player", "from": from, "to": to, "route": []string{from, to}, "action_id": actionID}},
 			"state_effects":    []map[string]any{}, "relationship_effects": []map[string]any{}, "item_transfers": []map[string]any{},

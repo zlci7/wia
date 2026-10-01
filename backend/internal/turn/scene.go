@@ -59,8 +59,7 @@ func applySceneUpdates(snapshot Snapshot, run wiaworld.Run, intent TurnIntent, o
 		if !ok || action.RunID != run.RunID || action.Stage < 1 || action.Stage > 2 {
 			return nil, coordinationInvalid("action_source_invalid", fmt.Sprintf("outcomes[%d].action_id", i), "current-stage-1-or-2-action-id")
 		}
-		id := fmt.Sprintf("%s:result:%d", outcome.ActionID, i+1)
-		byID[outcome.ActionID] = sceneSource{ID: outcome.ActionID, Content: outcome.Content, Recipients: append(append([]string{}, outcome.Recipients...), action.ActorID), Canonical: []string{id}}
+		byID[outcome.ActionID] = projectionSource(action, outcome, i)
 	}
 	return mergeSceneUpdates(snapshot.SceneViews, snapshot.SceneVersion+1, byID, host.SceneUpdates)
 }
@@ -103,7 +102,11 @@ func mergeSceneUpdates(previous []SceneView, version int64, byID map[string]scen
 				if !containsID(source.Recipients, recipient) {
 					return nil, coordinationInvalid("scene_source_forbidden", fmt.Sprintf("%s.source_ids[%d]", field, j), fmt.Sprintf("source-readable-by-recipients[%d]-including-own-view-only", r))
 				}
-				for _, sid := range source.Canonical {
+				canonicalIDs := source.Canonical
+				if source.CanonicalByRecipient != nil {
+					canonicalIDs = source.CanonicalByRecipient[recipient]
+				}
+				for _, sid := range canonicalIDs {
 					if !containsID(canonical, sid) {
 						canonical = append(canonical, sid)
 					}

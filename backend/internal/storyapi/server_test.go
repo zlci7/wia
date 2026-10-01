@@ -40,7 +40,15 @@ func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest)
 			if candidate.ActorID == "player" && strings.Contains(request.Input, "visibility=private") {
 				recipients = []string{"player", candidate.TargetID}
 			}
-			outcomes = append(outcomes, map[string]any{"action_id": candidate.EventID, "status": "succeeded", "content": "行动已经完成。", "recipients": recipients})
+			seen := map[string]bool{}
+			projections := []map[string]string{}
+			for _, id := range append(append([]string{}, recipients...), candidate.ActorID) {
+				if !seen[id] {
+					projections = append(projections, map[string]string{"recipient": id, "content": "行动已经完成。"})
+					seen[id] = true
+				}
+			}
+			outcomes = append(outcomes, map[string]any{"action_id": candidate.EventID, "status": "succeeded", "content": "行动已经完成。", "projections": projections, "recipients": recipients})
 		}
 		data, _ := json.Marshal(map[string]any{"time_minutes": 0, "scene": "旧渡口客栈", "scene_characters": []string{"npc:innkeeper", "npc:mercenary"}, "outcomes": outcomes, "scene_updates": []any{}})
 		return model.TextResponse{Text: string(data)}, nil

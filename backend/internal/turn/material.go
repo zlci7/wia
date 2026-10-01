@@ -97,7 +97,7 @@ func CoordinationDecisionContext(decisions map[string]NPCDecision, characters []
 		if !exists {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；action_intent=%q；silent=%t；relationship_proposals=%s", character.Name, character.Role, character.EntityID, decision.Speech, decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals)))
+		parts = append(parts, fmt.Sprintf("%s（%s，%s）：speech=%q；speech_visibility=%s；speech_recipients=%s；action_intent=%q；silent=%t；relationship_proposals=%s", character.Name, character.Role, character.EntityID, decision.Speech, decision.SpeechVisibility, wire.MarshalJSON(decision.SpeechRecipients), decision.ActionIntent, decision.Silent, wire.MarshalJSON(decision.RelationshipProposals)))
 	}
 	if len(parts) == 0 {
 		return "（暂无）"

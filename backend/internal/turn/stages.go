@@ -45,9 +45,9 @@ func normalizeNPCActionIntent(value string) string {
 const (
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion    = "story.intent.v7"
-	npcPromptVersion       = "story.npc.v14"
-	narrationPromptVersion = "story.narration.v11"
+	intentPromptVersion    = "story.intent.v8"
+	npcPromptVersion       = "story.npc.v15"
+	narrationPromptVersion = "story.narration.v12"
 )
 
 type narrativeResult struct {
@@ -161,7 +161,7 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 				return &GenerationError{Code: "json_field_value", Field: "action_rule_id", Expected: "rule-with-satisfied-program-preconditions", Cause: ErrGenerationFailed}
 			}
 		}
-		return nil
+		return validateInputFragments(snapshot, run, &intent)
 	}
 	repairCount, err := GenerateJSONCheckedMetrics(callCtx, generator, material.System, input, &intent, structuredTurnOutputTokens, []string{"addressee_id"}, []string{"intent_type", "addressee_id", "visibility"}, checkRecipient)
 	if err != nil {
@@ -203,12 +203,16 @@ func (a *Service) resolveIntentStage(ctx context.Context, generator model.TextGe
 func (a *Service) runCharacterStages(ctx context.Context, generator model.TextGenerator, snapshot *Snapshot, run wiaworld.Run, intent TurnIntent, participants []wiaworld.Character, perceptText map[string]string, stageOneInputs map[string]StageInput, output *Output) error {
 	def := definitionFor(snapshot)
 
-	playerEventID := run.RunID + ":input"
+	playerEventID := inputPrefix(run) + ":input"
 	decisions := make(map[string]NPCDecision)
 	if err := a.decideNPCs(ctx, generator, *snapshot, def, run, intent.AddresseeID, intent.IntentType, stageOneInputs, nil, decisions, 1); err != nil {
 		return AtStage(StageNPC, err)
 	}
 	var publicReplyLog []string
+	output.speechAudience = append([]string{"player"}, CharacterIDs(participants)...)
+	for _, bystander := range snapshot.BystanderRefs {
+		output.speechAudience = append(output.speechAudience, bystander.BystanderID)
+	}
 	for _, character := range participants {
 		decision := decisions[character.EntityID]
 		if reply := appendNPCDecisionOutput(output, run, character, decision, participants, playerEventID, snapshot.SceneVersion, 1); reply != "" {
@@ -280,29 +284,29 @@ func (a *Service) narrateStage(ctx context.Context, generator model.TextGenerato
 // appendNPCDecisionOutput turns one character's decision into the events, perceptions,
 // memories and public reply the rest of the turn reads.
 func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
+	start := len(output.Events)
 	applyPlanUpdates(output, run, character.EntityID, decision, stage)
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
-		actionEventID := fmt.Sprintf("%s:%s:action:%d", run.RunID, character.EntityID, stage)
-		output.Events = append(output.Events, wiaworld.Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: decision.ActionTargetID, Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", CreatedAt: time.Now().UTC()})
+		actionEventID := fmt.Sprintf("%s:%s:action:%d", inputPrefix(run), character.EntityID, stage)
+		output.Events = append(output.Events, wiaworld.Event{EventID: actionEventID, EventType: "npc_action_intent", ActorID: character.EntityID, TargetID: decision.ActionTargetID, Content: decision.ActionIntent, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "npc_intent", ProjectionParentID: defaultSourceEventID, CreatedAt: time.Now().UTC()})
 		sourceEventID = actionEventID
 	}
 	var reply string
 	if decision.Speech != "" {
-		eventID := fmt.Sprintf("%s:%s:speech:%d", run.RunID, character.EntityID, stage)
-		output.Events = append(output.Events, wiaworld.Event{EventID: eventID, EventType: "npc_dialogue", ActorID: character.EntityID, TargetID: "player", Content: decision.Speech, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "visible_dialogue", CreatedAt: time.Now().UTC()})
-		for _, other := range participants {
-			if other.EntityID != character.EntityID {
-				output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: other.EntityID, SourceEventID: eventID, SourceType: "heard_public_reply", Content: fmt.Sprintf("%s（%s）公开说：%s", character.Name, character.Role, decision.Speech), Stage: stage, SceneVersion: sceneVersion, CreatedAt: time.Now().UTC()})
-			}
-		}
+		var speechID string
+		speechID, reply = appendNPCSpeech(output, run, character, decision, participants, sceneVersion, stage)
 		if decision.ActionIntent == "" {
-			sourceEventID = eventID
+			sourceEventID = speechID
 		}
-		reply = fmt.Sprintf("%s（%s）说：%s", character.Name, character.Role, decision.Speech)
 	}
 	if decision.Memory != "" {
 		output.Memories = append(output.Memories, wiaworld.Memory{RecipientID: character.EntityID, Kind: "character_judgment", Content: wire.Clean(decision.Memory), SourceEventID: sourceEventID, CreatedAt: time.Now().UTC()})
+	}
+	for i := start; i < len(output.Events); i++ {
+		if output.Events[i].EventType == "npc_speech" || output.Events[i].EventType == "npc_action_intent" {
+			output.Events[i].BasisEventIDs = append([]string{defaultSourceEventID}, decision.sourceEventIDs...)
+		}
 	}
 	return reply
 }
@@ -360,6 +364,9 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 				if err := validatePlanUpdates(snapshot, character.EntityID, stageInput, decision, callGenerator.(*ContextGenerator)); err != nil {
 					return err
 				}
+				if err := validateNPCSpeech(snapshot, character.EntityID, &decision); err != nil {
+					return err
+				}
 				return validateRelationshipProposals(snapshot, character.EntityID, &decision)
 			}
 			repairCount, err := GenerateJSONCheckedMetrics(callCtx, callGenerator, material.System, input, &decision, structuredTurnOutputTokens, []string{"speech", "action_intent", "memory"}, required, checkDecision)
@@ -400,7 +407,25 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 			if decision.Silent {
 				decision.Speech = ""
 			}
-			a.host.LogStage(snapshot.Summary.WorldID, run, StageNPC, "npc_decision", character.EntityID, stage, npcPromptVersion, stageInput.SourceEventIDs, recipient, repairCount, time.Since(started))
+			known := map[string]bool{}
+			for id := range snapshot.Sources {
+				known[id] = true
+			}
+			for _, id := range stageInput.SourceEventIDs {
+				known[id] = true
+			}
+			for _, id := range SceneViewSources(snapshot, character.EntityID) {
+				known[id] = true
+			}
+			for _, p := range snapshot.Perceptions[character.EntityID] {
+				known[p.SourceEventID] = true
+			}
+			for _, id := range callGenerator.(*ContextGenerator).providedSources {
+				if known[id] && !strings.HasPrefix(id, "material:") {
+					decision.sourceEventIDs = append(decision.sourceEventIDs, id)
+				}
+			}
+			a.host.LogStage(snapshot.Summary.WorldID, run, StageNPC, "npc_decision", character.EntityID, inputStage(run, stage), npcPromptVersion, stageInput.SourceEventIDs, recipient, repairCount, time.Since(started))
 			decisionMu.Lock()
 			decisions[character.EntityID] = decision
 			decisionMu.Unlock()
@@ -462,18 +487,7 @@ func generateNarrativeText(ctx context.Context, generator model.TextGenerator, s
 
 // generator wraps a model generator for one composed call of this turn.
 func (s *Service) generator(generator model.TextGenerator, material Material, snapshot Snapshot, run wiaworld.Run, purpose, recipient string, stage int, template string) model.TextGenerator {
-	return NewContextGenerator(s.deps, s.deps.Owner, generator, material, snapshot, run, purpose, recipient, stage, template)
-}
-
-// resolveIntent reads the player's input into an intent and opens the turn's output,
-// because both are decided at the same moment: the intent says who was addressed and how,
-// and the output's first event is the player's own attempt.
-func (s *Service) resolveIntent(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run) (TurnIntent, Output, error) {
-	intent, err := s.resolveIntentStage(ctx, generator, snapshot, run)
-	if err != nil {
-		return TurnIntent{}, Output{}, err
-	}
-	return intent, OpenOutput(&snapshot, intent, run), nil
+	return NewContextGenerator(s.deps, s.deps.Owner, generator, material, snapshot, run, purpose, recipient, inputStage(run, stage), template)
 }
 
 // runCharacters has each character in the scene decide what to do. Who is present is

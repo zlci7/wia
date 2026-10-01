@@ -103,6 +103,23 @@ func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testin
 		if !errors.Is(err, ErrInvalidRequest) {
 			t.Fatalf("consumed plan source correction accepted: %v", err)
 		}
+		foundPerception := false
+		view, readErr := a.ReadMemory(ctx, world.WorldID, plan.OwnerID, true, 0)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		for _, record := range view.Sources {
+			if record.EventID == plan.SourceIDs[0] && strings.HasPrefix(record.Kind, "perception:") {
+				foundPerception = true
+				_, err = a.Correct(ctx, world.WorldID, memory.CorrectionRequest{RequestKey: "correct-personal-" + plan.ID, ExpectedEpoch: snapshot.Summary.ContextEpoch, Kind: "perception", Scope: plan.OwnerID, TargetID: record.ID, Replacement: "我没有收到这项检查依据。"})
+				if !errors.Is(err, ErrInvalidRequest) {
+					t.Fatalf("consumed personal basis corrected: %v", err)
+				}
+			}
+		}
+		if !foundPerception {
+			t.Fatal("plan owner perception source missing")
+		}
 	}
 	status, err := a.Status(ctx)
 	if err != nil {

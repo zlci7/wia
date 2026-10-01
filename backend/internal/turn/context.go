@@ -75,13 +75,13 @@ func PlotTimeLimit(snapshot Snapshot) int {
 		due, ok = eventDue, true
 	}
 	if !ok {
-		return 120
+		return max(0, 120-snapshot.elapsedMinutes)
 	}
 	current, err := plot.ClockMinute(snapshot.Summary.Clock)
 	if err != nil {
 		return 0
 	}
-	return min(120, max(0, due-current))
+	return min(max(0, 120-snapshot.elapsedMinutes), max(0, due-current))
 }
 
 func PlotContext(snapshot Snapshot) string {
