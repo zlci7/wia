@@ -21,7 +21,7 @@ func TestMemoryWindowFitsDigestAndActualSystemPreservingSources(t *testing.T) {
 	actualSystem := material.System + strings.Repeat("附加字段合同与修复要求", 120)
 	minimal := renderMemoryWindow(base, m, "player", tail[len(tail)-1:], "")
 	input, _, _ := contextInput(minimal, nil)
-	limit := FramedContextTokens(model.TextRequest{System: actualSystem, Input: input}) + 50
+	limit := model.FramedTextInputTokens(model.TextRequest{System: actualSystem, Input: input}) + 50
 	composer := ContextComposer{Window: model.WindowLimits{ContextTokens: limit + 512, OutputTokens: 512}}
 	req, report, err := composer.Build(material, actualSystem, 512)
 	if err != nil {
@@ -67,8 +67,8 @@ func TestRecentWindowShrinksToFitTheWholeRequest(t *testing.T) {
 	}
 	// A budget that fits the base prompt and every group, measured rather than
 	// estimated, so the initial window is the whole recent history.
-	base := FramedContextTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
-	testBudget := base + FramedContextTokens(model.TextRequest{Input: memory.MemoryRecordsText(tail)}) + 1024
+	base := model.FramedTextInputTokens(model.TextRequest{System: "规则", Input: "本轮职责与刺激：玩家输入"})
+	testBudget := base + model.FramedTextInputTokens(model.TextRequest{Input: memory.MemoryRecordsText(tail)}) + 1024
 	material := withLongMemory(Material{
 		Required: "本轮职责与刺激：玩家输入",
 		System:   "规则",

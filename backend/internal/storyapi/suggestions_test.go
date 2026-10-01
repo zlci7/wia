@@ -11,7 +11,7 @@ import (
 
 func TestSuggestionRoutes(t *testing.T) {
 	ctx := context.Background()
-	a, err := app.Open(ctx, app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	a, err := app.Open(ctx, app.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

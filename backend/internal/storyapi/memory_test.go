@@ -14,7 +14,7 @@ import (
 
 func TestMemoryRoutesRequireOwnershipAndExplicitAuthorView(t *testing.T) {
 	ctx := context.Background()
-	app, err := app.Open(ctx, app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	app, err := app.Open(ctx, app.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

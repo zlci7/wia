@@ -19,6 +19,34 @@ import (
 
 const textSuccessBody = `{"status":"completed","error":null,"incomplete_details":null,"output":[{"type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Alice did not act.","annotations":[]}]}]}`
 
+func TestTextInputBudgetMatchesMessageContract(t *testing.T) {
+	var calls atomic.Int32
+	req := model.TextRequest{System: "Keep source boundaries.", Input: strings.Repeat("事实\\", 600), MaxOutputTokens: 32}
+	req.MaxInputTokens = model.FramedTextInputTokens(req)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body struct {
+			Input []struct{ Content string } `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Input) != 1 || body.Input[0].Content != req.Input {
+			t.Error("complete input was not transported")
+		}
+		_, _ = io.WriteString(w, textSuccessBody)
+	}))
+	defer server.Close()
+	p := NewProvider("test", strings.Repeat("configured-model-", 40), WithBaseURL(server.URL), WithModelWindow(model.WindowLimits{ContextTokens: req.MaxInputTokens + req.MaxOutputTokens, OutputTokens: req.MaxOutputTokens}))
+	if _, err := p.GenerateText(context.Background(), req); err != nil {
+		t.Fatalf("valid framed input was rejected: %v", err)
+	}
+	req.Input += strings.Repeat("越界", 64)
+	if _, err := p.GenerateText(context.Background(), req); !errors.Is(err, model.ErrTextInputTooLarge) {
+		t.Fatalf("oversized input: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("HTTP calls = %d, want 1", calls.Load())
+	}
+}
+
 func TestResponsesUsageCache(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, strings.TrimSuffix(textSuccessBody, "}")+`,"usage":{"input_tokens":100,"output_tokens":30,"input_tokens_details":{"cached_tokens":60},"output_tokens_details":{"reasoning_tokens":20}}}`)

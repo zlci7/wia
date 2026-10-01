@@ -28,6 +28,7 @@ func TestPackRealModel(t *testing.T) {
 	t.Logf("provider=%s model=%s", config.Provider, config.Model)
 	ctx := context.Background()
 	root := t.TempDir()
+	installTestPacks(t, root)
 	app, err := Open(ctx, Options{DataRoot: root, Generator: generator})
 	if err != nil {
 		t.Fatal(err)

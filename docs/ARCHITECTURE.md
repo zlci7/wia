@@ -62,7 +62,7 @@ wia/
 
 - **不以包数量作为架构指标。** 判断标准是"是否对应一个稳定职责"。代码少时并入相邻模块即可。
 - 模块分三层：核心业务（`turn`、`world`、`memory`、`plot`、`story`）、基础设施（`model`、`storage`、`storyapi`）、产品外围（`content`、`app`）。人物决策与 purpose 驱动的上下文装配都属于一轮故事，代码量不足以证明需要独立 package，因此保留在 `turn`。
-- 内置剧本位于 `backend/internal/content/packs/lantern-dusk`、`orbital-repair` 与 `mist-embers`；开发者本地草稿、外部剧本包与已发布修订属于用户数据目录。
+- 内置初始剧本位于 `backend/internal/content/packs/mist-embers`；v1/v2 示例保留在 `backend/internal/content/testdata/legacy-packs` 作为兼容性测试资料。开发者本地草稿、外部剧本包与已发布修订属于用户数据目录。
 
 ## 5. 模块职责与依赖规则
 

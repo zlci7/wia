@@ -19,6 +19,34 @@ import (
 
 const textSuccessBody = `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"Alice did not act.","reasoning_content":"private reasoning"}}]}`
 
+func TestTextInputBudgetMatchesMessageContract(t *testing.T) {
+	var calls atomic.Int32
+	req := model.TextRequest{System: "Keep source boundaries.", Input: strings.Repeat("事实\\", 600), MaxOutputTokens: 32, ReasoningReserveTokens: 64}
+	req.MaxInputTokens = model.FramedTextInputTokens(req)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body struct {
+			Messages []struct{ Content string } `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Messages) != 2 || body.Messages[1].Content != req.Input {
+			t.Error("complete input was not transported")
+		}
+		_, _ = io.WriteString(w, textSuccessBody)
+	}))
+	defer server.Close()
+	p := NewProvider("test", strings.Repeat("configured-model-", 40), WithBaseURL(server.URL), WithModelWindow(model.WindowLimits{ContextTokens: req.MaxInputTokens + req.TotalOutputTokens(), OutputTokens: req.TotalOutputTokens()}))
+	if _, err := p.GenerateText(context.Background(), req); err != nil {
+		t.Fatalf("valid framed input was rejected: %v", err)
+	}
+	req.Input += strings.Repeat("越界", 64)
+	if _, err := p.GenerateText(context.Background(), req); !errors.Is(err, model.ErrTextInputTooLarge) {
+		t.Fatalf("oversized input: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("HTTP calls = %d, want 1", calls.Load())
+	}
+}
+
 func TestTextCacheUsageIncludingInvalidOutput(t *testing.T) {
 	for _, finish := range []string{"stop", "length"} {
 		for _, usage := range []string{``, `,"usage":{"prompt_tokens":100,"completion_tokens":30,"completion_tokens_details":{"reasoning_tokens":20},"prompt_cache_hit_tokens":60,"prompt_cache_miss_tokens":40}`} {

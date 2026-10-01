@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/tokenestimate"
 )
 
 var _ model.TextGenerator = (*Provider)(nil)
@@ -53,10 +52,7 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 	if err != nil {
 		return model.TextResponse{}, model.ErrInvalidTextRequest
 	}
-	inputTokens := tokenestimate.EstimateText(string(body))
-	if inputTokens > req.MaxInputTokens {
-		return model.TextResponse{}, model.ErrTextInputTooLarge
-	}
+	inputTokens := model.FramedTextInputTokens(req)
 	if p.window.ContextTokens > 0 {
 		if err := p.window.Check(inputTokens, req.MaxOutputTokens); err != nil {
 			return model.TextResponse{}, err

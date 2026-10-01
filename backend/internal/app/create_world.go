@@ -69,14 +69,18 @@ func (a *App) CreateStoryWorld(ctx context.Context, request CreateWorldRequest) 
 // CreateWorld is a convenience for local callers; the public HTTP API requires
 // the selected game and revision. The author-owned mode cannot be overridden.
 func (a *App) CreateWorld(ctx context.Context, name, mode, playerName, playerProfile string, activate bool) (wiaworld.WorldSummary, error) {
-	p, ok := a.Pack(GameID)
+	games := a.Games()
+	if len(games) == 0 {
+		return wiaworld.WorldSummary{}, ErrWorldNotFound
+	}
+	p, ok := a.Pack(games[0].ID)
 	if !ok {
 		return wiaworld.WorldSummary{}, ErrWorldNotFound
 	}
 	if mode != "" && mode != p.Definition.Summary.Mode {
 		return wiaworld.WorldSummary{}, ErrInvalidRequest
 	}
-	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: GameID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
+	return a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: p.Catalog.ID, ExpectedRevision: p.Definition.Revision, RequestKey: wire.NewID("create"), Name: name, PlayerName: playerName, PlayerProfile: playerProfile, Activate: activate})
 }
 
 func (a *App) createWorldFromPack(ctx context.Context, pack content.LoadedPack, request CreateWorldRequest, hash string) (wiaworld.WorldSummary, error) {

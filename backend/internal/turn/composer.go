@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/tokenestimate"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -135,7 +134,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 	}
 	report.RecallLimited = material.RecallLimited
 	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
-	report.InputTokens = FramedContextTokens(req)
+	report.InputTokens = model.FramedTextInputTokens(req)
 	if _, err := model.ValidateTextRequest(req); err != nil {
 		if !errors.Is(err, model.ErrTextInputTooLarge) {
 			report.Failure = "invalid_request"
@@ -195,7 +194,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 		}
 	}
 	report.Sources = len(report.SelectedSources)
-	report.InputTokens = FramedContextTokens(req)
+	report.InputTokens = model.FramedTextInputTokens(req)
 	return req, report, nil
 }
 
@@ -225,11 +224,6 @@ func contextInput(material Material, sections []Section) (string, int, int) {
 		parts = append(parts, note)
 	}
 	return strings.Join(parts, "\n"), included, excluded
-}
-
-func FramedContextTokens(req model.TextRequest) int {
-	n, _ := tokenestimate.EstimateStableJSON(map[string]any{"messages": []map[string]string{{"role": "system", "content": req.System}, {"role": "user", "content": req.Input}}})
-	return n + 16
 }
 
 func NarrativeSections(messages []wiaworld.Message) []Section {

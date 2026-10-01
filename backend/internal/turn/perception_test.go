@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,6 +15,21 @@ import (
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
+
+func TestCoordinationProjectionContractAndRepairIdentifyMissingRecipients(t *testing.T) {
+	snapshot := spatialFixture()
+	material := composeCoordination(snapshot, wiaworld.Run{RunID: "contract", Input: "检查门口。"}, TurnIntent{}, nil, nil, "", nil)
+	fields := strings.SplitN(material.Required, "完整字段类型：", 2)
+	if len(fields) != 2 || !strings.Contains(strings.SplitN(fields[1], "scene_updates", 2)[0], "projections 对象数组") {
+		t.Fatal("the complete outcome field contract omitted personal projections")
+	}
+	outcome := hostActionResult{ActionID: "contract:action", Projections: []actionProjection{{Recipient: "player", Content: "看见门口。"}}}
+	_, err := actionProjectionText(outcome, map[string]bool{"player": true, "npc:b": true, "npc:a": true})
+	var detail *GenerationError
+	if !errors.As(err, &detail) || detail.Code != "action_projection_missing" || detail.Expected != "action_id=contract:action; missing-recipient-ids=npc:a,npc:b" {
+		t.Fatalf("repair did not identify the exact action and missing observers: %v", err)
+	}
+}
 
 const privateInput = "我悄悄告诉记者：暗号是银色渡鸦。"
 const leaveInput = "随后走到街上，再进入诊所。"

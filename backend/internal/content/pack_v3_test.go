@@ -149,7 +149,7 @@ func TestLoadV3AuthorDefinedMechanicsWithoutBuiltInStateNames(t *testing.T) {
 }
 
 func TestLegacyPackDoesNotGainSpatialRuntimeState(t *testing.T) {
-	pack, err := Load(filepath.Join("packs", "orbital-repair"))
+	pack, err := Load(filepath.Join("testdata", "legacy-packs", "orbital-repair"))
 	if err != nil {
 		t.Fatal(err)
 	}

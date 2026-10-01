@@ -141,7 +141,14 @@ func actionProjectionText(outcome hostActionResult, recipients map[string]bool) 
 		texts[projection.Recipient] = strings.TrimSpace(projection.Content)
 	}
 	if len(texts) != len(recipients) {
-		return nil, coordinationInvalid("action_projection_missing", "outcomes.projections", "exactly-one-personal-projection-per-recipient-actor-and-bystander")
+		missing := []string{}
+		for id := range recipients {
+			if texts[id] == "" {
+				missing = append(missing, id)
+			}
+		}
+		slices.Sort(missing)
+		return nil, coordinationInvalid("action_projection_missing", "outcomes.projections", "action_id="+outcome.ActionID+"; missing-recipient-ids="+strings.Join(missing, ","))
 	}
 	return texts, nil
 }

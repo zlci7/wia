@@ -135,7 +135,7 @@ func TestSuggestionRequiresConfiguredModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close()
-	w, err := a.CreateWorld(ctx, "no-model", "guided", "旅人", "", true)
+	w, err := a.CreateWorld(ctx, "no-model", "", "旅人", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

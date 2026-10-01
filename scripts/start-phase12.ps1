@@ -4,6 +4,7 @@ Start the Phase12 local Runtime.
 
 .DESCRIPTION
 The default path starts the Runtime with the existing embedded client build.
+The source launcher reads the repository's current initial story pack.
 Use -Rebuild when the web client needs to be reconstructed before startup.
 
 .EXAMPLE
@@ -62,6 +63,9 @@ function Resolve-OptionalPath([string]$value, [string]$label) {
 $runtimeArgs = @('-http-addr', $HttpAddr)
 if ($NoOpen) { $runtimeArgs += '-no-open' }
 
+if (-not $StoryPacks -and -not $env:WIA_STORY_PACKS) {
+    $StoryPacks = 'backend\internal\content\packs'
+}
 $resolvedStoryPacks = Resolve-OptionalPath $StoryPacks 'story packs'
 if ($resolvedStoryPacks) { $runtimeArgs += @('-story-packs', $resolvedStoryPacks) }
 

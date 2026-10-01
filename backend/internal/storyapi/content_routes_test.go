@@ -15,7 +15,7 @@ import (
 
 func contentTestServer(t *testing.T) (*Server, *app.App) {
 	t.Helper()
-	app, err := app.Open(context.Background(), app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	app, err := app.Open(context.Background(), app.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

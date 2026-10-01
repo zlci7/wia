@@ -26,6 +26,9 @@ func packFixture(t *testing.T, id string) string {
 	t.Helper()
 	root := t.TempDir()
 	source := filepath.Join("..", "content", "packs", id)
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		source = filepath.Join("..", "content", "testdata", "legacy-packs", id)
+	}
 	err := fs.WalkDir(os.DirFS(source), ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -152,6 +155,7 @@ func TestPackDigestAndIsolation(t *testing.T) {
 func TestPackSnapshotSurvivesReplacementAndRemoval(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
+	installTestPacks(t, root)
 	app, e := Open(ctx, Options{DataRoot: root, Generator: &packGenerator{}})
 	if e != nil {
 		t.Fatal(e)

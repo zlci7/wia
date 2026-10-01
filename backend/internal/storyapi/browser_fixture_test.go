@@ -43,7 +43,7 @@ func TestBrowserFixture(t *testing.T) {
 		t.Skip("interactive browser fixture")
 	}
 	root := t.TempDir()
-	app, err := wiaapp.Open(context.Background(), wiaapp.Options{DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
+	app, err := wiaapp.Open(context.Background(), wiaapp.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
 	if err != nil {
 		t.Fatal(err)
 	}

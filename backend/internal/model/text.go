@@ -63,22 +63,22 @@ func ValidateTextRequest(req TextRequest) (TextRequest, error) {
 		return TextRequest{}, ErrTextInputTooLarge
 	}
 
-	// Count escaped JSON for both roles, including an empty system message. The
-	// reserve covers native message delimiters and the assistant response prefix.
-	const framingReserve = 16
-	tokens, err := tokenestimate.EstimateStableJSON(map[string]any{
+	if FramedTextInputTokens(req) > req.MaxInputTokens {
+		return TextRequest{}, ErrTextInputTooLarge
+	}
+	return req, nil
+}
+
+// FramedTextInputTokens counts escaped content and native message framing. HTTP
+// transport options such as model names and output limits do not consume input.
+func FramedTextInputTokens(req TextRequest) int {
+	n, _ := tokenestimate.EstimateStableJSON(map[string]any{
 		"messages": []map[string]string{
 			{"role": "system", "content": req.System},
 			{"role": "user", "content": req.Input},
 		},
 	})
-	if err != nil {
-		return TextRequest{}, ErrInvalidTextRequest
-	}
-	if tokens > req.MaxInputTokens-framingReserve {
-		return TextRequest{}, ErrTextInputTooLarge
-	}
-	return req, nil
+	return n + 16
 }
 
 // ValidateTextResponse checks text without trimming or truncating its content.

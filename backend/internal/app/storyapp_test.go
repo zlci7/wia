@@ -156,7 +156,9 @@ func (g *scriptedGenerator) GenerateText(ctx context.Context, req model.TextRequ
 
 func newTestApp(t *testing.T, generator model.TextGenerator) *App {
 	t.Helper()
-	app, err := Open(context.Background(), Options{DataRoot: t.TempDir(), UserID: LocalUserID, Generator: generator})
+	root := t.TempDir()
+	installTestPacks(t, root)
+	app, err := Open(context.Background(), Options{DataRoot: root, UserID: LocalUserID, Generator: generator})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -958,6 +960,7 @@ func TestSaveAsRejectsASecondPendingCopy(t *testing.T) {
 
 func TestCloseDrainsPendingCopyBeforeReleasingDataRoot(t *testing.T) {
 	root := t.TempDir()
+	installTestPacks(t, root)
 	app, err := Open(context.Background(), Options{DataRoot: root, UserID: LocalUserID, Generator: &scriptedGenerator{delay: 80 * time.Millisecond}})
 	if err != nil {
 		t.Fatal(err)
@@ -1007,7 +1010,9 @@ func TestStrictJSONRejectsDuplicateKeys(t *testing.T) {
 
 func TestRunFailureRecordsStageReasonAndSafeDiagnostic(t *testing.T) {
 	logger := &recordingLogger{}
-	app, err := Open(context.Background(), Options{DataRoot: t.TempDir(), UserID: LocalUserID, Generator: &scriptedGenerator{fail: true}, Logger: logger})
+	root := t.TempDir()
+	installTestPacks(t, root)
+	app, err := Open(context.Background(), Options{DataRoot: root, UserID: LocalUserID, Generator: &scriptedGenerator{fail: true}, Logger: logger})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1034,7 +1039,9 @@ func TestRunFailureRecordsStageReasonAndSafeDiagnostic(t *testing.T) {
 
 func TestSuccessfulRunLogsStageProvenanceWithoutStoryContent(t *testing.T) {
 	logger := &recordingLogger{}
-	app, err := Open(context.Background(), Options{DataRoot: t.TempDir(), UserID: LocalUserID, Generator: &scriptedGenerator{}, Logger: logger})
+	root := t.TempDir()
+	installTestPacks(t, root)
+	app, err := Open(context.Background(), Options{DataRoot: root, UserID: LocalUserID, Generator: &scriptedGenerator{}, Logger: logger})
 	if err != nil {
 		t.Fatal(err)
 	}

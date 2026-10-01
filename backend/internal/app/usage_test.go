@@ -15,6 +15,7 @@ import (
 func TestUsagePersistencePaginationAndOwnership(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
+	installTestPacks(t, root)
 	a, err := Open(ctx, Options{DataRoot: root, Generator: &scriptedGenerator{}})
 	if err != nil {
 		t.Fatal(err)

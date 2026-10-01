@@ -68,7 +68,7 @@ func (g *contextCaptureGenerator) GenerateText(_ context.Context, req model.Text
 
 func TestRepairIsRecomposedAndCanFailBeforeSecondProviderRequest(t *testing.T) {
 	material := turn.Material{System: "只输出JSON", Required: "玩家本轮原文"}
-	base := turn.FramedContextTokens(model.TextRequest{System: material.System, Input: material.Required})
+	base := model.FramedTextInputTokens(model.TextRequest{System: material.System, Input: material.Required})
 	provider := &contextCaptureGenerator{response: "not json", window: model.WindowLimits{ContextTokens: base + 64, OutputTokens: 64}}
 	logger := &recordingLogger{}
 	g := turn.NewContextGenerator(turn.Deps{Logger: logger}, LocalUserID, provider, material, turn.Snapshot{}, wiaworld.Run{}, "test_repair", "", 0, "")

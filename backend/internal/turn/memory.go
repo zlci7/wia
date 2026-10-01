@@ -41,7 +41,7 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 		for {
 			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query)
 			input, _, _ := contextInput(candidate, nil)
-			if FramedContextTokens(model.TextRequest{System: system, Input: input}) <= inputLimit || len(groups)-start <= 1 {
+			if model.FramedTextInputTokens(model.TextRequest{System: system, Input: input}) <= inputLimit || len(groups)-start <= 1 {
 				return candidate, start
 			}
 			start++

@@ -51,13 +51,13 @@ func (s *Service) PrepareLongMemory(ctx context.Context, store *storage.WorldSto
 		for maintenance := 0; maintenance < 3; maintenance++ {
 			m := snapshot.LongMemory[scope]
 			groups := memory.MemoryGroups(m.Tail)
-			if len(groups) <= 4 || (len(groups) <= 8 && FramedContextTokens(model.TextRequest{System: "memory", Input: memory.MemoryRecordsText(m.Tail)}) <= 6000) {
+			if len(groups) <= 4 || (len(groups) <= 8 && model.FramedTextInputTokens(model.TextRequest{System: "memory", Input: memory.MemoryRecordsText(m.Tail)}) <= 6000) {
 				break
 			}
 			prefix := []memory.MemorySource{}
 			for _, group := range groups[:len(groups)-4] {
 				candidate := append(append([]memory.MemorySource{}, prefix...), group...)
-				if FramedContextTokens(model.TextRequest{System: "memory", Input: memory.MemoryRecordsText(candidate)}) > 6500 && len(prefix) > 0 {
+				if model.FramedTextInputTokens(model.TextRequest{System: "memory", Input: memory.MemoryRecordsText(candidate)}) > 6500 && len(prefix) > 0 {
 					break
 				}
 				prefix = candidate

@@ -8,7 +8,7 @@ import (
 )
 
 func TestUsageRouteValidation(t *testing.T) {
-	a, err := app.Open(context.Background(), app.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	a, err := app.Open(context.Background(), app.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}

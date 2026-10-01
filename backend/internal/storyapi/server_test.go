@@ -60,7 +60,7 @@ func (apiGenerator) GenerateText(ctx context.Context, request model.TextRequest)
 }
 
 func TestLocalSessionAndStoryRoutes(t *testing.T) {
-	app, err := wiaapp.Open(context.Background(), wiaapp.Options{DataRoot: t.TempDir(), Generator: apiGenerator{}})
+	app, err := wiaapp.Open(context.Background(), wiaapp.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: t.TempDir(), Generator: apiGenerator{}})
 	if err != nil {
 		t.Fatal(err)
 	}
