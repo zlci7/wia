@@ -140,7 +140,7 @@ func composeIntent(snapshot Snapshot, run wiaworld.Run) Material {
 		}
 	}
 
-	input += "\n混合输入：只在交談范围、对象或影响观察资格的位置变化时拆为2至4个有序 fragments；普通输入省略 fragments。每项含 text(逐字复制原文连续片段，包括标点，顺序完整覆盖全部非空白原文)、actor_id=player、intent_type、addressee_id、visibility、wait_minutes、action_rule_id。顶层意图字段描述首段；每个后段使用自己的对象、范围和规则。先私聊后离开分别处理，不把前段秘密放入后段。范围由程序从原文推导；最多一段选择固定规则，等待共享120分钟。后段对象可从全部已定义人物选择，执行时必须实际可接触。\n全部定义人物：" + AvailableCharacterIDs(snapshot.Characters)
+	input += "\n混合输入：只在交談范围、对象或影响观察资格的位置变化时拆为2至4个有序 fragments；普通输入省略 fragments。每项含 text(逐字复制原文连续片段，包括标点，顺序完整覆盖全部非空白原文)、actor_id=player、intent_type、addressee_id、visibility、wait_minutes、action_rule_id。顶层意图字段描述首段；显式目标适用于首段，每个后段使用自己原文中的对象、范围和规则。先私聊后离开分别处理，不把前段秘密放入后段。范围由程序从原文推导；最多一段选择固定规则，等待共享120分钟。后段对象可从全部已定义人物选择，执行时必须实际可接触。\n全部定义人物：" + AvailableCharacterIDs(snapshot.Characters)
 	return Material{System: "你负责把玩家本轮输入解析成结构化回合意图。根据当前输入、在场名单与已提交对话判断目标、可见范围与意图类型，不替玩家执行行动。", RequiredSources: append([]string{run.RunID + ":input"}, SceneViewSources(snapshot, "player")...), Required: input, Optional: DialogueSections(snapshot)}
 }
 

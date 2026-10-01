@@ -35,6 +35,29 @@ const privateInput = "我悄悄告诉记者：暗号是银色渡鸦。"
 const leaveInput = "随后走到街上，再进入诊所。"
 const greetingInput = "我向看守问好。"
 
+func TestMixedIntentPreservesThePlayersExplicitOpeningAddressee(t *testing.T) {
+	snapshot := spatialFixture()
+	snapshot.Positions["npc:watcher"] = "office"
+	snapshot.Characters[1].InScene = true
+	first, later := "我低声说暗号是银色渡鸦。", "再向看守询问昨夜的情况。"
+	run := wiaworld.Run{RunID: "explicit-mixed", Input: first + later, AddresseeID: "npc:reporter"}
+	wanted := TurnIntent{IntentType: "speak", AddresseeID: "npc:watcher", Visibility: "private", Fragments: []InputFragment{
+		{Text: first, ActorID: "player", IntentType: "speak", AddresseeID: "npc:watcher", Visibility: "private"},
+		{Text: later, ActorID: "player", IntentType: "speak", AddresseeID: "npc:watcher", Visibility: "public"},
+	}}
+	g := &materialTestGenerator{responses: []string{wire.MarshalJSON(wanted)}}
+	intent, repairs, err := New(&rosterHost{}, Deps{}).resolveTurnIntent(context.Background(), g, snapshot, run)
+	if err != nil || repairs != 0 {
+		t.Fatalf("explicit mixed target: repairs=%d err=%v", repairs, err)
+	}
+	if intent.AddresseeID != "npc:reporter" || intent.Fragments[0].AddresseeID != "npc:reporter" || intent.Fragments[1].AddresseeID != "npc:watcher" {
+		t.Fatal("the model displaced the player's explicit opening target or later target")
+	}
+	if intent.Visibility != "private" || intent.Fragments[1].Visibility != "public" {
+		t.Fatal("binding the opening target changed the conversation scopes")
+	}
+}
+
 func TestMixedIntentRetainsItsLaterPreparedRule(t *testing.T) {
 	snapshot := spatialFixture()
 	rule := ruleTestSnapshot().Definition.ActionRules[0]

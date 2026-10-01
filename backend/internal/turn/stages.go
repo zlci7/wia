@@ -45,7 +45,7 @@ func normalizeNPCActionIntent(value string) string {
 const (
 	structuredTurnOutputTokens = 4096
 
-	intentPromptVersion    = "story.intent.v9"
+	intentPromptVersion    = "story.intent.v10"
 	npcPromptVersion       = "story.npc.v15"
 	narrationPromptVersion = "story.narration.v12"
 )
@@ -135,6 +135,9 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 	defer cancel()
 	checkRecipient := func() error {
 		if len(intent.Fragments) > 0 {
+			if explicitRecipient != "" {
+				intent.Fragments[0].AddresseeID = explicitRecipient
+			}
 			if err := validateInputFragments(snapshot, run, &intent); err != nil {
 				return err
 			}
