@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -48,6 +49,41 @@ func relationshipProposalOptions(snapshot Snapshot, subject string) []relationsh
 		return strings.Compare(left.RelationType, right.RelationType)
 	})
 	return result
+}
+
+// Sources with the same permitted relations share one group. Each group denotes
+// exactly its source_ids × relations, including exclusions already applied above.
+func relationshipProposalContext(options []relationshipProposalOption) string {
+	type relationPair struct {
+		TargetID     string `json:"target_id"`
+		RelationType string `json:"relation_type"`
+	}
+	type sourceGroup struct {
+		SourceIDs []string       `json:"source_ids"`
+		Relations []relationPair `json:"relations"`
+	}
+	groups := []sourceGroup{}
+	indexes := map[string]int{}
+	for start := 0; start < len(options); {
+		end := start + 1
+		for end < len(options) && options[end].SourceID == options[start].SourceID {
+			end++
+		}
+		pairs := make([]relationPair, 0, end-start)
+		for _, option := range options[start:end] {
+			pairs = append(pairs, relationPair{TargetID: option.TargetID, RelationType: option.RelationType})
+		}
+		key := wire.MarshalJSON(pairs)
+		index, found := indexes[key]
+		if !found {
+			index = len(groups)
+			indexes[key] = index
+			groups = append(groups, sourceGroup{SourceIDs: []string{}, Relations: pairs})
+		}
+		groups[index].SourceIDs = append(groups[index].SourceIDs, options[start].SourceID)
+		start = end
+	}
+	return wire.MarshalJSON(groups)
 }
 
 func validateRelationshipProposals(snapshot Snapshot, subject string, decision *NPCDecision) error {

@@ -38,19 +38,27 @@ func (g *stageBGenerator) GenerateText(_ context.Context, request model.TextRequ
 		}
 		start += len(marker)
 		end := strings.Index(request.Input[start:], "\n")
-		var options []struct {
-			SourceID     string `json:"source_id"`
-			TargetID     string `json:"target_id"`
-			RelationType string `json:"relation_type"`
+		var groups []struct {
+			SourceIDs []string `json:"source_ids"`
+			Relations []struct {
+				TargetID     string `json:"target_id"`
+				RelationType string `json:"relation_type"`
+			} `json:"relations"`
 		}
-		if end < 0 || json.Unmarshal([]byte(request.Input[start:start+end]), &options) != nil {
+		if end < 0 || json.Unmarshal([]byte(request.Input[start:start+end]), &groups) != nil {
 			return model.TextResponse{}, errors.New("invalid npc relationship options")
 		}
 		proposals := []map[string]any{}
-		for _, option := range options {
-			if option.TargetID == "player" && option.RelationType == "trust" {
-				proposals = append(proposals, map[string]any{"target_id": option.TargetID, "relation_type": option.RelationType, "delta": 3, "source_id": option.SourceID})
-				break
+	choose:
+		for _, group := range groups {
+			if len(group.SourceIDs) == 0 {
+				return model.TextResponse{}, errors.New("relationship group has no source")
+			}
+			for _, relation := range group.Relations {
+				if relation.TargetID == "player" && relation.RelationType == "trust" {
+					proposals = append(proposals, map[string]any{"target_id": relation.TargetID, "relation_type": relation.RelationType, "delta": 3, "source_id": group.SourceIDs[0]})
+					break choose
+				}
 			}
 		}
 		body, _ := json.Marshal(map[string]any{"speech": "我会把细节说清楚。", "action_intent": "", "silent": false, "memory": "玩家愿意认真核对委托细节。", "relationship_proposals": proposals})

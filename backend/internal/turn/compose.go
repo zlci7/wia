@@ -212,7 +212,7 @@ func composeNPC(snapshot Snapshot, def story.Definition, character wiaworld.Char
 	relationOptions := relationshipProposalOptions(snapshot, character.EntityID)
 	material := Material{PolicyRevision: revision, System: BehaviorContract + "\n你是一个重要 NPC。只根据自己的角色资料、个人记忆和本阶段感知作决定。你可以沉默；speech 是你选择说出的对白；speech_visibility 为 public 或 private，private 时 speech_recipients 列出实际同场接收者的 ID，public 时为空数组。你可以对玩家或其他同场人物私密回复；保密由听众范围表达，所有说出的内容放入 speech；action_intent 只表达非言语行动，不夹带问话、台词或转述式发言。action_intent 不作为私密对白的备用通道，不以行动安排额外耳语或口令回复；非言语行动仍可产生仅部分人物感知的结果。action_intent 只是尝试，不是已经发生的事实。memory 只写本次真正获知的简短经历。\n输出合同：只输出单个 JSON 对象，不带 Markdown 围栏；speech、action_intent、memory 均为字符串，无内容用空字符串；silent 是布尔值。多个动作合写在 action_intent 的字符串里，不使用数组或对象。四个字段都要提供。", RequiredSources: append(append([]string{}, stageInput.SourceEventIDs...), SceneViewSources(snapshot, character.EntityID)...), Required: buildNPCPrompt(base, def, character, recipient, intentType, stageInput, priorTurn, relationOptions, stage), Optional: PersonalSections(snapshot, character.EntityID)}
 	if snapshot.Definition.Capabilities["relations"] == 1 {
-		material.System += "\nrelationship_proposals 是你本人基于已经获准经历的已提交结果提出的有向关系变化数组，每项只含 target_id、relation_type、delta、source_id；source_id、target_id、relation_type 必须逐字复制“关系变化可用组合”中的同一项。本阶段尚未裁定的玩家输入和行动尝试不能作为关系变化来源。delta 不得为0；该类型声明正数单轮预算时遵守预算。关系属于你本人；不能替其他人物提案。没有可用组合或没有变化时返回 []。"
+		material.System += "\nrelationship_proposals 是你本人基于已经获准经历的已提交结果提出的有向关系变化数组，每项只含 target_id、relation_type、delta、source_id；从“关系变化可用组合”的同一组中选一个 source_ids 值和一个 relations 对象，source_id 填选定来源值，target_id、relation_type 逐字复制选定关系。每组只允许本组来源与本组关系搭配。本阶段尚未裁定的玩家输入和行动尝试不能作为关系变化来源。delta 不得为0；该类型声明正数单轮预算时遵守预算。关系属于你本人；不能替其他人物提案。没有可用组合或没有变化时返回 []。"
 	}
 	material.System += "\n可选 action_target_id 表达非言语行动的明确对象，使用已提供的人物 ID 或 player；未明确对象返回空字符串。整数关系预算仅在 max_change_per_turn 为正时生效，0 表示没有单轮预算，仍遵守总范围。"
 	material = withLongMemory(material, snapshot, character.EntityID, stageInput.PlayerPerception+"\n"+stageInput.NewStimulus)
@@ -242,7 +242,7 @@ func buildNPCPrompt(snapshot Snapshot, def story.Definition, character wiaworld.
 	fmt.Fprintf(&builder, "你获准知道的当前状态、关系与物品(JSON)：%s\n", MechanicsContext(snapshot, character.EntityID))
 	fmt.Fprintf(&builder, "当前可交谈对象(JSON)：%s\n", speechContactContext(snapshot, character.EntityID))
 	fmt.Fprintf(&builder, "本阶段输入来源ID(JSON)：%s\n", wire.MarshalJSON(stageInput.SourceEventIDs))
-	fmt.Fprintf(&builder, "关系变化可用组合(JSON)：%s\n", wire.MarshalJSON(relationOptions))
+	fmt.Fprintf(&builder, "关系变化可用组合(JSON)：%s\n", relationshipProposalContext(relationOptions))
 	if len(character.SpeakingExamples) > 0 {
 		// Style reference only: a sample shows how the person talks, it is not something
 		// that happened and must not be treated as memory.
