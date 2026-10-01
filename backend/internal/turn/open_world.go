@@ -71,19 +71,14 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 	}
 	woken := []string{}
 	if checkID != "" {
-		material := Material{System: BehaviorContract + "\n你是持续世界协调器。评估当前矛盾、压力或已到期的外部安排。读取最新权威事实，不将作者初始描述覆盖物品归属、位置、关系或状态。人物意向由本人决定；你只提供真实外部变化与个人可感知的刺激，不代写重要人物已经行动。只返回 JSON。",
-			Required: fmt.Sprintf("游戏时间：%s\n本轮已确认记录：%s\n当前位置：%s\n最新能力工作态：%s\n逐人情境：%s\n待评估对象：%s；external_schedule=%t\n输出 status(occurred/deferred/skipped)、content(作者真实结果)、source_ids、projections(逐人recipient/content/scene)、decision_requests、ending(空字符串)。每个人只能获得其实际观察或有效传达的部分；不得为共享信息改变人物位置。decision_requests最多两名已收到本次projection的重要人物。deferred不产生projection或决定请求；不确定时暂缓，不编造完成。", output.Clock, wire.MarshalJSON(output.Events), wire.MarshalJSON(output.Positions), HostMechanicsContext(working), CoordinationScene(working), checkID, external), RequiredSources: append(EventIDs(output.Events), SceneViewSources(working, "")...), Optional: plotEvidenceSections(snapshot.Events)}
-		for _, id := range materialIDs {
-			m, ok := story.MaterialByID(snapshot.Definition, id)
-			if !ok {
-				return nil, ErrContextSourceMissing
-			}
-			material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
+		material, err := composeOpenWorld(working, *output, checkID, external, materialIDs)
+		if err != nil {
+			return nil, err
 		}
-		call := s.generator(generator, material, working, run, "plot", "coordinator", 4, "story.open-world.v1")
+		call := s.generator(generator, material, working, run, "plot", "coordinator", 4, "story.open-world.v2")
 		var result plotResolution
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		_, err := GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, nil, []string{"status", "content", "source_ids", "projections", "decision_requests", "ending"}, func() error { return validateOpenResolution(working, result, call.(*ContextGenerator)) })
+		_, err = GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, nil, []string{"status", "content", "source_ids", "projections", "decision_requests", "ending"}, func() error { return validateOpenResolution(working, result, call.(*ContextGenerator)) })
 		cancel()
 		if err != nil {
 			return nil, err
@@ -135,6 +130,39 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 		}
 	}
 	return visible, nil
+}
+
+func composeOpenWorld(snapshot Snapshot, output Output, checkID string, external bool, materialIDs []string) (Material, error) {
+	material := Material{System: BehaviorContract + "\n你是持续世界协调器。评估当前矛盾、压力或已到期的外部安排。读取最新权威事实，不将作者初始描述覆盖物品归属、位置、关系或状态。人物意向由本人决定；你只提供真实外部变化与个人可感知的刺激，不代写重要人物已经行动。只返回 JSON。",
+		Required: fmt.Sprintf("游戏时间：%s\n本轮已确认记录：%s\n当前位置：%s\n最新能力工作态：%s\n逐人情境：%s\n待评估对象：%s；external_schedule=%t\n输出 status(occurred/deferred/skipped)、content(作者真实结果)、source_ids、projections(逐人recipient/content/scene)、decision_requests、ending(空字符串)。每个人只能获得其实际观察或有效传达的部分；不得为共享信息改变人物位置。decision_requests最多两名已收到本次projection的重要人物。deferred不产生projection或决定请求；不确定时暂缓，不编造完成。", output.Clock, worldProgressionRecords(output.Events), wire.MarshalJSON(output.Positions), HostMechanicsContext(snapshot), CoordinationScene(snapshot), checkID, external), RequiredSources: append(EventIDs(output.Events), SceneViewSources(snapshot, "")...), Optional: plotEvidenceSections(snapshot.Events)}
+	for _, id := range materialIDs {
+		m, ok := story.MaterialByID(snapshot.Definition, id)
+		if !ok {
+			return Material{}, ErrContextSourceMissing
+		}
+		material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
+	}
+	return material, nil
+}
+
+// A world evaluation uses game time and ordered events. Persistence timestamps,
+// unassigned sequence numbers and the shared run ID are outside this purpose.
+func worldProgressionRecords(events []wiaworld.Event) string {
+	type record struct {
+		EventID      string `json:"event_id"`
+		EventType    string `json:"event_type"`
+		ActorID      string `json:"actor_id,omitempty"`
+		TargetID     string `json:"target_id,omitempty"`
+		Content      string `json:"content"`
+		Stage        int    `json:"stage"`
+		SceneVersion int64  `json:"scene_version"`
+		SourceType   string `json:"source_type"`
+	}
+	records := make([]record, 0, len(events))
+	for _, event := range events {
+		records = append(records, record{EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, TargetID: event.TargetID, Content: event.Content, Stage: event.Stage, SceneVersion: event.SceneVersion, SourceType: event.SourceType})
+	}
+	return wire.MarshalJSON(records)
 }
 
 func validateOpenResolution(snapshot Snapshot, result plotResolution, call *ContextGenerator) error {
