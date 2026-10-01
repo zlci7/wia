@@ -218,7 +218,7 @@ func composeNPC(snapshot Snapshot, def story.Definition, character wiaworld.Char
 	if snapshot.Definition.Capabilities["relations"] == 1 {
 		material.System += "\nrelationship_proposals 是你本人基于已经获准经历的已提交结果提出的有向关系变化数组，每项只含 target_id、relation_type、delta、source_id；从“关系变化可用组合”的同一组中选一个 source_ids 值和一个 relations 对象，source_id 填选定来源值，target_id、relation_type 逐字复制选定关系。每组只允许本组来源与本组关系搭配。本阶段尚未裁定的玩家输入和行动尝试不能作为关系变化来源。delta 不得为0；该类型声明正数单轮预算时遵守预算。关系属于你本人；不能替其他人物提案。没有可用组合或没有变化时返回 []。"
 	}
-	material.System += "\n可选 action_target_id 表达非言语行动的明确对象，使用已提供的人物 ID 或 player；未明确对象返回空字符串。整数关系预算仅在 max_change_per_turn 为正时生效，0 表示没有单轮预算，仍遵守总范围。"
+	material.System += "\n可选 action_target_id 仅在非言语行动明确作用于已定义的重要 NPC 或 player 时填写该 ID。对象是背景人物、地点或物品时返回空字符串，在 action_intent 原文中描述具体对象；没有明确对象也返回空字符串。整数关系预算仅在 max_change_per_turn 为正时生效，0 表示没有单轮预算，仍遵守总范围。"
 	material = withLongMemory(material, snapshot, character.EntityID, stageInput.PlayerPerception+"\n"+stageInput.NewStimulus)
 	if _, ok := snapshot.LongMemory[character.EntityID]; ok {
 		committed := map[string]bool{}

@@ -1,15 +1,60 @@
 package turn
 
 import (
+	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
+
+type planSourceRepairGenerator struct{ requests []model.TextRequest }
+
+func (g *planSourceRepairGenerator) GenerateText(_ context.Context, request model.TextRequest) (model.TextResponse, error) {
+	g.requests = append(g.requests, request)
+	source := "UNPROVIDED_SECRET_VALUE"
+	if len(g.requests) > 1 {
+		source = "own-stimulus"
+	}
+	return model.TextResponse{Text: wire.MarshalJSON(NPCDecision{Silent: true, PlanUpdates: []planUpdate{{ID: "plan", Content: "根据本人获准的新消息重新调查", SourceIDs: []string{source}, Status: "active", ReviewAfterMinutes: 20}}})}, nil
+}
+
+func TestPlanSourceRepairNamesProvidedSourcesWithoutLeakingRejectedValues(t *testing.T) {
+	snapshot := Snapshot{OpenProgress: &wiaworld.OpenProgress{Plans: []wiaworld.PersonalPlan{{ID: "plan", OwnerID: "npc:a"}}}}
+	call := &ContextGenerator{providedSources: []string{"own-stimulus", "material:revision:own-knowledge"}}
+	bad := NPCDecision{PlanUpdates: []planUpdate{{ID: "plan", Content: "新计划", SourceIDs: []string{"UNPROVIDED_SECRET_VALUE"}, Status: "active", ReviewAfterMinutes: 20}}}
+	err := validatePlanUpdates(snapshot, "npc:a", bad, call)
+	var detail *GenerationError
+	if !errors.Is(err, ErrContextSourceMissing) || !errors.As(err, &detail) || detail.Code != "context_source_missing" || detail.Field != "plan_updates.source_ids" || !strings.Contains(detail.Expected, "plan-index=0; source-index=0") {
+		t.Fatal("source failure lacks its field and local contract", err)
+	}
+	logger := &recordingLogger{}
+	(&ContextGenerator{logger: logger}).recordJSONValidation(err)
+	if strings.Contains(err.Error()+logger.String(), "UNPROVIDED_SECRET_VALUE") {
+		t.Fatal("rejected response value entered diagnostics")
+	}
+	g := &planSourceRepairGenerator{}
+	var decision NPCDecision
+	repairs, err := GenerateJSONCheckedMetrics(context.Background(), g, "S", "I", &decision, 100, nil, []string{"speech", "action_intent", "silent", "memory"}, func() error { return validatePlanUpdates(snapshot, "npc:a", decision, call) })
+	if err != nil || repairs != 1 || len(g.requests) != 2 || decision.PlanUpdates[0].SourceIDs[0] != "own-stimulus" {
+		t.Fatal("source contract did not reach the technical repair", err, repairs)
+	}
+	for _, text := range []string{"plan_updates.source_ids", "own-stimulus", "material:revision:own-knowledge"} {
+		if !strings.Contains(g.requests[1].System, text) {
+			t.Fatal("repair omitted provided source contract", text)
+		}
+	}
+	if strings.Contains(g.requests[1].System, "UNPROVIDED_SECRET_VALUE") {
+		t.Fatal("rejected source value entered repair instructions")
+	}
+}
 
 func TestPersonalPlansAreCurrentOwnedStateRatherThanInitialFiles(t *testing.T) {
 	snapshot := materialTestSnapshot()

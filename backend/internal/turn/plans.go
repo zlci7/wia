@@ -109,7 +109,7 @@ func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, 
 		provided[id] = true
 	}
 	seen := map[string]bool{}
-	for _, update := range decision.PlanUpdates {
+	for updateIndex, update := range decision.PlanUpdates {
 		owned := false
 		for _, plan := range snapshot.OpenProgress.Plans {
 			if plan.ID == update.ID {
@@ -129,9 +129,9 @@ func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, 
 		if update.Status == "active" && (update.ReviewAfterMinutes < 1 || update.ReviewAfterMinutes > 43200) || update.Status != "active" && update.ReviewAfterMinutes != 0 {
 			return coordinationInvalid("plan_time_invalid", "plan_updates.review_after_minutes", "future-review-for-active-plan")
 		}
-		for _, id := range update.SourceIDs {
+		for sourceIndex, id := range update.SourceIDs {
 			if !provided[id] {
-				return ErrContextSourceMissing
+				return &GenerationError{Code: "context_source_missing", Field: "plan_updates.source_ids", Expected: fmt.Sprintf("plan-index=%d; source-index=%d; copy-source-ids-from-provided=%s", updateIndex, sourceIndex, wire.MarshalJSON(call.providedSources)), Cause: ErrContextSourceMissing}
 			}
 		}
 	}

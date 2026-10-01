@@ -46,7 +46,7 @@ const (
 	structuredTurnOutputTokens = 4096
 
 	intentPromptVersion    = "story.intent.v10"
-	npcPromptVersion       = "story.npc.v16"
+	npcPromptVersion       = "story.npc.v17"
 	narrationPromptVersion = "story.narration.v12"
 )
 
