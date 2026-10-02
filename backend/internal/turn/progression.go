@@ -577,7 +577,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		if s.deps.Logger != nil {
 			s.deps.Logger.Printf("story plot_actions records: run_id=%q prior_records=%d pending_records=%d supplied_prior=%d supplied_pending=%d", run.RunID, len(output.Events), len(extra.Events), len(plotActionRecords(output.Events)), len(plotActionRecords(extra.Events)))
 		}
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v13")
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v14")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
@@ -722,7 +722,7 @@ func composePlotActions(snapshot Snapshot, output Output, extra Output, rootID s
 		audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
 	}
 	material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-		Required: fmt.Sprintf("本次世界刺激的作者结果见已确认记录中的来源：%s；各人物获知的部分见对应plot_perceived记录。\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n已确认记录可为事件数组或{records,bodies}：后者每条records的content_index为bodies数组的零基下标，完整正文是bodies[content_index]；来源仍为原始event_id，文本下标不是来源ID。\n人物计划调整保存在本人当前计划中，计划不是已执行事实；已裁定的旧行动以其结果为准。本阶段只处理待处理记录中的新行动。\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", rootID, plotActionFactContext(facts), worldProgressionRecords(pending), audienceContract), RequiredSources: append(EventIDs(facts), EventIDs(pending)...)}
+		Required: fmt.Sprintf("本次世界刺激的作者结果见已确认记录中的来源：%s；各人物获知的部分见对应plot_perceived记录。\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n已确认记录可为事件数组或{columns,records,bodies}表：每条records按columns顺序对应字段；content_index为bodies数组的零基下标，完整正文是bodies[content_index]；来源仍为原始event_id，文本下标不是来源ID。\n人物计划调整保存在本人当前计划中，计划不是已执行事实；已裁定的旧行动以其结果为准。本阶段只处理待处理记录中的新行动。\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", rootID, plotActionFactContext(facts), worldProgressionRecords(pending), audienceContract), RequiredSources: append(EventIDs(facts), EventIDs(pending)...)}
 	material.Required += personalProjectionContract
 	material.Required += plotActionSceneContract(output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
 	material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
@@ -763,20 +763,11 @@ func plotActionRecords(events []wiaworld.Event) []wiaworld.Event {
 // Repeated speech and projections share their exact body while the event order,
 // identities and audiences stay separate. Unique text retains the smaller array form.
 func plotActionFactContext(events []wiaworld.Event) string {
-	type record struct {
-		EventID      string `json:"event_id"`
-		EventType    string `json:"event_type"`
-		ActorID      string `json:"actor_id,omitempty"`
-		TargetID     string `json:"target_id,omitempty"`
-		ContentIndex int    `json:"content_index"`
-		Stage        int    `json:"stage"`
-		SceneVersion int64  `json:"scene_version"`
-		SourceType   string `json:"source_type"`
-	}
 	table := struct {
-		Records []record `json:"records"`
+		Columns []string `json:"columns"`
+		Records [][]any  `json:"records"`
 		Bodies  []string `json:"bodies"`
-	}{Records: []record{}, Bodies: []string{}}
+	}{Columns: []string{"event_id", "event_type", "actor_id", "target_id", "content_index", "stage", "scene_version", "source_type"}, Records: [][]any{}, Bodies: []string{}}
 	indexes := map[string]int{}
 	for _, event := range events {
 		index, found := indexes[event.Content]
@@ -785,7 +776,7 @@ func plotActionFactContext(events []wiaworld.Event) string {
 			indexes[event.Content] = index
 			table.Bodies = append(table.Bodies, event.Content)
 		}
-		table.Records = append(table.Records, record{EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, TargetID: event.TargetID, ContentIndex: index, Stage: event.Stage, SceneVersion: event.SceneVersion, SourceType: event.SourceType})
+		table.Records = append(table.Records, []any{event.EventID, event.EventType, event.ActorID, event.TargetID, index, event.Stage, event.SceneVersion, event.SourceType})
 	}
 	plain, compact := worldProgressionRecords(events), wire.MarshalJSON(table)
 	if model.FramedTextInputTokens(model.TextRequest{Input: compact}) < model.FramedTextInputTokens(model.TextRequest{Input: plain}) {

@@ -25,19 +25,29 @@ func TestWorldActionFactBodiesRoundTripWithoutMergingAudiencesOrOrder(t *testing
 	}
 	text := plotActionFactContext(events)
 	var table struct {
-		Records []struct {
-			wiaworld.Event
-			ContentIndex int `json:"content_index"`
-		} `json:"records"`
-		Bodies []string `json:"bodies"`
+		Columns []string            `json:"columns"`
+		Records [][]json.RawMessage `json:"records"`
+		Bodies  []string            `json:"bodies"`
 	}
 	if err := json.Unmarshal([]byte(text), &table); err != nil || len(table.Bodies) != 2 {
 		t.Fatal("repeated bodies did not use a complete text table", err)
 	}
 	var decoded []wiaworld.Event
 	for _, row := range table.Records {
-		row.Event.Content = table.Bodies[row.ContentIndex]
-		decoded = append(decoded, row.Event)
+		values := map[string]json.RawMessage{}
+		for i, name := range table.Columns {
+			values[name] = row[i]
+		}
+		var index int
+		if err := json.Unmarshal(values["content_index"], &index); err != nil {
+			t.Fatal(err)
+		}
+		values["content"] = json.RawMessage(wire.MarshalJSON(table.Bodies[index]))
+		var event wiaworld.Event
+		if err := json.Unmarshal([]byte(wire.MarshalJSON(values)), &event); err != nil {
+			t.Fatal(err)
+		}
+		decoded = append(decoded, event)
 	}
 	if !reflect.DeepEqual(events, decoded) || strings.Count(text, wire.MarshalJSON(body)) != 1 {
 		t.Fatal("text sharing merged distinct recipients, event identity, order or source", decoded)
@@ -92,6 +102,7 @@ func TestWorldActionsKeepFactsAndNewProposalsWhilePlansRemainOwned(t *testing.T)
 		t.Fatal("record selection changed the events committed with owned plans")
 	}
 	legacy := material
+	legacy.Required = strings.Replace(legacy.Required, plotActionFactContext(plotActionRecords(original)), worldProgressionRecords(plotActionRecords(original)), 1)
 	legacy.Required += worldProgressionRecords(append(original[:2:2], extra.Events[0]))
 	_, oldReport, oldErr := (ContextComposer{}).Build(legacy, legacy.System, structuredTurnOutputTokens)
 	t.Logf("facts/new-actions=%d; with future plans=%d", report.InputTokens, oldReport.InputTokens)
