@@ -574,7 +574,10 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			remainingMinutes = max(0, 120-output.elapsedMinutes)
 		}
 		material := composePlotActions(base, *output, extra, rootID, allowed, decisions, remainingMinutes)
-		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v11")
+		if s.deps.Logger != nil {
+			s.deps.Logger.Printf("story plot_actions records: run_id=%q prior_records=%d pending_records=%d supplied_prior=%d supplied_pending=%d", run.RunID, len(output.Events), len(extra.Events), len(plotActionRecords(output.Events)), len(plotActionRecords(extra.Events)))
+		}
+		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v13")
 		var resolved struct {
 			TimeMinutes         int                  `json:"time_minutes,omitempty"`
 			Outcomes            []plotActionResult   `json:"outcomes"`
@@ -713,12 +716,13 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 }
 
 func composePlotActions(snapshot Snapshot, output Output, extra Output, rootID string, allowed map[string][]string, decisions map[string]NPCDecision, remainingMinutes int) Material {
+	facts, pending := plotActionRecords(output.Events), plotActionRecords(extra.Events)
 	audienceContract := "recipients只能取对应允许集合；行动者自动获知。"
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		audienceContract = "recipients按本行动执行前同场和有效移动后的到达同场确定；行动者自动获知。"
 	}
 	material := Material{System: BehaviorContract + "\n你是世界剧情行动协调器。只裁定人物本人提交的新行动，不代作新的NPC或玩家选择。",
-		Required: fmt.Sprintf("本次世界刺激的作者结果见已确认记录中的来源：%s；各人物获知的部分见对应plot_perceived记录。\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", rootID, worldProgressionRecords(output.Events), worldProgressionRecords(extra.Events), audienceContract), RequiredSources: append(EventIDs(output.Events), EventIDs(extra.Events)...)}
+		Required: fmt.Sprintf("本次世界刺激的作者结果见已确认记录中的来源：%s；各人物获知的部分见对应plot_perceived记录。\n本轮此前已确认结果：%s\n待处理NPC记录：%s\n已确认记录可为事件数组或{records,bodies}：后者每条records的content_index为bodies数组的零基下标，完整正文是bodies[content_index]；来源仍为原始event_id，文本下标不是来源ID。\n人物计划调整保存在本人当前计划中，计划不是已执行事实；已裁定的旧行动以其结果为准。本阶段只处理待处理记录中的新行动。\n返回JSON对象。outcomes数组项含action_id/status/content/recipients/bystanders/projections；scene_updates遵守下方场景来源合同，其他启用字段遵守下方能力与时间合同。每个npc_action_intent一一对应，status只能succeeded/failed/partial/not_executed。已经完成的相同行动可not_executed，不把计划当成功。%s场外行动不广播。", rootID, plotActionFactContext(facts), worldProgressionRecords(pending), audienceContract), RequiredSources: append(EventIDs(facts), EventIDs(pending)...)}
 	material.Required += personalProjectionContract
 	material.Required += plotActionSceneContract(output, allowed, snapshot.Definition.Capabilities["spatial"] == 1)
 	material.Required += "\n当前实际在场人物：" + wire.MarshalJSON(output.SceneCharacters)
@@ -728,11 +732,66 @@ func composePlotActions(snapshot Snapshot, output Output, extra Output, rootID s
 	} else {
 		material.Required += "\n每个outcome可附actor_in_scene布尔值，仅当本行动成功或部分成功地改变行动者本人进场/离场时填写；无位置变化省略。入场结果可以让player及最终在场人物感知，入场前的场外对白、经历仍限原范围。离场不改变此前对白的听众。scene_updates同步描述对应接收者可见的进场或离场结果。"
 	}
-	material.Required += coordinationCapabilityContext(snapshot, decisions, extra.Events)
+	material.Required += coordinationCapabilityContext(snapshot, decisions, pending)
 	if snapshot.Definition.Progression != nil {
 		material.Required += fmt.Sprintf("\n本轮剩余游戏时间预算：%d分钟。time_minutes为本批新行动实际经过的分钟数，范围0..%d；移动需要正数耗时，依据路线与方式判断。预算不足时not_executed或partial，只提交已经完成的路线段，不将计划写成瞬间抵达。没有新行动或移动可以为0。", remainingMinutes, remainingMinutes)
 	}
 	return material
+}
+
+// Action coordination consumes settled facts and new proposals. Plans remain
+// owned state; an earlier proposal that already has a result is not submitted again.
+func plotActionRecords(events []wiaworld.Event) []wiaworld.Event {
+	resolved := map[string]bool{}
+	for _, event := range events {
+		if event.EventType == "npc_action_result" || event.EventType == "player_action_result" {
+			if at := strings.LastIndex(event.EventID, ":result:"); at >= 0 {
+				resolved[event.EventID[:at]] = true
+			}
+		}
+	}
+	records := make([]wiaworld.Event, 0, len(events))
+	for _, event := range events {
+		if event.EventType == "npc_plan_updated" || (event.EventType == "npc_action_intent" || event.EventType == "player_action_intent") && resolved[event.EventID] {
+			continue
+		}
+		records = append(records, event)
+	}
+	return records
+}
+
+// Repeated speech and projections share their exact body while the event order,
+// identities and audiences stay separate. Unique text retains the smaller array form.
+func plotActionFactContext(events []wiaworld.Event) string {
+	type record struct {
+		EventID      string `json:"event_id"`
+		EventType    string `json:"event_type"`
+		ActorID      string `json:"actor_id,omitempty"`
+		TargetID     string `json:"target_id,omitempty"`
+		ContentIndex int    `json:"content_index"`
+		Stage        int    `json:"stage"`
+		SceneVersion int64  `json:"scene_version"`
+		SourceType   string `json:"source_type"`
+	}
+	table := struct {
+		Records []record `json:"records"`
+		Bodies  []string `json:"bodies"`
+	}{Records: []record{}, Bodies: []string{}}
+	indexes := map[string]int{}
+	for _, event := range events {
+		index, found := indexes[event.Content]
+		if !found {
+			index = len(table.Bodies)
+			indexes[event.Content] = index
+			table.Bodies = append(table.Bodies, event.Content)
+		}
+		table.Records = append(table.Records, record{EventID: event.EventID, EventType: event.EventType, ActorID: event.ActorID, TargetID: event.TargetID, ContentIndex: index, Stage: event.Stage, SceneVersion: event.SceneVersion, SourceType: event.SourceType})
+	}
+	plain, compact := worldProgressionRecords(events), wire.MarshalJSON(table)
+	if model.FramedTextInputTokens(model.TextRequest{Input: compact}) < model.FramedTextInputTokens(model.TextRequest{Input: plain}) {
+		return compact
+	}
+	return plain
 }
 
 func plotActionSceneContract(output Output, allowed map[string][]string, spatial bool) string {

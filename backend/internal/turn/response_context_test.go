@@ -1,9 +1,11 @@
 package turn
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,91 @@ import (
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
+
+func TestWorldActionFactBodiesRoundTripWithoutMergingAudiencesOrOrder(t *testing.T) {
+	body := strings.Repeat("已发生的完整对白，含\"引号\"与\n换行。", 12)
+	events := []wiaworld.Event{
+		{EventID: "speech", EventType: "npc_speech", ActorID: "npc:a", Content: body, Stage: 1, SceneVersion: 4, SourceType: "author_speech"},
+		{EventID: "speech:player", EventType: "npc_dialogue", ActorID: "npc:a", TargetID: "player", Content: body, Stage: 1, SceneVersion: 4, SourceType: "speech_private"},
+		{EventID: "intervening", EventType: "action_perceived", TargetID: "npc:b", Content: "另一人物只看到公开动作", Stage: 3, SceneVersion: 5, SourceType: "action_succeeded"},
+		{EventID: "later:own", EventType: "npc_speech", ActorID: "npc:a", Content: body, Stage: 5, SceneVersion: 6, SourceType: "author_speech"},
+	}
+	text := plotActionFactContext(events)
+	var table struct {
+		Records []struct {
+			wiaworld.Event
+			ContentIndex int `json:"content_index"`
+		} `json:"records"`
+		Bodies []string `json:"bodies"`
+	}
+	if err := json.Unmarshal([]byte(text), &table); err != nil || len(table.Bodies) != 2 {
+		t.Fatal("repeated bodies did not use a complete text table", err)
+	}
+	var decoded []wiaworld.Event
+	for _, row := range table.Records {
+		row.Event.Content = table.Bodies[row.ContentIndex]
+		decoded = append(decoded, row.Event)
+	}
+	if !reflect.DeepEqual(events, decoded) || strings.Count(text, wire.MarshalJSON(body)) != 1 {
+		t.Fatal("text sharing merged distinct recipients, event identity, order or source", decoded)
+	}
+	unique := []wiaworld.Event{{EventID: "one", Content: "独立正文"}}
+	if plotActionFactContext(unique) != worldProgressionRecords(unique) {
+		t.Fatal("unique event text acquired a larger reference representation")
+	}
+}
+
+func TestWorldActionsKeepFactsAndNewProposalsWhilePlansRemainOwned(t *testing.T) {
+	pack, err := content.Load(filepath.Join("..", "content", "packs", "mist-embers"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := Snapshot{Definition: pack.Definition, Characters: pack.Definition.Characters, Positions: pack.Definition.InitialLocations}
+	output := Output{Clock: "第 1 日 10:10", SceneViews: initialSceneViews(snapshot)}
+	planText := strings.Repeat("这是本人未来调查计划，不是已经执行的事实。", 45)
+	for _, owner := range []string{"npc:reporter", "npc:tailor"} {
+		output.Events = append(output.Events, wiaworld.Event{EventID: owner + ":plan:1", EventType: "npc_plan_updated", ActorID: owner, Content: planText})
+	}
+	intent := wiaworld.Event{EventID: "old:action", EventType: "npc_action_intent", ActorID: "npc:reporter", Content: "本人已裁定的旧提案"}
+	result := wiaworld.Event{EventID: intent.EventID + ":result:1", EventType: "npc_action_result", ActorID: intent.ActorID, Content: "旧行动的真实部分成功结果", SourceType: "action_partial"}
+	perceived := wiaworld.Event{EventID: result.EventID + ":projection:player", EventType: "action_perceived", ActorID: intent.ActorID, TargetID: "player", Content: "玩家获知的部分结果"}
+	stimulus := wiaworld.Event{EventID: "world:stimulus", EventType: "plot_result", ActorID: "world", Content: "最新刺激"}
+	output.Events = append(output.Events, intent, result, perceived, stimulus)
+	for i := 1; i <= 26; i++ {
+		output.Events = append(output.Events, wiaworld.Event{EventID: fmt.Sprintf("earlier:result:%d:projection:player", i), EventType: "action_perceived", ActorID: "npc:tailor", TargetID: "player", Content: fmt.Sprintf("获准结果%d：%s", i, strings.Repeat("玩家实际获准的早先结果，位置已经改变，计划没有被当成执行事实。", 3))})
+	}
+	newAction := wiaworld.Event{EventID: "new:action", EventType: "npc_action_intent", ActorID: "npc:reporter", Content: "本人新提交的行动"}
+	extra := Output{Events: []wiaworld.Event{{EventID: "npc:reporter:plan:2", EventType: "npc_plan_updated", ActorID: "npc:reporter", Content: planText}, newAction}}
+	original, pendingOriginal := append([]wiaworld.Event{}, output.Events...), append([]wiaworld.Event{}, extra.Events...)
+	material := composePlotActions(snapshot, output, extra, stimulus.EventID, map[string][]string{newAction.EventID: {"npc:reporter"}}, nil, 45)
+	request, report, err := (ContextComposer{}).Build(material, material.System, structuredTurnOutputTokens)
+	if err != nil || !report.RequiredComplete || request.MaxInputTokens != 12000 {
+		t.Fatal("settled facts and new action did not fit", err, report)
+	}
+	if strings.Contains(request.Input, planText) || strings.Contains(request.Input, intent.Content) {
+		t.Fatal("future plans or already resolved proposal entered action coordination")
+	}
+	for _, event := range append(plotActionRecords(original), newAction) {
+		if !strings.Contains(request.Input, event.Content) || !wiaworld.ContainsID(report.SelectedSources, event.EventID) {
+			t.Fatal("complete fact, projection or new action missing", event.EventID)
+		}
+	}
+	for _, event := range append(original[:2:2], intent) {
+		if wiaworld.ContainsID(report.SelectedSources, event.EventID) {
+			t.Fatal("omitted record was offered as supplied provenance", event.EventID)
+		}
+	}
+	if !reflect.DeepEqual(output.Events, original) || !reflect.DeepEqual(extra.Events, pendingOriginal) {
+		t.Fatal("record selection changed the events committed with owned plans")
+	}
+	legacy := material
+	legacy.Required += worldProgressionRecords(append(original[:2:2], extra.Events[0]))
+	_, oldReport, oldErr := (ContextComposer{}).Build(legacy, legacy.System, structuredTurnOutputTokens)
+	t.Logf("facts/new-actions=%d; with future plans=%d", report.InputTokens, oldReport.InputTokens)
+	if !errors.Is(oldErr, ErrContextCapacity) {
+		t.Fatal("fixture must reproduce future-plan capacity failure", oldErr)
+	}
+}
 
 func TestWorldResponseMergesExactExperiencesOnce(t *testing.T) {
 	old := wiaworld.Perception{RecipientID: "npc:a", SourceEventID: "shared", Content: "本人已经听到的私密内容", Stage: 3, SceneVersion: 2}
@@ -72,7 +159,7 @@ func TestMistEmbersWorldActionContextPreservesCompleteRecordsWithinBudget(t *tes
 		}
 	}
 	legacy := material
-	legacy.Required = strings.Replace(legacy.Required, worldProgressionRecords(output.Events), wire.MarshalJSON(output.Events), 1)
+	legacy.Required = strings.Replace(legacy.Required, plotActionFactContext(output.Events), wire.MarshalJSON(output.Events), 1)
 	_, oldReport, oldErr := (ContextComposer{}).Build(legacy, legacy.System, structuredTurnOutputTokens)
 	t.Logf("storage-envelope input=%d", oldReport.InputTokens)
 	if !errors.Is(oldErr, ErrContextCapacity) {
