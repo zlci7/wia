@@ -369,7 +369,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 						return coordinationInvalid("npc_action_target_invalid", "action_target_id", "defined-important-character-or-player")
 					}
 				}
-				if err := validatePlanUpdates(snapshot, character.EntityID, decision, callGenerator.(*ContextGenerator)); err != nil {
+				if err := validatePlanUpdates(snapshot, character.EntityID, &decision, callGenerator.(*ContextGenerator)); err != nil {
 					return err
 				}
 				if err := validateNPCSpeech(snapshot, character.EntityID, &decision); err != nil {

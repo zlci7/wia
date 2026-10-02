@@ -97,7 +97,7 @@ func personalPlanContext(snapshot Snapshot, recipient string, material Material)
 	return material
 }
 
-func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, call *ContextGenerator) error {
+func validatePlanUpdates(snapshot Snapshot, owner string, decision *NPCDecision, call *ContextGenerator) error {
 	if len(decision.PlanUpdates) == 0 {
 		return nil
 	}
@@ -109,6 +109,7 @@ func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, 
 		provided[id] = true
 	}
 	seen := map[string]bool{}
+	canonical := make([][]string, len(decision.PlanUpdates))
 	for updateIndex, update := range decision.PlanUpdates {
 		owned := false
 		for _, plan := range snapshot.OpenProgress.Plans {
@@ -134,8 +135,54 @@ func validatePlanUpdates(snapshot Snapshot, owner string, decision NPCDecision, 
 				return &GenerationError{Code: "context_source_missing", Field: "plan_updates.source_ids", Expected: fmt.Sprintf("plan-index=%d; source-index=%d; copy-source-ids-from-provided=%s", updateIndex, sourceIndex, wire.MarshalJSON(call.providedSources)), Cause: ErrContextSourceMissing}
 			}
 		}
+		var err error
+		canonical[updateIndex], err = canonicalPlanSources(snapshot, owner, update.SourceIDs)
+		if err != nil {
+			return err
+		}
+	}
+	for i := range decision.PlanUpdates {
+		decision.PlanUpdates[i].SourceIDs = canonical[i]
 	}
 	return nil
+}
+
+// Context record IDs describe an owner's view of an event. Persisted plan bases
+// use the underlying events so dependencies and correction protection agree.
+func canonicalPlanSources(snapshot Snapshot, owner string, ids []string) ([]string, error) {
+	context := snapshot.LongMemory[owner]
+	aliases := map[string]string{}
+	for _, record := range context.Archive {
+		if record.Scope == owner {
+			aliases[record.ID] = record.EventID
+		}
+	}
+	expanded := []string{}
+	for _, id := range ids {
+		if context.Digest.Revision > 0 && id == fmt.Sprintf("digest:%s:%d", owner, context.Digest.Revision) {
+			expanded = append(expanded, context.Digest.Sources...)
+		} else {
+			expanded = append(expanded, id)
+		}
+	}
+	canonical := []string{}
+	for _, id := range expanded {
+		if eventID, exists := aliases[id]; exists {
+			id = eventID
+		} else if strings.HasPrefix(id, "perception:") || strings.HasPrefix(id, "memory:") || strings.HasPrefix(id, "digest:") || strings.HasPrefix(id, "correction:") || strings.HasPrefix(id, "message:") {
+			return nil, coordinationInvalid("plan_basis_invalid", "plan_updates.source_ids", "provided-owned-record-with-durable-event-or-material-basis")
+		}
+		if id == "" {
+			return nil, coordinationInvalid("plan_basis_invalid", "plan_updates.source_ids", "provided-owned-record-with-durable-event-or-material-basis")
+		}
+		if !slices.Contains(canonical, id) {
+			canonical = append(canonical, id)
+		}
+	}
+	if len(canonical) == 0 || len(canonical) > 8 {
+		return nil, coordinationInvalid("plan_basis_invalid", "plan_updates.source_ids", "one-to-eight-durable-bases-use-specific-provided-records-for-a-larger-digest")
+	}
+	return canonical, nil
 }
 
 func applyPlanUpdates(output *Output, run wiaworld.Run, owner string, decision NPCDecision, stage int) {

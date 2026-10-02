@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,7 +26,10 @@ func deferredOpenWorldResponse(request model.TextRequest) (model.TextResponse, e
 	return model.TextResponse{Text: string(body)}, err
 }
 
-type planReviewGenerator struct{ base stageBItemGenerator }
+type planReviewGenerator struct {
+	base            stageBItemGenerator
+	historicalBasis bool
+}
 
 func (g planReviewGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
 	if strings.Contains(request.System, "重要 NPC") && strings.Contains(request.Input, "阶段：5") {
@@ -44,10 +48,111 @@ func (g planReviewGenerator) GenerateText(ctx context.Context, request model.Tex
 		if len(match) != 2 || json.Unmarshal([]byte(match[1]), &sources) != nil {
 			return model.TextResponse{}, errors.New("owned review stimulus missing")
 		}
-		body, err := json.Marshal(map[string]any{"speech": "", "action_intent": "", "silent": true, "memory": "依据当前线索暂停这项安排。", "relationship_proposals": []any{}, "plan_updates": []map[string]any{{"id": plans[0].ID, "content": "已经重估；本人取消原安排，等待新的实际线索。", "source_ids": sources, "status": "cancelled", "review_after_minutes": 0}}})
+		status, after := "cancelled", 0
+		if g.historicalBasis {
+			status, after = "active", 1
+			if history := regexp.MustCompile(`\[(perception:[0-9]+|memory:[0-9]+)；`).FindStringSubmatch(request.Input); len(history) == 2 {
+				sources = []string{history[1]}
+			}
+		}
+		body, err := json.Marshal(map[string]any{"speech": "", "action_intent": "", "silent": true, "memory": "依据当前线索重估这项安排。", "relationship_proposals": []any{}, "plan_updates": []map[string]any{{"id": plans[0].ID, "content": "已经重估；本人等待新的实际线索。", "source_ids": sources, "status": status, "review_after_minutes": after}}})
 		return model.TextResponse{Text: string(body)}, err
 	}
 	return g.base.GenerateText(ctx, request)
+}
+
+func TestPlanHistoryAliasesCommitAsDurableOwnedEvents(t *testing.T) {
+	ctx := context.Background()
+	packRoot := packFixture(t, "mist-embers")
+	path := filepath.Join(packRoot, "narrative", "progression.json")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var progression map[string]any
+	if err = json.Unmarshal(body, &progression); err != nil {
+		t.Fatal(err)
+	}
+	for _, plan := range progression["initial_plans"].([]any) {
+		plan.(map[string]any)["review_after_minutes"] = 1
+	}
+	body, _ = json.Marshal(progression)
+	if err = os.WriteFile(path, body, 0644); err != nil {
+		t.Fatal(err)
+	}
+	rewritePack(t, packRoot, func(p map[string]any) { p["revision"] = "mist-plan-history.v1" })
+	a, err := Open(ctx, Options{DataRoot: t.TempDir(), UserID: LocalUserID, StoryPacksPath: filepath.Dir(packRoot), Generator: planReviewGenerator{historicalBasis: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	game, err := a.Game("mist-embers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := a.CreateStoryWorld(ctx, CreateWorldRequest{GameID: game.ID, ExpectedRevision: game.Revision, RequestKey: "create-history", Activate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, input := range []string{"我赶到废弃诊所并拾起银镜。", "我带着银镜回到事务所。"} {
+		run, err := a.SubmitRun(ctx, w.WorldID, RunRequest{Input: input, RequestKey: fmt.Sprintf("history-%d", i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done := waitRun(t, a, w.WorldID, run.RunID); done.Status != "completed" {
+			t.Fatalf("history turn %d: %+v", i, done)
+		}
+	}
+	saved := readContextSnapshot(t, a, w.WorldID)
+	for _, plan := range saved.OpenProgress.Plans {
+		if plan.Version != 3 || len(plan.SourceIDs) != 1 || !strings.Contains(plan.SourceIDs[0], ":plan-review:projection:") {
+			t.Fatalf("history basis was not resolved to the owned event: %+v", plan)
+		}
+		_, err = a.Correct(ctx, w.WorldID, memory.CorrectionRequest{RequestKey: "correct-history-" + plan.ID, ExpectedEpoch: saved.Summary.ContextEpoch, Kind: "event", Scope: "author", TargetID: plan.SourceIDs[0], Replacement: "本人没有收到这项依据。"})
+		if !errors.Is(err, ErrInvalidRequest) {
+			t.Fatalf("consumed history basis corrected: %v", err)
+		}
+		view, err := a.ReadMemory(ctx, w.WorldID, plan.OwnerID, true, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, source := range view.Sources {
+			if source.EventID != plan.SourceIDs[0] || !strings.HasPrefix(source.ID, "perception:") {
+				continue
+			}
+			found = true
+			_, err = a.Correct(ctx, w.WorldID, memory.CorrectionRequest{RequestKey: "correct-alias-" + plan.ID, ExpectedEpoch: saved.Summary.ContextEpoch, Kind: "perception", Scope: plan.OwnerID, TargetID: source.ID, Replacement: "本人没有收到这项依据。"})
+			if !errors.Is(err, ErrInvalidRequest) {
+				t.Fatalf("consumed personal alias corrected: %v", err)
+			}
+		}
+		if !found {
+			t.Fatal("owned historical perception alias missing")
+		}
+	}
+	status, err := a.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy, err := a.SaveAs(ctx, w.WorldID, "历史计划分支", "copy-history", status.ActiveRevision)
+	if err != nil || copy.Status != "ready" {
+		t.Fatalf("copy=%+v err=%v", copy, err)
+	}
+	dataRoot := a.dataRoot
+	if err = a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, Options{DataRoot: dataRoot, UserID: LocalUserID, StoryPacksPath: filepath.Dir(packRoot), Generator: planReviewGenerator{historicalBasis: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	for _, id := range []string{w.WorldID, copy.TargetWorldID} {
+		if got := readContextSnapshot(t, reopened, id); wire.MarshalJSON(got.OpenProgress.Plans) != wire.MarshalJSON(saved.OpenProgress.Plans) {
+			t.Fatal("copy/restart changed resolved plan bases")
+		}
+	}
 }
 
 func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testing.T) {

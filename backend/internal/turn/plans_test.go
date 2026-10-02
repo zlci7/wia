@@ -3,11 +3,13 @@ package turn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"gameagent/backend/internal/content"
+	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
@@ -30,7 +32,7 @@ func TestPlanSourceRepairNamesProvidedSourcesWithoutLeakingRejectedValues(t *tes
 	snapshot := Snapshot{OpenProgress: &wiaworld.OpenProgress{Plans: []wiaworld.PersonalPlan{{ID: "plan", OwnerID: "npc:a"}}}}
 	call := &ContextGenerator{providedSources: []string{"own-stimulus", "material:revision:own-knowledge"}}
 	bad := NPCDecision{PlanUpdates: []planUpdate{{ID: "plan", Content: "新计划", SourceIDs: []string{"UNPROVIDED_SECRET_VALUE"}, Status: "active", ReviewAfterMinutes: 20}}}
-	err := validatePlanUpdates(snapshot, "npc:a", bad, call)
+	err := validatePlanUpdates(snapshot, "npc:a", &bad, call)
 	var detail *GenerationError
 	if !errors.Is(err, ErrContextSourceMissing) || !errors.As(err, &detail) || detail.Code != "context_source_missing" || detail.Field != "plan_updates.source_ids" || !strings.Contains(detail.Expected, "plan-index=0; source-index=0") {
 		t.Fatal("source failure lacks its field and local contract", err)
@@ -42,7 +44,7 @@ func TestPlanSourceRepairNamesProvidedSourcesWithoutLeakingRejectedValues(t *tes
 	}
 	g := &planSourceRepairGenerator{}
 	var decision NPCDecision
-	repairs, err := GenerateJSONCheckedMetrics(context.Background(), g, "S", "I", &decision, 100, nil, []string{"speech", "action_intent", "silent", "memory"}, func() error { return validatePlanUpdates(snapshot, "npc:a", decision, call) })
+	repairs, err := GenerateJSONCheckedMetrics(context.Background(), g, "S", "I", &decision, 100, nil, []string{"speech", "action_intent", "silent", "memory"}, func() error { return validatePlanUpdates(snapshot, "npc:a", &decision, call) })
 	if err != nil || repairs != 1 || len(g.requests) != 2 || decision.PlanUpdates[0].SourceIDs[0] != "own-stimulus" {
 		t.Fatal("source contract did not reach the technical repair", err, repairs)
 	}
@@ -102,17 +104,46 @@ func TestPlanUpdateRequiresItsOwnersProvidedSources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			bad := update
 			test.mutate(&bad)
-			if validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{bad}}, call) == nil {
+			if validatePlanUpdates(snapshot, "npc:a", &NPCDecision{PlanUpdates: []planUpdate{bad}}, call) == nil {
 				t.Fatal("invalid plan update accepted")
 			}
 		})
 	}
-	if err := validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
+	if err := validatePlanUpdates(snapshot, "npc:a", &NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
 		t.Fatal(err)
 	}
 	update.SourceIDs = []string{"material:revision:own-knowledge"}
-	if err := validatePlanUpdates(snapshot, "npc:a", NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
+	if err := validatePlanUpdates(snapshot, "npc:a", &NPCDecision{PlanUpdates: []planUpdate{update}}, call); err != nil {
 		t.Fatal("provided owned material was rejected:", err)
+	}
+}
+
+func TestPlanBasisResolvesOnlyProvidedOwnedHistoryWithoutDroppingEvidence(t *testing.T) {
+	snapshot := Snapshot{OpenProgress: &wiaworld.OpenProgress{Plans: []wiaworld.PersonalPlan{{ID: "plan", OwnerID: "npc:a"}}}, LongMemory: map[string]MemoryContext{"npc:a": {
+		Digest:  memory.MemoryDigest{Scope: "npc:a", Revision: 2, Sources: []string{"perception:1", "memory:2", "perception:3"}},
+		Archive: []memory.MemorySource{{Scope: "npc:a", ID: "perception:1", EventID: "own:projection"}, {Scope: "npc:a", ID: "memory:2", EventID: "own:projection"}, {Scope: "npc:a", ID: "perception:3", EventID: "earlier:own"}, {Scope: "npc:b", ID: "perception:4", EventID: "foreign:event"}, {Scope: "npc:a", ID: "correction:1"}},
+	}}}
+	call := &ContextGenerator{providedSources: []string{"digest:npc:a:2", "perception:1", "perception:4", "correction:1", "material:r:knowledge"}}
+	decision := NPCDecision{PlanUpdates: []planUpdate{{ID: "plan", Content: "本人依据已有经历调整计划", SourceIDs: []string{"digest:npc:a:2", "perception:1", "material:r:knowledge"}, Status: "active", ReviewAfterMinutes: 20}}}
+	if err := validatePlanUpdates(snapshot, "npc:a", &decision, call); err != nil || wire.MarshalJSON(decision.PlanUpdates[0].SourceIDs) != `["own:projection","earlier:own","material:r:knowledge"]` {
+		t.Fatal("owned digest and record bases did not preserve all durable evidence", err, decision)
+	}
+	for _, id := range []string{"perception:3", "perception:4", "correction:1"} {
+		bad := NPCDecision{PlanUpdates: []planUpdate{{ID: "plan", Content: "本人计划", SourceIDs: []string{id}, Status: "active", ReviewAfterMinutes: 20}}}
+		if validatePlanUpdates(snapshot, "npc:a", &bad, call) == nil {
+			t.Fatal("unprovided, foreign or non-event record accepted as durable basis", id)
+		}
+	}
+	digest := snapshot.LongMemory["npc:a"]
+	digest.Digest.Sources = nil
+	for i := 0; i < 9; i++ {
+		id := fmt.Sprintf("perception:%d", i+10)
+		digest.Digest.Sources = append(digest.Digest.Sources, id)
+		digest.Archive = append(digest.Archive, memory.MemorySource{Scope: "npc:a", ID: id, EventID: fmt.Sprintf("own:%d", i)})
+	}
+	snapshot.LongMemory["npc:a"] = digest
+	if _, err := canonicalPlanSources(snapshot, "npc:a", []string{"digest:npc:a:2"}); err == nil {
+		t.Fatal("large digest silently dropped some of its evidence")
 	}
 }
 
