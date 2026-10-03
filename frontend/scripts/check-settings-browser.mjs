@@ -88,19 +88,19 @@ try {
 
   click('button:has-text("故事设置")');
   const other = js(
-    `fetch('/api/v1/worlds').then(r=>r.json()).then(v=>v.worlds.find(w=>w.world_id!=='${id}').world_id)`,
+    `fetch('/api/v1/worlds').then(r=>r.json()).then(v=>v.worlds.find(w=>w.world_id!=='${id}'))`,
   );
   const revision = js(
     `fetch('/api/v1/status').then(r=>r.json()).then(v=>v.status.active_revision)`,
   );
   assert.equal(
     js(
-      `fetch('/api/v1/worlds/${other}/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key:crypto.randomUUID(),expected_active_revision:${revision}})}).then(r=>r.status)`,
+      `fetch('/api/v1/worlds/${other.world_id}/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_key:crypto.randomUUID(),expected_active_revision:${revision}})}).then(r=>r.status)`,
     ),
     200,
   );
   await wait(
-    `!document.querySelector('[role=dialog]')&&document.querySelector('.reading-heading h1')?.textContent==='另一段旅程'`,
+    `!document.querySelector('[role=dialog]')&&document.querySelector('.reading-heading h1')?.textContent===${JSON.stringify(other.name)}`,
   );
   console.log("PASS active world change invalidates settings editor");
   console.log("Browser settings checks passed");

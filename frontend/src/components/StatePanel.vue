@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Character, PublicState } from "../types";
+import { stateDisplayValue } from "../worldInformation";
 
 const props = defineProps<{
   states: PublicState[];
@@ -12,18 +13,13 @@ function label(state: PublicState) {
   return `${owner?.name ?? state.entity_id} · ${state.name}`;
 }
 
-function value(state: PublicState) {
-  if (state.value.type === "integer") return `${state.value.integer ?? 0}${state.unit ?? ""}`;
-  if (state.value.type === "boolean") return state.value.boolean ? "是" : "否";
-  return state.value.enum ?? "";
-}
 </script>
 
 <template>
   <dl v-if="states.length" class="status-list">
     <div v-for="state in states" :key="`${state.entity_id}:${state.state_id}`">
-      <dt>{{ label(state) }}</dt>
-      <dd>{{ value(state) }}</dd>
+      <dt>{{ label(state) }}<small v-if="state.category === 'skill' && state.description">{{ state.description }}</small></dt>
+      <dd>{{ stateDisplayValue(state) }}</dd>
     </div>
   </dl>
 </template>

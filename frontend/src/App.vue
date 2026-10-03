@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import AppDialog from "./components/AppDialog.vue";
 import CreatorView from "./components/CreatorView.vue";
-import StatePanel from "./components/StatePanel.vue";
+import InformationPanel from "./components/InformationPanel.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
 import { useExperience } from "./useExperience";
+import { formatWorldClock } from "./worldInformation";
 import "./style.css";
 const {
   storyEntries,
@@ -20,6 +21,9 @@ const {
   characters,
   states,
   items,
+  player,
+  knownLocations,
+  informationTab,
   view,
   game,
   loaded,
@@ -61,6 +65,7 @@ const {
   formatDate,
   failureText,
   showDialog,
+  openInformation,
   closeDialog,
   openModel,
   changeProvider,
@@ -86,18 +91,6 @@ const {
   bystanders,
   resizeInput,
 } = useExperience();
-function stateOwner(entityID: string) {
-  if (entityID === "player") return "你";
-  return characters.value.find((item) => item.entity_id === entityID)?.name ?? entityID;
-}
-function locationName(locationID: string) {
-  if (currentWorld.value?.location?.id === locationID) return currentWorld.value.location.name;
-  return currentWorld.value?.adjacent_locations?.find((item) => item.id === locationID)?.name ?? locationID;
-}
-function itemPlacement(item: (typeof items.value)[number]) {
-  if (item.holder_id) return item.holder_id === "player" ? "持有中" : `由${stateOwner(item.holder_id)}持有`;
-  return item.location_id ? `位于${locationName(item.location_id)}` : "";
-}
 const policyOptions = [
   {
     key: "coordination",
@@ -228,7 +221,7 @@ const policyOptions = [
       <section v-if="currentWorld" class="continue-panel">
         <div>
           <h2>{{ currentWorld.name }}</h2>
-          <p>{{ currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</p>
+          <p>{{ currentWorld.scene }} · 游戏内 {{ formatWorldClock(currentWorld.clock) }}</p>
         </div>
         <button
           class="primary-button"
@@ -340,7 +333,7 @@ const policyOptions = [
             ><span>{{ world.scene }}</span
             ><small
               >更新于 {{ formatDate(world.updated_at) }} · 游戏内
-              {{ world.clock }} ·
+              {{ formatWorldClock(world.clock) }} ·
               {{ world.mode === "guided" ? "流程型" : "开放型" }}</small
             ></button
           ><button
@@ -357,18 +350,17 @@ const policyOptions = [
     <div v-else-if="currentWorld && view === 'play'" class="game-layout">
       <section class="story-column">
         <div class="reading-heading">
-          <div>
-            <h1>{{ currentWorld.name }}</h1>
-            <span class="subtle"
-              >{{ currentWorld.location?.name ?? currentWorld.scene }} · 游戏内 {{ currentWorld.clock }}</span
-            >
+          <div class="world-context">
+            <h1 class="visually-hidden">{{ currentWorld.name }}</h1>
+            <strong class="world-clock">{{ formatWorldClock(currentWorld.clock) }}</strong>
+            <span class="world-location">{{ currentWorld.location?.name ?? currentWorld.scene }}</span>
           </div>
-          <button
-            class="quiet-button scene-toggle"
-            @click="showDialog('scene')"
-          >
-            场景与人物
-          </button>
+          <nav class="information-entry" aria-label="世界与角色资料">
+            <button id="wia-information-character" class="quiet-button" @click="openInformation('character')">角色</button>
+            <button class="quiet-button" @click="openInformation('inventory')">背包</button>
+            <button class="quiet-button" @click="openInformation('map')">地图</button>
+            <button class="quiet-button" @click="openInformation('people')">人物</button>
+          </nav>
         </div>
         <div
           ref="viewport"
@@ -405,9 +397,6 @@ const policyOptions = [
             "
           >
             <div class="message-content">{{ message.content }}</div>
-            <time :datetime="message.created_at">{{
-              formatDate(message.created_at)
-            }}</time>
           </article>
           <div v-if="activeRun" class="run-card" role="status">
             <p class="pending-input">{{ activeRun.input }}</p>
@@ -537,56 +526,6 @@ const policyOptions = [
           </div>
         </form>
       </section>
-      <aside class="side-column">
-        <section class="side-panel">
-          <h2>{{ currentWorld.location?.name ?? currentWorld.scene }}</h2>
-          <p v-if="currentWorld.location?.description" class="subtle">
-            {{ currentWorld.location.description }}
-          </p>
-          <span class="subtle">游戏内时间</span>
-          <p class="clock-value">{{ currentWorld.clock }}</p>
-          <template v-if="currentWorld.adjacent_locations?.length">
-            <span class="subtle">可前往</span>
-            <ul class="location-list">
-              <li v-for="location in currentWorld.adjacent_locations" :key="location.id">
-                <strong>{{ location.name }}</strong>
-                <span v-if="location.description" class="location-description">{{ location.description }}</span>
-              </li>
-            </ul>
-          </template>
-        </section>
-        <section v-if="states.length || items.length" class="side-panel">
-          <h2>人物与物品</h2>
-          <StatePanel :states="states" :characters="characters" />
-          <ul v-if="items.length" class="item-list">
-            <li v-for="item in items" :key="item.instance_id">
-              <strong>{{ item.name }}</strong>
-              <span v-if="item.description">{{ item.description }}</span>
-              <small>{{ itemPlacement(item) }}</small>
-            </li>
-          </ul>
-        </section>
-        <section class="side-panel">
-          <h2>眼前的人</h2>
-          <button
-            v-for="character in characters"
-            :key="character.entity_id"
-            class="character-row"
-            :class="{ selected: session.addressee === character.entity_id }"
-            :aria-pressed="session.addressee === character.entity_id"
-            @click="chooseCharacter(character)"
-          >
-            <span class="avatar">{{ character.name.slice(0, 1) }}</span
-            ><span
-              ><strong>{{ character.name }}</strong
-              ><small>{{ character.role }}</small></span
-            >
-          </button>
-          <p v-if="!characters.length" class="subtle">
-            眼前暂时没有可交谈的人物。
-          </p>
-        </section>
-      </aside>
     </div>
 
     <AppDialog
@@ -595,8 +534,8 @@ const policyOptions = [
       :title="dialogTitle"
       :busy="dialogBusy"
       :destructive="dialog === 'delete'"
-      :drawer="dialog === 'scene'"
-      return-focus-to="#wia-more-menu"
+      :drawer="dialog === 'information'"
+      :return-focus-to="dialog === 'information' ? '#wia-information-character' : '#wia-more-menu'"
       @close="closeDialog"
     >
       <p v-if="dialogError" class="inline-error" role="alert">
@@ -877,7 +816,7 @@ const policyOptions = [
             ><span>{{ world.scene }}</span
             ><small
               >更新于 {{ formatDate(world.updated_at) }} · 游戏内
-              {{ world.clock }} ·
+              {{ formatWorldClock(world.clock) }} ·
               {{ world.mode === "guided" ? "流程型" : "开放型" }}</small
             ></button
           ><button
@@ -1005,61 +944,19 @@ const policyOptions = [
           </button>
         </div></template
       >
-      <template v-else-if="dialog === 'scene'"
-        >
-        <h3>{{ currentWorld?.location?.name ?? currentWorld?.scene }}</h3>
-        <p v-if="currentWorld?.location?.description" class="subtle">
-          {{ currentWorld.location.description }}
-        </p>
-        <p class="subtle">游戏内时间 · {{ currentWorld?.clock }}</p>
-        <template v-if="currentWorld?.adjacent_locations?.length">
-          <h3>可前往</h3>
-          <ul class="location-list">
-            <li v-for="location in currentWorld.adjacent_locations" :key="location.id">
-              <strong>{{ location.name }}</strong>
-              <span v-if="location.description" class="location-description">{{ location.description }}</span>
-            </li>
-          </ul>
-        </template>
-        <template v-if="states.length || items.length">
-          <h3>人物与物品</h3>
-          <StatePanel :states="states" :characters="characters" />
-          <ul v-if="items.length" class="item-list">
-            <li v-for="item in items" :key="item.instance_id">
-              <strong>{{ item.name }}</strong>
-              <span v-if="item.description">{{ item.description }}</span>
-              <small>{{ itemPlacement(item) }}</small>
-            </li>
-          </ul>
-        </template>
-        <h3>眼前的人</h3>
-        <button
-          v-for="character in characters"
-          :key="character.entity_id"
-          class="character-row"
-          :class="{ selected: session.addressee === character.entity_id }"
-          :aria-pressed="session.addressee === character.entity_id"
-          @click="chooseCharacter(character)"
-        >
-          <span class="avatar">{{ character.name.slice(0, 1) }}</span
-          ><span
-            ><strong>{{ character.name }}</strong
-            ><small>{{ character.role }}</small></span
-          >
-        </button>
-        <p v-if="!characters.length" class="subtle">
-          眼前暂时没有可交谈的人物。
-        </p>
-        <template v-if="bystanders.length">
-          <h3>场景里的路人</h3>
-          <div v-for="bystander in bystanders" :key="bystander.bystander_id" class="bystander-row">
-            <span
-              ><strong>{{ bystander.name }}</strong
-              ><small>{{ bystander.description }}</small></span
-            >
-          </div>
-        </template>
-        </template>
+      <InformationPanel
+        v-else-if="dialog === 'information' && currentWorld"
+        v-model:tab="informationTab"
+        :world="currentWorld"
+        :player="player"
+        :known-locations="knownLocations"
+        :states="states"
+        :items="items"
+        :characters="characters"
+        :bystanders="bystanders"
+        :addressee="session.addressee"
+        @choose-character="chooseCharacter"
+      />
     </AppDialog>
   </main>
 </template>

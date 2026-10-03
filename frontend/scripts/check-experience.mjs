@@ -49,6 +49,7 @@ try {
   const id = js(
     `fetch('/api/v1/status').then(r=>r.json()).then(v=>v.status.active_world.world_id)`,
   );
+  await wait(`(()=>{const e=document.querySelector('.transcript');return e.scrollHeight-e.scrollTop-e.clientHeight<3})()`);
   assert(
     js(
       `(()=>{const e=document.querySelector('.transcript');return e.scrollHeight-e.scrollTop-e.clientHeight<3})()`,
@@ -80,7 +81,8 @@ try {
     "PASS history pages retain visible message anchors and retry failed reads",
   );
 
-  click('.character-row:has-text("沈岚")');
+  click('.information-entry button:has-text("人物")');
+  click('.modal .character-row:has-text("沈岚")');
   fill('textarea[aria-label="你的行动"]', "留在 A 的草稿");
   js(`document.querySelector('.transcript').scrollTop=3000`);
   await pause(100);
@@ -218,7 +220,7 @@ try {
     assert(js(`document.querySelector('.transcript').clientHeight>0`));
   }
   call("viewport", "390x844");
-  click('button:has-text("场景与人物")');
+  click('.information-entry button:has-text("人物")');
   click('.modal .character-row:has-text("铁杉")');
   assert.equal(js(`document.querySelector('select').value`), "npc:mercenary");
   assert.equal(
@@ -234,21 +236,25 @@ try {
   await wait(
     `document.querySelector('.reading-heading h1')?.textContent==='雾都机制验收'`,
   );
-  click('button:has-text("场景与人物")');
+  click('.information-entry button:has-text("地图")');
   assert(
     js(`document.querySelector('[role=dialog]').textContent.includes('调查事务所')`),
   );
   assert(
     js(`document.querySelector('[role=dialog]').textContent.includes('街角咖啡馆')`),
   );
+  click('.information-tabs button:has-text("角色")');
   assert(
     js(`document.querySelector('[role=dialog]').textContent.includes('疲劳')`),
   );
+  click('.information-tabs button:has-text("人物")');
+  const held = js(`fetch('/api/v1/status').then(r=>r.json()).then(s=>fetch('/api/v1/worlds/'+s.status.active_world.world_id)).then(r=>r.json()).then(snapshot=>{const item=snapshot.items.find(item=>item.name==='裂纹银镜');return {item,owner:snapshot.characters.find(character=>character.entity_id===item?.holder_id)}})`);
+  assert(held.item && held.owner, 'fixture mirror has a visible current holder');
   assert(
     js(`document.querySelector('[role=dialog]').textContent.includes('裂纹银镜')`),
   );
   assert(
-    js(`document.querySelector('[role=dialog]').textContent.includes('由裁缝店老板持有')`),
+    js(`document.querySelector('[role=dialog]').textContent.includes(${JSON.stringify(`由${held.owner.name}持有`)})`),
   );
   assert(
     js(`document.querySelector('[role=dialog]').scrollWidth<=document.querySelector('[role=dialog]').clientWidth`),
@@ -268,7 +274,7 @@ try {
   call("press", "Escape");
   assert(js(`!document.querySelector('[role=dialog]')`));
   console.log(
-    "PASS responsive layout, scene drawer and keyboard dismissal (simulated viewports)",
+    "PASS responsive layout, shared information drawer and keyboard dismissal (simulated viewports)",
   );
 
   call("viewport", "1280x800");

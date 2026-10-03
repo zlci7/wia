@@ -43,6 +43,7 @@ export interface WorldSummary {
   event_head: number
   context_epoch: number
   clock: string
+  calendar?: { kind: 'gregorian'; era?: string }
   scene: string
   scene_location?: string
   location?: { id: string; name: string; description?: string }
@@ -50,6 +51,15 @@ export interface WorldSummary {
   status: string
   story_ended?: boolean
   updated_at: string
+}
+
+export interface KnownLocation {
+  id: string
+  name: string
+  description?: string
+  kind: 'region' | 'place'
+  parent?: string
+  connections: string[]
 }
 
 export interface Character {
@@ -71,8 +81,12 @@ export interface PublicState {
   entity_id: string
   state_id: string
   name: string
+  description?: string
   value: StateValue
   unit?: string
+  category?: 'condition' | 'skill' | 'resource'
+  currency?: { name: string; denominations: { name: string; units: number }[] }
+  display_value?: string
 }
 
 export interface PublicItem {

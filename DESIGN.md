@@ -187,7 +187,7 @@ Selection uses dark blue text on a pale blue highlight. The caret uses Ultramari
 - **Display:** the frontmatter display role serves home and story-detail headings. Mobile headings reduce to 27px.
 - **Cover:** the cover role serves title planes. Detail cover lettering grows to 42px; compact covers use 27px.
 - **Headline:** section headings use the headline role. Mobile section headings use 20px; dialogs use 24px, reducing to 22px on mobile.
-- **Title:** smaller headings use the title role. Reader titles use 19px, reducing to 17px on mobile; factual-rail headings use 16px.
+- **Title:** smaller headings use the title role. Reader titles use 19px, reducing to 17px on mobile; information section headings use 17px.
 - **Reading:** narration uses the reading role in a maximum measure of 70ch. Mobile narration uses 17px with line-height 1.95. Text preserves intentional line breaks and wraps long strings.
 - **Player:** submitted player text uses the player role inside a pale blue surface aligned to the right.
 - **Body and Label:** the body role is the operational default. Labels and factual metadata use the label role; timestamps use 11px. Dates, clocks, status values and save metadata use tabular numerals.
@@ -201,9 +201,9 @@ The display face is loaded from [the local font asset](frontend/public/fonts/wia
 
 ## Layout
 
-The centered shell is capped at 1280px with 32px side gutters. Page content has generous vertical separation, while controls and related labels use the compact spacing scale. Home story entries pair a 280px cover plane with a flexible description surface. Reading uses a flexible story column beside a 280px factual rail, separated by 40px.
+The centered shell is capped at 1280px with 32px side gutters. Page content has generous vertical separation, while controls and related labels use the compact spacing scale. Home story entries pair a 280px cover plane with a flexible description surface. Reading occupies one flexible story column. A compact context row shows the authored world date, time and current location, followed by four on-demand information entries.
 
-The play shell follows the visible viewport through `--viewport-height`, initialized to `100dvh`. Its header takes natural height and its content takes the remaining space. The story column contains a fixed-size heading, a flexible independently scrolling transcript and the composer. The factual rail scrolls independently. Transcript scrolling preserves its own reading position; returning to the latest content is a separate visible action.
+The play shell follows the visible viewport through `--viewport-height`, initialized to `100dvh`. Its header takes natural height and its content takes the remaining space. The story column contains the compact context row, a flexible independently scrolling transcript and the composer. Character, inventory, known places and present people share one information drawer; switching its sections preserves the reading session. Transcript scrolling preserves its own reading position; returning to the latest content is a separate visible action.
 
 The composer divides into a scrollable body and a non-shrinking submit footer. Its text field grows within a viewport-relative cap. Safe-area padding protects the bottom control row. Long suggestions scroll horizontally within their own strip and retain their text inside individually scrollable options.
 
@@ -211,12 +211,12 @@ The composer divides into a scrollable body and a non-shrinking submit footer. I
 
 | Condition | Layout behavior |
 | --- | --- |
-| Width ≤1100px | Shell gutters become 20px; factual rail becomes 240px with a 24px gap; secondary header actions move into the More menu. |
-| Width ≤859px | Reading becomes one column; factual information is available in the scene drawer; story-detail cover planes are hidden; home cover columns become 220px. |
-| Width ≤600px | Shell gutters become 14px; the header uses the WIA mark; home entries stack cover and description; reading insets reduce; settings options become one column; dialogs use 12px outer clearance. |
+| Width ≤1100px | Shell gutters become 20px; secondary header actions move into the More menu. |
+| Width ≤859px | Story-detail cover planes are hidden; home cover columns become 220px. Reading remains one column with information available on demand. |
+| Width ≤600px | Shell gutters become 14px; the header uses the WIA mark; home entries stack cover and description; reading insets reduce; settings options become one column; dialogs use 12px outer clearance. The reader context and information entries wrap into separate compact rows. |
 | Height ≤600px | Reader chrome and composer spacing compact; the transcript retains a 90px CSS minimum; the composer is capped at the remaining column height minus 160px; textarea, errors and suggestions receive smaller scrollable caps. |
 
-On mobile, the reader surface has rounded upper corners and meets the viewport bottom. The scene drawer is right-aligned, limited to `min(380px, 92vw)`, and fills the visible viewport height. Regular dialogs are capped at 660px wide and scroll within the visible viewport.
+On mobile, the reader surface has rounded upper corners and meets the viewport bottom. The information drawer is right-aligned, limited to `min(480px, 96vw)`, and fills the visible viewport height. At mobile widths it can use the full screen width. Regular dialogs are capped at 660px wide and scroll within the visible viewport.
 
 ### Named Rules
 
@@ -231,7 +231,7 @@ Resting reading surfaces and story entries use flat tonal separation. Rules defi
 - **More menu:** `0 12px 35px #24345924`.
 - **Return to latest:** `0 5px 18px #2434591a`.
 - **Dialog:** `0 24px 70px #17234333`.
-- **Scene drawer:** `-12px 0 40px #17234322`.
+- **Information drawer:** `-12px 0 40px #17234322`.
 
 Dialogs and drawers dim the page with a translucent Blue Ink backdrop. The application header uses stacking level 5, the latest-content control uses 2 within the reader, and overlays use 20.
 
@@ -241,7 +241,7 @@ Dialogs and drawers dim the page with a translucent Blue Ink backdrop. The appli
 
 ## Shapes
 
-The form language is softened rectangles. Controls and fields use the control radius; saves, messages and run surfaces use the item radius; story and reading surfaces and regular dialogs use the surface radius. Recipient chips use the compact chip radius. The scene drawer has square edges.
+The form language is softened rectangles. Controls and fields use the control radius; saves, messages and run surfaces use the item radius; story and reading surfaces and regular dialogs use the surface radius. Recipient chips use the compact chip radius. The information drawer has square edges.
 
 Dividers and field boundaries are one-pixel strokes. Temporary run surfaces use a dashed rule. Person avatars are small rectangular initials, with a 5px radius; selecting a person fills that initial tile with Ultramarine. These initials are content, while the dialog close control is an authored stroke SVG.
 
@@ -273,7 +273,7 @@ Save entries use an outlined item surface, with a separately bounded deletion ac
 
 ### People and recipient chips
 
-Person rows combine an initial tile, name and role. Selection uses an accent outline, pale blue fill and a filled initial tile, exposed with `aria-pressed`. The composer destination reflects the same selected person. The removable recipient chip supplements the destination select and is hidden on mobile.
+Person rows combine an initial tile, name and role. Selection uses an accent outline, pale blue fill and a filled initial tile, exposed with `aria-pressed`. The composer destination reflects the same selected person. The removable recipient chip supplements the destination select and remains visible on mobile. Selecting a person chooses the explicit addressee; the natural-language action retains its own public or private expression.
 
 ### Suggestions and waiting
 
@@ -281,9 +281,9 @@ Suggestions are numbered choices in a horizontal strip. The numbering represents
 
 A pending run uses a dashed neutral surface and one small Ultramarine dot pulsing over 1.6s with ease-in-out. Reduced-motion preference leaves the dot static. Errors use a red-tinted surface with an explicit recovery action.
 
-### Dialogs and the scene drawer
+### Dialogs and the information drawer
 
-Regular dialogs center a white surface over the dimmed page; the scene drawer anchors to the right edge. Both cap their content to the visible viewport and scroll internally. The dialog traps focus, handles Escape, blocks page scrolling and returns focus to the original control or its visible fallback. Busy state protects ongoing operations; destructive confirmation requires an explicit dismissal control or Escape.
+Regular dialogs center a white surface over the dimmed page; the information drawer anchors to the right edge. Its four section buttons switch between character, inventory, map and people in one surface. Both cap their content to the visible viewport and scroll internally. The dialog traps focus, handles Escape, blocks page scrolling and returns focus to the original control or its visible fallback. Busy state protects ongoing operations; destructive confirmation requires an explicit dismissal control or Escape.
 
 ## Do's and Don'ts
 

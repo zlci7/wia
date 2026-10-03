@@ -44,6 +44,7 @@ import {
   type WorldSummary,
   type PublicState,
   type PublicItem,
+  type KnownLocation,
 } from "./types";
 import { useStoryReader } from "./useStoryReader";
 
@@ -55,7 +56,7 @@ type Dialog =
   | "new"
   | "copy"
   | "delete"
-  | "scene"
+  | "information"
   | "usage"
   | "memory";
 export function useExperience() {
@@ -66,6 +67,9 @@ export function useExperience() {
     characters = ref<Character[]>([]);
   const states = ref<PublicState[]>([]),
     items = ref<PublicItem[]>([]);
+  const player = ref({ name: "", profile: "" });
+  const knownLocations = ref<KnownLocation[]>([]);
+  const informationTab = ref<"character" | "inventory" | "map" | "people">("character");
   const packIssues = ref<
     { file: string; field?: string; code: string; message: string }[]
   >([]);
@@ -292,7 +296,7 @@ export function useExperience() {
         new: "确认你的主角",
         copy: "另存当前进度",
         delete: "删除存档",
-        scene: "场景与人物",
+        information: "资料",
         memory: "回顾与纠正",
         usage: "模型用量",
         "": "",
@@ -379,6 +383,10 @@ export function useExperience() {
     dialogError.value = "";
     dialog.value = value;
   }
+  function openInformation(tab: typeof informationTab.value) {
+    informationTab.value = tab;
+    showDialog("information");
+  }
   function closeDialog() {
     if (dialogBusy.value) return;
     const back = dialog.value === "model" ? modelReturn.value : "";
@@ -406,7 +414,7 @@ export function useExperience() {
     delete runs[id];
     delete submissions[id];
     if (currentWorld.value?.world_id !== id) return;
-    if (dialog.value === "memory") {
+    if (dialog.value === "memory" || dialog.value === "information") {
       dialog.value = "";
       dialogBusy.value = false;
     }
@@ -416,6 +424,9 @@ export function useExperience() {
     characters.value = [];
     states.value = [];
     items.value = [];
+    player.value = { name: "", profile: "" };
+    knownLocations.value = [];
+    bystanders.value = [];
     view.value = "story";
     void reader.select("");
     notice.value = "该存档已被删除或不可访问，请选择其他进度。";
@@ -431,7 +442,7 @@ export function useExperience() {
       if (epoch !== generation || status.value?.active_world?.world_id !== id)
         return;
       if (currentWorld.value?.world_id !== id) {
-        if (dialog.value === "memory") {
+        if (dialog.value === "memory" || dialog.value === "information") {
           dialog.value = "";
           dialogBusy.value = false;
         }
@@ -449,6 +460,9 @@ export function useExperience() {
       characters.value = snapshot.characters.filter((item) => item.in_scene);
       states.value = snapshot.states ?? [];
       items.value = snapshot.items ?? [];
+      player.value = { name: snapshot.player_name ?? "", profile: snapshot.player_profile ?? "" };
+      bystanders.value = snapshot.bystander_refs ?? [];
+      knownLocations.value = snapshot.known_locations ?? [];
       settings.value = snapshot.narrative_settings;
       policyDefaults.value = snapshot.behavior_policy_defaults;
       await reader.select(id);
@@ -545,7 +559,6 @@ export function useExperience() {
     if (refreshing) return refreshing;
     refreshing = refreshNow().finally(() => {
       refreshing = undefined;
-      void loadBystanders();
     });
     return refreshing;
   }
@@ -1132,7 +1145,7 @@ export function useExperience() {
   }
   function chooseCharacter(item: Character) {
     session.value.addressee = item.entity_id;
-    if (dialog.value === "scene") closeDialog();
+    if (dialog.value === "information") closeDialog();
     void nextTick(() => textarea.value?.focus());
   }
   function chooseSuggestion(text: string, basis: import('./types').SuggestionBasis) {
@@ -1225,6 +1238,9 @@ export function useExperience() {
     characters,
     states,
     items,
+    player,
+    knownLocations,
+    informationTab,
     view,
     game,
     gameID,
@@ -1267,6 +1283,7 @@ export function useExperience() {
     formatDate,
     failureText,
     showDialog,
+    openInformation,
     closeDialog,
     openModel,
     changeProvider,

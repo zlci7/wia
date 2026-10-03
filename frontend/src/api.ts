@@ -212,7 +212,7 @@ export async function createWorld(input: { name: string; game_id: string; expect
   return result.world
 }
 
-export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; behavior_policy_defaults: BehaviorPolicyCatalog; messages: Message[]; characters: Character[]; states: PublicState[]; items: PublicItem[] }> {
+export async function fetchWorld(worldID: string): Promise<{ world: WorldSummary; player_name: string; player_profile: string; narrative_settings: NarrativeSettings; behavior_policy_defaults: BehaviorPolicyCatalog; messages: Message[]; characters: Character[]; states: PublicState[]; items: PublicItem[]; bystander_refs?: import('./types').PackBystander[]; known_locations?: import('./types').KnownLocation[] }> {
   return request(`/api/v1/worlds/${encodeURIComponent(worldID)}`)
 }
 

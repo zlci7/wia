@@ -9,6 +9,7 @@
     "build": "node scripts/prepare-dist.mjs && vite build && node scripts/embed-dist.mjs",
     "embed-dist": "node scripts/embed-dist.mjs",
     "type-check": "vue-tsc --noEmit",
+    "test:reading": "node scripts/check-reading.mjs",
     "test:settings": "node scripts/check-settings.mjs",
     "test:memory": "node scripts/check-memory.mjs",
     "test:creator": "node scripts/check-creator.mjs",
