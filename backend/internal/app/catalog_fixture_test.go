@@ -27,7 +27,7 @@ func TestFreshCatalogProvidesMistEmbersInitialStory(t *testing.T) {
 	}
 	defer a.Close()
 	games := a.Games()
-	if len(games) != 1 || games[0].ID != "mist-embers" || games[0].Revision != "mist-embers.pack.v6" || len(a.PackIssues()) != 0 {
+	if len(games) != 1 || games[0].ID != "mist-embers" || games[0].Revision != "mist-embers.pack.v7" || len(a.PackIssues()) != 0 {
 		t.Fatalf("initial catalog: games=%v issues=%v", games, a.PackIssues())
 	}
 	w, err := a.CreateWorld(context.Background(), "initial", "", "", "", false)

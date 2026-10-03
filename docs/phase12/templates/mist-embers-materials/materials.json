@@ -23,7 +23,8 @@
       "visibility": "public",
       "delivery": "on_demand",
       "summary": "报价、报酬与支出涉及的鲁恩币制。",
-      "file": "world/background/currency.md"
+      "file": "world/background/currency.md",
+      "known_to": ["player", "npc:tailor", "npc:reporter", "npc:clockmaker", "npc:missing-woman"]
     },
     {
       "id": "world-core",
@@ -44,7 +45,8 @@
         "bridge",
         "east"
       ],
-      "file": "world/background/city.md"
+      "file": "world/background/city.md",
+      "known_to": ["player", "npc:tailor", "npc:reporter", "npc:clockmaker", "npc:missing-woman"]
     },
     {
       "id": "anomaly-rules",

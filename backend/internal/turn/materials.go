@@ -28,7 +28,7 @@ func materialAuthorized(snapshot Snapshot, purpose, recipient string, m story.Ma
 	if m.Visibility == "owner" {
 		return m.OwnerID == recipient && (purpose == "npc" || recipient == "player")
 	}
-	if m.Delivery == "core" || recipient == "player" || slices.Contains(m.KnownTo, recipient) || snapshot.PerceivedSources[recipient][m.SourceID(snapshot.Definition.Revision)] {
+	if m.Delivery == "core" || slices.Contains(m.KnownTo, recipient) || snapshot.PerceivedSources[recipient][m.SourceID(snapshot.Definition.Revision)] {
 		return true
 	}
 	return m.Purpose == "location_lore" && materialAtLocation(snapshot, m, snapshot.Positions[recipient])

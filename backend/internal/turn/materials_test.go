@@ -47,6 +47,60 @@ func TestMaterialDirectoryAndBodyShareKnowledgeAuthorization(t *testing.T) {
 	}
 }
 
+func TestPlayerMaterialKnowledgeAppliesToDirectoryBodyAndReadRequests(t *testing.T) {
+	for _, purpose := range []string{"intent", "narration"} {
+		t.Run(purpose, func(t *testing.T) {
+			snapshot := materialTestSnapshot()
+			snapshot.Positions = map[string]string{"player": "office"}
+			snapshot.Definition.Materials = append(snapshot.Definition.Materials,
+				story.Material{ID: "archive", Purpose: "location_lore", Visibility: "public", Delivery: "on_demand", LocationIDs: []string{"archive-room"}, Summary: "REMOTE_ARCHIVE_INDEX", Body: "REMOTE_ARCHIVE_BODY"})
+			material, directory := selectStoryMaterials(snapshot, purpose, "player", Material{System: "S", Required: "archive"})
+			request, _, err := (ContextComposer{}).Build(material, material.System, 100)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, text := range []string{"UNKNOWN_DIRECTORY", "UNKNOWN_DETAIL", "REMOTE_ARCHIVE_INDEX", "REMOTE_ARCHIVE_BODY", "SECRET_DIRECTORY", "FOREIGN_DIRECTORY"} {
+				if strings.Contains(request.Input, text) {
+					t.Fatalf("unacquired player material leaked: %s", text)
+				}
+			}
+			if len(directory) != 0 || !strings.Contains(request.Input, "COMMON_WORLD") {
+				t.Fatal("player directory or common knowledge is incorrect")
+			}
+			base := &materialTestGenerator{responses: []string{`{"needs_material":["archive"]}`}}
+			call := NewContextGenerator(Deps{}, "owner", base, material, snapshot, wiaworld.Run{}, purpose, "player", 1, "T")
+			var result struct {
+				Answer string `json:"answer"`
+			}
+			if err := GenerateJSON(context.Background(), call, "S", "request", &result, 100, "answer"); err == nil {
+				t.Fatal("unacquired material read was accepted")
+			}
+			for _, request := range base.requests {
+				if strings.Contains(request.Input, "REMOTE_ARCHIVE_BODY") {
+					t.Fatal("unacquired body supplied during material read")
+				}
+			}
+			for _, acquisition := range []string{"initial", "observation", "source"} {
+				known := snapshot
+				switch acquisition {
+				case "initial":
+					known.Definition.Materials = append([]story.Material{}, snapshot.Definition.Materials...)
+					known.Definition.Materials[len(known.Definition.Materials)-1].KnownTo = []string{"player"}
+				case "observation":
+					known.Positions = map[string]string{"player": "archive-room"}
+				case "source":
+					known.PerceivedSources = map[string]map[string]bool{"player": {"material:rev.1:archive": true}}
+				}
+				knownMaterial, knownDirectory := selectStoryMaterials(known, purpose, "player", Material{System: "S", Required: "archive"})
+				knownRequest, _, err := (ContextComposer{}).Build(knownMaterial, knownMaterial.System, 100)
+				if err != nil || knownDirectory["archive"].ID == "" || !strings.Contains(knownRequest.Input, "REMOTE_ARCHIVE_BODY") {
+					t.Fatalf("authorized %s material missing: %v", acquisition, err)
+				}
+			}
+		})
+	}
+}
+
 type materialTestGenerator struct {
 	mu        sync.Mutex
 	responses []string
