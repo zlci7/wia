@@ -150,26 +150,9 @@ func validatePlanUpdates(snapshot Snapshot, owner string, decision *NPCDecision,
 // Context record IDs describe an owner's view of an event. Persisted plan bases
 // use the underlying events so dependencies and correction protection agree.
 func canonicalPlanSources(snapshot Snapshot, owner string, ids []string) ([]string, error) {
-	context := snapshot.LongMemory[owner]
-	aliases := map[string]string{}
-	for _, record := range context.Archive {
-		if record.Scope == owner {
-			aliases[record.ID] = record.EventID
-		}
-	}
-	expanded := []string{}
-	for _, id := range ids {
-		if context.Digest.Revision > 0 && id == fmt.Sprintf("digest:%s:%d", owner, context.Digest.Revision) {
-			expanded = append(expanded, context.Digest.Sources...)
-		} else {
-			expanded = append(expanded, id)
-		}
-	}
 	canonical := []string{}
-	for _, id := range expanded {
-		if eventID, exists := aliases[id]; exists {
-			id = eventID
-		} else if strings.HasPrefix(id, "perception:") || strings.HasPrefix(id, "memory:") || strings.HasPrefix(id, "digest:") || strings.HasPrefix(id, "correction:") || strings.HasPrefix(id, "message:") {
+	for _, id := range canonicalContextSources(snapshot, owner, ids) {
+		if strings.HasPrefix(id, "perception:") || strings.HasPrefix(id, "memory:") || strings.HasPrefix(id, "digest:") || strings.HasPrefix(id, "correction:") || strings.HasPrefix(id, "message:") {
 			return nil, coordinationInvalid("plan_basis_invalid", "plan_updates.source_ids", "provided-owned-record-with-durable-event-or-material-basis")
 		}
 		if id == "" {

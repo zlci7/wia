@@ -313,7 +313,7 @@ func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworl
 	}
 	for i := start; i < len(output.Events); i++ {
 		if output.Events[i].EventType == "npc_speech" || output.Events[i].EventType == "npc_action_intent" {
-			output.Events[i].BasisEventIDs = append([]string{defaultSourceEventID}, decision.sourceEventIDs...)
+			output.Events[i].BasisEventIDs = eventBasisSources(append([]string{defaultSourceEventID}, decision.sourceEventIDs...))
 		}
 	}
 	return reply
@@ -415,24 +415,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 			if decision.Silent {
 				decision.Speech = ""
 			}
-			known := map[string]bool{}
-			for id := range snapshot.Sources {
-				known[id] = true
-			}
-			for _, id := range stageInput.SourceEventIDs {
-				known[id] = true
-			}
-			for _, id := range SceneViewSources(snapshot, character.EntityID) {
-				known[id] = true
-			}
-			for _, p := range snapshot.Perceptions[character.EntityID] {
-				known[p.SourceEventID] = true
-			}
-			for _, id := range callGenerator.(*ContextGenerator).providedSources {
-				if known[id] && !strings.HasPrefix(id, "material:") {
-					decision.sourceEventIDs = append(decision.sourceEventIDs, id)
-				}
-			}
+			decision.sourceEventIDs = decisionEventSources(snapshot, character.EntityID, stageInput.SourceEventIDs, callGenerator.(*ContextGenerator).providedSources)
 			a.host.LogStage(snapshot.Summary.WorldID, run, StageNPC, "npc_decision", character.EntityID, inputStage(run, stage), npcPromptVersion, stageInput.SourceEventIDs, recipient, repairCount, time.Since(started))
 			decisionMu.Lock()
 			decisions[character.EntityID] = decision

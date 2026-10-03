@@ -299,7 +299,7 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 func (s *Service) publishPlotResolution(ctx context.Context, generator model.TextGenerator, snapshot Snapshot, run wiaworld.Run, rootID string, result plotResolution, output *Output) ([]wiaworld.Event, error) {
 	var visible []wiaworld.Event
 	if result.Status != "deferred" {
-		event := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, CreatedAt: time.Now().UTC()}
+		event := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: result.Content, RunID: run.RunID, Stage: 4, SceneVersion: output.SceneVersion, SourceType: "plot_" + result.Status, BasisEventIDs: eventBasisSources(result.SourceIDs), CreatedAt: time.Now().UTC()}
 		output.Events = append(output.Events, event)
 		for i, p := range result.Projections {
 			// Projection IDs have their own text. Possessing their ID never grants the
