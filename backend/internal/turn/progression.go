@@ -578,127 +578,25 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 			s.deps.Logger.Printf("story plot_actions records: run_id=%q prior_records=%d pending_records=%d supplied_prior=%d supplied_pending=%d", run.RunID, len(output.Events), len(extra.Events), len(plotActionRecords(output.Events)), len(plotActionRecords(extra.Events)))
 		}
 		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v14")
-		var resolved struct {
-			TimeMinutes         int                  `json:"time_minutes,omitempty"`
-			Outcomes            []plotActionResult   `json:"outcomes"`
-			SceneUpdates        []sceneUpdate        `json:"scene_updates"`
-			StateEffects        []stateEffect        `json:"state_effects,omitempty"`
-			RelationshipEffects []relationshipEffect `json:"relationship_effects,omitempty"`
-			ItemTransfers       []itemTransferEffect `json:"item_transfers,omitempty"`
-			Movements           []movementResult     `json:"movements,omitempty"`
-		}
+		var resolved plotActionResolution
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		required := []string{"outcomes", "scene_updates"}
 		if snapshot.Definition.Progression != nil {
 			required = append(required, "time_minutes")
 		}
 		required = append(required, coordinationCapabilityFields(base)...)
-		err := GenerateJSON(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, required...)
+		var accepted coordinatedPlotActions
+		_, err := GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &resolved, structuredTurnOutputTokens, nil, required, func() error {
+			var checkErr error
+			accepted, checkErr = s.preparePlotActions(base, run, rootID, *output, extra, allowed, resolved, remainingMinutes)
+			return checkErr
+		})
 		cancel()
 		if err != nil {
 			return nil, err
 		}
-		if snapshot.Definition.Progression != nil && (resolved.TimeMinutes < 0 || resolved.TimeMinutes > remainingMinutes || len(resolved.Movements) > 0 && resolved.TimeMinutes == 0) {
-			return nil, coordinationInvalid("world_action_time_invalid", "time_minutes", "bounded-actual-time-with-positive-movement-cost")
-		}
-		if snapshot.Definition.Capabilities["spatial"] == 1 {
-			for _, outcome := range resolved.Outcomes {
-				if outcome.ActorInScene != nil {
-					return nil, coordinationInvalid("spatial_plot_presence_unsupported", "outcomes.actor_in_scene", "omitted-when-authoritative-movements-are-enabled")
-				}
-			}
-		}
-		outcomes := make([]hostActionResult, 0, len(resolved.Outcomes))
-		for _, o := range resolved.Outcomes {
-			if snapshot.Definition.Progression != nil && o.Projections == nil {
-				return nil, coordinationInvalid("action_projections_required", "outcomes.projections", "explicit-personal-projections")
-			}
-			outcomes = append(outcomes, o.hostActionResult)
-		}
-		finalCharacters := append([]string{}, output.SceneCharacters...)
-		movementHost := hostResult{Outcomes: outcomes, Movements: resolved.Movements, SceneUpdates: resolved.SceneUpdates}
-		if snapshot.Definition.Capabilities["spatial"] == 1 {
-			positions, changes, derived, moveErr := applyMovements(base, extra.Events, movementHost)
-			if moveErr != nil {
-				return nil, moveErr
-			}
-			if err = validateMovementSceneUpdates(movementHost); err != nil {
-				return nil, err
-			}
-			if err = validateSpatialOutcomeAudiences(base, positions, extra.Events, movementHost); err != nil {
-				return nil, err
-			}
-			extra.Positions, extra.PositionChanges = positions, changes
-			finalCharacters = derived
-		} else {
-			finalCharacters, err = plotActionPresence(output.SceneCharacters, extra.Events, resolved.Outcomes)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if err = validateSceneCharacters(finalCharacters, snapshot.Characters); err != nil {
-			return nil, err
-		}
-		for _, outcome := range resolved.Outcomes {
-			if snapshot.Definition.Capabilities["spatial"] == 1 {
-				continue
-			}
-			for _, id := range outcome.Recipients {
-				if !slices.Contains(allowed[outcome.ActionID], id) {
-					if s.deps.Logger != nil {
-						s.deps.Logger.Printf("story plot_actions validation failed: run_id=%q boundary=outcome_audience", run.RunID)
-					}
-					return nil, ErrGenerationFailed
-				}
-			}
-		}
-		results, err := appendHostOutcomes(&extra, run, snapshot.Characters, snapshot.Definition.BystanderRefs, outcomes)
-		if err != nil {
-			if s.deps.Logger != nil {
-				s.deps.Logger.Printf("story plot_actions validation failed: run_id=%q boundary=action_correspondence", run.RunID)
-			}
-			return nil, err
-		}
-		for i := range results {
-			results[i].Stage = 6
-		}
-		visible = append(visible, results...)
-		for i := range extra.Events {
-			if extra.Events[i].EventType == "npc_action_result" || extra.Events[i].EventType == "action_perceived" {
-				extra.Events[i].Stage = 6
-			}
-		}
-		for i := range extra.Perceptions {
-			if extra.Perceptions[i].Stage == 3 {
-				extra.Perceptions[i].Stage = 6
-			}
-		}
-		if err = applyMechanicEffects(base, &extra, hostResult{Outcomes: outcomes, Movements: resolved.Movements, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}); err != nil {
-			return nil, err
-		}
-		sources := plotSceneSources(*output, nil)
-		for i, outcome := range resolved.Outcomes {
-			action, _ := EventByID(extra.Events, outcome.ActionID)
-			sources[outcome.ActionID] = projectionSource(action, outcome.hostActionResult, i)
-		}
-		version := output.SceneVersion
-		if err := applyPlotSceneUpdates(output, sources, resolved.SceneUpdates); err != nil {
-			if s.deps.Logger != nil {
-				s.deps.Logger.Printf("story plot_actions validation failed: run_id=%q boundary=scene_sources detail=%q", run.RunID, err.Error())
-			}
-			return nil, err
-		}
-		if !slices.Equal(output.SceneCharacters, finalCharacters) && output.SceneVersion == version {
-			output.SceneVersion++
-		}
-		output.SceneCharacters = finalCharacters
-		if snapshot.Definition.Progression != nil && resolved.TimeMinutes > 0 {
-			output.elapsedMinutes += resolved.TimeMinutes
-			output.Clock = AdvanceClock(output.Clock, resolved.TimeMinutes)
-			elapsed := wiaworld.Event{EventID: rootID + ":action-clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("随后实际经过%d分钟，当前游戏时间为%s。", resolved.TimeMinutes, output.Clock), RunID: run.RunID, Stage: 6, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
-			extra.Events = append(extra.Events, elapsed)
-			visible = append(visible, elapsed)
-		}
+		*output, extra = accepted.output, accepted.extra
+		visible = append(visible, accepted.visible...)
 	}
 	output.Events = append(output.Events, extra.Events...)
 	output.OpenProgress = extra.OpenProgress
