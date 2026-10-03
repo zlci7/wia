@@ -1,0 +1,6 @@
+{
+  "locations": [
+    {"id": "service-bay", "kind": "place", "name": "维修间", "description": "运输机停在明亮的检修平台旁。", "public": true, "connections": ["cargo-locker"]},
+    {"id": "cargo-locker", "kind": "place", "name": "物资舱", "description": "有工具架与登记台的公共物资舱。", "public": true, "connections": ["service-bay"]}
+  ]
+}

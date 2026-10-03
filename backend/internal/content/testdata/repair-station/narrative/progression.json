@@ -1,0 +1,5 @@
+{
+  "developments": [{"id": "maintenance-pressure", "material_ids": ["maintenance-development"], "entity_ids": ["npc:engineer"], "location_ids": ["service-bay", "cargo-locker"]}],
+  "initial_plans": [{"id": "engineer-handover", "owner_id": "npc:engineer", "material_id": "engineer-plan", "review_after_minutes": 120}],
+  "external_schedules": []
+}

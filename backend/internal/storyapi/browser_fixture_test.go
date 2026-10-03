@@ -32,7 +32,7 @@ func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRe
 	// The suggestion call has its own role and response contract; without this the
 	// generic stub would answer it with an NPC payload.
 	if strings.Contains(request.System, "玩家行动建议助手") {
-		return model.TextResponse{Text: `{"items":["我向沈岚问候。","我看看窗外的河面。","我在一旁稍作停留。"]}`, Diagnostic: model.TextDiagnostic{Provider: "fixture", Model: "controlled-fixture", InputKnown: true, OutputKnown: true, ReasoningKnown: true, CacheKnown: true, InputTokens: 100, OutputTokens: 30, ReasoningTokens: 10, CacheHitTokens: 60, CacheMissTokens: 40}}, nil
+		return model.TextResponse{Text: `{"items":["我向眼前的人问候。","我看看周围的环境。","我在原地稍作停留。"]}`, Diagnostic: model.TextDiagnostic{Provider: "fixture", Model: "controlled-fixture", InputKnown: true, OutputKnown: true, ReasoningKnown: true, CacheKnown: true, InputTokens: 100, OutputTokens: 30, ReasoningTokens: 10, CacheHitTokens: 60, CacheMissTokens: 40}}, nil
 	}
 	return g.apiGenerator.GenerateText(ctx, request)
 }
@@ -43,7 +43,11 @@ func TestBrowserFixture(t *testing.T) {
 		t.Skip("interactive browser fixture")
 	}
 	root := t.TempDir()
-	app, err := wiaapp.Open(context.Background(), wiaapp.Options{StoryPacksPath: apiStoryPacks(t), DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
+	packRoot := apiStoryPacks(t)
+	if err := os.CopyFS(filepath.Join(packRoot, "repair-station"), os.DirFS(filepath.Join("..", "content", "testdata", "repair-station"))); err != nil {
+		t.Fatal(err)
+	}
+	app, err := wiaapp.Open(context.Background(), wiaapp.Options{StoryPacksPath: packRoot, DataRoot: root, Generator: browserGenerator{}, WorldPlayerName: "旅人"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +93,13 @@ func TestBrowserFixture(t *testing.T) {
 	mechanicsPack, ok := app.Pack("mist-embers")
 	if !ok {
 		t.Fatal("mist-embers fixture pack is unavailable")
+	}
+	repairPack, ok := app.Pack("repair-station")
+	if !ok {
+		t.Fatal("repair-station fixture pack is unavailable")
+	}
+	if _, err := app.CreateStoryWorld(context.Background(), wiaapp.CreateWorldRequest{GameID: "repair-station", ExpectedRevision: repairPack.Definition.Revision, RequestKey: "browser-repair-world", Name: "维修站复用验收"}); err != nil {
+		t.Fatal(err)
 	}
 	mechanicsWorld, err := app.CreateStoryWorld(context.Background(), wiaapp.CreateWorldRequest{
 		GameID:           "mist-embers",

@@ -1,0 +1,8 @@
+{
+  "materials": [
+    {"id": "station-background", "purpose": "background", "visibility": "public", "delivery": "core", "summary": "维修站生活与积分计价。", "file": "world/background.md"},
+    {"id": "engineer-knowledge", "purpose": "npc_knowledge", "visibility": "owner", "owner_id": "npc:engineer", "delivery": "core", "summary": "工程师本人的检修记录。", "file": "npcs/engineer/knowledge.md"},
+    {"id": "engineer-plan", "purpose": "npc_plan", "visibility": "owner", "owner_id": "npc:engineer", "delivery": "on_demand", "summary": "核对运输机故障与交班安排。", "file": "npcs/engineer/plans.md"},
+    {"id": "maintenance-development", "purpose": "development", "visibility": "author", "delivery": "on_demand", "summary": "值班工作与运输机的持续状况。", "entity_ids": ["npc:engineer"], "location_ids": ["service-bay", "cargo-locker"], "file": "narrative/developments.md"}
+  ]
+}

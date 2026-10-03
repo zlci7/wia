@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "requires": {"spatial": 1, "state": 1, "items": 1, "progression": 1, "world_info": 1},
+  "game_id": "repair-station",
+  "revision": "repair-station.test.v1",
+  "mode": "open",
+  "title": "轨道维修站",
+  "description": "年末值班时，一台运输机正在等待检修。",
+  "gameplay": "在维修间与物资舱之间自由行动，与值班工程师交谈。",
+  "player": {
+    "name": "维修员",
+    "profile": "轨道维修站的值班维修员，熟悉基础检修与安全操作。",
+    "editable": true,
+    "known_locations": ["service-bay", "cargo-locker"],
+    "initial_state": {"credits": 10000, "fatigue": 5}
+  },
+  "opening": "维修间的顶灯照着停泊的运输机。工程师林澈把检修单放在工作台上，问你准备先检查哪里。你的工具和通行卡放在随身工具袋中。",
+  "initial_location": "service-bay",
+  "clock": "2189-12-31 23:55",
+  "calendar": {"kind": "gregorian", "era": "联合历"},
+  "npcs": ["npcs/engineer/npc.json"],
+  "materials_file": "materials.json",
+  "data_files": {
+    "locations": "world/locations.json",
+    "state": "world/state.json",
+    "items": "world/items.json",
+    "progression": "narrative/progression.json"
+  }
+}

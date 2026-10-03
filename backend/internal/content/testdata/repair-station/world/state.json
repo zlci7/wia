@@ -1,0 +1,6 @@
+{
+  "state_definitions": [
+    {"id": "credits", "name": "现金", "type": "integer", "minimum": 0, "maximum": 1000000, "default": 10000, "scope": "player", "projection": "self", "knowledge": "owner", "update_policy": {"kind": "model"}, "category": "resource", "currency": {"name": "维修站积分", "denominations": [{"name": "积分", "units": 100}, {"name": "分", "units": 1}]}, "description": "已持有的积分金额；一积分等于一百分。"},
+    {"id": "fatigue", "name": "疲劳", "type": "integer", "minimum": 0, "maximum": 100, "default": 5, "scope": "player", "projection": "self", "knowledge": "owner", "update_policy": {"kind": "model"}, "category": "condition", "description": "值班、检修与休息造成的身体负担。"}
+  ]
+}

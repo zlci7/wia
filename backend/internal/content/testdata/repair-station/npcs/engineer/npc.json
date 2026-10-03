@@ -1,0 +1,11 @@
+{
+  "definition_id": "engineer.v1",
+  "revision": "engineer.test.v1",
+  "entity_id": "npc:engineer",
+  "name": "林澈",
+  "role": "值班工程师",
+  "appearance": "穿着有油渍的工作服，胸前挂着维修站工牌。",
+  "profile": "谨慎务实，先核对记录再判断故障，希望顺利完成交班。",
+  "initial_location": "service-bay",
+  "speaking_examples": ["先看记录，别急着拆。"]
+}

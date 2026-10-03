@@ -1,0 +1,10 @@
+{
+  "item_definitions": [
+    {"id": "wrench", "name": "检修扳手", "description": "适合运输机检修的便携扳手。", "projection": "public"},
+    {"id": "access-card", "name": "通行卡", "description": "维修站发给你的个人通行卡。", "projection": "holder"}
+  ],
+  "item_instances": [
+    {"instance_id": "wrench-1", "definition_id": "wrench", "holder_id": "player"},
+    {"instance_id": "access-card-1", "definition_id": "access-card", "holder_id": "player"}
+  ]
+}
