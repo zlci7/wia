@@ -45,11 +45,15 @@ type ItemInstance struct {
 
 // PublicState is the player-facing projection of an allowed state.
 type PublicState struct {
-	EntityID string     `json:"entity_id"`
-	StateID  string     `json:"state_id"`
-	Name     string     `json:"name"`
-	Value    StateValue `json:"value"`
-	Unit     string     `json:"unit,omitempty"`
+	EntityID     string     `json:"entity_id"`
+	StateID      string     `json:"state_id"`
+	Name         string     `json:"name"`
+	Value        StateValue `json:"value"`
+	Unit         string     `json:"unit,omitempty"`
+	Category     string     `json:"category,omitempty"`
+	Description  string     `json:"description,omitempty"`
+	Currency     *Currency  `json:"currency,omitempty"`
+	DisplayValue string     `json:"display_value,omitempty"`
 }
 
 // PublicItem is the player-facing projection of an item the player holds or can

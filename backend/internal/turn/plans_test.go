@@ -151,9 +151,7 @@ func TestLegacyWorldEvaluationUsesLatestItemPlacement(t *testing.T) {
 	snapshot := Snapshot{Definition: story.Definition{Capabilities: map[string]int{"items": 1}}, Plot: &plot.Definition{Revision: "legacy"}}
 	output := Output{Clock: "第 1 日 10:00", Items: map[string]wiaworld.ItemInstance{"mirror": {InstanceID: "mirror", HolderID: "player", SourceEvent: "transfer"}}}
 	material := composePlot(snapshot, wiaworld.Run{}, plot.Node{ID: "review"}, &output)
-	if !strings.Contains(material.Required, `"holder_id":"player"`) || !strings.Contains(material.Required, `"source_event_id":"transfer"`) {
-		t.Fatal("world evaluation omitted latest item placement or source")
-	}
+	assertHostItemContext(t, material.Required, "mirror", "player", "transfer")
 }
 
 func TestPrivateResultBystandersAndUnsupportedMovementAreRejected(t *testing.T) {

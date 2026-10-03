@@ -104,6 +104,28 @@ func (g *stageBGenerator) saw(systemPart, inputPart string) bool {
 	return false
 }
 
+func (g *stageBGenerator) sawState(systemPart, entityID, stateID string, expected int) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for _, request := range g.requests {
+		start := strings.Index(request.Input, `{"state_definitions":`)
+		if !strings.Contains(request.System, systemPart) || start < 0 {
+			continue
+		}
+		var host struct {
+			States map[string]map[string]json.RawMessage `json:"states"`
+		}
+		if json.NewDecoder(strings.NewReader(request.Input[start:])).Decode(&host) != nil {
+			continue
+		}
+		var value int
+		if json.Unmarshal(host.States[entityID][stateID], &value) == nil && value == expected {
+			return true
+		}
+	}
+	return false
+}
+
 func TestStageBStateRelationshipPersistenceAndSaveAs(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -172,7 +194,7 @@ func TestStageBStateRelationshipPersistenceAndSaveAs(t *testing.T) {
 	if completed := waitRun(t, a, world.WorldID, second.RunID); completed.Status != "completed" {
 		t.Fatalf("second run=%+v", completed)
 	}
-	if !generator.saw("场景协调 Agent", `"integer":20`) {
+	if !generator.sawState("场景协调 Agent", "player", "fatigue", 20) {
 		t.Fatal("second coordination did not receive the committed player state")
 	}
 	after, err = a.ReadWorld(ctx, world.WorldID, 20)

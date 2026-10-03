@@ -28,11 +28,12 @@ type PackBystander struct {
 }
 
 type PlayerDefaults struct {
-	Name         string                     `json:"name"`
-	Profile      string                     `json:"profile"`
-	Requirements string                     `json:"requirements"`
-	Editable     bool                       `json:"editable"`
-	InitialState map[string]json.RawMessage `json:"initial_state,omitempty"`
+	Name           string                     `json:"name"`
+	Profile        string                     `json:"profile"`
+	Requirements   string                     `json:"requirements"`
+	Editable       bool                       `json:"editable"`
+	InitialState   map[string]json.RawMessage `json:"initial_state,omitempty"`
+	KnownLocations []string                   `json:"known_locations,omitempty"`
 }
 
 type PackLocation struct {

@@ -9,7 +9,6 @@ import (
 
 	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
-	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -35,7 +34,7 @@ func TestMistEmbersOpeningCoordinationFitsApplicationBudget(t *testing.T) {
 	decisions := map[string]NPCDecision{"npc:tailor": {Speech: "谢谢你。我把照片和住址交给你。", ActionIntent: "将照片和纸条递给调查员", ActionTargetID: "player"}}
 	material := composeCoordination(snapshot, run, TurnIntent{IntentType: "speak", AddresseeID: "npc:tailor", Visibility: "public"}, decisions, events, nil)
 	material, _ = selectStoryMaterials(snapshot, "coordination", "coordinator", material)
-	for _, text := range []string{def.Rules, def.Secret, wire.MarshalJSON(def.Locations), coordinationDecisionContext(decisions, snapshot.Characters, events)} {
+	for _, text := range []string{def.Rules, def.Secret, locationContext(def.Locations), coordinationDecisionContext(decisions, snapshot.Characters, events)} {
 		if text == "" {
 			continue
 		}

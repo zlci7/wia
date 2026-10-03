@@ -48,6 +48,7 @@ type StoryPack struct {
 	Opening             string                      `json:"opening"`
 	InitialLocation     string                      `json:"initial_location"`
 	Clock               string                      `json:"clock"`
+	Calendar            *wiaworld.Calendar          `json:"calendar,omitempty"`
 	Locations           []PackLocation              `json:"locations"`
 	NPCs                []string                    `json:"npcs"`
 	Bystanders          []PackBystander             `json:"bystanders"`
@@ -94,6 +95,8 @@ type PackStateDefinition struct {
 	UpdatePolicy story.StateUpdatePolicy `json:"update_policy"`
 	Description  string                  `json:"description,omitempty"`
 	Unit         string                  `json:"unit,omitempty"`
+	Category     string                  `json:"category,omitempty"`
+	Currency     *wiaworld.Currency      `json:"currency,omitempty"`
 }
 
 type PackRelationDefinition struct {
@@ -414,7 +417,7 @@ func loadPack(root string) (loadedPack, error) {
 			return bad("requires.spatial")
 		}
 		for name, version := range p.Requires {
-			if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(p.SchemaVersion == SchemaV4 && name == "progression")) {
+			if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(p.SchemaVersion == SchemaV4 && (name == "progression" || name == "world_info"))) {
 				return bad("requires." + name)
 			}
 		}
@@ -585,6 +588,9 @@ func loadPack(root string) (loadedPack, error) {
 	def.StateDefinitions, def.InitialStates, def.RelationDefinitions, def.InitialRelations, def.ItemDefinitions, def.InitialItems, err = compileMechanics(p, loadedNPCs, locations)
 	if err != nil {
 		return bad("state/relations/items: " + err.Error())
+	}
+	if err := compileWorldInformation(p, &def, locations); err != nil {
+		return bad("world_info: " + err.Error())
 	}
 	def.ActionRules, err = compileActionRules(p, def, seen)
 	if err != nil {

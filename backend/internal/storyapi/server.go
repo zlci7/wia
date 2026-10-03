@@ -354,7 +354,7 @@ func (s *Server) world(w http.ResponseWriter, r *http.Request, id string) {
 			writeAppError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": turn.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": wiaworld.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders, "bystander_refs": snapshot.BystanderRefs, "states": turn.PlayerStateProjection(snapshot), "items": turn.PlayerItemProjection(snapshot)})
+		writeJSON(w, 200, map[string]any{"world": snapshot.Summary, "player_name": snapshot.PlayerName, "player_profile": snapshot.PlayerProfile, "narrative_settings": snapshot.Narrative, "behavior_policy_defaults": turn.DefaultBehaviorPolicies(), "messages": snapshot.Messages, "characters": wiaworld.PublicCharacterViews(snapshot.Characters), "bystanders": snapshot.Bystanders, "bystander_refs": snapshot.BystanderRefs, "known_locations": turn.PlayerLocationProjection(snapshot), "states": turn.PlayerStateProjection(snapshot), "items": turn.PlayerItemProjection(snapshot)})
 	case "DELETE":
 		raw := strings.TrimSpace(r.URL.Query().Get("expected_active_revision"))
 		expectedRevision, err := strconv.ParseInt(raw, 10, 64)

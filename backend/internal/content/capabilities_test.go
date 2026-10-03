@@ -77,6 +77,12 @@ func TestMistEmbersNarrativeActionsDoNotRequireSuccessFlags(t *testing.T) {
 		t.Fatal("open-world pressure and personal plans are not configured independently")
 	}
 	for _, state := range def.StateDefinitions {
+		if state.Category == "skill" {
+			if state.UpdatePolicy.Kind != "readonly" {
+				t.Fatalf("initial skill should be read-only: %+v", state)
+			}
+			continue
+		}
 		if state.UpdatePolicy.Kind != "model" {
 			t.Fatalf("state policy=%+v", state)
 		}

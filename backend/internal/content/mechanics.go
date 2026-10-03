@@ -95,7 +95,18 @@ func compileStateDefinitions(definitions []PackStateDefinition) ([]story.StateDe
 		} else {
 			return nil, nil, fmt.Errorf("invalid state type")
 		}
-		definition := story.StateDefinition{ID: pack.ID, Name: strings.TrimSpace(pack.Name), Type: pack.Type, Minimum: pack.Minimum, Maximum: pack.Maximum, EnumValues: append([]string(nil), pack.EnumValues...), Scope: pack.Scope, Projection: pack.Projection, Knowledge: pack.Knowledge, UpdatePolicy: pack.UpdatePolicy, Description: strings.TrimSpace(pack.Description), Unit: strings.TrimSpace(pack.Unit)}
+		if pack.Category != "" && !slices.Contains([]string{"condition", "skill", "resource"}, pack.Category) {
+			return nil, nil, fmt.Errorf("invalid state category")
+		}
+		if pack.Currency != nil {
+			if pack.Type != "integer" || pack.Minimum == nil || *pack.Minimum < 0 || pack.Category != "resource" {
+				return nil, nil, fmt.Errorf("currency requires a nonnegative integer resource")
+			}
+			if err := pack.Currency.Validate(); err != nil {
+				return nil, nil, err
+			}
+		}
+		definition := story.StateDefinition{ID: pack.ID, Name: strings.TrimSpace(pack.Name), Type: pack.Type, Minimum: pack.Minimum, Maximum: pack.Maximum, EnumValues: append([]string(nil), pack.EnumValues...), Scope: pack.Scope, Projection: pack.Projection, Knowledge: pack.Knowledge, UpdatePolicy: pack.UpdatePolicy, Description: strings.TrimSpace(pack.Description), Unit: strings.TrimSpace(pack.Unit), Category: pack.Category, Currency: pack.Currency}
 		value, err := parseStateValue(definition, pack.Default)
 		if err != nil {
 			return nil, nil, fmt.Errorf("state %s default: %w", pack.ID, err)

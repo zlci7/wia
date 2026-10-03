@@ -6,10 +6,11 @@
     "relations": 1,
     "items": 1,
     "rules": 1,
-    "progression": 1
+    "progression": 1,
+    "world_info": 1
   },
   "game_id": "mist-embers",
-  "revision": "mist-embers.pack.v7",
+  "revision": "mist-embers.pack.v8",
   "mode": "open",
   "title": "雾都余烬",
   "description": "第一部结束后的贝克兰德，一宗失踪案把新晋调查员带向红烟囱街与一面裂纹银镜。人物各有打算，城市不会因你离开而停下。",
@@ -23,11 +24,13 @@
       "fatigue": 18,
       "investigation_strain": 0,
       "mirror_dissonance": 0
-    }
+    },
+    "known_locations": ["office", "cafe", "tailor-shop", "newspaper-office", "clock-shop"]
   },
   "opening": "上午的雾贴在调查事务所窗外。来访的马丁·维尔自称是维尔裁缝店的店主。他坐在访客椅上，帽子被攥得变了形，说二十岁的女儿已经失踪三天，愿意付三镑请人把她找回来。说到两人最后一次见面时，他明显停顿了一下。桌上放着女孩的近照，以及一张写着裁缝店地址的纸条。",
   "initial_location": "office",
-  "clock": "第 1 日 09:00",
+  "calendar": {"kind": "gregorian", "era": "第五纪"},
+  "clock": "1358-03-29 09:00",
   "npcs": [
     "npcs/reporter/npc.json",
     "npcs/clockmaker/npc.json",

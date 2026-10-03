@@ -99,6 +99,13 @@ func LoadSnapshot(ctx context.Context, store *storage.WorldStore, limit int) (Sn
 		return out, err
 	}
 	out.Summary.GameTitle = out.Definition.Summary.Title
+	if _, err := plot.ClockMinute(out.Summary.Clock); err != nil || plot.IsDateClock(out.Summary.Clock) != plot.IsDateClock(out.Definition.Clock) {
+		return out, fmt.Errorf("%w: invalid frozen world clock", memory.ErrStorageUnavailable)
+	}
+	out.Summary.Calendar = out.Definition.Calendar
+	if err := validateWorldInformation(out.Definition); err != nil {
+		return out, fmt.Errorf("%w: %s", memory.ErrStorageUnavailable, err)
+	}
 	out.OpenProgress, err = store.LoadOpenProgress(ctx)
 	if err != nil {
 		return out, err
@@ -238,7 +245,7 @@ func validateCapabilityManifest(ctx context.Context, store *storage.WorldStore, 
 		return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
 	}
 	for name, version := range definition.Capabilities {
-		if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(definition.SchemaVersion == 4 && name == "progression")) {
+		if version != 1 || (name != "spatial" && name != "state" && name != "relations" && name != "items" && name != "rules" && !(definition.SchemaVersion == 4 && (name == "progression" || name == "world_info"))) {
 			return fmt.Errorf("%w: unsupported frozen capability manifest", memory.ErrStorageUnavailable)
 		}
 	}

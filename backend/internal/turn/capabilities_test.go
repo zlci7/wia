@@ -197,7 +197,7 @@ func (g *offsceneCapabilityGenerator) GenerateText(ctx context.Context, request 
 		if strings.Contains(request.Input, "recipients只能取对应允许集合") || !strings.Contains(request.Input, "有效移动后的到达同场") {
 			g.t.Error("spatial coordination contract excludes authorized arrival witnesses")
 		}
-		for _, needed := range []string{`"npc:clock":"clockshop"`, `"connections":["road"]`, "state_definitions", "strain", "token-1", "from_holder_id", "proposal_source_id", "relationship_proposals"} {
+		for _, needed := range []string{`"npc:clock":"clockshop"`, `"clockshop","place","","","",["road"]`, "state_definitions", "strain", "token-1", "from_holder_id", "proposal_source_id", "relationship_proposals"} {
 			if !strings.Contains(request.Input, needed) {
 				g.t.Errorf("offscene material missing %s", needed)
 			}

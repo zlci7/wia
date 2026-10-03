@@ -159,7 +159,8 @@ func TestMistEmbersWorldActionContextPreservesCompleteRecordsWithinBudget(t *tes
 			t.Fatalf("required event or source missing: %s", event.EventID)
 		}
 	}
-	for _, required := range []string{root.EventID, wire.MarshalJSON(allowed), `"holder_id":"player"`, `"source_event_id":"latest-transfer"`, "预算：90分钟"} {
+	assertHostItemContext(t, request.Input, "mirror", "player", "latest-transfer")
+	for _, required := range []string{root.EventID, wire.MarshalJSON(allowed), "预算：90分钟"} {
 		if !strings.Contains(request.Input, required) {
 			t.Fatalf("required action context missing: %s", required)
 		}

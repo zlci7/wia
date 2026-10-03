@@ -19,7 +19,11 @@ func PlayerStateProjection(snapshot Snapshot) []wiaworld.PublicState {
 			if !ok || definition.Projection == "hidden" || (entityID != "player" && (definition.Projection != "public" || !visibleCurrentSource(snapshot, "player", entityID, current.SourceEvent))) {
 				continue
 			}
-			result = append(result, wiaworld.PublicState{EntityID: entityID, StateID: stateID, Name: definition.Name, Value: current.Value, Unit: definition.Unit})
+			state := wiaworld.PublicState{EntityID: entityID, StateID: stateID, Name: definition.Name, Value: current.Value, Unit: definition.Unit, Category: definition.Category, Currency: definition.Currency, Description: definition.Description}
+			if definition.Currency != nil {
+				state.DisplayValue = definition.Currency.Format(current.Value.Integer)
+			}
+			result = append(result, state)
 		}
 	}
 	slices.SortFunc(result, func(a, b wiaworld.PublicState) int {
@@ -112,7 +116,11 @@ func MechanicsContext(snapshot Snapshot, recipient string) string {
 				allowed := entityID == recipient && (definition.Knowledge == "owner" || definition.Knowledge == "public")
 				allowed = allowed || (entityID != recipient && definition.Knowledge == "public" && visibleCurrentSource(snapshot, recipient, entityID, current.SourceEvent))
 				if allowed {
-					view.States = append(view.States, wiaworld.PublicState{EntityID: entityID, StateID: stateID, Name: definition.Name, Value: current.Value, Unit: definition.Unit})
+					state := wiaworld.PublicState{EntityID: entityID, StateID: stateID, Name: definition.Name, Value: current.Value, Unit: definition.Unit, Category: definition.Category, Currency: definition.Currency, Description: definition.Description}
+					if definition.Currency != nil {
+						state.DisplayValue = definition.Currency.Format(current.Value.Integer)
+					}
+					view.States = append(view.States, state)
 				}
 			}
 		}
@@ -141,28 +149,55 @@ func MechanicsContext(snapshot Snapshot, recipient string) string {
 }
 
 func HostMechanicsContext(snapshot Snapshot) string {
-	stateValues := map[string]map[string]wiaworld.StateValue{}
+	stateDefinitions := newContextTable("id", "name", "type", "minimum", "maximum", "enum_values", "projection", "knowledge", "update_policy", "description", "unit", "currency")
+	for _, definition := range snapshot.Definition.StateDefinitions {
+		stateDefinitions.add(definition.ID, definition.Name, definition.Type, definition.Minimum, definition.Maximum, definition.EnumValues, definition.Projection, definition.Knowledge, definition.UpdatePolicy, definition.Description, definition.Unit, definition.Currency)
+	}
+	stateValues := map[string]map[string]any{}
 	for entityID, states := range snapshot.States {
-		stateValues[entityID] = map[string]wiaworld.StateValue{}
+		stateValues[entityID] = map[string]any{}
 		for stateID, current := range states {
-			stateValues[entityID][stateID] = current.Value
+			var value any
+			switch current.Value.Type {
+			case "integer":
+				value = current.Value.Integer
+			case "boolean":
+				value = current.Value.Boolean
+			case "enum":
+				value = current.Value.Enum
+			}
+			stateValues[entityID][stateID] = value
 		}
 	}
-	nonDefaultRelationships := []wiaworld.Relationship{}
+	relationDefinitions := newContextTable("id", "name", "minimum", "maximum", "default", "max_change_per_turn", "projection", "description")
+	for _, definition := range snapshot.Definition.RelationDefinitions {
+		relationDefinitions.add(definition.ID, definition.Name, definition.Minimum, definition.Maximum, definition.Default, definition.MaxChangePerTurn, definition.Projection, definition.Description)
+	}
+	nonDefaultRelationships := newContextTable("subject_id", "target_id", "relation_type", "value", "source_event_id")
 	for _, relation := range snapshot.Relationships {
 		definition, ok := relationDefinition(snapshot.Definition, relation.RelationType)
 		if ok && (relation.Value != definition.Default || relation.UpdatedTurn > 0) {
-			nonDefaultRelationships = append(nonDefaultRelationships, relation)
+			nonDefaultRelationships.add(relation.SubjectID, relation.TargetID, relation.RelationType, relation.Value, relation.SourceEvent)
 		}
 	}
+	nonDefaultRelationships.sortRows()
+	itemDefinitions := newContextTable("id", "name", "description", "projection")
+	for _, definition := range snapshot.Definition.ItemDefinitions {
+		itemDefinitions.add(definition.ID, definition.Name, definition.Description, definition.Projection)
+	}
+	items := newContextTable("instance_id", "definition_id", "holder_id", "location_id", "source_event_id")
+	for _, item := range snapshot.Items {
+		items.add(item.InstanceID, item.DefinitionID, item.HolderID, item.LocationID, item.SourceEvent)
+	}
+	items.sortRows()
 	value := struct {
-		StateDefinitions    []story.StateDefinition                   `json:"state_definitions,omitempty"`
-		States              map[string]map[string]wiaworld.StateValue `json:"states,omitempty"`
-		RelationDefinitions []story.RelationDefinition                `json:"relation_definitions,omitempty"`
-		Relationships       []wiaworld.Relationship                   `json:"relationships,omitempty"`
-		ItemDefinitions     []story.ItemDefinition                    `json:"item_definitions,omitempty"`
-		Items               map[string]wiaworld.ItemInstance          `json:"items,omitempty"`
-	}{snapshot.Definition.StateDefinitions, stateValues, snapshot.Definition.RelationDefinitions, nonDefaultRelationships, snapshot.Definition.ItemDefinitions, snapshot.Items}
+		StateDefinitions    contextTable              `json:"state_definitions"`
+		States              map[string]map[string]any `json:"states"`
+		RelationDefinitions contextTable              `json:"relation_definitions"`
+		Relationships       contextTable              `json:"relationships"`
+		ItemDefinitions     contextTable              `json:"item_definitions"`
+		Items               contextTable              `json:"items"`
+	}{stateDefinitions, stateValues, relationDefinitions, nonDefaultRelationships, itemDefinitions, items}
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
 }

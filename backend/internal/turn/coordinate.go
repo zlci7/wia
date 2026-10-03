@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -147,7 +148,11 @@ func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	output := original
 	output.Events = slices.Clone(original.Events)
 	output.Perceptions = slices.Clone(original.Perceptions)
-	output.Clock = AdvanceClock(snapshot.Summary.Clock, host.TimeMinutes)
+	clock, err := plot.AdvanceClock(snapshot.Summary.Clock, host.TimeMinutes)
+	if err != nil {
+		return coordinatedTurn{}, coordinationInvalid("world_clock_invalid", "time_minutes", "valid-world-date-and-bounded-time")
+	}
+	output.Clock = clock
 	output.elapsedMinutes += host.TimeMinutes
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
 	if snapshot.Definition.Capabilities["spatial"] == 1 {

@@ -50,7 +50,8 @@ func TestOpenWorldContextPreservesOrderedEventsAndLatestFacts(t *testing.T) {
 			t.Fatalf("provided source missing: %s", event.EventID)
 		}
 	}
-	for _, fact := range []string{`"holder_id":"player"`, `"source_event_id":"latest-transfer"`, `"player":"clinic"`} {
+	assertHostItemContext(t, request.Input, "mirror", "player", "latest-transfer")
+	for _, fact := range []string{`"player":"clinic"`} {
 		if !strings.Contains(request.Input, fact) {
 			t.Fatalf("latest world fact missing: %s", fact)
 		}

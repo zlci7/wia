@@ -2,6 +2,7 @@
   "state_definitions": [
     {
       "id": "fatigue",
+      "category": "condition",
       "name": "疲劳",
       "type": "integer",
       "minimum": 0,
@@ -17,6 +18,7 @@
     },
     {
       "id": "investigation_strain",
+      "category": "condition",
       "name": "调查负荷",
       "type": "integer",
       "minimum": 0,
@@ -38,12 +40,39 @@
       "maximum": 100,
       "default": 0,
       "scope": "player",
-      "projection": "self",
-      "knowledge": "owner",
+      "projection": "hidden",
+      "knowledge": "host_only",
       "update_policy": {
         "kind": "model"
       },
       "description": "接触裂纹银镜后，对镜中自我与现实自我的混淆程度。"
+    },
+    {
+      "id": "cash",
+      "name": "随身现金",
+      "category": "resource",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 960000000,
+      "default": 8352,
+      "scope": "player",
+      "projection": "self",
+      "knowledge": "owner",
+      "update_policy": {"kind": "model"},
+      "currency": {"name": "鲁恩货币", "denominations": [{"name": "金镑", "units": 960}, {"name": "苏勒", "units": 48}, {"name": "便士", "units": 4}, {"name": "四分之一便士", "units": 1}]},
+      "description": "随身现金，以四分之一便士为整数单位。实际收付改变余额；报价与承诺单独存在。"
+    },
+    {
+      "id": "basic-investigation",
+      "name": "基础调查",
+      "category": "skill",
+      "type": "boolean",
+      "default": true,
+      "scope": "player",
+      "projection": "self",
+      "knowledge": "owner",
+      "update_policy": {"kind": "readonly"},
+      "description": "能做基础访谈、整理线索与核对普通账目。"
     }
   ]
 }

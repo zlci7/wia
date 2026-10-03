@@ -149,6 +149,8 @@ type Definition struct {
 	// InitialLocation is the identifier of the scene the story starts in.
 	InitialLocation string
 	Clock           string
+	Calendar        *wiaworld.Calendar `json:"calendar,omitempty"`
+	KnownLocations  []string           `json:"known_locations,omitempty"`
 	Characters      []wiaworld.Character
 	// Bystanders are the display names; BystanderRefs carries the normalized
 	// definitions next to them so identity survives the pack boundary.

@@ -2,6 +2,7 @@ package turn
 
 import (
 	"fmt"
+	"gameagent/backend/internal/plot"
 	"slices"
 	"time"
 
@@ -128,7 +129,10 @@ func (s *Service) preparePlotActions(base Snapshot, run wiaworld.Run, rootID str
 	output.SceneCharacters = finalCharacters
 	if base.Definition.Progression != nil && resolved.TimeMinutes > 0 {
 		output.elapsedMinutes += resolved.TimeMinutes
-		output.Clock = AdvanceClock(output.Clock, resolved.TimeMinutes)
+		output.Clock, err = plot.AdvanceClock(output.Clock, resolved.TimeMinutes)
+		if err != nil {
+			return coordinatedPlotActions{}, coordinationInvalid("world_clock_invalid", "time_minutes", "valid-world-date-and-bounded-time")
+		}
 		elapsed := wiaworld.Event{EventID: rootID + ":action-clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("随后实际经过%d分钟，当前游戏时间为%s。", resolved.TimeMinutes, output.Clock), RunID: run.RunID, Stage: 6, SceneVersion: output.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}
 		extra.Events = append(extra.Events, elapsed)
 		visible = append(visible, elapsed)

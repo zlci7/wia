@@ -109,6 +109,9 @@ func applyRuleStateEffects(snapshot Snapshot, output *Output, actor, ruleID, act
 			return coordinationInvalid("rule_effect_invalid", fmt.Sprintf("action_rules.%s.effects[%d]", ruleID, index), "rule-owned-integer-state")
 		}
 		nextValue, safe := checkedAdd(current.Value.Integer, effect.Delta)
+		if definition.Currency != nil && (!safe || nextValue < *definition.Minimum || nextValue > *definition.Maximum) {
+			return coordinationInvalid("currency_range_exceeded", fmt.Sprintf("action_rules.%s.effects[%d]", ruleID, index), "exact-nonnegative-currency-settlement")
+		}
 		if !safe {
 			if effect.Delta > 0 {
 				nextValue = *definition.Maximum

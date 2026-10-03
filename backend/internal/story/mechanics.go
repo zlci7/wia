@@ -23,6 +23,8 @@ type StateDefinition struct {
 	UpdatePolicy StateUpdatePolicy   `json:"update_policy"`
 	Description  string              `json:"description,omitempty"`
 	Unit         string              `json:"unit,omitempty"`
+	Category     string              `json:"category,omitempty"`
+	Currency     *wiaworld.Currency  `json:"currency,omitempty"`
 }
 
 type RelationDefinition struct {

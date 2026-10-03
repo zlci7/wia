@@ -125,21 +125,6 @@ func MergeNPCDecision(previous, current NPCDecision) NPCDecision {
 	return current
 }
 
-func AdvanceClock(clock string, minutes int) string {
-	if minutes == 0 {
-		return clock
-	}
-	var day, hour, minute int
-	if _, err := fmt.Sscanf(clock, "第 %d 日 %d:%d", &day, &hour, &minute); err != nil || day < 1 || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-		return clock
-	}
-	total := (day-1)*24*60 + hour*60 + minute + minutes
-	if total < 0 {
-		return clock
-	}
-	return fmt.Sprintf("第 %d 日 %02d:%02d", total/(24*60)+1, (total/60)%24, total%60)
-}
-
 func SourceTypeFor(private bool, id, recipient, intentType string) string {
 	if private && id != recipient {
 		return "observed_private_conversation"
