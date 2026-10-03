@@ -1,0 +1,102 @@
+{
+  "viewport": [
+    1440,
+    600
+  ],
+  "boxes": [
+    {
+      "selector": ".topbar",
+      "rect": {
+        "x": 80,
+        "y": 0,
+        "width": 1280,
+        "height": 64,
+        "top": 0,
+        "right": 1360,
+        "bottom": 64,
+        "left": 80
+      }
+    },
+    {
+      "selector": ".reading-heading",
+      "rect": {
+        "x": 80,
+        "y": 70,
+        "width": 1280,
+        "height": 57,
+        "top": 70,
+        "right": 1360,
+        "bottom": 127,
+        "left": 80
+      }
+    },
+    {
+      "selector": ".story-column",
+      "rect": {
+        "x": 80,
+        "y": 70,
+        "width": 1280,
+        "height": 530,
+        "top": 70,
+        "right": 1360,
+        "bottom": 600,
+        "left": 80
+      }
+    },
+    {
+      "selector": ".transcript",
+      "rect": {
+        "x": 80,
+        "y": 127,
+        "width": 1280,
+        "height": 224.984375,
+        "top": 127,
+        "right": 1360,
+        "bottom": 351.984375,
+        "left": 80
+      }
+    },
+    {
+      "selector": ".composer",
+      "rect": {
+        "x": 80,
+        "y": 351.984375,
+        "width": 1280,
+        "height": 248.015625,
+        "top": 351.984375,
+        "right": 1360,
+        "bottom": 600,
+        "left": 80
+      }
+    },
+    {
+      "selector": ".side-column",
+      "rect": null
+    }
+  ],
+  "bodyWidth": 1440,
+  "line": {
+    "rect": {
+      "x": 1039.71875,
+      "y": -12830,
+      "width": 260.28125,
+      "height": 27.75,
+      "top": -12830,
+      "right": 1300,
+      "bottom": -12802.25,
+      "left": 1039.71875
+    },
+    "fontSize": "15px",
+    "lineHeight": "27.75px"
+  },
+  "submit": {
+    "x": 1216,
+    "y": 548.90625,
+    "width": 116,
+    "height": 45.09375,
+    "top": 548.90625,
+    "right": 1332,
+    "bottom": 594,
+    "left": 1216
+  }
+}

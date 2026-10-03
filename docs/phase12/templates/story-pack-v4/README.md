@@ -4,9 +4,22 @@
 
 [story.json](story.json)引用两个地点、一个固定人物、分类材料和持续推进初始配置。复制整个目录后填写世界与人物内容，修改剧本和人物 revision。能力按需配置，现有字段见[编写规范](../../stages/开发者剧本编写规范与模板.md)。
 
+开场日期使用世界年月日与时分，模板中的配置为：
+
+```json
+{
+  "schema_version": 4,
+  "requires": { "spatial": 1, "progression": 1, "world_info": 1 },
+  "calendar": { "kind": "gregorian" },
+  "clock": "2026-01-01 09:00"
+}
+```
+
+`calendar.era` 可填写世界内的纪元名称；日期按公历规则计算。`player.known_locations` 可填写主角开场已知的公开地点 ID。题材、年份与地名由剧本配置，运行界面在角色、背包、地图和人物栏目提供获准资料。
+
 | 文件 | 内容 |
 | --- | --- |
-| [story.json](story.json) | 身份、展示信息、主角、开场和引用 |
+| [story.json](story.json) | 身份、展示信息、主角、历法、开场日期和引用 |
 | [materials.json](materials.json) | 材料 ID、用途、权限、关联与正文路径 |
 | [world/locations.json](world/locations.json) | 地点与有向路线 |
 | [world/background/core.md](world/background/core.md) | 精简公开背景 |
@@ -21,3 +34,7 @@
 | [npcs/contact/plans.md](npcs/contact/plans.md) | 本人初始计划 |
 
 初始位置、物品和数值以结构化配置为准，文字材料中的开场事实标注为初始经历。原作参考资料供作者核对，运行时材料按明确引用与知情范围提供。
+
+现金与随身物品按需接入既有 `state`、`items` 能力及对应文件：现金使用带 `currency` 的非负整数资源状态，物品填写真实初始归属。模板未配置的资产保持未配置状态，具体字段见[世界信息编写合同](../../stages/开发者剧本编写规范与模板.md#世界信息配置)。
+
+新世界冻结当前剧本和开场条件；旧存档沿用自己的冻结定义与运行值。修改开场日期、币制或初始资产只影响新世界，旧相对时间存档显示“日期未配置 · 时分”。

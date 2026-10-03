@@ -6,7 +6,7 @@
   "title": "填写剧本名称",
   "description": "填写题材、玩家身份与当前局势。",
   "gameplay": "从接待室出发，与联系人交谈或到附近街道自由活动。",
-  "requires": { "spatial": 1, "progression": 1 },
+  "requires": { "spatial": 1, "progression": 1, "world_info": 1 },
   "player": {
     "name": "来访者",
     "profile": "填写主角开始时的身份和已知经历。",
@@ -14,7 +14,8 @@
     "editable": true
   },
   "initial_location": "reception",
-  "clock": "第 1 日 09:00",
+  "calendar": { "kind": "gregorian" },
+  "clock": "2026-01-01 09:00",
   "opening": "你走进接待室，联系人正在桌旁整理来访记录。门外是一条可供步行的街道。",
   "materials_file": "materials.json",
   "data_files": {

@@ -41,13 +41,13 @@ A fresh standalone installation seeds the initial pack. An existing developer ca
 - Mixed input executes in its original order against one working state. The final world update commits atomically.
 - Private conversations, NPC private replies and action results have individual recipient projections. Corrections protect sources already consumed by persistent facts.
 - Authoritative positions determine location, nearby destinations and the people present. State, directed relationships and uniquely owned items share the turn commit. Existing fixed percentile rules remain available.
-- The workspace provides story reading, action input, character selection, state and possessions, automatic saves, independent branches, settings, memory review and correction. Generation can be cancelled; failed input remains available for retry.
+- The reading workspace shows authored world dates and action input, with character, cash, possessions, known places and people available on demand. Automatic saves, independent branches, settings, memory review and correction remain available. Generation can be cancelled; failed input remains available for retry.
 
 Developers edit v4 packages as files using the [authoring contract and template](docs/phase12/stages/开发者剧本编写规范与模板.md). Import, publication and export preserve the file package. The structured content editor explicitly rejects formats it cannot fully represent.
 
 ## Validation
 
-Engineering tests, browser checks, real-model observations and user acceptance are recorded separately in the [current status](docs/phase12/开发状态.md) and [closed-loop verification record](docs/phase12/records/开放世界闭环-验收记录.md). The world, perception and workspace modules have engineering evidence; continuous real-model play is under verification. Provider timeouts, generation failures and semantic deviations remain practical limitations. Desktop browser mobile viewports do not replace physical-phone testing.
+Engineering tests, browser checks, real-model observations and user acceptance are recorded separately in the [current status](docs/phase12/开发状态.md), [closed-loop verification record](docs/phase12/records/开放世界闭环-验收记录.md) and [world information verification record](docs/phase12/records/世界信息与阅读界面-验收记录.md). The world, perception and workspace modules have engineering evidence; continuous real-model play is under verification. Provider timeouts, generation failures and semantic deviations remain practical limitations. Desktop browser mobile viewports do not replace physical-phone testing.
 
 ## Documentation
 
