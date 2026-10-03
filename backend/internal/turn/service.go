@@ -105,12 +105,17 @@ func (s *Service) executeInput(ctx context.Context, store *storage.WorldStore, g
 			partRun.InputPart = i + 1
 		}
 		partIntent := TurnIntent{IntentType: part.IntentType, AddresseeID: part.AddresseeID, Visibility: part.Visibility, WaitMinutes: part.WaitMinutes, ActionRuleID: part.ActionRuleID, Input: part.Text}
+		participants := InScene(snapshot.Characters)
+		reachable := true
 		if part.AddresseeID != "" {
 			if _, ok := FindSceneCharacter(snapshot.Characters, part.AddresseeID); !ok {
-				return Output{}, AtStage(StageIntent, ErrInvalidRequest)
+				if i == 0 {
+					return Output{}, AtStage(StageIntent, ErrInvalidRequest)
+				}
+				reachable, participants = false, nil
 			}
 		}
-		local := OpenOutput(&snapshot, partIntent, partRun)
+		local := openOutput(&snapshot, partIntent, partRun, participants)
 		local.StateChanges = slices.Clone(output.StateChanges)
 		local.RelationshipChanges = slices.Clone(output.RelationshipChanges)
 		local.ItemTransfers = slices.Clone(output.ItemTransfers)
@@ -120,24 +125,35 @@ func (s *Service) executeInput(ctx context.Context, store *storage.WorldStore, g
 			local.Events = append([]wiaworld.Event{segment}, local.Events...)
 			local.Events[1].ProjectionParentID = segment.EventID
 		}
-		if part.ActionRuleID != "" {
-			resolution, err := prepareActionResolution(ctx, store, snapshot, partRun, part.ActionRuleID)
+		if !reachable {
+			notePlayerAction(&local, partRun, partIntent)
+			reason := CharacterDisplayName(snapshot.Characters, part.AddresseeID) + "当前不在可接触范围内，这一段未执行。"
+			visible, err := appendHostOutcomes(&local, partRun, snapshot.Characters, snapshot.Definition.BystanderRefs, []hostActionResult{{ActionID: inputPrefix(partRun) + ":player-action", Status: "not_executed", Content: reason, Recipients: []string{"player"}, Projections: []actionProjection{{Recipient: "player", Content: reason}}}})
 			if err != nil {
-				return Output{}, AtStage(StageIntent, err)
+				return Output{}, AtStage(StageCoordination, err)
 			}
-			local.ActionResolution = &resolution
+			local.VisibleEvents = visible
+		} else {
+			if part.ActionRuleID != "" {
+				resolution, err := prepareActionResolution(ctx, store, snapshot, partRun, part.ActionRuleID)
+				if err != nil {
+					return Output{}, AtStage(StageIntent, err)
+				}
+				local.ActionResolution = &resolution
+			}
+			openingParticipants := CharacterIDs(InScene(snapshot.Characters))
+			if err := s.runCharacters(ctx, generator, &snapshot, partRun, partIntent, &local); err != nil {
+				return Output{}, AtStage(StageNPC, err)
+			}
+			notePlayerAction(&local, partRun, partIntent)
+			host, visible, err := s.coordinateStage(ctx, generator, &snapshot, partRun, partIntent, part.AddresseeID, &local)
+			if err != nil {
+				return Output{}, AtStage(StageCoordination, err)
+			}
+			local.VisibleEvents = visible
+			recordPlayerExperience(&snapshot, &local, partIntent, openingParticipants, local.PlayerEventID)
+			lastHost = host
 		}
-		openingParticipants := CharacterIDs(InScene(snapshot.Characters))
-		if err := s.runCharacters(ctx, generator, &snapshot, partRun, partIntent, &local); err != nil {
-			return Output{}, AtStage(StageNPC, err)
-		}
-		notePlayerAction(&local, partRun, partIntent)
-		host, visible, err := s.coordinateStage(ctx, generator, &snapshot, partRun, partIntent, part.AddresseeID, &local)
-		if err != nil {
-			return Output{}, AtStage(StageCoordination, err)
-		}
-		local.VisibleEvents = visible
-		recordPlayerExperience(&snapshot, &local, partIntent, openingParticipants, local.PlayerEventID)
 		for _, e := range local.Events {
 			stageByEvent[e.EventID] = i*3 + e.Stage
 		}
@@ -145,7 +161,6 @@ func (s *Service) executeInput(ctx context.Context, store *storage.WorldStore, g
 		snapshot.Summary.Clock = local.Clock
 		snapshot.elapsedMinutes = output.elapsedMinutes
 		mergeConfirmedInput(&snapshot, local)
-		lastHost = host
 	}
 	// World progression and narration run once, after the ordered workspace is settled.
 	start := len(output.Events)

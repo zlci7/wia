@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -34,6 +35,7 @@ func TestCoordinationProjectionContractAndRepairIdentifyMissingRecipients(t *tes
 const privateInput = "我悄悄告诉记者：暗号是银色渡鸦。"
 const leaveInput = "随后走到街上，再进入诊所。"
 const greetingInput = "我向看守问好。"
+const independentInput = "我留在原地观察门口。"
 
 func TestMixedIntentPreservesThePlayersExplicitOpeningAddressee(t *testing.T) {
 	snapshot := spatialFixture()
@@ -90,6 +92,7 @@ type orderedPerceptionGenerator struct {
 	coordinationCalls int
 	narrationCalls    int
 	failArrival       bool
+	blockArrival      bool
 }
 
 func (g *orderedPerceptionGenerator) GenerateText(_ context.Context, request model.TextRequest) (model.TextResponse, error) {
@@ -99,6 +102,9 @@ func (g *orderedPerceptionGenerator) GenerateText(_ context.Context, request mod
 			{Text: leaveInput, ActorID: "player", IntentType: "act", Visibility: "public"},
 			{Text: greetingInput, ActorID: "player", IntentType: "speak", AddresseeID: "npc:watcher", Visibility: "public"},
 		}}
+		if g.blockArrival {
+			intent.Fragments = append(intent.Fragments, InputFragment{Text: independentInput, ActorID: "player", IntentType: "observe", Visibility: "public"})
+		}
 		return model.TextResponse{Text: wire.MarshalJSON(intent)}, nil
 	}
 	if strings.Contains(request.System, "重要 NPC") {
@@ -143,6 +149,11 @@ func (g *orderedPerceptionGenerator) GenerateText(_ context.Context, request mod
 				if g.failArrival {
 					return model.TextResponse{}, fmt.Errorf("arrival model unavailable")
 				}
+				if g.blockArrival {
+					host.TimeMinutes, host.Scene, host.SceneCharacters = 2, "office", []string{"npc:reporter", "npc:observer"}
+					host.Movements, host.SceneUpdates = []movementResult{}, []sceneUpdate{}
+					ids, content = []string{"player", "npc:reporter", "npc:observer"}, "出口被阻挡，玩家仍留在事务所。"
+				}
 			} else if action.Content == greetingInput {
 				host.Scene, host.SceneCharacters = "clinic", []string{"npc:watcher"}
 				ids = []string{"player", "npc:watcher"}
@@ -156,7 +167,11 @@ func (g *orderedPerceptionGenerator) GenerateText(_ context.Context, request mod
 				}
 				projections = append(projections, actionProjection{Recipient: id, Content: text})
 			}
-			host.Outcomes = append(host.Outcomes, hostActionResult{ActionID: action.EventID, Status: "succeeded", Content: content, Recipients: ids, Projections: projections})
+			status := "succeeded"
+			if g.blockArrival && action.Content == leaveInput {
+				status = "failed"
+			}
+			host.Outcomes = append(host.Outcomes, hostActionResult{ActionID: action.EventID, Status: status, Content: content, Recipients: ids, Projections: projections})
 		}
 		var body map[string]any
 		_ = json.Unmarshal([]byte(wire.MarshalJSON(host)), &body)
@@ -167,6 +182,33 @@ func (g *orderedPerceptionGenerator) GenerateText(_ context.Context, request mod
 	g.narrationCalls++
 	g.mu.Unlock()
 	return model.TextResponse{Text: "你和记者私下交谈，随后沿街抵达诊所，与看守打了招呼。"}, nil
+}
+
+func TestFailedMovementKeepsItsResultAndIndependentLaterFragments(t *testing.T) {
+	snapshot := spatialFixture()
+	snapshot.Summary.Clock = "第 1 日 09:00"
+	snapshot.Characters = append(snapshot.Characters, wiaworld.Character{EntityID: "npc:observer", Name: "旁观者", InScene: true})
+	snapshot.Positions["npc:observer"] = "office"
+	snapshot.SceneViews = []SceneView{{Recipient: "player", Content: "office"}, {Recipient: "npc:reporter", Content: "office"}, {Recipient: "npc:observer", Content: "office"}, {Recipient: "npc:watcher", Content: "clinic"}}
+	snapshot.LongMemory = map[string]MemoryContext{"npc:reporter": {}, "npc:observer": {}, "npc:watcher": {}}
+	g := &orderedPerceptionGenerator{blockArrival: true, npcInputs: map[string][]string{}}
+	run := wiaworld.Run{RunID: "blocked", Input: privateInput + leaveInput + greetingInput + independentInput}
+	output, err := New(&rosterHost{}, Deps{}).executeSnapshot(context.Background(), g, snapshot, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Positions["player"] != "office" || output.Clock != "第 1 日 09:02" || g.coordinationCalls != 3 || g.narrationCalls != 1 || len(g.npcInputs["npc:watcher"]) != 0 {
+		t.Fatalf("blocked fragments lost facts or reached the remote recipient: %+v %+v", output, g)
+	}
+	for part, status := range map[int]string{2: "action_failed", 3: "action_not_executed", 4: "action_succeeded"} {
+		e, ok := EventByID(output.Events, fmt.Sprintf("blocked:part:%d:player-action:result:1", part))
+		if !ok || e.SourceType != status {
+			t.Fatalf("part %d outcome missing: %+v", part, e)
+		}
+	}
+	if !slices.Contains(output.SceneCharacters, "npc:reporter") || !slices.Contains(output.SceneCharacters, "npc:observer") {
+		t.Fatal("a skipped fragment changed the scene roster")
+	}
 }
 
 func TestOrderedInputKeepsPrivateSpeechBeforeMovementAndArrival(t *testing.T) {

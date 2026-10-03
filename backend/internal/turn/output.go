@@ -100,7 +100,10 @@ type PositionChange struct {
 // rule is here rather than in a stage because it decides the perceptions the rest of the
 // turn builds on.
 func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output {
-	participants := InScene(snapshot.Characters)
+	return openOutput(snapshot, intent, run, InScene(snapshot.Characters))
+}
+
+func openOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run, participants []wiaworld.Character) Output {
 	recipient := intent.AddresseeID
 	private := intent.Private()
 
@@ -109,7 +112,7 @@ func OpenOutput(snapshot *Snapshot, intent TurnIntent, run wiaworld.Run) Output 
 	output := Output{
 		OpenProgress: cloneOpenProgress(snapshot.OpenProgress),
 		Clock:        snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneVersion: snapshot.SceneVersion,
-		SceneCharacters: CharacterIDs(participants),
+		SceneCharacters: CharacterIDs(InScene(snapshot.Characters)),
 		Events: []wiaworld.Event{{
 			EventID: playerEventID, EventType: "player_attempt", ActorID: "player", TargetID: recipient,
 			Content: run.Input, RunID: run.RunID, Stage: 1, SceneVersion: snapshot.SceneVersion,
