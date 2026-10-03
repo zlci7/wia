@@ -200,6 +200,9 @@ func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testin
 	if snapshot.OpenProgress == nil || len(snapshot.OpenProgress.Plans) != 2 || len(snapshot.Definition.Materials) != 19 {
 		t.Fatal("frozen material or plan state missing")
 	}
+	if snapshot.OpenProgress.DevelopmentCursor != "case-pressure" {
+		t.Fatal("development selection was not committed")
+	}
 	for _, plan := range snapshot.OpenProgress.Plans {
 		if plan.Status != "cancelled" || plan.Version != 2 || len(plan.SourceIDs) != 1 || !strings.Contains(plan.SourceIDs[0], ":plan-review:projection:") {
 			t.Fatalf("owned plan update was not committed: %+v", plan)
@@ -248,6 +251,9 @@ func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testin
 	defer reopened.Close()
 	for _, id := range []string{world.WorldID, copy.TargetWorldID} {
 		saved := readContextSnapshot(t, reopened, id)
+		if saved.OpenProgress.DevelopmentCursor != snapshot.OpenProgress.DevelopmentCursor || wire.MarshalJSON(saved.OpenProgress.DevelopmentChecks) != wire.MarshalJSON(snapshot.OpenProgress.DevelopmentChecks) {
+			t.Fatal("copy/restart lost development evaluation progress")
+		}
 		if saved.Definition.Revision != "mist-plans-test.v1" || len(saved.Definition.Materials) != 19 || saved.OpenProgress.Plans[0].Status != "cancelled" || saved.Items["mirror-3-917"].HolderID != "player" {
 			t.Fatal("copy/restart lost frozen materials, current plan or item placement")
 		}

@@ -18,4 +18,5 @@ type OpenProgress struct {
 	Plans             []PersonalPlan    `json:"plans"`
 	ExternalApplied   map[string]string `json:"external_applied"`
 	DevelopmentChecks map[string]string `json:"development_checks"`
+	DevelopmentCursor string            `json:"development_cursor,omitempty"`
 }

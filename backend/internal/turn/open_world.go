@@ -2,7 +2,6 @@ package turn
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"slices"
 	"strings"
@@ -45,28 +44,26 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 			break
 		}
 	}
-	basis := fmt.Sprintf("%x", sha256.Sum256([]byte(wire.MarshalJSON(struct {
-		Clock     string
-		Positions map[string]string
-		Facts     string
-		Events    []string
-	}{output.Clock, output.Positions, HostMechanicsContext(working), EventIDs(output.Events)}))))
+	basis := ""
 	if checkID == "" {
-		for _, development := range snapshot.Definition.Progression.Developments {
-			if output.OpenProgress.DevelopmentChecks[development.ID] == basis {
+		developments := snapshot.Definition.Progression.Developments
+		start := 0
+		for i, development := range developments {
+			if development.ID == output.OpenProgress.DevelopmentCursor {
+				start = (i + 1) % len(developments)
+			}
+		}
+		for offset := range len(developments) {
+			development := developments[(start+offset)%len(developments)]
+			if !developmentRelevant(working, output.Events, development) {
 				continue
 			}
-			relevant := len(development.LocationIDs) == 0 && len(development.EntityIDs) == 0
-			for _, location := range output.Positions {
-				relevant = relevant || slices.Contains(development.LocationIDs, location)
+			candidateBasis := developmentBasis(working, *output, development)
+			if output.OpenProgress.DevelopmentChecks[development.ID] == candidateBasis {
+				continue
 			}
-			for _, entity := range development.EntityIDs {
-				relevant = relevant || strings.Contains(wire.MarshalJSON(output.Events), entity)
-			}
-			if relevant {
-				checkID, materialIDs = development.ID, development.MaterialIDs
-				break
-			}
+			checkID, materialIDs, basis = development.ID, development.MaterialIDs, candidateBasis
+			break
 		}
 	}
 	woken := []string{}
@@ -95,6 +92,7 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 		}
 		if !external {
 			output.OpenProgress.DevelopmentChecks[checkID] = basis
+			output.OpenProgress.DevelopmentCursor = checkID
 		}
 	}
 	minute, _ = plot.ClockMinute(output.Clock)
