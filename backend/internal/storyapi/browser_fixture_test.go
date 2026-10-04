@@ -38,6 +38,7 @@ func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRe
 }
 
 // Opt-in fixture serves disposable data and the real API/client for browser verification.
+// Run with -timeout=25m; POST /fixture/finish ends the 20-minute service early.
 func TestBrowserFixture(t *testing.T) {
 	if os.Getenv("WIA_BROWSER_FIXTURE") != "1" {
 		t.Skip("interactive browser fixture")
