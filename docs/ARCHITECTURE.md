@@ -348,13 +348,15 @@ app.SubmitRun → app.runWorker
  │   ├─ Load Snapshot + Memory
  │   ├─ Prepare Scene / Rules / Due Context
  │   │   └─ Intent → Model（仅需要规则准备等条件时）
- │   ├─ Scene Creation → Model（完整候选；有界材料读取与纠正）
+ │   ├─ Scene Creation → Model（完整候选；有界材料读取、判定检查点与纠正）
  │   ├─ Validate ordered draft against working state
  │   └─ Project personal experience → existing Output
  └─ app.commitTurn → existing atomic commit
 ```
 
 `turn` 继续是唯一内核，场景提示与调用属于该职责；ContextComposer 保持一个装配入口。`memory`、`plot`、`world`、`model/llm`、`storage`、`app` 的依赖方向和存储职责保持本文件第 5、7 节约定，不新增 Agent Runtime、通用工具框架或提交服务。
+
+固定规则按行动当时的已验证工作态准备。后段规则可以使用一次场景检查点，由 turn 验证前段、准备既有判定并交回同一创作职责完成候选；检查点不提交世界后果。来源归一、效果累计、资格与正式事件编译继续属于程序纯规则。
 
 场景调用用途为 `scene`，以受控人物集合读取相关个人资料和主持材料。玩家、建议与个人回顾用途继续按接收者裁剪；共享创作输入的拟调整合同见[总体技术方案 1.3](phase12/总体技术方案.md#13-phase13-共享创作上下文拟调整)。
 
