@@ -11,7 +11,7 @@ import (
 func canonicalContextSources(snapshot Snapshot, recipient string, ids []string) []string {
 	context := snapshot.LongMemory[recipient]
 	aliases := map[string]string{}
-	for _, record := range context.Archive {
+	for _, record := range append(slices.Clone(context.Archive), context.Tail...) {
 		if record.Scope == recipient {
 			aliases[record.ID] = record.EventID
 		}

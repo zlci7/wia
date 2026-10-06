@@ -63,6 +63,8 @@ type Snapshot struct {
 	materialGroup    *materialReadGroup
 	speechRoster     []string
 	elapsedMinutes   int
+	// sceneEntities bounds creation rights for the temporary centralized request.
+	sceneEntities []string
 }
 
 // SceneView is one character's picture of where they are: what they last understood

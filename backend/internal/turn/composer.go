@@ -37,12 +37,16 @@ func JoinPerceptions(snapshot Snapshot, items []wiaworld.Perception) string {
 }
 
 type Section struct {
-	Name    string
-	Text    string
-	Sources []string
+	Priority int
+	Name     string
+	Text     string
+	Sources  []string
 }
 
 type Material struct {
+	// Prefix contains mandatory stable sections before optional history. Dynamic
+	// authority follows history in Required; Final keeps the original input last.
+	Prefix        []Section
 	RecallSources []string
 	// RecallLimited means retrieval ended at its candidate, byte, query or time
 	// boundary. Callers must not treat an empty result as proof that no older match
@@ -56,6 +60,7 @@ type Material struct {
 	RequiredSources []string
 	System          string
 	Required        string
+	Final           string    // Current input follows capacity and retrieval notices.
 	Optional        []Section // oldest first; a section is an indivisible causal group
 	// Bounded rebuilds this material to fit an input budget. It reports changed=false
 	// when it is already as small as it can be, so a caller can tell "does not fit"
@@ -64,6 +69,7 @@ type Material struct {
 }
 
 type ContextScope struct {
+	SelectedEntityIDs                                     []string
 	Owner, Game, World, Run, Purpose, Recipient, Template string
 	PolicyRevision                                        string
 	Attempt, Stage                                        int
@@ -133,7 +139,10 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 		}
 	}
 	report.RecallLimited = material.RecallLimited
-	req := model.TextRequest{System: system, Input: material.Required, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
+	required := material
+	required.Optional = nil
+	requiredInput, _, _ := contextInput(required, nil)
+	req := model.TextRequest{System: system, Input: requiredInput, MaxInputTokens: limit, MaxOutputTokens: output, ReasoningReserveTokens: reasoning, MaxResponseBytes: 1 << 20}
 	report.InputTokens = model.FramedTextInputTokens(req)
 	if _, err := model.ValidateTextRequest(req); err != nil {
 		if !errors.Is(err, model.ErrTextInputTooLarge) {
@@ -163,6 +172,7 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 	for left, right := 0, len(sections)-1; left < right; left, right = left+1, right-1 {
 		sections[left], sections[right] = sections[right], sections[left]
 	}
+	sort.SliceStable(sections, func(i, j int) bool { return sections[i].Priority < sections[j].Priority })
 	for {
 		req.Input, report.RecallIncluded, report.RecallExcluded = contextInput(material, sections)
 		if _, err := model.ValidateTextRequest(req); err == nil {
@@ -185,6 +195,14 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 			report.SelectedSources = append(report.SelectedSources, id)
 		}
 	}
+	for _, section := range material.Prefix {
+		report.Sections = append(report.Sections, section.Name)
+		for _, id := range section.Sources {
+			if !wiaworld.ContainsID(report.SelectedSources, id) {
+				report.SelectedSources = append(report.SelectedSources, id)
+			}
+		}
+	}
 	for _, section := range sections {
 		report.Sections = append(report.Sections, section.Name)
 		for _, id := range section.Sources {
@@ -201,6 +219,9 @@ func (c ContextComposer) Build(material Material, system string, output int) (mo
 // contextInput includes the retrieval notice in both window sizing and final assembly.
 func contextInput(material Material, sections []Section) (string, int, int) {
 	parts := make([]string, 0, len(sections)+2)
+	for _, section := range material.Prefix {
+		parts = append(parts, section.Text)
+	}
 	selected := map[string]bool{}
 	for _, section := range sections {
 		parts = append(parts, section.Text)
@@ -222,6 +243,9 @@ func contextInput(material Material, sections []Section) (string, int, int) {
 			note += " 本次检索受近期候选窗口或检索预算限制；未命中不代表更早经历不存在。"
 		}
 		parts = append(parts, note)
+	}
+	if material.Final != "" {
+		parts = append(parts, material.Final)
 	}
 	return strings.Join(parts, "\n"), included, excluded
 }

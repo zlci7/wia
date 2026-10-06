@@ -15,6 +15,15 @@ import (
 
 // Material authorization applies equally to the directory and the full text.
 func materialAuthorized(snapshot Snapshot, purpose, recipient string, m story.Material) bool {
+	if purpose == "scene" {
+		if m.Purpose == "npc_plan" {
+			return false
+		}
+		if m.Visibility == "owner" {
+			return slices.Contains(snapshot.sceneEntities, m.OwnerID)
+		}
+		return true
+	}
 	author := purpose == "coordination" || purpose == "plot" || purpose == "plot_actions" || purpose == "event_generation"
 	if m.Purpose == "npc_plan" {
 		return false // The initial file initializes a persisted plan, rather than restoring it on every call.
@@ -91,7 +100,7 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		material = personalPlanContext(snapshot, recipient, material)
 	}
 	switch purpose {
-	case "npc", "intent", "coordination", "plot", "plot_actions", "event_generation", "narration":
+	case "npc", "intent", "coordination", "plot", "plot_actions", "event_generation", "narration", "scene":
 	default:
 		return material, available
 	}
@@ -105,7 +114,11 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 			continue
 		}
 		if m.Delivery == "core" {
-			material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
+			if purpose == "scene" {
+				material.Prefix = append(material.Prefix, materialSection(m, snapshot.Definition.Revision))
+			} else {
+				material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
+			}
 			continue
 		}
 		score := 0
@@ -116,7 +129,7 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		if materialAtLocation(snapshot, m, place) {
 			score += 4
 		}
-		if m.OwnerID == recipient {
+		if m.OwnerID != "" && (m.OwnerID == recipient || purpose == "scene" && slices.Contains(snapshot.sceneEntities, m.OwnerID)) {
 			score += 6
 		}
 		for _, id := range append(slices.Clone(m.EntityIDs), m.ItemIDs...) {
@@ -144,15 +157,23 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		available[c.m.ID] = c.m
 		directory = append(directory, c.m.ID+": "+c.m.Summary)
 		if c.score > 0 && selected < 4 {
-			material = appendOptionalMaterial(material, materialSection(c.m, snapshot.Definition.Revision))
+			section := materialSection(c.m, snapshot.Definition.Revision)
+			if purpose == "scene" {
+				section.Priority = 50
+			}
+			material = appendOptionalMaterial(material, section)
 			selected++
 		}
 	}
 	if len(directory) > 0 {
 		material = appendRequiredMaterial(material, Section{Name: "material_directory", Text: "获准材料目录（摘要只描述资料，不代表正文已提供）：\n" + strings.Join(directory, "\n")})
-		material.System += "\n若最终输出前必须读取目录中尚未提供的正文，只返回 {\"needs_material\":[\"材料ID\"]}，每个用途一次、最多四份，整轮最多两次。只请求目录中的ID；否则直接返回最终输出。读取不产生行动、决定或经历。"
+		if purpose == "scene" {
+			material.System += "\n目录只说明获准文件；正文未提供时不能引用它为事实。一次补充上下文机会与目的地人物扩展共享，最多读取四个目录文件。读取没有世界后果。"
+		} else {
+			material.System += "\n若最终输出前必须读取目录中尚未提供的正文，只返回 {\"needs_material\":[\"材料ID\"]}，每个用途一次、最多四份，整轮最多两次。只请求目录中的ID；否则直接返回最终输出。读取不产生行动、决定或经历。"
+		}
 	}
-	if purpose == "coordination" || purpose == "plot" || purpose == "plot_actions" || purpose == "event_generation" {
+	if purpose == "coordination" || purpose == "plot" || purpose == "plot_actions" || purpose == "event_generation" || purpose == "scene" {
 		sources := currentFactSources(snapshot)
 		material = appendRequiredMaterial(material, Section{Name: "current_fact_sources", Text: "本次权威位置、状态、关系、物品的因果来源（只作当前事实依据）：" + strings.Join(sources, ","), Sources: sources})
 	}

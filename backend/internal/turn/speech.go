@@ -62,7 +62,7 @@ func validateSpeechAudience(snapshot Snapshot, speaker, visibility string, recip
 			if snapshot.speechRoster != nil && (!slices.Contains(snapshot.speechRoster, speaker) || id != "player" && !slices.Contains(snapshot.speechRoster, id)) {
 				return coordinationInvalid("speech_recipient_unreachable", "speech_recipients", "actual-current-contact")
 			}
-			if _, ok := FindSceneCharacter(snapshot.Characters, speaker); !ok {
+			if _, ok := FindSceneCharacter(snapshot.Characters, speaker); !ok && speaker != "player" {
 				return coordinationInvalid("speech_recipient_unreachable", "speech_recipients", "actual-current-contact")
 			}
 			if id != "player" {
@@ -83,6 +83,9 @@ func validateSpeechAudience(snapshot Snapshot, speaker, visibility string, recip
 func appendSpeech(output *Output, run wiaworld.Run, character wiaworld.Character, content, visibility string, privateRecipients []string, participants []wiaworld.Character, sceneVersion int64, stage int) (string, string) {
 	rootID := fmt.Sprintf("%s:%s:speech:%d", inputPrefix(run), character.EntityID, stage)
 	root := wiaworld.Event{EventID: rootID, EventType: "npc_speech", ActorID: character.EntityID, Content: content, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "author_speech", CreatedAt: time.Now().UTC()}
+	if character.EntityID == "player" {
+		root.EventType = "player_speech"
+	}
 	output.Events = append(output.Events, root)
 	output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: rootID, SourceType: "own_speech", Content: content, Stage: stage, SceneVersion: sceneVersion, CreatedAt: root.CreatedAt})
 	private := visibility == "private"
