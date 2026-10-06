@@ -24,17 +24,24 @@ func validateNPCSpeech(snapshot Snapshot, speaker string, decision *NPCDecision)
 		decision.SpeechVisibility = "public"
 		return nil
 	}
-	if decision.SpeechVisibility == "public" {
-		if len(decision.SpeechRecipients) > 0 {
+	return validateSpeechAudience(snapshot, speaker, decision.SpeechVisibility, decision.SpeechRecipients)
+}
+
+func validateSpeechAudience(snapshot Snapshot, speaker, visibility string, recipients []string) error {
+	if visibility != "public" && visibility != "private" {
+		return coordinationInvalid("speech_scope_invalid", "speech_visibility", "public|private")
+	}
+	if visibility == "public" {
+		if len(recipients) > 0 {
 			return coordinationInvalid("speech_recipients_invalid", "speech_recipients", "empty-for-public-speech")
 		}
 		return nil
 	}
-	if len(decision.SpeechRecipients) == 0 || len(decision.SpeechRecipients) > 4 {
+	if len(recipients) == 0 || len(recipients) > 4 {
 		return coordinationInvalid("speech_recipients_invalid", "speech_recipients", "one-to-four-contactable-recipients-for-private-speech")
 	}
 	seen := map[string]bool{}
-	for _, id := range decision.SpeechRecipients {
+	for _, id := range recipients {
 		if id == speaker || seen[id] {
 			return coordinationInvalid("speech_recipient_invalid", "speech_recipients", "unique-other-contactable-person")
 		}
@@ -73,19 +80,19 @@ func validateNPCSpeech(snapshot Snapshot, speaker string, decision *NPCDecision)
 	return nil
 }
 
-func appendNPCSpeech(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, sceneVersion int64, stage int) (string, string) {
+func appendSpeech(output *Output, run wiaworld.Run, character wiaworld.Character, content, visibility string, privateRecipients []string, participants []wiaworld.Character, sceneVersion int64, stage int) (string, string) {
 	rootID := fmt.Sprintf("%s:%s:speech:%d", inputPrefix(run), character.EntityID, stage)
-	root := wiaworld.Event{EventID: rootID, EventType: "npc_speech", ActorID: character.EntityID, Content: decision.Speech, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "author_speech", CreatedAt: time.Now().UTC()}
+	root := wiaworld.Event{EventID: rootID, EventType: "npc_speech", ActorID: character.EntityID, Content: content, RunID: run.RunID, Stage: stage, SceneVersion: sceneVersion, SourceType: "author_speech", CreatedAt: time.Now().UTC()}
 	output.Events = append(output.Events, root)
-	output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: rootID, SourceType: "own_speech", Content: decision.Speech, Stage: stage, SceneVersion: sceneVersion, CreatedAt: root.CreatedAt})
-	private := decision.SpeechVisibility == "private"
+	output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: character.EntityID, SourceEventID: rootID, SourceType: "own_speech", Content: content, Stage: stage, SceneVersion: sceneVersion, CreatedAt: root.CreatedAt})
+	private := visibility == "private"
 	recipients := []string{}
 	audience := output.speechAudience
 	if audience == nil {
 		audience = append(CharacterIDs(participants), "player")
 	}
 	for _, id := range audience {
-		if id != character.EntityID && !slices.Contains(recipients, id) && (!private || slices.Contains(decision.SpeechRecipients, id)) {
+		if id != character.EntityID && !slices.Contains(recipients, id) && (!private || slices.Contains(privateRecipients, id)) {
 			recipients = append(recipients, id)
 		}
 	}
@@ -100,11 +107,11 @@ func appendNPCSpeech(output *Output, run wiaworld.Run, character wiaworld.Charac
 			typeName, scope = "heard_private_reply", "私下"
 		}
 		output.Events = append(output.Events, projection)
-		output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: recipient, SourceEventID: projection.EventID, SourceType: typeName, Content: fmt.Sprintf("%s（%s）%s说：%s", character.Name, character.Role, scope, decision.Speech), Stage: stage, SceneVersion: sceneVersion, CreatedAt: root.CreatedAt})
+		output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: recipient, SourceEventID: projection.EventID, SourceType: typeName, Content: fmt.Sprintf("%s（%s）%s说：%s", character.Name, character.Role, scope, content), Stage: stage, SceneVersion: sceneVersion, CreatedAt: root.CreatedAt})
 	}
 	reply := ""
 	if !private {
-		reply = fmt.Sprintf("%s（%s）说：%s", character.Name, character.Role, decision.Speech)
+		reply = fmt.Sprintf("%s（%s）说：%s", character.Name, character.Role, content)
 	}
 	return rootID, reply
 }
@@ -151,6 +158,28 @@ func actionProjectionText(outcome hostActionResult, recipients map[string]bool) 
 		return nil, coordinationInvalid("action_projection_missing", "outcomes.projections", "action_id="+outcome.ActionID+"; missing-recipient-ids="+strings.Join(missing, ","))
 	}
 	return texts, nil
+}
+
+func appendActionProjections(output *Output, resultEvent wiaworld.Event, texts map[string]string) []wiaworld.Event {
+	resultID := resultEvent.EventID
+	var visible []wiaworld.Event
+	ids := make([]string, 0, len(texts))
+	for id := range texts {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		projection := resultEvent
+		projection.EventID = resultID + ":projection:" + id
+		projection.EventType = "action_perceived"
+		projection.TargetID, projection.Content, projection.ProjectionParentID = id, texts[id], resultID
+		output.Events = append(output.Events, projection)
+		output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: projection.EventID, SourceType: projection.SourceType, Content: projection.Content, Stage: resultEvent.Stage, SceneVersion: output.SceneVersion, CreatedAt: projection.CreatedAt})
+		if id == "player" {
+			visible = append(visible, projection)
+		}
+	}
+	return visible
 }
 
 func speechContactContext(snapshot Snapshot, speaker string) string {

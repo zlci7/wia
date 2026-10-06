@@ -159,7 +159,7 @@ func TestPrivateResultBystandersAndUnsupportedMovementAreRejected(t *testing.T) 
 	if err == nil {
 		t.Fatal("private player outcome leaked through bystanders")
 	}
-	if validateMechanicCapabilities(Snapshot{}, hostResult{Movements: []movementResult{{EntityID: "npc:a"}}}) == nil {
+	if validateMechanicCapabilities(Snapshot{}, mechanicEffects{Movements: []movementResult{{EntityID: "npc:a"}}}) == nil {
 		t.Fatal("unsupported movement was silently ignored")
 	}
 }

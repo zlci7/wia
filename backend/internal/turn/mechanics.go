@@ -17,6 +17,17 @@ type mechanicSource struct {
 	resultID   string
 }
 
+// Sources and relationship grants have already crossed their phase-specific
+// authorization boundary. Applying capabilities uses only these resolved facts.
+type mechanicEffects struct {
+	Movements             []movementResult
+	StateEffects          []stateEffect
+	RelationshipEffects   []relationshipEffect
+	ItemTransfers         []itemTransferEffect
+	sources               map[string]mechanicSource
+	relationshipAuthority map[string]bool
+}
+
 func mechanicSources(events []wiaworld.Event, outcomes []hostActionResult) map[string]mechanicSource {
 	actions := map[string]wiaworld.Event{}
 	for _, event := range events {
@@ -82,8 +93,8 @@ func checkedDistance(left, right int) (int64, bool) {
 
 // applyMechanicEffects publishes only a complete candidate. Individual modules
 // own their state and return changes without committing to storage.
-func applyMechanicEffects(snapshot Snapshot, output *Output, host hostResult) error {
-	if err := validateMechanicCapabilities(snapshot, host); err != nil {
+func applyMechanicEffects(snapshot Snapshot, output *Output, effects mechanicEffects) error {
+	if err := validateMechanicCapabilities(snapshot, effects); err != nil {
 		return err
 	}
 	candidate := *output
@@ -95,14 +106,14 @@ func applyMechanicEffects(snapshot Snapshot, output *Output, host hostResult) er
 	candidate.ItemTransfers = slices.Clone(output.ItemTransfers)
 	candidate.Events = slices.Clone(output.Events)
 	candidate.Perceptions = slices.Clone(output.Perceptions)
-	sources := mechanicSources(output.Events, host.Outcomes)
-	if err := applyStateEffects(snapshot, &candidate, host.StateEffects, sources); err != nil {
+	sources := effects.sources
+	if err := applyStateEffects(snapshot, &candidate, effects.StateEffects, sources); err != nil {
 		return err
 	}
-	if err := applyRelationshipEffects(snapshot, &candidate, host.RelationshipEffects); err != nil {
+	if err := applyRelationshipEffects(snapshot, &candidate, effects.RelationshipEffects, effects.relationshipAuthority); err != nil {
 		return err
 	}
-	if err := applyItemTransfers(snapshot, &candidate, host.ItemTransfers, sources); err != nil {
+	if err := applyItemTransfers(snapshot, &candidate, effects.ItemTransfers, sources); err != nil {
 		return err
 	}
 

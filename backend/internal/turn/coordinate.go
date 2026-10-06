@@ -46,6 +46,11 @@ type hostResult struct {
 	ItemTransfers       []itemTransferEffect `json:"item_transfers,omitempty"`
 }
 
+func (h hostResult) mechanics(snapshot Snapshot, output Output) mechanicEffects {
+	return mechanicEffects{Movements: h.Movements, StateEffects: h.StateEffects, RelationshipEffects: h.RelationshipEffects, ItemTransfers: h.ItemTransfers,
+		sources: mechanicSources(output.Events, h.Outcomes), relationshipAuthority: committedRelationshipAuthority(snapshot, output.Decisions)}
+}
+
 type movementResult struct {
 	EntityID string   `json:"entity_id"`
 	From     string   `json:"from"`
@@ -157,7 +162,7 @@ func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	output.SceneCharacters = append([]string(nil), host.SceneCharacters...)
 	if snapshot.Definition.Capabilities["spatial"] == 1 {
 		var err error
-		output.Positions, output.PositionChanges, output.SceneCharacters, err = applyMovements(snapshot, output.Events, host)
+		output.Positions, output.PositionChanges, output.SceneCharacters, err = applyMovements(snapshot, host.Movements, mechanicSources(output.Events, host.Outcomes))
 		if err != nil {
 			return coordinatedTurn{}, err
 		}
@@ -198,7 +203,7 @@ func prepareCoordination(snapshot Snapshot, run wiaworld.Run, intent TurnIntent,
 	if ruleEvent.EventID != "" {
 		visibleOutcomes = append(visibleOutcomes, ruleEvent)
 	}
-	if err = applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err = applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		return coordinatedTurn{}, err
 	}
 	output.SceneViews, err = applySceneUpdates(snapshot, run, intent, output, host)
@@ -415,78 +420,13 @@ func appendHostOutcomes(output *Output, run wiaworld.Run, participants []wiaworl
 		if err != nil {
 			return nil, err
 		}
-		ids := make([]string, 0, len(recipients))
-		for id := range recipients {
-			ids = append(ids, id)
-		}
-		slices.Sort(ids)
-		for _, id := range ids {
-			projection := resultEvent
-			projection.EventID = resultID + ":projection:" + id
-			projection.EventType = "action_perceived"
-			projection.TargetID, projection.Content, projection.ProjectionParentID = id, texts[id], resultID
-			output.Events = append(output.Events, projection)
-			output.Perceptions = append(output.Perceptions, wiaworld.Perception{RecipientID: id, SourceEventID: projection.EventID, SourceType: projection.SourceType, Content: projection.Content, Stage: 3, SceneVersion: output.SceneVersion, CreatedAt: projection.CreatedAt})
-			if id == "player" {
-				visible = append(visible, projection)
-			}
-		}
+		visible = append(visible, appendActionProjections(output, resultEvent, texts)...)
 	}
 	return visible, nil
 }
 
 func coordinationInvalid(code, field, expected string) error {
 	return &GenerationError{Code: code, Field: field, Expected: expected, Cause: ErrGenerationFailed}
-}
-
-func applyMovements(snapshot Snapshot, events []wiaworld.Event, host hostResult) (map[string]string, []PositionChange, []string, error) {
-	positions := clonePositions(snapshot.Positions)
-	actions := map[string]wiaworld.Event{}
-	for _, event := range events {
-		if event.EventType == "npc_action_intent" || event.EventType == "player_action_intent" {
-			actions[event.EventID] = event
-		}
-	}
-	type outcomeInfo struct {
-		status string
-		index  int
-	}
-	outcomes := map[string]outcomeInfo{}
-	for index, outcome := range host.Outcomes {
-		outcomes[wire.Clean(outcome.ActionID)] = outcomeInfo{status: strings.ToLower(wire.Clean(outcome.Status)), index: index}
-	}
-	graph := story.PlaceGraph(snapshot.Definition)
-	changes := make([]PositionChange, 0, len(host.Movements))
-	seenEntity, seenAction := map[string]bool{}, map[string]bool{}
-	for index, movement := range host.Movements {
-		field := fmt.Sprintf("movements[%d]", index)
-		movement.EntityID, movement.From, movement.To, movement.ActionID = wire.Clean(movement.EntityID), wire.Clean(movement.From), wire.Clean(movement.To), wire.Clean(movement.ActionID)
-		action, exists := actions[movement.ActionID]
-		outcome, settled := outcomes[movement.ActionID]
-		if !exists || !settled || seenAction[movement.ActionID] {
-			return nil, nil, nil, coordinationInvalid("movement_source_invalid", field+".action_id", "unique-current-action-with-outcome")
-		}
-		if movement.EntityID == "" || positions[movement.EntityID] == "" || seenEntity[movement.EntityID] || action.ActorID != movement.EntityID {
-			return nil, nil, nil, coordinationInvalid("movement_entity_invalid", field+".entity_id", "positioned-actor-of-source-action")
-		}
-		if outcome.status != "succeeded" && outcome.status != "partial" {
-			return nil, nil, nil, coordinationInvalid("movement_outcome_invalid", field+".action_id", "succeeded-or-partial-outcome")
-		}
-		if positions[movement.EntityID] != movement.From || movement.From == movement.To {
-			return nil, nil, nil, coordinationInvalid("movement_origin_invalid", field+".from", "current-location-and-different-destination")
-		}
-		if err := wiaworld.ValidateRoute(movement.Route, movement.From, movement.To, graph); err != nil {
-			return nil, nil, nil, coordinationInvalid("movement_route_invalid", field+".route", "directed-connected-place-route")
-		}
-		seenEntity[movement.EntityID], seenAction[movement.ActionID] = true, true
-		positions[movement.EntityID] = movement.To
-		changes = append(changes, PositionChange{
-			EntityID: movement.EntityID, To: movement.To, ActionID: movement.ActionID,
-			SourceEventID:         fmt.Sprintf("%s:result:%d", movement.ActionID, outcome.index+1),
-			PreviousSourceEventID: snapshot.PositionSources[movement.EntityID],
-		})
-	}
-	return positions, changes, spatialSceneCharacters(snapshot.Characters, positions), nil
 }
 
 func spatialSceneCharacters(characters []wiaworld.Character, positions map[string]string) []string {
@@ -556,7 +496,7 @@ func validateCoordination(result *hostResult, snapshot Snapshot, run wiaworld.Ru
 		return coordinationInvalid("scene_time_invalid", "time_minutes", fmt.Sprintf("integer:0..%d", PlotTimeLimit(snapshot)))
 	}
 	result.SceneCharacters = NormalizeSceneCharacters(result.SceneCharacters)
-	if err := validateMechanicCapabilities(snapshot, *result); err != nil {
+	if err := validateMechanicCapabilities(snapshot, result.mechanics(snapshot, Output{})); err != nil {
 		return err
 	}
 	if snapshot.Definition.Capabilities["spatial"] == 1 {

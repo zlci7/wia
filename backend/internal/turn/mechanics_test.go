@@ -32,7 +32,7 @@ func mechanicsFixture() (Snapshot, Output, hostResult) {
 
 func TestMechanicEffectsUseAuthorDefinitionsAndApplyAsOneGroup(t *testing.T) {
 	snapshot, output, host := mechanicsFixture()
-	if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		t.Fatal(err)
 	}
 	if got := output.States["player"]["ritual_stability"].Value.Integer; got != 54 {
@@ -62,7 +62,7 @@ func TestMechanicEffectsUseAuthorDefinitionsAndApplyAsOneGroup(t *testing.T) {
 func TestMechanicEffectsRejectWholeGroupWhenOneCandidateIsInvalid(t *testing.T) {
 	snapshot, output, host := mechanicsFixture()
 	host.ItemTransfers[0].FromHolderID = "npc:warden"
-	if err := applyMechanicEffects(snapshot, &output, host); err == nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil {
 		t.Fatal("invalid transfer was accepted")
 	}
 	if got := output.States["player"]["ritual_stability"].Value.Integer; got != 60 {
@@ -94,7 +94,7 @@ func TestMechanicEffectsEnforceBudgetExperienceAndOwnership(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot, output, host := mechanicsFixture()
 			test.mutate(&host)
-			err := applyMechanicEffects(snapshot, &output, host)
+			err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output))
 			if err == nil || !strings.Contains(err.Error(), test.code) {
 				t.Fatalf("error=%v", err)
 			}
@@ -110,28 +110,28 @@ func TestMechanicEffectsEnforceCumulativeBudgetFailedSourcesAndReferences(t *tes
 		host.Outcomes = append(host.Outcomes, hostActionResult{ActionID: second.EventID, Status: "succeeded", Recipients: []string{"player", "npc:warden"}})
 		host.StateEffects[0].Delta = -6
 		host.StateEffects = append(host.StateEffects, stateEffect{EntityID: "player", StateID: "ritual_stability", Delta: -5, ActionID: second.EventID})
-		if err := applyMechanicEffects(snapshot, &output, host); err == nil || !strings.Contains(err.Error(), "state_budget_exceeded") {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "state_budget_exceeded") {
 			t.Fatalf("error=%v", err)
 		}
 	})
 	t.Run("failed source", func(t *testing.T) {
 		snapshot, output, host := mechanicsFixture()
 		host.Outcomes[0].Status = "failed"
-		if err := applyMechanicEffects(snapshot, &output, host); err == nil || !strings.Contains(err.Error(), "state_effect_invalid") {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "state_effect_invalid") {
 			t.Fatalf("error=%v", err)
 		}
 	})
 	t.Run("relationship without personal experience", func(t *testing.T) {
 		snapshot, output, host := mechanicsFixture()
 		snapshot.Perceptions["npc:warden"] = nil
-		if err := applyMechanicEffects(snapshot, &output, host); err == nil || !strings.Contains(err.Error(), "relationship_effect_invalid") {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "relationship_effect_invalid") {
 			t.Fatalf("error=%v", err)
 		}
 	})
 	t.Run("unknown recipient", func(t *testing.T) {
 		snapshot, output, host := mechanicsFixture()
 		host.ItemTransfers[0].ToHolderID = "npc:unknown"
-		if err := applyMechanicEffects(snapshot, &output, host); err == nil || !strings.Contains(err.Error(), "item_transfer_invalid") {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "item_transfer_invalid") {
 			t.Fatalf("error=%v", err)
 		}
 	})
@@ -154,7 +154,7 @@ func TestMechanicEffectsContinueOneTurnWorkingStateAcrossStages(t *testing.T) {
 		snapshot, output, host := mechanicsFixture()
 		host.StateEffects = nil
 		host.ItemTransfers = nil
-		if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 			t.Fatal(err)
 		}
 		secondSource := "prior:result:2"
@@ -162,7 +162,7 @@ func TestMechanicEffectsContinueOneTurnWorkingStateAcrossStages(t *testing.T) {
 		snapshot.Perceptions["npc:warden"] = append(snapshot.Perceptions["npc:warden"], wiaworld.Perception{RecipientID: "npc:warden", SourceEventID: secondSource, SourceType: "action_succeeded"})
 		output.Decisions["npc:warden"] = NPCDecision{RelationshipProposals: []relationshipProposal{{TargetID: "player", RelationType: "confidence", Delta: 3, SourceID: secondSource}}}
 		second := hostResult{RelationshipEffects: []relationshipEffect{{SubjectID: "npc:warden", TargetID: "player", RelationType: "confidence", Delta: 3, ProposalSourceID: secondSource}}}
-		if err := applyMechanicEffects(snapshot, &output, second); err != nil {
+		if err := applyMechanicEffects(snapshot, &output, second.mechanics(snapshot, output)); err != nil {
 			t.Fatal(err)
 		}
 		if len(output.RelationshipChanges) != 2 || output.Relationships[1].Value != 7 {
@@ -171,7 +171,7 @@ func TestMechanicEffectsContinueOneTurnWorkingStateAcrossStages(t *testing.T) {
 		if output.RelationshipChanges[0].SourceEventID != "run:relationship-effect:1" || output.RelationshipChanges[1].SourceEventID != "run:relationship-effect:2" {
 			t.Fatalf("relationship event IDs=%q/%q", output.RelationshipChanges[0].SourceEventID, output.RelationshipChanges[1].SourceEventID)
 		}
-		if err := applyMechanicEffects(snapshot, &output, second); err == nil || !strings.Contains(err.Error(), "relationship_effect_invalid") {
+		if err := applyMechanicEffects(snapshot, &output, second.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "relationship_effect_invalid") {
 			t.Fatalf("repeated proposal error=%v", err)
 		}
 		if len(output.RelationshipChanges) != 2 || output.Relationships[1].Value != 7 {
@@ -185,13 +185,13 @@ func TestMechanicEffectsContinueOneTurnWorkingStateAcrossStages(t *testing.T) {
 		host.StateEffects[0].Delta = -6
 		host.RelationshipEffects = nil
 		host.ItemTransfers = nil
-		if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+		if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 			t.Fatal(err)
 		}
 		secondAction := wiaworld.Event{EventID: "run:plot-action", EventType: "npc_action_intent", ActorID: "player", TargetID: "npc:warden", RunID: "run", Stage: 5}
 		output.Events = append(output.Events, secondAction)
 		second := hostResult{Outcomes: []hostActionResult{{ActionID: secondAction.EventID, Status: "succeeded", Recipients: []string{"player", "npc:warden"}}}, StateEffects: []stateEffect{{EntityID: "player", StateID: "ritual_stability", Delta: -5, ActionID: secondAction.EventID}}}
-		if err := applyMechanicEffects(snapshot, &output, second); err == nil || !strings.Contains(err.Error(), "state_budget_exceeded") {
+		if err := applyMechanicEffects(snapshot, &output, second.mechanics(snapshot, output)); err == nil || !strings.Contains(err.Error(), "state_budget_exceeded") {
 			t.Fatalf("second-stage budget error=%v", err)
 		}
 		if got := output.States["player"]["ritual_stability"].Value.Integer; got != 54 || len(output.StateChanges) != 1 {

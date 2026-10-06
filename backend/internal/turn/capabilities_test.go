@@ -26,7 +26,7 @@ func TestModelStateUpdatesTypedValuesAndFailureConsequences(t *testing.T) {
 			host.RelationshipEffects, host.ItemTransfers = nil, nil
 			host.Outcomes[0].Status = "failed"
 			host.StateEffects = []stateEffect{{EntityID: "player", StateID: definition.ID, Value: &value, ActionID: host.Outcomes[0].ActionID}}
-			if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+			if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 				t.Fatal(err)
 			}
 			if got := output.States["player"][definition.ID].Value; got != value {
@@ -41,7 +41,7 @@ func TestModelStatePreservesAtomicityAndDeclaredTypes(t *testing.T) {
 	snapshot.Definition.StateDefinitions[0].UpdatePolicy = story.StateUpdatePolicy{Kind: "model"}
 	host.StateEffects[1].Value = &wiaworld.StateValue{Type: "boolean", Boolean: true}
 	host.StateEffects[1].Delta = 0
-	if err := applyMechanicEffects(snapshot, &output, host); err == nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil {
 		t.Fatal("wrong type accepted")
 	}
 	if output.States["player"]["ritual_stability"].Value.Integer != 60 || output.Items["token-1"].HolderID != "player" {
@@ -49,7 +49,7 @@ func TestModelStatePreservesAtomicityAndDeclaredTypes(t *testing.T) {
 	}
 	host.StateEffects = host.StateEffects[:1]
 	host.Outcomes[0].Status = "not_executed"
-	if err := applyMechanicEffects(snapshot, &output, host); err == nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil {
 		t.Fatal("unexecuted source changed state")
 	}
 }
@@ -60,7 +60,7 @@ func TestModelStateUsesResolvedCausalityInsteadOfExplicitTarget(t *testing.T) {
 	output.Events[0].TargetID = ""
 	host.RelationshipEffects, host.ItemTransfers = nil, nil
 	host.StateEffects = host.StateEffects[1:]
-	if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		t.Fatal(err)
 	}
 	if output.States["npc:warden"]["ritual_stability"].Value.Integer != 57 {
@@ -77,7 +77,7 @@ func TestItemsFollowModelPlacementAcrossCompoundActions(t *testing.T) {
 		{InstanceID: "token-1", FromHolderID: "player", ToHolderID: "npc:warden", ActionID: host.Outcomes[0].ActionID},
 		{InstanceID: "token-1", FromHolderID: "npc:warden", ToHolderID: "npc:keeper", ActionID: host.Outcomes[0].ActionID},
 	}
-	if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		t.Fatal(err)
 	}
 	if output.Items["token-1"].HolderID != "npc:keeper" || len(output.ItemTransfers) != 2 {
@@ -90,7 +90,7 @@ func TestItemsFollowModelPlacementAcrossCompoundActions(t *testing.T) {
 	output.Positions = map[string]string{"player": "street", "npc:warden": "hall"}
 	host.StateEffects, host.RelationshipEffects = nil, nil
 	host.ItemTransfers = []itemTransferEffect{{InstanceID: "token-1", FromLocationID: "hall", ToHolderID: "player", ActionID: host.Outcomes[0].ActionID}}
-	if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		t.Fatal(err)
 	}
 	if output.Items[item.InstanceID].HolderID != "player" {
@@ -140,7 +140,7 @@ func TestRelationshipSubjectInterpretsExperienceAboutOtherPeople(t *testing.T) {
 	output.Decisions["npc:warden"] = decision
 	host.StateEffects, host.ItemTransfers = nil, nil
 	host.RelationshipEffects[0].Delta = 20
-	if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 		t.Fatal(err)
 	}
 	if output.Relationships[1].Value != 20 {
@@ -165,14 +165,14 @@ func TestOptionalCapabilitiesApplyIndependently(t *testing.T) {
 			if name != "relations" {
 				host.RelationshipEffects = nil
 			}
-			if err := applyMechanicEffects(snapshot, &output, host); err != nil {
+			if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err != nil {
 				t.Fatal(err)
 			}
 		})
 	}
 	snapshot, output, host := mechanicsFixture()
 	snapshot.Definition.Capabilities = nil
-	if err := applyMechanicEffects(snapshot, &output, host); err == nil {
+	if err := applyMechanicEffects(snapshot, &output, host.mechanics(snapshot, output)); err == nil {
 		t.Fatal("disabled changes accepted")
 	}
 }

@@ -122,17 +122,23 @@ func validateRelationshipProposals(snapshot Snapshot, subject string, decision *
 	return nil
 }
 
-func proposedRelationship(decisions map[string]NPCDecision, effect relationshipEffect) bool {
-	decision, ok := decisions[effect.SubjectID]
-	if !ok {
-		return false
-	}
-	for _, proposal := range decision.RelationshipProposals {
-		if proposal.TargetID == effect.TargetID && proposal.RelationType == effect.RelationType && proposal.Delta == effect.Delta && proposal.SourceID == effect.ProposalSourceID {
-			return true
+// The legacy stage grants only exact proposals based on committed personal
+// experience. The effect engine consumes these grants, not NPCDecision shapes.
+func committedRelationshipAuthority(snapshot Snapshot, decisions map[string]NPCDecision) map[string]bool {
+	allowed := map[string]bool{}
+	for subject, decision := range decisions {
+		for _, proposal := range decision.RelationshipProposals {
+			if slices.Contains(relationshipExperienceSources(snapshot, subject), proposal.SourceID) {
+				effect := relationshipEffect{SubjectID: subject, TargetID: proposal.TargetID, RelationType: proposal.RelationType, Delta: proposal.Delta, ProposalSourceID: proposal.SourceID}
+				allowed[relationshipAuthorityKey(effect)] = true
+			}
 		}
 	}
-	return false
+	return allowed
+}
+
+func relationshipAuthorityKey(effect relationshipEffect) string {
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%d\x00%s", effect.SubjectID, effect.TargetID, effect.RelationType, effect.Delta, effect.ProposalSourceID)
 }
 
 func relationshipExperienceSources(snapshot Snapshot, recipient string) []string {
@@ -151,7 +157,7 @@ func relationshipExperienceSources(snapshot Snapshot, recipient string) []string
 	return result
 }
 
-func applyRelationshipEffects(snapshot Snapshot, output *Output, effects []relationshipEffect) error {
+func applyRelationshipEffects(snapshot Snapshot, output *Output, effects []relationshipEffect, authority map[string]bool) error {
 	relations, relationChanges := output.Relationships, output.RelationshipChanges
 	relationEvents := []wiaworld.Event{}
 	relationBudget := map[string]int64{}
@@ -181,7 +187,7 @@ func applyRelationshipEffects(snapshot Snapshot, output *Output, effects []relat
 		position := relationshipIndex(relations, effect.SubjectID, effect.TargetID, effect.RelationType)
 		appliedKey := effect.ProposalSourceID + "\x00" + effect.SubjectID + "\x00" + effect.TargetID + "\x00" + effect.RelationType
 		_, sourceExists := snapshot.Sources[effect.ProposalSourceID]
-		if !sourceExists || !defined || position < 0 || effect.SubjectID == effect.TargetID || effect.Delta == 0 || appliedRelationshipSources[appliedKey] || !slices.Contains(relationshipExperienceSources(snapshot, effect.SubjectID), effect.ProposalSourceID) || !proposedRelationship(output.Decisions, effect) {
+		if !sourceExists || !defined || position < 0 || effect.SubjectID == effect.TargetID || effect.Delta == 0 || appliedRelationshipSources[appliedKey] || !authority[relationshipAuthorityKey(effect)] {
 			return coordinationInvalid("relationship_effect_invalid", field, "subject-proposed-change-from-committed-personal-experience")
 		}
 		key := effect.SubjectID + "\x00" + effect.TargetID + "\x00" + effect.RelationType

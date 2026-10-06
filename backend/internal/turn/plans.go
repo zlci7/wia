@@ -98,53 +98,62 @@ func personalPlanContext(snapshot Snapshot, recipient string, material Material)
 }
 
 func validatePlanUpdates(snapshot Snapshot, owner string, decision *NPCDecision, call *ContextGenerator) error {
-	if len(decision.PlanUpdates) == 0 {
-		return nil
+	updates, err := validateOwnedPlanUpdates(snapshot, owner, decision.PlanUpdates, call.providedSources)
+	if err == nil {
+		decision.PlanUpdates = updates
 	}
-	if snapshot.OpenProgress == nil || len(decision.PlanUpdates) > 4 {
-		return coordinationInvalid("plan_updates_invalid", "plan_updates", "at-most-four-owned-plans-with-progression-enabled")
+	return err
+}
+
+func validateOwnedPlanUpdates(snapshot Snapshot, owner string, updates []planUpdate, providedSources []string) ([]planUpdate, error) {
+	if len(updates) == 0 {
+		return updates, nil
+	}
+	if snapshot.OpenProgress == nil || len(updates) > 4 {
+		return nil, coordinationInvalid("plan_updates_invalid", "plan_updates", "at-most-four-owned-plans-with-progression-enabled")
 	}
 	provided := map[string]bool{}
-	for _, id := range call.providedSources {
+	for _, id := range providedSources {
 		provided[id] = true
 	}
 	seen := map[string]bool{}
-	canonical := make([][]string, len(decision.PlanUpdates))
-	for updateIndex, update := range decision.PlanUpdates {
+	canonical := make([][]string, len(updates))
+	for updateIndex, update := range updates {
 		owned := false
 		for _, plan := range snapshot.OpenProgress.Plans {
 			if plan.ID == update.ID {
 				if plan.OwnerID != owner {
-					return coordinationInvalid("plan_owner_invalid", "plan_updates.id", "owned-plan")
+					return nil, coordinationInvalid("plan_owner_invalid", "plan_updates.id", "owned-plan")
 				}
 				owned = true
 			}
 		}
 		if update.ID == "" || len(update.ID) > 100 || (!owned && !strings.HasPrefix(update.ID, owner+":")) || seen[update.ID] || strings.TrimSpace(update.Content) == "" || !utf8.ValidString(update.Content) || len([]rune(update.Content)) > 1200 || len(update.SourceIDs) == 0 || len(update.SourceIDs) > 8 {
-			return coordinationInvalid("plan_update_invalid", "plan_updates", "unique-owned-plan-with-bounded-content-and-sources")
+			return nil, coordinationInvalid("plan_update_invalid", "plan_updates", "unique-owned-plan-with-bounded-content-and-sources")
 		}
 		seen[update.ID] = true
 		if update.Status != "active" && update.Status != "paused" && update.Status != "completed" && update.Status != "cancelled" {
-			return coordinationInvalid("plan_status_invalid", "plan_updates.status", "active|paused|completed|cancelled")
+			return nil, coordinationInvalid("plan_status_invalid", "plan_updates.status", "active|paused|completed|cancelled")
 		}
 		if update.Status == "active" && (update.ReviewAfterMinutes < 1 || update.ReviewAfterMinutes > 43200) || update.Status != "active" && update.ReviewAfterMinutes != 0 {
-			return coordinationInvalid("plan_time_invalid", "plan_updates.review_after_minutes", "future-review-for-active-plan")
+			return nil, coordinationInvalid("plan_time_invalid", "plan_updates.review_after_minutes", "future-review-for-active-plan")
 		}
 		for sourceIndex, id := range update.SourceIDs {
 			if !provided[id] {
-				return &GenerationError{Code: "context_source_missing", Field: "plan_updates.source_ids", Expected: fmt.Sprintf("plan-index=%d; source-index=%d; copy-source-ids-from-provided=%s", updateIndex, sourceIndex, wire.MarshalJSON(call.providedSources)), Cause: ErrContextSourceMissing}
+				return nil, &GenerationError{Code: "context_source_missing", Field: "plan_updates.source_ids", Expected: fmt.Sprintf("plan-index=%d; source-index=%d; copy-source-ids-from-provided=%s", updateIndex, sourceIndex, wire.MarshalJSON(providedSources)), Cause: ErrContextSourceMissing}
 			}
 		}
 		var err error
 		canonical[updateIndex], err = canonicalPlanSources(snapshot, owner, update.SourceIDs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	for i := range decision.PlanUpdates {
-		decision.PlanUpdates[i].SourceIDs = canonical[i]
+	updates = slices.Clone(updates)
+	for i := range updates {
+		updates[i].SourceIDs = canonical[i]
 	}
-	return nil
+	return updates, nil
 }
 
 // Context record IDs describe an owner's view of an event. Persisted plan bases
@@ -168,12 +177,12 @@ func canonicalPlanSources(snapshot Snapshot, owner string, ids []string) ([]stri
 	return canonical, nil
 }
 
-func applyPlanUpdates(output *Output, run wiaworld.Run, owner string, decision NPCDecision, stage int) {
+func applyPlanUpdates(output *Output, run wiaworld.Run, owner string, updates []planUpdate, stage int) {
 	if output.OpenProgress == nil {
 		return
 	}
 	minute, _ := plot.ClockMinute(output.Clock)
-	for i, update := range decision.PlanUpdates {
+	for i, update := range updates {
 		index := -1
 		for j, plan := range output.OpenProgress.Plans {
 			if plan.ID == update.ID {

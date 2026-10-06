@@ -311,7 +311,7 @@ func TestPrivateNPCSpeechValidatesContactAndUsesOnlyListeners(t *testing.T) {
 		t.Fatal(err)
 	}
 	output := Output{}
-	appendNPCSpeech(&output, wiaworld.Run{RunID: "r"}, snapshot.Characters[0], decision, snapshot.Characters, 1, 1)
+	appendSpeech(&output, wiaworld.Run{RunID: "r"}, snapshot.Characters[0], decision.Speech, decision.SpeechVisibility, decision.SpeechRecipients, snapshot.Characters, 1, 1)
 	if len(PublicReplyStageInputs(output.Perceptions, map[string]string{}, 1)) != 1 {
 		t.Fatal("private listener followup missing")
 	}

@@ -132,7 +132,7 @@ func TestApplyMovementsUsesActionOwnershipAndDirectedRoutes(t *testing.T) {
 			{EntityID: "npc:reporter", From: "office", To: "street", Route: []string{"office", "street"}, ActionID: "move-reporter"},
 		},
 	}
-	positions, changes, scene, err := applyMovements(snapshot, events, host)
+	positions, changes, scene, err := applyMovements(snapshot, host.Movements, mechanicSources(events, host.Outcomes))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestApplyMovementsRejectsClaimedFollowingAndIllegalRoutes(t *testing.T) {
 		{"route cannot skip edge", movementResult{EntityID: "player", From: "office", To: "clinic", Route: []string{"office", "clinic"}, ActionID: "move-player"}, "movement_route_invalid"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, _, err := applyMovements(snapshot, events, hostResult{Outcomes: []hostActionResult{{ActionID: "move-player", Status: "succeeded"}}, Movements: []movementResult{tc.movement}})
+			_, _, _, err := applyMovements(snapshot, []movementResult{tc.movement}, mechanicSources(events, []hostActionResult{{ActionID: "move-player", Status: "succeeded"}}))
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error = %v, want %s", err, tc.want)
 			}

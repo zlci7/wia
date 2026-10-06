@@ -53,7 +53,7 @@ func (s *Service) preparePlotActions(base Snapshot, run wiaworld.Run, rootID str
 	finalCharacters := append([]string{}, output.SceneCharacters...)
 	movementHost := hostResult{Outcomes: outcomes, Movements: resolved.Movements, SceneUpdates: resolved.SceneUpdates}
 	if base.Definition.Capabilities["spatial"] == 1 {
-		positions, changes, derived, moveErr := applyMovements(base, extra.Events, movementHost)
+		positions, changes, derived, moveErr := applyMovements(base, movementHost.Movements, mechanicSources(extra.Events, movementHost.Outcomes))
 		if moveErr != nil {
 			return coordinatedPlotActions{}, moveErr
 		}
@@ -108,7 +108,7 @@ func (s *Service) preparePlotActions(base Snapshot, run wiaworld.Run, rootID str
 			extra.Perceptions[i].Stage = 6
 		}
 	}
-	if err = applyMechanicEffects(base, &extra, hostResult{Outcomes: outcomes, Movements: resolved.Movements, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}); err != nil {
+	if err = applyMechanicEffects(base, &extra, (hostResult{Outcomes: outcomes, Movements: resolved.Movements, StateEffects: resolved.StateEffects, RelationshipEffects: resolved.RelationshipEffects, ItemTransfers: resolved.ItemTransfers}).mechanics(base, extra)); err != nil {
 		return coordinatedPlotActions{}, err
 	}
 	sources := plotSceneSources(output, nil)

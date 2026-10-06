@@ -293,7 +293,7 @@ func (a *Service) narrateStage(ctx context.Context, generator model.TextGenerato
 // memories and public reply the rest of the turn reads.
 func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworld.Character, decision NPCDecision, participants []wiaworld.Character, defaultSourceEventID string, sceneVersion int64, stage int) string {
 	start := len(output.Events)
-	applyPlanUpdates(output, run, character.EntityID, decision, stage)
+	applyPlanUpdates(output, run, character.EntityID, decision.PlanUpdates, stage)
 	sourceEventID := defaultSourceEventID
 	if decision.ActionIntent != "" {
 		actionEventID := fmt.Sprintf("%s:%s:action:%d", inputPrefix(run), character.EntityID, stage)
@@ -303,7 +303,7 @@ func appendNPCDecisionOutput(output *Output, run wiaworld.Run, character wiaworl
 	var reply string
 	if decision.Speech != "" {
 		var speechID string
-		speechID, reply = appendNPCSpeech(output, run, character, decision, participants, sceneVersion, stage)
+		speechID, reply = appendSpeech(output, run, character, decision.Speech, decision.SpeechVisibility, decision.SpeechRecipients, participants, sceneVersion, stage)
 		if decision.ActionIntent == "" {
 			sourceEventID = speechID
 		}
