@@ -1,0 +1,70 @@
+{
+  "schema_revision": "scene-draft.v1",
+  "input_map": [
+    {
+      "text": "我检查账簿和收据，记下发现。",
+      "intent_type": "act",
+      "addressee_id": "",
+      "visibility": "public",
+      "beat_ids": [
+        "b2"
+      ],
+      "status": "succeeded",
+      "unexecuted_reason": ""
+    }
+  ],
+  "beats": [
+    {
+      "local_id": "b1",
+      "kind": "dialogue",
+      "actor_id": "shopkeeper",
+      "offset_minutes": 0,
+      "basis": [
+        "personal:shopkeeper:receipt"
+      ],
+      "content": "账簿里夹着那张收据。你可以看，但我还没确认是谁交来的。",
+      "scope": "public",
+      "recipients": [],
+      "bystanders": [],
+      "projections": [],
+      "effects": {}
+    },
+    {
+      "local_id": "b2",
+      "kind": "observation",
+      "actor_id": "player",
+      "offset_minutes": 2,
+      "basis": [
+        "beat:b1",
+        "material:current-case"
+      ],
+      "content": "玩家检查账簿，找到夹在其中的收据，上面写着一个已声明街道的地址；玩家记下了发现。",
+      "recipients": [
+        "player"
+      ],
+      "bystanders": [],
+      "projections": [
+        {
+          "recipient": "player",
+          "content": "我找到收据，读到了地址并记下，但不知道实际顾客是谁。"
+        }
+      ],
+      "effects": {}
+    }
+  ],
+  "narrative_blocks": [
+    {
+      "beat_ids": [
+        "b1",
+        "b2"
+      ],
+      "text": "店主把账簿推过来，指出夹着收据的那一页。你翻开纸页，仔细核对收据上的地址，把它记进本子。顾客的身份仍没有证据。"
+    }
+  ],
+  "elapsed_minutes": 2,
+  "stop": {
+    "reason": "player_choice",
+    "content": "已获得地址，下一步调查方向由玩家决定。"
+  },
+  "progress_updates": []
+}
