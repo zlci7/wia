@@ -47,7 +47,7 @@ Developers edit v4 packages as files using the [authoring contract and template]
 
 ## Validation
 
-Engineering tests, browser checks, real-model observations and user acceptance are recorded separately in the [current status](docs/phase12/开发状态.md), [closed-loop verification record](docs/phase12/records/开放世界闭环-验收记录.md) and [world information verification record](docs/phase12/records/世界信息与阅读界面-验收记录.md). The world, perception and workspace modules have engineering evidence; continuous real-model play is under verification. Provider timeouts, generation failures and semantic deviations remain practical limitations. Desktop browser mobile viewports do not replace physical-phone testing.
+Engineering tests, browser checks, real-model observations and user acceptance are recorded separately in the [current status](docs/phase12/开发状态.md), [closed-loop verification record](docs/summary/phase12/records/开放世界闭环-验收记录.md) and [world information verification record](docs/summary/phase12/records/世界信息与阅读界面-验收记录.md). The world, perception and workspace modules have engineering evidence; continuous real-model play is under verification. Provider timeouts, generation failures and semantic deviations remain practical limitations. Desktop browser mobile viewports do not replace physical-phone testing.
 
 ## Documentation
 

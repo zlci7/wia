@@ -1,6 +1,6 @@
 # World Is Agent Phase12 文档
 
-本页汇集产品、架构、阶段实施、验证证据与剧本作者资料的阅读入口。
+本页汇集产品合同、阶段技术方案与剧本作者资料。执行计划、验收记录与截图证据见 [Phase12 总结目录](../summary/phase12/README.md)。
 
 ## 阅读顺序
 
@@ -24,7 +24,7 @@
 ## 剧本配置与世界能力
 
 - [世界信息与阅读界面规划书](stages/世界信息与阅读界面-规划书.md)：世界日期、通用币制、资产投影、阅读主界面与按需资料的实施合同。
-- [开放世界闭环执行方案](stages/开放世界闭环-10小时执行方案.md)：世界推进、个人感知、玩家工作台与真实游玩闭环的连续交付安排。
+- [开放世界闭环执行方案](../summary/phase12/plans/开放世界闭环-10小时执行方案.md)：世界推进、个人感知、玩家工作台与真实游玩闭环的连续交付安排。
 - [开发者剧本编写规范与模板](stages/开发者剧本编写规范与模板.md)：v4 分目录配置、材料索引与渐进披露合同。
 - [Story Pack v4 完整文件模板](templates/story-pack-v4/README.md)：入口、地图、人物、分类材料与初始计划；[Story Pack v3](templates/story-pack/story.json)保留旧格式示例。
 - [渐进材料与持续世界技术方案](stages/渐进材料与持续世界-技术方案.md)：世界推进、个人感知两个完整交付模块。
@@ -36,19 +36,21 @@
 ## 设计建议
 
 - [世界模拟剧本借鉴评估](stages/世界模拟剧本-借鉴评估.md)：两份 PNG 世界模拟卡的 36 项借鉴判断、作者材料与提示参考、状态和导入边界；参考建议，尚未纳入实施范围。
-- [主 Agent 创作与叙事体验改进建议](stages/主Agent创作与叙事体验-改进建议.md)：预设架构的 32 项借鉴评估、通用提示词草案、实施优先级和验收场景；待实施，不代表已交付能力。
-- [主 Agent 与阅读体验 5 小时执行计划](stages/主Agent与阅读体验-5小时执行计划.md)：NPC 互动衔接、主持创作、正文与建议、三套静态 UI、验证和本地提交的 300 分钟安排；待执行，UI 选定后再确定正式前端范围。
+- [主 Agent 创作与叙事体验改进建议](stages/主Agent创作与叙事体验-改进建议.md)：预设架构的 32 项借鉴评估与提示参考；主持创作、正文、建议及 A 阅读界面已有工程交付，其余建议按后续范围选择，真实模型质量仍待验证。
+- [主 Agent 与阅读体验执行记录](../summary/phase12/plans/主Agent与阅读体验-5小时执行计划.md)：已执行的预算与交付范围，结果以对应验收记录为准。
 
 ## 验收记录
 
-- [世界信息与阅读界面验收记录](records/世界信息与阅读界面-验收记录.md)
-- [模型主导的可选能力模块验收记录](records/模型主导的可选能力模块-验收记录.md)
-- [M1 验收记录](records/M1-验收记录.md)
-- [M2 验收记录](records/M2-验收记录.md)
-- [M3 验收记录](records/M3-验收记录.md)
-- [Story Pack v3 阶段 A 验收记录](records/Story-Pack-v3-阶段A验收记录.md)
-- [Story Pack v3 阶段 B 验收记录](records/Story-Pack-v3-阶段B验收记录.md)
-- [Story Pack v3 阶段 C 验收记录](records/Story-Pack-v3-阶段C验收记录.md)
+完整目录见 [Phase12 总结](../summary/phase12/README.md)。
+
+- [世界信息与阅读界面验收记录](../summary/phase12/records/世界信息与阅读界面-验收记录.md)
+- [模型主导的可选能力模块验收记录](../summary/phase12/records/模型主导的可选能力模块-验收记录.md)
+- [M1 验收记录](../summary/phase12/records/M1-验收记录.md)
+- [M2 验收记录](../summary/phase12/records/M2-验收记录.md)
+- [M3 验收记录](../summary/phase12/records/M3-验收记录.md)
+- [Story Pack v3 阶段 A 验收记录](../summary/phase12/records/Story-Pack-v3-阶段A验收记录.md)
+- [Story Pack v3 阶段 B 验收记录](../summary/phase12/records/Story-Pack-v3-阶段B验收记录.md)
+- [Story Pack v3 阶段 C 验收记录](../summary/phase12/records/Story-Pack-v3-阶段C验收记录.md)
 
 验收记录保存确定性测试、浏览器验证、真实模型结果和用户体验状态，不作为未来功能的设计入口。
 
