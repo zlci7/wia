@@ -72,7 +72,7 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 		if err != nil {
 			return nil, err
 		}
-		call := s.generator(generator, material, working, run, "plot", "coordinator", 4, "story.open-world.v2")
+		call := s.generator(generator, material, working, run, "plot", "coordinator", 4, "story.open-world.v3")
 		var result plotResolution
 		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		_, err = GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, nil, []string{"status", "content", "source_ids", "projections", "decision_requests", "ending"}, func() error { return validateOpenResolution(working, result, call.(*ContextGenerator)) })
@@ -131,7 +131,7 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 }
 
 func composeOpenWorld(snapshot Snapshot, output Output, checkID string, external bool, materialIDs []string) (Material, error) {
-	material := Material{System: BehaviorContract + "\n你是持续世界协调器。评估当前矛盾、压力或已到期的外部安排。读取最新权威事实，不将作者初始描述覆盖物品归属、位置、关系或状态。人物意向由本人决定；你只提供真实外部变化与个人可感知的刺激，不代写重要人物已经行动。只返回 JSON。",
+	material := Material{System: BehaviorContract + "\n你是持续世界协调器。依据发展材料、当前压力和已确认经历，形成具体、有因果的外部变化与可参与的新情境。环境变化、公开消息、线索的可见后果和到期安排可以推进处境；没有合理变化时暂缓或跳过，不强行制造危机或拉回玩家已拒绝的机会。最新位置、物品、关系和状态优先于开场描述。重要人物的意向与行动由本人决定；你提供其实际可感知的刺激，相关接收者再独立决定回应、拒绝、沉默或延续计划。只返回 JSON。",
 		Required: fmt.Sprintf("游戏时间：%s\n本轮已确认记录：%s\n当前位置：%s\n最新能力工作态：%s\n逐人情境：%s\n待评估对象：%s；external_schedule=%t\n输出 status(occurred/deferred/skipped)、content(作者真实结果)、source_ids、projections(逐人recipient/content/scene)、decision_requests、ending(空字符串)。每个人只能获得其实际观察或有效传达的部分；不得为共享信息改变人物位置。decision_requests最多两名已收到本次projection的重要人物。deferred不产生projection或决定请求；不确定时暂缓，不编造完成。", output.Clock, worldProgressionRecords(output.Events), wire.MarshalJSON(output.Positions), HostMechanicsContext(snapshot), CoordinationScene(snapshot), checkID, external), RequiredSources: append(EventIDs(output.Events), SceneViewSources(snapshot, "")...), Optional: plotEvidenceSections(snapshot.Events)}
 	for _, id := range materialIDs {
 		m, ok := story.MaterialByID(snapshot.Definition, id)
