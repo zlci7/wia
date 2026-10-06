@@ -11,6 +11,7 @@
 ## Phase documents
 
 - [Phase12](phase12/README.md): existing stage specifications, story pack templates and reference material.
+- [Phase13](phase13/README.md): proposed centralized scene creation, context composition, migration and acceptance tests. Runtime changes are pending.
 
 ## Delivery records
 

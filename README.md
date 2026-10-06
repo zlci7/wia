@@ -54,6 +54,7 @@ Engineering tests, browser checks, real-model observations and user acceptance a
 - [Architecture and dependency rules](docs/ARCHITECTURE.md)
 - [Documentation index](docs/README.md)
 - [Phase12 index](docs/phase12/README.md)
+- [Phase13 design](docs/phase13/README.md): centralized scene creation and context planning; implementation pending.
 - [Product scope](docs/phase12/产品说明.md)
 - [Cross-stage contracts](docs/phase12/总体技术方案.md)
 - [Player workspace design](DESIGN.md)

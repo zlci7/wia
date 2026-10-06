@@ -12,7 +12,7 @@ The authoritative product definition, users, workflows, and scope are in [the Ph
 
 ## Capabilities and Constraints
 
-Current delivery evidence is in [development status](docs/phase12/开发状态.md). Architecture constraints are in [the architecture specification](docs/ARCHITECTURE.md). The current work is defined by [the narration and reading experience plan](docs/summary/phase12/plans/主Agent与阅读体验-5小时执行计划.md).
+Current delivery evidence is in [development status](docs/phase12/开发状态.md). Architecture constraints are in [the architecture specification](docs/ARCHITECTURE.md). The next-stage design is defined by [Phase13](docs/phase13/README.md); centralized scene creation is not implemented yet.
 
 ## Brand Commitments
 

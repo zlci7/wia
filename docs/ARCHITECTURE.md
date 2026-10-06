@@ -336,6 +336,32 @@ turn.ContextGenerator → app.meteredText → model.TextGenerator → llm Provid
 
 位置、状态、关系和物品通过各自能力入口提供最新工作态。世界推进共用人物决策、行动协调与最终提交路径，在玩家回合内进行有界推进。个人感知共用一套授权与投影合同，正文只消费玩家投影。材料读取、人物计划与个人感知使用同一个 Context 构建入口和回合引擎，游玩不依赖创作系统。
 
+### 6.10 Phase13 集中创作职责（待实施）
+
+设计入口：[Phase13 技术方案](phase13/开放叙事与单Agent-技术方案.md)。当前 6.1、6.4、6.5 的独立人物调用仍是实际实现；本节描述下一阶段的目标职责，不表示正式链路已切换。
+
+目标为一个核心场景创作职责统一生成相关人物互动、场景结果与正文。人物身份、动机、个人记忆和知识分别维护，模型调用不按人物数量拆分。程序继续持有规则准备、上下文、资格校验和最终提交职责。
+
+```text
+app.SubmitRun → app.runWorker
+ ├─ turn.Service.Execute
+ │   ├─ Load Snapshot + Memory
+ │   ├─ Prepare Scene / Rules / Due Context
+ │   │   └─ Intent → Model（仅需要规则准备等条件时）
+ │   ├─ Scene Creation → Model（完整候选；有界材料读取与纠正）
+ │   ├─ Validate ordered draft against working state
+ │   └─ Project personal experience → existing Output
+ └─ app.commitTurn → existing atomic commit
+```
+
+`turn` 继续是唯一内核，场景提示与调用属于该职责；ContextComposer 保持一个装配入口。`memory`、`plot`、`world`、`model/llm`、`storage`、`app` 的依赖方向和存储职责保持本文件第 5、7 节约定，不新增 Agent Runtime、通用工具框架或提交服务。
+
+场景调用用途为 `scene`，以受控人物集合读取相关个人资料和主持材料。玩家、建议与个人回顾用途继续按接收者裁剪；共享创作输入的拟调整合同见[总体技术方案 1.3](phase12/总体技术方案.md#13-phase13-共享创作上下文拟调整)。
+
+目标并发单位为 world 的单写者 Turn，候选节点顺序处理；同轮人物后续回应依据前一节点的本人投影。切换后以该节点来源合同替换“每个角色每个 Stage 一次独立请求”，保持取消、版本校验和派生任务的 basis 发布边界。
+
+切换提交直接替换旧人物、协调、世界和正文的创作调用，保留纯规则和现有 Output；发布边界必须覆盖既有世界推进与存档兼容。对照评估使用分别启动的代码修订和测试世界，正式程序不保留长期双引擎或每 NPC 调用开关。数据与接口细节、迁移和验收由 Phase13 阶段文件定义。
+
 ## 7. 存储
 
 ### 7.1 本次只统一代码责任
