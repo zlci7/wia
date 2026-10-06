@@ -1,4 +1,4 @@
-import { computed, nextTick, reactive, ref } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { fetchMessages } from "./api";
 import { ApiError, type Message } from "./types";
 
@@ -89,6 +89,14 @@ export function useStoryReader(onMissing: (id: string) => void) {
       else box.scrollTop = state.top;
     }
   }
+  watch(viewport, (box, _, onCleanup) => {
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (viewport.value === box && worldID.value) restore();
+    });
+    observer.observe(box);
+    onCleanup(() => observer.disconnect());
+  }, { flush: "post" });
   async function latest() {
     session.value.bottom = true;
     session.value.unread = false;

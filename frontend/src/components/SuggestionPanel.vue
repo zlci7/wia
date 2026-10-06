@@ -64,8 +64,8 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
 .suggestions { margin-bottom:.65rem; }
 .suggestion-heading { display:flex; justify-content:space-between; align-items:center; color:var(--muted,#766f65); font-size:.8rem; }
 .suggestion-heading button { padding:.25rem .5rem; }
-.suggestion-items { display:flex; gap:.4rem; overflow-x:auto; max-height:6rem; }
-.suggestion-items button { flex:1; min-width:130px; text-align:left; font:inherit; font-size:.85rem; color:inherit; background:var(--paper,#fffdf8); border:1px solid var(--border,#ddd2c4); border-radius:8px; padding:.5rem; cursor:pointer; overflow:auto; }
+.suggestion-items { display:grid; grid-template-columns:minmax(0,1fr); gap:.4rem; max-height:min(12rem,calc(var(--viewport-height,100dvh) * .24)); overflow-y:auto; }
+.suggestion-items button { min-width:0; width:100%; text-align:left; font:inherit; font-size:.85rem; line-height:1.65; white-space:normal; overflow-wrap:anywhere; color:inherit; background:var(--paper,#fffdf8); border:1px solid var(--border,#ddd2c4); border-radius:8px; padding:.5rem; cursor:pointer; }
 .suggestion-items button:disabled { cursor:default; opacity:.55; }
 .suggestion-items span { color:var(--accent,#ae5440); margin-right:.5rem; }
 .suggestions p { font-size:.8rem; margin:.2rem 0 0; }

@@ -276,8 +276,6 @@ summary { cursor: pointer; color: var(--accent-dark); }
   .composer { max-height: calc(100% - 160px); padding-top: 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
   .composer textarea { min-height: 40px; max-height: min(64px, calc(var(--viewport-height) * .25)); margin: 6px 0; }
   .composer .suggestion-heading button { min-height: 28px; }
-  .composer .suggestion-items { max-height: 44px; }
-  .composer .suggestion-items button { min-width: 180px; }
   .composer .inline-error { max-height: 40px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
   .status-banner { max-height: 50px; overflow-y: auto; padding: 4px 8px; }
 }

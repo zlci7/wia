@@ -44,6 +44,16 @@ function assertLayout(size) {
   assert(layout.submit.left >= 0 && layout.submit.right <= layout.width + 1 && layout.submit.top >= 0 && layout.submit.bottom <= layout.height + 1, `${size}: submit outside viewport`);
   assert(layout.submit.width > 0 && layout.submit.height > 0 && layout.submit.reachable && !layout.submit.disabled, `${size}: enabled submit is reachable`);
 }
+function assertSuggestionRows(size) {
+  const layout = js(`(()=>{const list=document.querySelector('.suggestion-items');return {width:list.clientWidth,scrollWidth:list.scrollWidth,rows:[...list.querySelectorAll('button')].map(button=>{const box=button.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:button.clientWidth,scrollWidth:button.scrollWidth,height:button.clientHeight,scrollHeight:button.scrollHeight}})}})()`);
+  assert.equal(layout.rows.length, 3, `${size}: three suggestions`);
+  assert(layout.scrollWidth <= layout.width, `${size}: suggestions have no horizontal scrolling`);
+  for (const [index, row] of layout.rows.entries()) {
+    assert(Math.abs(row.left - layout.rows[0].left) < 1 && Math.abs(row.right - layout.rows[0].right) < 1, `${size}: each suggestion occupies its own full-width row`);
+    if (index) assert(row.top >= layout.rows[index - 1].bottom, `${size}: suggestions appear in vertical order`);
+    assert(row.scrollWidth <= row.width && row.scrollHeight <= row.height + 1, `${size}: suggestion text fits its button`);
+  }
+}
 
 let opened = false;
 try {
@@ -69,6 +79,28 @@ try {
   await wait(`(()=>{const box=document.querySelector('.transcript');return box.scrollHeight-box.scrollTop-box.clientHeight<3})()`);
   assert(js(`(()=>{const box=document.querySelector('.transcript');return box.scrollHeight-box.scrollTop-box.clientHeight<3})()`));
   await wait(`!document.querySelector('.suggestion-heading')?.textContent.includes('正在准备')`);
+  await wait(`document.querySelectorAll('.suggestion-items button').length===3`);
+  for (const size of ["1440x900", "390x844", "1440x600"]) {
+    call("viewport", size);
+    await pause(300);
+    assertSuggestionRows(size);
+    // Exercise the permitted text-length boundary without changing fixture data.
+    const texts = js(`[...document.querySelectorAll('.suggestion-items button')].map(button=>button.innerHTML)`);
+    js(`(()=>{document.querySelectorAll('.suggestion-items button').forEach(button=>button.textContent='观察'.repeat(60));return true})()`);
+    assertSuggestionRows(`${size} / 120 characters`);
+    await wait(`(()=>{const box=document.querySelector('.transcript');return box.scrollHeight-box.scrollTop-box.clientHeight<3})()`);
+    js(`(()=>{document.querySelectorAll('.suggestion-items button').forEach((button,index)=>button.innerHTML=${JSON.stringify(texts)}[index]);return true})()`);
+  }
+  call("viewport", "1280x800");
+  const suggestedText = js(`document.querySelector('.suggestion-items button').textContent.replace(/^1/,'')`);
+  const suggestionBaseline = heads(readWorld(world.world_id));
+  click('.suggestion-items button:first-child');
+  assert.equal(js(`document.querySelector('textarea[aria-label="你的行动"]').value`), suggestedText, "selection fills the editable draft");
+  assert.deepEqual(heads(readWorld(world.world_id)), suggestionBaseline, "selection does not execute an action");
+  click('textarea[aria-label="你的行动"]');
+  call("press", "Control+A");
+  call("press", "Backspace");
+  console.log("PASS suggestions use three full-width rows at desktop, mobile and short viewports, wrap 120-character text, and fill without submitting");
 
   const snapshot = readWorld(world.world_id);
   const character = snapshot.characters.find(value => value.in_scene);
