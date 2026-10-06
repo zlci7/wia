@@ -218,10 +218,10 @@ func composeNarration(snapshot Snapshot, run wiaworld.Run, def story.Definition,
 当前背景人群：%s
 本轮玩家可见且已经确定的对白与结果：
 本轮玩家可见事件(JSON)：%s
-表达任务：按事件阶段顺序写出清晰、连贯、有现场感的正文，完整呈现关键对白、实际执行过程与后果。每段围绕一个动作或交谈重点，转换说话人时清楚分段；相同立场的重复对白可以合并或间接转述，保留原意、态度和重要信息。环境细节服务于当前观察和行动，篇幅随新增内容变化。
+表达任务：按事件阶段顺序写出清晰、连贯、有现场感的正文，完整呈现关键对白、实际执行过程与后果。每段围绕一个动作或交谈重点，转换说话人时清楚分段；相同立场的重复对白可以合并或间接转述，保留原意、态度和重要信息，不把疑问改成承诺，不把拒绝改成接受。环境细节服务于当前观察和行动，篇幅随新增内容变化。
 人物与听众：actor_id、actor_name、narrative_reference 和 event_type 标明事件归属，旁白使用 narrative_reference。玩家输入的“我”按叙事人称转述，NPC 台词的“我”属于说话者。speech_scope=public_current_scene 是在场者可听的公开表达；private_recipient 保持私人听众范围，语气和音量描写保持已确定的可听范围。NPC 对白、行动及表示选择的姿态以本人事件为依据，保留拒绝、沉默和承诺；邀请后点头或推碗若表示接受，也需要本人决定支持。
-结果与视角：实际结果优先于行动尝试，保留 succeeded、failed、partial 的区别。outcome_status=not_executed 表示没有另行执行，只在理解衔接有必要时说明；尚未处理的等待和后续行动仍未发生。主角只叙述亲自感知、已知或有明确来源的信息，其他人物的心理采用已经表露的部分。当前人物与背景人群仍在场，正文只提本轮相关的人，省去未变化状态的逐项汇报。
-表现自由：在描写密度和主角补写规则内，自由组织措辞、节奏、感官和临时低影响氛围，让简单互动自然结束、重要变化充分展开。补写服从当前场景与人物既定表达，删除补写后下一轮的地点、物品、资源、关系、知识、剧情条件、人物立场和可选行动保持一致。日常陈设和氛围仅用于表现，不成为新线索、障碍或资源；主角尚未选择的重要决定留在发生前。`, snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
+结果与视角：实际结果优先于行动尝试，保留 succeeded、failed、partial 的区别。outcome_status=not_executed 表示没有另行执行，只在理解衔接有必要时说明；尚未处理的等待和后续行动仍未发生。主角只叙述亲自感知、已知或有明确来源的信息，其他人物的心理采用已经表露的部分；不得使用“没有任何人注意到”等无法确认的全知判断。当前人物与背景人群仍在场，正文只提本轮相关的人，禁止为了证明仍在场而逐个点名，省去未变化状态的逐项汇报。
+表现自由：在描写密度和主角补写规则内，可以自由补充临时、低影响的感官与氛围，自由组织措辞和节奏，让简单互动自然结束、重要变化充分展开。补写服从当前场景与人物既定表达，删除补写后下一轮的地点、物品、资源、关系、知识、剧情条件、人物立场和可选行动保持一致。日常陈设和氛围仅用于表现，不成为新线索、障碍或资源；主角尚未选择的重要决定留在发生前。`, snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
 	input += "\n玩家可见状态与物品(JSON)：" + MechanicsContext(snapshot, "player")
 
 	input += "\n公开世界背景：" + snapshot.Definition.Background + "\n世界规则：" + snapshot.Definition.Rules
