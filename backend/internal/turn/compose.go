@@ -201,11 +201,31 @@ func composeNarration(snapshot Snapshot, run wiaworld.Run, def story.Definition,
 	if snapshot.Plot != nil {
 		customInstruction += "\n多阶段叙事：事件清单是可用依据，不是必须逐条复述的稿件。保留关键选择与结果，相同立场的连续对白可以合并、间接转述，省去重复环境与动作；在现有回复长度预算内完整收尾。玩家原文中的等待是请求，实际经过的时间以 time_advanced 事件为准；未处理的剩余时段尚未发生。按事件阶段先后承接，不把较晚节点的刺激写到较早行动之前。"
 	}
-	input := fmt.Sprintf("剧本：%s\n当前地点与情境：%s\n时间：%s\n主角：%s\n主角简介：%s\n叙事人称规则：%s\n正文篇幅规则：%s\n描写密度规则：%s\n主角补写规则：%s\n正文表达策略（在明确选项与固定合同内生效）：%s\n玩家可见历史正文（只作剧情连贯参考，不得写成本轮再次发生；历史中不一致的人称不得继续沿用）：%s\n玩家本轮自己的完整表达：%s\n玩家意图类型：%s\n明确交谈对象：%s\n当前公开人物：%s\n当前背景人群：%s\n本轮玩家可见且已经确定的对白与结果：\n本轮玩家可见事件(JSON)：%s\n只根据以上玩家可见事件组织一段自然正文。事件的 actor_id、actor_name、narrative_reference 和 event_type 是事实边界；正文旁白必须使用 narrative_reference 指代相应行动者，对白必须保持原说话人、含义和可听范围；speech_scope=public_current_scene 的玩家表达或 NPC 对白已按公开范围分发，应呈现为在场者可听见，不改成仅特定人物听见；private_recipient 的玩家表达和 NPC 对白保持私聊范围。玩家试探语气不能被正文补写成耳语，NPC 对白保持事件声明的可听范围，NPC 的新对白和可见行动必须来自事件，不得由正文自行添加。细节是否越界取决于含义而非动作大小；例如在邀请后推碗、点头可能表示接受，不能替未作决定的人补出这类回应。outcome_status=not_executed 表示没有另行执行，不将该提案写成发生，也不逐项播报未执行清单。玩家输入中的“我”按叙事人称规则转述，NPC 台词中的“我”仍属于该 NPC。只呈现主角能够感知、已经知道或有明确来源获知的信息；不得断言其他人物未表露的心理，也不得使用“没有任何人注意到”等主角无法确认的全知判断。当前人物和背景人群继续留在场景状态中，但正文只提与本轮有关的少量人物；没有写到不表示离场，禁止为了证明仍在场而逐个点名或逐项汇报未变化状态。可以自由补充临时、低影响、符合场景的感官、天气、日常陈设和氛围；不得把补充陈设写成线索、障碍或可改变进程的资源。按照主角补写规则补全玩家表达，保留玩家已经说出的原意、态度和重要信息；可以直接承接而不逐字复述，语气轻缓不等于只有特定人听见；不得通过压低声音或空间描述缩小已确定的公开可听范围。不能把一句陈述改写成多次询问，不把疑问改成承诺、把拒绝改成接受，也不增加会成为后续依据的新事实。所有正文补写都只改善本轮呈现；删除这些补写后，不得改变下一轮的地点、物品持有、资源、关系、知识、任务、剧情条件、NPC 立场或可选行动。遇到会明显改变主角目标、关系、重要资源或剧情走向的选择，在选择发生前自然停下，把决定留给玩家；不得把玩家会影响进程的尝试直接写成成功。", snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, "", playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
+	input := fmt.Sprintf(`剧本：%s
+当前地点与情境：%s
+时间：%s
+主角：%s
+主角简介：%s
+叙事人称规则：%s
+正文篇幅规则：%s
+描写密度规则：%s
+主角补写规则：%s
+正文表达策略（在明确选项与固定合同内生效）：%s
+玩家本轮自己的完整表达：%s
+玩家意图类型：%s
+明确交谈对象：%s
+当前公开人物：%s
+当前背景人群：%s
+本轮玩家可见且已经确定的对白与结果：
+本轮玩家可见事件(JSON)：%s
+表达任务：按事件阶段顺序写出清晰、连贯、有现场感的正文，完整呈现关键对白、实际执行过程与后果。每段围绕一个动作或交谈重点，转换说话人时清楚分段；相同立场的重复对白可以合并或间接转述，保留原意、态度和重要信息。环境细节服务于当前观察和行动，篇幅随新增内容变化。
+人物与听众：actor_id、actor_name、narrative_reference 和 event_type 标明事件归属，旁白使用 narrative_reference。玩家输入的“我”按叙事人称转述，NPC 台词的“我”属于说话者。speech_scope=public_current_scene 是在场者可听的公开表达；private_recipient 保持私人听众范围，语气和音量描写保持已确定的可听范围。NPC 对白、行动及表示选择的姿态以本人事件为依据，保留拒绝、沉默和承诺；邀请后点头或推碗若表示接受，也需要本人决定支持。
+结果与视角：实际结果优先于行动尝试，保留 succeeded、failed、partial 的区别。outcome_status=not_executed 表示没有另行执行，只在理解衔接有必要时说明；尚未处理的等待和后续行动仍未发生。主角只叙述亲自感知、已知或有明确来源的信息，其他人物的心理采用已经表露的部分。当前人物与背景人群仍在场，正文只提本轮相关的人，省去未变化状态的逐项汇报。
+表现自由：在描写密度和主角补写规则内，自由组织措辞、节奏、感官和临时低影响氛围，让简单互动自然结束、重要变化充分展开。补写服从当前场景与人物既定表达，删除补写后下一轮的地点、物品、资源、关系、知识、剧情条件、人物立场和可选行动保持一致。日常陈设和氛围仅用于表现，不成为新线索、障碍或资源；主角尚未选择的重要决定留在发生前。`, snapshot.Summary.GameID, SceneFor(snapshot, "player"), clock, snapshot.PlayerName, snapshot.PlayerProfile, perspectiveRule, lengthRule, detailRule, elaborationRule, customInstruction, playerInput, intentType, describeAddressee(def, recipient), publicCharacters, FormatBystanders(snapshot.BystanderRefs, snapshot.Bystanders), projectedEvents)
 	input += "\n玩家可见状态与物品(JSON)：" + MechanicsContext(snapshot, "player")
 
 	input += "\n公开世界背景：" + snapshot.Definition.Background + "\n世界规则：" + snapshot.Definition.Rules
-	material := Material{PolicyRevision: revision, System: BehaviorContract + "\n你是玩家正文 Agent。你的职责是转述和润色已经确认的玩家可见事件，不继续替玩家或 NPC 作决定。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", RequiredSources: append(EventIDs(visibleEvents), SceneViewSources(snapshot, "player")...), Required: input, Optional: NarrativeSections(snapshot.Messages)}
+	material := Material{PolicyRevision: revision, System: BehaviorContract + "\n你是玩家正文 Agent。你的职责是把已确认的玩家可见事件写成自然、具体、有节奏的故事。你负责措辞、段落、表现与衔接，人物决定和行动结果采用已有事件。叙事人称、玩家有限视角、事件来源和玩家控制权是不可覆盖的系统规则；创作者补充偏好只在这些边界内生效。只输出故事正文，不要输出 JSON、代码块、标题或解释。", RequiredSources: append(EventIDs(visibleEvents), SceneViewSources(snapshot, "player")...), Required: input, Optional: NarrativeSections(snapshot.Messages)}
 	material = withLongMemory(material, snapshot, "player", run.Input)
 	return material, maxOutputTokens, nil
 }

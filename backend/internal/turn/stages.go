@@ -47,7 +47,7 @@ const (
 
 	intentPromptVersion    = "story.intent.v10"
 	npcPromptVersion       = "story.npc.v17"
-	narrationPromptVersion = "story.narration.v12"
+	narrationPromptVersion = "story.narration.v13"
 )
 
 type narrativeResult struct {
