@@ -200,7 +200,7 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 	defer a.copyWG.Done()
 	defer cancel()
 	run := wiaworld.Run{RunID: set.ID, Attempt: 1, BaseContextEpoch: set.Basis.Epoch}
-	g := a.contextGenerator(generator, material, snapshot, run, "suggestions", "player", 0, "story.suggestions.v1")
+	g := a.contextGenerator(generator, material, snapshot, run, "suggestions", "player", 0, "story.suggestions.v2")
 	var result struct {
 		Items []string `json:"items"`
 	}
