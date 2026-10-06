@@ -95,6 +95,14 @@ func (s *Service) SummarizeMemory(ctx context.Context, g model.TextGenerator, sn
 	if len(prefix) == 0 {
 		return d, nil
 	}
+	if previous.Scope != "" && previous.Scope != scope {
+		return d, ErrContextSourceMissing
+	}
+	for _, source := range prefix {
+		if source.Scope != "" && source.Scope != scope {
+			return d, ErrContextSourceMissing
+		}
+	}
 	sources := append([]string{}, previous.Sources...)
 	allowed := memory.RetainedStateSources(previous)
 	for _, source := range prefix {
@@ -105,10 +113,10 @@ func (s *Service) SummarizeMemory(ctx context.Context, g model.TextGenerator, sn
 			sources = append(sources, source.ID)
 		}
 	}
-	material := Material{System: "你整理单一接收者已经提交的经历，不执行故事，不读取其他人物资料。按时间组织回顾，保留关键约定、结果及来源。尝试不等于成功，主观判断不等于事实，玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment，source_ids只引用获准来源。保留有效旧状态，已完成关切标明完成而非继续当待办。回顾简洁，通常不超过1000字。", Required: "接收者：" + scope + "\n已有连续回顾：" + memory.DigestContext(previous) + "\n新增连续经历：\n" + memory.MemoryRecordsText(prefix), RequiredSources: allowed}
+	material := Material{System: memoryDigestPrompt, Required: "接收者：" + scope + "\n已有连续回顾：" + memory.DigestContext(previous) + "\n新增连续经历：\n" + memory.MemoryRecordsText(prefix), RequiredSources: allowed}
 	material.Required += "\nsource_ids 的完整合法记录ID列表：" + wire.MarshalJSON(allowed) + "\n本次列表仅含保留状态的必要来源与新增记录，完整历史覆盖仍由存档维护。每条状态的 source_ids 只从此列表原样选择。经历中的来源事件字段是溯源元数据，不是此处可填写的个人记录ID。没有可保留状态时 states 返回[]。"
 	material.System += MemoryCorrectionRule
-	call := NewContextGenerator(s.deps, s.deps.Owner, g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v3")
+	call := NewContextGenerator(s.deps, s.deps.Owner, g, material, snapshot, run, "memory_digest", scope, 0, "story.memory.v4")
 	var result struct {
 		Content string                   `json:"content"`
 		States  []memory.SubjectiveState `json:"states"`
@@ -136,6 +144,19 @@ func (s *Service) SummarizeMemory(ctx context.Context, g model.TextGenerator, sn
 	}
 	return memory.MemoryDigest{Scope: scope, Revision: previous.Revision + 1, Epoch: run.BaseContextEpoch, Through: prefix[len(prefix)-1].Seq, Head: prefix[len(prefix)-1].Seq, Content: result.Content, States: result.States, Sources: sources}, nil
 }
+
+const memoryDigestPrompt = `你整理单一接收者已经提交的连续经历，不执行故事，不读取其他人物资料。
+按来源顺序保留关键经历、约定、关系变化、结果及其依据，合并重复描述。
+人物说法注明是谁声称、转述或推测；belief保留本人判断，不将它升级为世界事实。
+实际结果优先于尝试：行动失败仍是失败，不能摘要成已取得物品或已完成承诺。
+仍有效的旧约定要承接；已兑现或取消的约定保留结果，写清完成或取消，不继续当待办。
+尝试履约但失败不等于承诺已取消。没有依据时保留不确定性，不补写他人的秘密或原话。
+经历中的世界时间用于解释当时的“明天”“今晚”；有确切世界日期依据才归一日期。
+CreatedAt是持久化时间，不是世界日期。历史日期没有依据时保留当时措辞和来源。
+回顾与subjective states是个人记忆，当前钱物、位置、健康和计划由权威工作态确定。
+玩家文学正文只作玩家经历参考。只返回JSON：content字符串、states数组。
+states每项仅含kind、content、source_ids；kind为belief/relationship/concern/commitment。
+source_ids只引用获准个人记录；保留有效旧状态及其来源，回顾简洁，通常不超过1000字。`
 
 func (s *Service) logMemoryValidation(world, scope, boundary string) {
 	if s.deps.Logger != nil {
