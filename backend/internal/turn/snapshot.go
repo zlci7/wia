@@ -67,6 +67,13 @@ type Snapshot struct {
 	sceneEntities []string
 }
 
+func (s Snapshot) OpenProgressPlans() []wiaworld.PersonalPlan {
+	if s.OpenProgress == nil {
+		return nil
+	}
+	return s.OpenProgress.Plans
+}
+
 // SceneView is one character's picture of where they are: what they last understood
 // their surroundings to be, and which events that understanding came from, so a later
 // correction can tell whether the view it invalidates is still the current one.

@@ -19,7 +19,7 @@ func TestMemoryWindowFitsDigestAndActualSystemPreservingSources(t *testing.T) {
 	base := Material{System: "本轮规则", Required: "本轮事件正文与场景来源", RequiredSources: []string{"current:event", "scene:source"}}
 	material := withLongMemory(base, Snapshot{InputBudgetTokens: 20000, LongMemory: map[string]MemoryContext{"player": m}}, "player", "")
 	actualSystem := material.System + strings.Repeat("附加字段合同与修复要求", 120)
-	minimal := renderMemoryWindow(base, m, "player", tail[len(tail)-1:], "")
+	minimal := renderMemoryWindow(base, m, "player", tail[len(tail)-1:], "", nil)
 	input, _, _ := contextInput(minimal, nil)
 	limit := model.FramedTextInputTokens(model.TextRequest{System: actualSystem, Input: input}) + 50
 	composer := ContextComposer{Window: model.WindowLimits{ContextTokens: limit + 512, OutputTokens: 512}}

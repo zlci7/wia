@@ -7,6 +7,7 @@ package turn
 
 import (
 	"fmt"
+	"slices"
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
@@ -39,7 +40,7 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 	// can grow when the generation contract or repair instruction is appended.
 	fit := func(inputLimit int, system string, start int) (Material, int) {
 		for {
-			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query)
+			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query, planMemorySources(snapshot, scope))
 			input, _, _ := contextInput(candidate, nil)
 			if model.FramedTextInputTokens(model.TextRequest{System: system, Input: input}) <= inputLimit || len(groups)-start <= 1 {
 				return candidate, start
@@ -58,7 +59,7 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material Material, m MemoryContext, scope string, block []memory.MemorySource, query string) Material {
+func renderMemoryWindow(material Material, m MemoryContext, scope string, block []memory.MemorySource, query string, references []string) Material {
 	material.RequiredSources = append([]string(nil), material.RequiredSources...)
 	material.DeclinedSources = nil
 	material.RecallSources = nil
@@ -102,7 +103,18 @@ func renderMemoryWindow(material Material, m MemoryContext, scope string, block 
 	for _, record := range block {
 		supplied[record.ID] = true
 	}
-	return withRecall(material, memoryProjection{Context: m, Supplied: supplied}, query)
+	references = append(append([]string{}, references...), memory.RetainedStateSources(m.Digest)...)
+	return withRecall(material, memoryProjection{Context: m, Supplied: supplied, References: references}, query)
+}
+
+func planMemorySources(snapshot Snapshot, scope string) []string {
+	var ids []string
+	for _, plan := range snapshot.OpenProgressPlans() {
+		if plan.OwnerID == scope {
+			ids = append(ids, plan.SourceIDs...)
+		}
+	}
+	return ids
 }
 
 // memoryProjection is what this request already supplies, so retrieval does not offer the
@@ -112,6 +124,9 @@ type memoryProjection struct {
 	// Supplied marks the records this request already provides; anything else the
 	// receiver may lawfully recall stays eligible for retrieval.
 	Supplied map[string]bool
+	// References are already authorized personal record/event IDs carried by this
+	// owner's current plans or retained subjective states, never model guesses.
+	References []string
 }
 
 // withRecall appends authorized retrieval hits to the material as optional sections, one
@@ -126,7 +141,7 @@ func withRecall(material Material, projection memoryProjection, query string) Ma
 	for _, id := range material.RecallSources {
 		excluded[id] = true
 	}
-	search := memory.SearchMemoryGroups(m.Archive, query, excluded, 5)
+	search := memory.SearchMemoryGroups(m.Archive, query, projection.References, excluded, 5)
 	material.RecallLimited = material.RecallLimited || search.Limited
 	var selected []Section
 	// Lowest-ranked matches are removed first by the shared budgeter. Search returns
@@ -139,6 +154,21 @@ func withRecall(material Material, projection memoryProjection, query string) Ma
 		}
 		selected = append(selected, section)
 	}
+	// A recalled group can also be in the unsummarized backlog. Keep its recall
+	// placement once, so prioritization does not duplicate the same personal text.
+	optional := make([]Section, 0, len(material.Optional))
+	for _, section := range material.Optional {
+		overlap := false
+		if section.Name == "memory_recent_backlog" {
+			for _, id := range section.Sources {
+				overlap = overlap || slices.Contains(material.RecallSources, id)
+			}
+		}
+		if !overlap {
+			optional = append(optional, section)
+		}
+	}
+	material.Optional = optional
 	for i := len(selected) - 1; i >= 0; i-- {
 		material.Optional = append(material.Optional, selected[i])
 	}

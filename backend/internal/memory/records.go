@@ -141,7 +141,7 @@ func SearchMemory(items []MemorySource, query string, limit int) []MemorySource 
 	if limit <= 0 {
 		return nil
 	}
-	candidates, _ := searchMemoryCandidates(items, query)
+	candidates, _ := searchMemoryCandidates(items, query, nil)
 	result := []MemorySource{}
 	for i := 0; i < min(limit, len(candidates)); i++ {
 		result = append(result, items[candidates[i].index])
@@ -149,15 +149,16 @@ func SearchMemory(items []MemorySource, query string, limit int) []MemorySource 
 	return result
 }
 
-// SearchMemoryGroups ranks a bounded recent candidate window, filters groups that
+// SearchMemoryGroups prioritizes exact personal references before keyword matches
+// in the same bounded candidate scan. It filters groups that
 // overlap records already supplied to the request, and expands only complete groups
 // that still fit the same byte and time budget. It never builds text for a rejected
 // group.
-func SearchMemoryGroups(items []MemorySource, query string, excluded map[string]bool, limit int) MemoryGroupSearchResult {
+func SearchMemoryGroups(items []MemorySource, query string, references []string, excluded map[string]bool, limit int) MemoryGroupSearchResult {
 	if limit <= 0 {
 		return MemoryGroupSearchResult{}
 	}
-	candidates, budget := searchMemoryCandidates(items, query)
+	candidates, budget := searchMemoryCandidates(items, query, references)
 	result := MemoryGroupSearchResult{}
 	visited := map[string]bool{}
 	for _, candidate := range candidates {
@@ -188,10 +189,25 @@ func SearchMemoryGroups(items []MemorySource, query string, excluded map[string]
 	return result
 }
 
-func searchMemoryCandidates(items []MemorySource, query string) ([]memorySearchCandidate, *memorySearchBudget) {
+func searchMemoryCandidates(items []MemorySource, query string, references []string) ([]memorySearchCandidate, *memorySearchBudget) {
 	tokens, queryLimited := memorySearchTerms(query)
 	budget := &memorySearchBudget{deadline: time.Now().Add(memorySearchTimeout), counted: map[int]bool{}, limited: queryLimited}
-	if len(tokens) == 0 {
+	exact := map[string]bool{}
+	for index, id := range references {
+		if index >= memorySearchQueryTerms {
+			budget.limited = true
+			break
+		}
+		if id == "" || exact[id] {
+			continue
+		}
+		if len(id) > memorySearchQueryChars*4 {
+			budget.limited = true
+			continue
+		}
+		exact[id] = true
+	}
+	if len(tokens) == 0 && len(exact) == 0 {
 		return nil, budget
 	}
 	var candidates []memorySearchCandidate
@@ -207,6 +223,9 @@ func searchMemoryCandidates(items []MemorySource, query string) ([]memorySearchC
 			if strings.Contains(text, token) {
 				score++
 			}
+		}
+		if exact[items[i].ID] || items[i].EventID != "" && exact[items[i].EventID] {
+			score = len(tokens) + 1
 		}
 		if score > 0 {
 			candidates = append(candidates, memorySearchCandidate{index: i, score: score})

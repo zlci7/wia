@@ -345,13 +345,6 @@ func (w *sceneWorldCompiler) applyReady(snapshot *Snapshot, out *Output, run wia
 	return nil
 }
 
-func (s Snapshot) OpenProgressPlans() []wiaworld.PersonalPlan {
-	if s.OpenProgress == nil {
-		return nil
-	}
-	return s.OpenProgress.Plans
-}
-
 func sceneDueOwnerExpansion(snapshot Snapshot, clock string) *sceneActorExpansion {
 	minute, err := plot.ClockMinute(clock)
 	if err != nil {

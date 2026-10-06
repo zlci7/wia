@@ -137,7 +137,7 @@ func composeScene(snapshot Snapshot, run wiaworld.Run, selected []string) Materi
 		if len(groups) > 0 {
 			recent = groups[len(groups)-1]
 		}
-		own = renderMemoryWindow(own, m, owner, recent, run.Input)
+		own = renderMemoryWindow(own, m, owner, recent, run.Input, planMemorySources(snapshot, owner))
 		qualify := func(text string, sources []string) (string, []string) {
 			qualified := make([]string, len(sources))
 			for i, id := range sources {
