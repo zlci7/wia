@@ -50,12 +50,14 @@ func (l *SourceLedger) resolve(owner string, ids []string, author bool) ([]strin
 		var exists bool
 		if beat, ok := strings.CutPrefix(id, "beat:"); ok {
 			canonical, exists = l.Beats[beat][owner]
-			if author {
+			if author && owner == "world" {
 				canonical, exists = l.Beats[beat][""]
 			}
 		} else {
 			canonical, exists = l.Personal[owner][id]
-			if author {
+			// Host-authored outcomes may use frozen world facts for adjudication.
+			// Personal records and raw input remain scoped even for action nodes.
+			if author && (owner == "world" || strings.HasPrefix(id, "material:") || strings.HasPrefix(id, "definition:") || strings.HasPrefix(id, "fact:")) {
 				if ids, ok := l.Author[id]; ok {
 					canonical, exists = ids, true
 				}
@@ -316,7 +318,7 @@ observation与world_change提供不同人物的实际projections，不把作者�
 dialogue/observation只可更新有本人basis的关系和计划；移动、钱物变化写实际行动或世界变化。
 effects仅提供已启用的能力字段，不填写action_id，程序绑定正式来源。没有变化填{}。
 无spatial的冻结旧世界在明确场景转换时可填effects.legacy_scene={content,characters}，人物ID来自冻结目录；它不声明空间路线。
-basis使用实际提供的来源或beat:更早local_id；人物引用更早节点只取得自己的投影。
+basis使用实际提供的来源或beat:更早local_id；人物的对白、行动和观察引用更早节点只取得自己的投影。
 input:索引表示相应原文片段；本人只能引用实际收到的原文，私下第三人只有观察迹象。
 stop.reason为completed/player_choice/interrupted/time_limit，content说明完整结束点。
 有剩余意图时input_map说明未执行原因。已成功原文段不写未执行说明。

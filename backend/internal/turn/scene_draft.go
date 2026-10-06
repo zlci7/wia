@@ -288,8 +288,8 @@ func (d *SceneDraft) validateGeneratedFields() error {
 				return coordinationInvalid("scene_input_beat_invalid", "input_map.beat_ids", "existing-node")
 			}
 		}
-		if len(part.BeatIDs) == 0 && part.UnexecutedReason == "" {
-			return coordinationInvalid("scene_input_unanswered", "input_map", "response-node-or-explicit-unexecuted-reason")
+		if len(part.BeatIDs) == 0 && (part.Status != "not_executed" || part.UnexecutedReason == "") {
+			return coordinationInvalid("scene_input_unanswered", "input_map", "response-node-or-not-executed-with-reason")
 		}
 	}
 	for _, block := range d.NarrativeBlocks {
@@ -352,8 +352,23 @@ func validateSceneBeats(beats []sceneBeat, elapsed int) error {
 
 func validateSceneInput(d *SceneDraft, run wiaworld.Run) error {
 	raw, cursor := []rune(run.Input), 0
+	order := map[string]int{}
+	for i, beat := range d.Beats {
+		order[beat.LocalID] = i
+	}
+	lastFirst := -1
 	for i := range d.InputMap {
 		part := &d.InputMap[i]
+		if len(part.BeatIDs) > 0 {
+			first := len(d.Beats)
+			for _, id := range part.BeatIDs {
+				first = min(first, order[id])
+			}
+			if first < lastFirst {
+				return coordinationInvalid("scene_input_order_invalid", "input_map.beat_ids", "original-fragments-introduced-in-order")
+			}
+			lastFirst = first
+		}
 		text := []rune(part.Text)
 		if len(text) == 0 {
 			return coordinationInvalid("scene_input_span_invalid", "input_map.text", "nonempty-original-input")

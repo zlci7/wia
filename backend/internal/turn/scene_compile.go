@@ -74,8 +74,15 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 		stage := index + 1
 		// Introduce each raw fragment at its first associated node, using the
 		// actual audience at that point rather than broadcasting the whole input.
+		lastAssociated := -1
 		for inputIndex, part := range draft.InputMap {
-			if inputs[inputIndex] || !slices.Contains(part.BeatIDs, beat.LocalID) {
+			if slices.Contains(part.BeatIDs, beat.LocalID) {
+				lastAssociated = inputIndex
+			}
+		}
+		for inputIndex, part := range draft.InputMap {
+			unexecutedBefore := inputIndex < lastAssociated && len(part.BeatIDs) == 0
+			if inputs[inputIndex] || !slices.Contains(part.BeatIDs, beat.LocalID) && !unexecutedBefore {
 				continue
 			}
 			if err := appendSceneInput(&work, &out, run, part, inputIndex, stage, ledger); err != nil {
@@ -420,6 +427,10 @@ func appendSceneInput(snapshot *Snapshot, out *Output, run wiaworld.Run, part sc
 		return coordinationInvalid("scene_input_target_changed", "input_map.addressee_id", "explicit-ui-addressee")
 	}
 	participants := InScene(snapshot.Characters)
+	unexecuted := part.Status == "not_executed" && len(part.BeatIDs) == 0
+	if unexecuted {
+		participants = nil
+	}
 	if part.AddresseeID != "" {
 		if _, ok := FindSceneCharacter(snapshot.Characters, part.AddresseeID); !ok {
 			participants = nil
@@ -431,10 +442,23 @@ func appendSceneInput(snapshot *Snapshot, out *Output, run wiaworld.Run, part sc
 	partRun := run
 	partRun.InputPart = index + 1
 	partRun.Input = part.Text
-	local := openOutput(snapshot, TurnIntent{IntentType: part.IntentType, Visibility: part.Visibility, AddresseeID: part.AddresseeID, Input: part.Text}, partRun, participants)
+	intent := TurnIntent{IntentType: part.IntentType, Visibility: part.Visibility, AddresseeID: part.AddresseeID, Input: part.Text}
+	local := openOutput(snapshot, intent, partRun, participants)
 	local.Events[0].ProjectionParentID = out.PlayerEventID
+	if unexecuted {
+		local.SceneVersion = out.SceneVersion
+		notePlayerAction(&local, partRun, intent)
+		visible, err := appendHostOutcomes(&local, partRun, nil, nil, []hostActionResult{{ActionID: inputPrefix(partRun) + ":player-action", Status: "not_executed", Content: part.UnexecutedReason, Recipients: []string{"player"}, Projections: []actionProjection{{Recipient: "player", Content: part.UnexecutedReason}}}})
+		if err != nil {
+			return err
+		}
+		local.VisibleEvents = visible
+	}
 	for i := range local.Events {
 		local.Events[i].Stage = stage
+	}
+	for i := range local.VisibleEvents {
+		local.VisibleEvents[i].Stage = stage
 	}
 	for i := range local.Perceptions {
 		local.Perceptions[i].Stage = stage
@@ -442,6 +466,7 @@ func appendSceneInput(snapshot *Snapshot, out *Output, run wiaworld.Run, part sc
 	}
 	out.Events = append(out.Events, local.Events...)
 	out.Perceptions = append(out.Perceptions, local.Perceptions...)
+	out.VisibleEvents = append(out.VisibleEvents, local.VisibleEvents...)
 	alias := fmt.Sprintf("input:%d", index)
 	ledger.grant("", alias, []string{local.PlayerEventID})
 	ledger.grant("player", alias, []string{local.PlayerEventID})

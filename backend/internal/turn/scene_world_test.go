@@ -275,6 +275,10 @@ func TestSceneArrivalEventOfferKeepsTriggerAndScope(t *testing.T) {
 	move := scenePlayerAction("b1", "我抵达码头。")
 	move.OffsetMinutes = 5
 	move.Effects.Movements = []sceneMovement{{EntityID: "player", From: "workplace", To: "dock", Route: []string{"workplace", "dock"}}}
+	quiet, err := sceneCompileFixture(t, s, run, []string{"player", "npc:a"}, sceneComplete(run.Input, move))
+	if err != nil || quiet.GeneratedEvents == nil || len(quiet.GeneratedEvents.Active) != 0 || quiet.GeneratedEvents.LastOfferTurn != s.GeneratedEvents.LastOfferTurn {
+		t.Fatal("arrival without an offer invented a pending event or cooldown", err)
+	}
 	b := sceneWorldBeat("b2", "渡轮晚点的通知刚刚张贴。", "beat:b1", 5)
 	d := sceneComplete(run.Input, move, b)
 	d.EventOffer = &sceneEventOffer{TriggerBeatID: "b1", Kind: "arrival", Location: "dock", Condition: "下一班渡轮到来。", Development: "可以询问工作人员，也可以继续等候。", AfterMinutes: 10, InitialBeatIDs: []string{"b2"}}
