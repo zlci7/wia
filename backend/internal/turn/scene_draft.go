@@ -70,6 +70,14 @@ type sceneEffects struct {
 	RelationshipEffects []sceneRelation     `json:"relationship_effects,omitempty"`
 	ItemTransfers       []sceneItemTransfer `json:"item_transfers,omitempty"`
 	PlanUpdates         []scenePlanUpdate   `json:"plan_updates,omitempty"`
+	LegacyScene         *sceneLegacyScene   `json:"legacy_scene,omitempty"`
+}
+
+// Legacy worlds carry authored presence without a spatial graph. This field is
+// accepted only for their explicit scene transition, never as a route fallback.
+type sceneLegacyScene struct {
+	Content    string   `json:"content"`
+	Characters []string `json:"characters"`
 }
 
 type sceneMovement struct {
@@ -123,11 +131,14 @@ type sceneStop struct {
 }
 
 type sceneProgress struct {
-	Type    string   `json:"type"`
-	ID      string   `json:"id"`
-	Status  string   `json:"status"`
-	Basis   []string `json:"basis"`
-	BeatIDs []string `json:"beat_ids"`
+	Type          string   `json:"type"`
+	ID            string   `json:"id"`
+	Status        string   `json:"status"`
+	Content       string   `json:"content"`
+	OffsetMinutes int      `json:"offset_minutes"`
+	Basis         []string `json:"basis"`
+	BeatIDs       []string `json:"beat_ids"`
+	Ending        string   `json:"ending,omitempty"`
 }
 
 type sceneEventOffer struct {
@@ -208,7 +219,7 @@ func (b *sceneBeat) validateGeneratedFields() error {
 	}
 	switch b.Kind {
 	case "dialogue":
-		if b.Scope == nil || !slices.Contains([]string{"public", "private"}, *b.Scope) || b.Status != nil || b.Attempt != nil || len(b.Projections) != 0 || len(b.Bystanders) != 0 || len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 {
+		if b.Scope == nil || !slices.Contains([]string{"public", "private"}, *b.Scope) || b.Status != nil || b.Attempt != nil || len(b.Projections) != 0 || len(b.Bystanders) != 0 || len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 || b.Effects.LegacyScene != nil {
 			return coordinationInvalid("scene_dialogue_invalid", "beats", "speech-scope-and-program-derived-projections")
 		}
 		if *b.Scope == "public" && len(b.Recipients) != 0 || *b.Scope == "private" && (len(b.Recipients) < 1 || len(b.Recipients) > 4 || slices.Contains(b.Recipients, b.ActorID)) {
@@ -222,7 +233,7 @@ func (b *sceneBeat) validateGeneratedFields() error {
 			return coordinationInvalid("scene_attempt_binding_invalid", "beats.attempt", "only-player-attempts-reference-original-input")
 		}
 	case "observation", "world_change":
-		if b.Scope != nil || b.Status != nil || b.Attempt != nil || len(b.Projections) == 0 || b.Kind == "observation" && len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 {
+		if b.Scope != nil || b.Status != nil || b.Attempt != nil || len(b.Projections) == 0 && (b.Kind == "observation" || len(b.Recipients)+len(b.Bystanders) > 0) || b.Kind == "observation" && (len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 || b.Effects.LegacyScene != nil) {
 			return coordinationInvalid("scene_observation_invalid", "beats", "explicit-personal-projections-with-kind-appropriate-effects")
 		}
 	default:
@@ -289,6 +300,26 @@ func (d *SceneDraft) validateGeneratedFields() error {
 			if !ids[id] {
 				return coordinationInvalid("scene_narrative_beat_invalid", "narrative_blocks.beat_ids", "existing-node")
 			}
+		}
+	}
+	for _, p := range d.ProgressUpdates {
+		if !slices.Contains([]string{"external_schedule", "development", "personal_plan", "legacy_node", "generated_event"}, p.Type) || p.ID == "" || strings.TrimSpace(p.Content) == "" || p.OffsetMinutes < 0 || p.OffsetMinutes > d.ElapsedMinutes || !slices.Contains([]string{"occurred", "deferred", "skipped"}, p.Status) || p.Type == "personal_plan" && p.Status == "skipped" || len(p.Basis) == 0 || !uniqueSceneIDs(p.Basis) || p.BeatIDs == nil || !uniqueSceneIDs(p.BeatIDs) || p.Status == "deferred" && len(p.BeatIDs) > 0 {
+			return coordinationInvalid("scene_progress_invalid", "progress_updates", "selected-object-with-actual-time-status-and-basis")
+		}
+		for _, id := range p.BeatIDs {
+			if !ids[id] {
+				return coordinationInvalid("scene_progress_beat_invalid", "progress_updates.beat_ids", "existing-node")
+			}
+			if p.Type != "personal_plan" {
+				for _, beat := range d.Beats {
+					if beat.LocalID == id && (beat.Kind != "world_change" || beat.OffsetMinutes != p.OffsetMinutes) {
+						return coordinationInvalid("scene_progress_beat_invalid", "progress_updates.beat_ids", "world-node-at-assessment-time")
+					}
+				}
+			}
+		}
+		if p.Type != "personal_plan" && p.Status == "occurred" && len(p.BeatIDs) == 0 {
+			return coordinationInvalid("scene_progress_occurrence_missing", "progress_updates.beat_ids", "world-node-for-occurred-assessment")
 		}
 	}
 	return nil

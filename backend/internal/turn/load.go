@@ -499,6 +499,16 @@ func loadSourceMetadata(ctx context.Context, db *sql.DB, snapshot Snapshot) (map
 			}
 		}
 	}
+	for _, event := range snapshot.GeneratedEvents.Active {
+		add(event.StartID)
+		add(event.TriggerID)
+		add(event.State.EventID)
+		for _, id := range event.State.Evidence {
+			if !strings.HasPrefix(id, "definition:") && !strings.HasPrefix(id, "fact:") && !strings.HasPrefix(id, "material:") {
+				add(id)
+			}
+		}
+	}
 	result := map[string]SourceMetadata{}
 	for start := 0; start < len(ids); start += 200 {
 		end := min(start+200, len(ids))

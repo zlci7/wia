@@ -129,8 +129,11 @@ func TestSceneFuturePlanSelectionDoesNotGrantEarlyActions(t *testing.T) {
 	s.OpenProgress = &wiaworld.OpenProgress{Plans: []wiaworld.PersonalPlan{{ID: "npc:c:later", OwnerID: "npc:c", Content: "检查", SourceIDs: []string{"opening"}, NextCheck: minute + 20, Status: "active", Version: 1}}}
 	run := wiaworld.Run{RunID: "future", Input: "我留在原处。"}
 	selected := selectedSceneEntities(s, run)
-	if !slices.Contains(selected, "npc:c") {
-		t.Fatal("forecast fixture did not select the future owner")
+	if slices.Contains(selected, "npc:c") {
+		t.Fatal("future plan eagerly loaded an unrelated owner")
+	}
+	if !strings.Contains(sceneWorldWindow(s).Text, "npc:c:later") {
+		t.Fatal("future plan missing from metadata window")
 	}
 	b := sceneObservation("b1", "npc:c", "我检查了远处房间。", scenePersonalID("npc:c", "definition:"+s.Definition.Revision+":npc:c"))
 	d := sceneComplete(run.Input, b)

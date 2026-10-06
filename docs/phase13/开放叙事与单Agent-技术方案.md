@@ -1,6 +1,6 @@
 # WIA 开放叙事与单 Agent 技术方案
 
-日期：2026-10-07。状态：待实施技术设计。代码评估基线：`89ff0ef`；文档归档基线：`a751013`。当前生产路径仍为独立人物决定、协调、世界推进与正文生成，集中创作尚未实现。
+日期：2026-10-07。状态：阶段技术合同。设计代码评估基线：`89ff0ef`；文档归档基线：`a751013`。正式路径为独立人物决定、协调、世界推进与正文生成；候选工程状态与正式切换条件见[开发状态](../phase12/开发状态.md)及[实施与验收计划](实施与验收计划.md)。
 
 产品目标见[产品说明](../phase12/产品说明.md)，架构职责与依赖见[架构方案](../ARCHITECTURE.md)，跨阶段合同见[总体技术方案](../phase12/总体技术方案.md)。本文定义 Phase13 的场景请求、候选输出、上下文策略和迁移验收，不建立第二份架构事实源。执行顺序见[实施与验收计划](实施与验收计划.md)。
 
@@ -301,7 +301,7 @@ selected_entity_ids 是本请求的实际创作人物范围，不等同于数据
 
 沿用模型窗口、推理预留和完整请求估计。首版继续以当前 12,000 输入上限为起点，阶段基准再决定是否调整。该值不是一般模型能力上限。
 
-裁剪顺序：无关详细背景、无关远期记录、较旧完整因果组，再缩减非关键人物的详细表达资料。原文、当前权威状态、当前关键事实、相关人物核心身份和最新完整因果组属于必需内容；必需内容仍超限时明确失败或要求缩短输入，不偷偷删除。
+裁剪顺序：无关详细背景、无关远期记录、较旧完整因果组，再缩减非关键人物的详细表达资料。完整地点 ID、名称、层级和连接保留为必需图；详细环境参加可选背景预算，当前个人情境继续保留本人来源。稳定人物档案可使用共享字段表，完整保留 owner、身份、资料、外貌及表达样例。原文、当前权威状态、当前关键事实、相关人物核心身份和最新完整因果组属于必需内容；必需内容仍超限时明确失败或要求缩短输入，不偷偷删除。
 
 场景输出同时包含正文和结构化信息，不能直接套用原正文的 768/1536/3072 token 上限。首版由已有篇幅设置提供正文目标，再加经场景样本测量的结构预算；两部分总和仍受 Provider 输出窗口及响应字节上限约束。结构开销不足时调小场景跨度或非关键内容，不能通过破坏 JSON 取得更长正文。
 
@@ -344,7 +344,7 @@ selected_entity_ids 是本请求的实际创作人物范围，不等同于数据
 
 首版继续保持有限场外参与，不展开全城模拟。每轮实际处理选中的世界评估对象与至多两名到期计划所有者，沿用已有优先级和轮转，不因合并请求同时评估所有安排。外部变化可以良好、不利、中性或平静；玩家不行动本身不构成必须惩罚的理由。
 
-SceneFrame 中的窗口候选与最终选中对象分别表达：窗口只说明哪些事项可能在 0—120 分钟内变得相关，正式资格由实际经过时间、工作位置、当前状态和已有轮转决定。不能用预估 120 分钟提前唤醒实际只过了一分钟的计划，也不能只按开场位置选择发展事项。验证后若选中对象缺少材料，补足仍消耗本场景唯一一次材料读取预算，完整候选重建遵守第 3.2 节的共享调用上限。必要依据仍不足或预算已耗尽时失败，不以“留到下一轮”掩盖遗漏已应评估的事项。
+SceneFrame 中的窗口候选与最终选中对象分别表达：窗口只说明哪些事项可能在 0—120 分钟内变得相关，正式资格由实际经过时间、工作位置、当前状态和已有轮转决定。未来个人计划以 ID、owner 和检查时点提供目录；初始人物资料按当前同场、明确对象和实际到期 owner 装配。节点使计划实际到期时，至多两名缺少资料的 owner 共用一次扩展机会，获得完整个人资料后才能复查或行动。不能用预估 120 分钟提前唤醒实际只过了一分钟的计划，也不能只按开场位置选择发展事项。验证后若选中对象缺少材料，补足仍消耗本场景唯一一次材料读取预算，完整候选重建遵守第 3.2 节的共享调用上限。必要依据仍不足或预算已耗尽时失败，不以“留到下一轮”掩盖遗漏已应评估的事项。
 
 候选节点造成新地点/显著变化后，尚未进入本轮必需评估集合的新发展机会可以按既有轮转留待下一轮；已经符合本轮评估资格的安排与计划遵守上一段的处理合同。不得用“节省调用”为由猜测尚未读取的作者安排。
 
@@ -354,7 +354,7 @@ SceneFrame 中的窗口候选与最终选中对象分别表达：窗口只说明
 
 ## 9. SceneDraft 输出合同
 
-以下类型属于待实施的内部候选，不是现有 API，也不是最终数据库结构。运行结果仍转换为现有 `turn.Output`。
+以下类型属于内部候选合同。运行结果转换为现有 `turn.Output`；玩家 API 与数据库继续使用各自现有结构。
 
 完整候选、补充材料请求和固定判定检查点三种响应互斥。补充读取继续使用已有 `{"needs_material":["已列出的材料ID"]}` 形状，不同时返回正文、节点或部分效果。needs_resolution 只使用第 3.3 节的前段合同；最终响应必须是完整 SceneDraft。
 
@@ -378,7 +378,7 @@ input_map 的每项包含 text、intent_type、addressee_id、visibility、beat_
 | `local_id` | 本响应内唯一，如 b1；不是模型指定的正式事件 ID |
 | `kind` | dialogue / action_result / observation / world_change |
 | `actor_id` | 当前可用人物、玩家或对应世界职责；不得编造实例 |
-| `target_id` | 可选目标，使用本次声明目录 |
+| `target_id` | 可选人物目标，使用冻结人物 ID 或 `player`；地点和物品由相应效果字段标识 |
 | `offset_minutes` | 实际发生时间偏移，顺序不回退 |
 | `basis` | 请求已提供来源或更早节点对本人开放的投影 |
 | `status` | 行动结果使用 succeeded / failed / partial / not_executed |
@@ -436,10 +436,13 @@ effects 按本剧本启用能力提供字段，关闭能力时省略该字段并
 | relationship_effects | subject_id、target_id、relation_type、delta、个人 basis | 有向主体、知情来源与新关系值 |
 | item_transfers | instance_id、明确的原归属与目标归属 | 当前实际归属、唯一归属和正式来源 |
 | plan_updates | owner_id、id 或 local_plan_id、content、status、review_after_minutes、个人 basis | 正式计划 ID、版本、下次检查时间、来源归一 |
+| legacy_scene | content、characters；仅无 spatial 的冻结旧世界 | 已成功或部分成功的显式换场、冻结人物名单与旧场景内容 |
 
 有实际行动的节点由程序生成对应尝试与结果事件；尝试来自玩家原文或 NPC 的 attempt，结果保留 succeeded/failed/partial 区别。能力 effects 引用程序绑定的行动/结果 ID，不让模型猜测旧阶段 event_id。失败节点不同时获得成功才会产生的钱物效果。
 
-progress_updates 仅列本请求选中的对象，包含 type、id、status、basis、关联 beat_ids。类型区分 external_schedule、development、personal_plan、legacy_node、generated_event。评估使用对应已有 occurred/deferred/skipped 合同；personal_plan 以 occurred/deferred 表示本次复查是否完成，计划自身 active/paused/completed/cancelled 仍由 plan_updates 表达，不合并为一套新的任务状态。
+progress_updates 仅列本请求选中的对象，包含 type、id、status、content、offset_minutes、basis、关联 beat_ids。content 保留评估结论或暂缓原因；offset_minutes 是实际评估时点，相对本轮世界起点计算。类型区分 external_schedule、development、personal_plan、legacy_node、generated_event。评估使用对应已有 occurred/deferred/skipped 合同；personal_plan 以 occurred/deferred 表示本次复查是否完成，计划自身 active/paused/completed/cancelled 仍由 plan_updates 表达，不合并为一套新的任务状态。
+
+世界事项的 occurred 进度关联同一评估时点的 world_change；deferred 使用空 beat_ids，不生成已经发生的世界事实。世界变化可以没有个人接收者，projections 此时为空，正文只引用玩家实际获得的投影。结构条件由程序在首次发生节点之前判定，程序记录条件依据；同一次发生不会因自身改变了条件而被再次否定。legacy_node 的 ending 只适用于 guided 模式中已经结算的 terminal 节点。
 
 personal_plan 的 progress_updates 仅记录此次复查是否完成及其依据，具体计划 content/status/review_after_minutes 由唯一的 plan_updates 提供。程序按 owner/id 合并一次，拒绝重复或互相矛盾的更新，不让同一计划因两处字段递增两次版本。
 
@@ -449,7 +452,7 @@ NPC 可以形成新计划。更新已有计划使用现有 id，新建使用响�
 
 development 的语义 basis 和轮转由程序计算；外部安排的已应用标记绑定正式事件。初始计划材料只初始化一次，后续使用当前 PersonalPlan。没有世界变动的复查仍可更新已评估依据，不把它编造成玩家可见事件。
 
-event_offer 复用现有开放事件的 condition、development、after_minutes；触发位置与 kind 引用本轮已成功/部分成功节点。初始结果以当前 beats/projections 表达并关联 initial_beat_ids，不再重复另一份对白或事实。程序校验作者节点优先、冷却、活跃上限和候选 0/1，再生成原有 GeneratedEvent 起点与后续记录。首版没有额外的开放事件导演请求；配置关闭时没有 event_offer。
+event_offer 复用现有开放事件的 condition、development、after_minutes；触发位置与 kind 引用本轮已成功/部分成功节点。初始结果以当前 beats/projections 表达并关联 initial_beat_ids，不再重复另一份对白或事实。initial_beat_ids 按当前节点顺序排列，后续检查时间等于首次初始节点的世界时间加 after_minutes；本轮停止点位于该时间之前。程序校验作者节点优先、冷却、活跃上限和候选 0/1，再生成原有 GeneratedEvent 起点与后续记录。首版没有额外的开放事件导演请求；配置关闭时没有 event_offer。
 
 ## 10. 示例：普通调查
 

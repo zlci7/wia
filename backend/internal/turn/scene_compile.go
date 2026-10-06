@@ -10,7 +10,10 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
-type sceneActorExpansion struct{ EntityID string }
+type sceneActorExpansion struct {
+	EntityID  string
+	EntityIDs []string
+}
 
 func (e *sceneActorExpansion) Error() string { return "scene participant material required" }
 
@@ -41,9 +44,6 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 	if draft.ElapsedMinutes > PlotTimeLimit(snapshot) {
 		return Output{}, coordinationInvalid("scene_time_invalid", "elapsed_minutes", "within-current-world-window")
 	}
-	if len(draft.ProgressUpdates) > 0 || draft.EventOffer != nil {
-		return Output{}, coordinationInvalid("scene_progress_pending", "progress_updates", "world-progress-compiler-required")
-	}
 	work := snapshot
 	work.sceneEntities = slices.Clone(selected)
 	work.Characters = slices.Clone(snapshot.Characters)
@@ -59,6 +59,8 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 	}
 	out := Output{Clock: snapshot.Summary.Clock, Scene: snapshot.Summary.Scene, SceneLocation: snapshot.SceneLocation, SceneVersion: snapshot.SceneVersion + 1, SceneCharacters: CharacterIDs(InScene(snapshot.Characters)), SceneViews: slices.Clone(snapshot.SceneViews), Positions: clonePositions(snapshot.Positions), States: cloneStates(snapshot.States), Relationships: slices.Clone(snapshot.Relationships), Items: cloneItems(snapshot.Items), OpenProgress: cloneOpenProgress(snapshot.OpenProgress), ActionResolution: resolution, PlayerEventID: run.RunID + ":input"}
 	out.Events = append(out.Events, wiaworld.Event{EventID: out.PlayerEventID, EventType: "player_input", ActorID: "player", Content: run.Input, RunID: run.RunID, SourceType: "author_input", SceneVersion: snapshot.SceneVersion, CreatedAt: time.Now().UTC()})
+	worldCompiler := newSceneWorldCompiler(snapshot, draft, &out)
+	done := map[string]bool{}
 	inputs := map[int]bool{}
 	visible := map[string]bool{}
 	plansSeen := map[string]bool{}
@@ -69,7 +71,6 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 		if err != nil {
 			return Output{}, err
 		}
-		out.Clock = clock
 		stage := index + 1
 		// Introduce each raw fragment at its first associated node, using the
 		// actual audience at that point rather than broadcasting the whole input.
@@ -82,15 +83,35 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 			}
 			inputs[inputIndex] = true
 		}
-		if !slices.Contains(selected, beat.ActorID) {
-			if c, ok := characterByID(work.Characters, beat.ActorID); ok && c.InScene {
+		if !prefix {
+			for _, p := range draft.ProgressUpdates {
+				if len(p.BeatIDs) == 0 && p.OffsetMinutes < beat.OffsetMinutes {
+					assessmentClock, _ := plot.AdvanceClock(snapshot.Summary.Clock, p.OffsetMinutes)
+					previousMinute, _ := plot.ClockMinute(out.Clock)
+					assessmentMinute, _ := plot.ClockMinute(assessmentClock)
+					if assessmentMinute >= previousMinute {
+						out.Clock = assessmentClock
+						if err := worldCompiler.applyReady(&work, &out, run, ledger, done, plansSeen); err != nil {
+							return Output{}, err
+						}
+					}
+				}
+			}
+		}
+		out.Clock = clock
+		worldActor := beat.Kind == "world_change" && beat.ActorID == "world"
+		if !slices.Contains(selected, beat.ActorID) && !worldActor {
+			if c, ok := characterByID(work.Characters, beat.ActorID); ok && (c.InScene || worldCompiler.stimulated[beat.ActorID] || sceneOffsceneEligible(work, beat.ActorID, clock)) {
+				if expansion := sceneDueOwnerExpansion(work, out.Clock); expansion != nil && slices.Contains(expansion.EntityIDs, beat.ActorID) {
+					return Output{}, expansion
+				}
 				return Output{}, &sceneActorExpansion{EntityID: beat.ActorID}
 			}
 			return Output{}, coordinationInvalid("scene_actor_invalid", "beats.actor_id", "selected-scene-participant")
 		}
-		if beat.ActorID != "player" {
+		if beat.ActorID != "player" && !worldActor {
 			c, ok := characterByID(work.Characters, beat.ActorID)
-			if !ok || !c.InScene && !sceneOffsceneEligible(work, beat.ActorID, clock) {
+			if !ok || !c.InScene && !sceneOffsceneEligible(work, beat.ActorID, clock) && !worldCompiler.stimulated[beat.ActorID] {
 				return Output{}, coordinationInvalid("scene_actor_not_due", "beats.actor_id", "current-contact-or-actually-due-selected-owner")
 			}
 		}
@@ -98,6 +119,9 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 			if _, ok := characterByID(work.Characters, beat.TargetID); !ok {
 				return Output{}, coordinationInvalid("scene_target_invalid", "beats.target_id", "defined-person")
 			}
+		}
+		if err := worldCompiler.authorizeBeat(work, out, beat, ledger); err != nil {
+			return Output{}, err
 		}
 		author := beat.Kind == "observation" || beat.Kind == "action_result" || beat.Kind == "world_change"
 		basis, err := ledger.resolve(beat.ActorID, beat.Basis, author)
@@ -201,6 +225,9 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 					return Output{}, err
 				}
 			}
+			if err := applySceneLegacyTransition(&work, &out, beat, source); err != nil {
+				return Output{}, err
+			}
 			if err := validateSceneRecipients(work, beat); err != nil {
 				return Output{}, err
 			}
@@ -233,7 +260,43 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 			out.Events = append(out.Events, root)
 			out.VisibleEvents = append(out.VisibleEvents, appendActionProjections(&out, root, texts)...)
 		case "world_change":
-			return Output{}, coordinationInvalid("scene_world_change_pending", "beats.kind", "selected-world-progress-compiler-required")
+			if !worldActor {
+				return Output{}, coordinationInvalid("scene_world_actor_invalid", "world_change.actor_id", "world")
+			}
+			rootID = sceneWorldEventID(run, index)
+			root := wiaworld.Event{EventID: rootID, EventType: "plot_result", ActorID: "world", Content: beat.Content, RunID: run.RunID, Stage: stage, SceneVersion: out.SceneVersion, SourceType: "plot_occurred", BasisEventIDs: eventBasisSources(basis), CreatedAt: time.Now().UTC()}
+			source = mechanicSource{action: root, status: "succeeded", resultID: rootID, recipients: map[string]bool{}}
+			for _, id := range beat.Recipients {
+				source.recipients[id] = true
+				if id != "player" {
+					if _, ok := characterByID(work.Characters, id); !ok {
+						return Output{}, coordinationInvalid("scene_world_recipient_invalid", "recipients", "defined-person-or-player")
+					}
+				}
+			}
+			if len(beat.Bystanders) > 0 {
+				return Output{}, coordinationInvalid("scene_world_bystander_invalid", "bystanders", "background-reactions-in-content")
+			}
+			if err := applySceneWorldMovements(&work, &out, beat, source); err != nil {
+				return Output{}, err
+			}
+			if err := applySceneLegacyTransition(&work, &out, beat, source); err != nil {
+				return Output{}, err
+			}
+			texts, err := actionProjectionText(hostActionResult{Projections: beat.Projections}, sceneProjectionRecipients(beat))
+			if err != nil {
+				return Output{}, err
+			}
+			out.Events = append(out.Events, root)
+			projectionStart := len(out.Events)
+			appendActionProjections(&out, root, texts)
+			for i := projectionStart; i < len(out.Events); i++ {
+				out.Events[i].EventType, out.Events[i].SourceType = "plot_perceived", "plot_observed"
+				worldCompiler.stimulated[out.Events[i].TargetID] = true
+			}
+			for i := startPerceptions; i < len(out.Perceptions); i++ {
+				out.Perceptions[i].SourceType = "plot_observed"
+			}
 		}
 		for i := startEvents; i < len(out.Events); i++ {
 			if out.Events[i].EventID == rootID {
@@ -277,7 +340,7 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 			out.Perceptions[i].Content = "[世界时间=" + clock + "] " + out.Perceptions[i].Content
 		}
 		for i := startEvents; i < len(out.Events); i++ {
-			if out.Events[i].EventType == "action_perceived" || out.Events[i].EventType == "npc_dialogue" {
+			if out.Events[i].EventType == "action_perceived" || out.Events[i].EventType == "npc_dialogue" || out.Events[i].EventType == "plot_perceived" {
 				out.Events[i].Content = "[世界时间=" + clock + "] " + out.Events[i].Content
 			}
 		}
@@ -287,6 +350,12 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 		work.Items = cloneItems(out.Items)
 		work.OpenProgress = cloneOpenProgress(out.OpenProgress)
 		work.SceneViews = slices.Clone(out.SceneViews)
+		done[beat.LocalID] = true
+		if !prefix {
+			if err := worldCompiler.applyReady(&work, &out, run, ledger, done, plansSeen); err != nil {
+				return Output{}, err
+			}
+		}
 	}
 	for i, part := range draft.InputMap {
 		if !inputs[i] && !prefix {
@@ -327,12 +396,22 @@ func compileSceneWorkspace(snapshot Snapshot, run wiaworld.Run, draft *SceneDraf
 		return Output{}, err
 	}
 	out.Clock = clock
+	if err := worldCompiler.applyReady(&work, &out, run, ledger, done, plansSeen); err != nil {
+		return Output{}, err
+	}
+	if err := worldCompiler.finish(work, &out, run, ledger, plansSeen); err != nil {
+		return Output{}, err
+	}
 	out.SceneLocation = out.Positions["player"]
 	if out.SceneLocation == "" {
 		out.SceneLocation = snapshot.SceneLocation
 	}
 	work.SceneViews = out.SceneViews
-	out.Scene = SceneFor(work, "player")
+	if snapshot.Definition.Capabilities["spatial"] == 1 {
+		out.Scene = SceneFor(work, "player")
+	}
+	settled := "结束时间：" + clock + "\n玩家已经历结果：" + worldProgressionRecords(out.VisibleEvents)
+	out.Events = append(out.Events, wiaworld.Event{EventID: run.RunID + ":clock", EventType: "time_advanced", ActorID: "world", Content: fmt.Sprintf("本轮实际经过%d分钟，从%s到%s。", draft.ElapsedMinutes, snapshot.Summary.Clock, clock), RunID: run.RunID, Stage: len(draft.Beats) + 1, SceneVersion: out.SceneVersion, SourceType: "world_clock", CreatedAt: time.Now().UTC()}, wiaworld.Event{EventID: run.RunID + ":settled", EventType: "turn_settled", ActorID: "world", Content: settled, RunID: run.RunID, Stage: len(draft.Beats) + 2, SceneVersion: out.SceneVersion, SourceType: "settled_turn", CreatedAt: time.Now().UTC()})
 	return out, nil
 }
 
@@ -379,7 +458,10 @@ func appendSceneInput(snapshot *Snapshot, out *Output, run wiaworld.Run, part sc
 }
 
 func sceneProjectionRecipients(beat sceneBeat) map[string]bool {
-	ids := map[string]bool{beat.ActorID: true}
+	ids := map[string]bool{}
+	if beat.ActorID != "world" {
+		ids[beat.ActorID] = true
+	}
 	for _, id := range append(slices.Clone(beat.Recipients), beat.Bystanders...) {
 		ids[id] = true
 	}
@@ -463,6 +545,9 @@ func sceneDurableSources(snapshot *Snapshot, ids []string) error {
 }
 
 func updateScenePersonalView(out *Output, p wiaworld.Perception) {
+	if p.SourceType == "own_speech" || strings.HasPrefix(p.SourceType, "heard_") {
+		return
+	}
 	for i, v := range out.SceneViews {
 		if v.Recipient == p.RecipientID {
 			out.SceneViews[i] = SceneView{Recipient: p.RecipientID, Content: p.Content, SourceIDs: []string{p.SourceEventID}, Version: out.SceneVersion}
@@ -591,6 +676,11 @@ func applySceneEffects(snapshot *Snapshot, out *Output, run wiaworld.Run, beat s
 		if err := sceneDurableSources(snapshot, basis); err != nil {
 			return err
 		}
+		for _, id := range basis {
+			if strings.HasPrefix(id, "definition:") || strings.HasPrefix(id, "fact:") {
+				return coordinationInvalid("scene_plan_basis_invalid", "plan_updates.basis", "durable-personal-event-or-frozen-material")
+			}
+		}
 		update := planUpdate{ID: id, Content: p.Content, SourceIDs: basis, Status: p.Status, ReviewAfterMinutes: p.ReviewAfterMinutes}
 		updates, err := validateOwnedPlanUpdates(*snapshot, p.OwnerID, []planUpdate{update}, basis)
 		if err != nil {
@@ -616,4 +706,53 @@ func sceneOffsceneEligible(snapshot Snapshot, owner, clock string) bool {
 		return false
 	}
 	return slices.Contains(plot.DuePlanOwners(snapshot.OpenProgress.Plans, minute, 2), owner)
+}
+
+func applySceneWorldMovements(snapshot *Snapshot, out *Output, beat sceneBeat, source mechanicSource) error {
+	if len(beat.Effects.Movements) > 1 {
+		return coordinationInvalid("scene_world_movement_invalid", "effects.movements", "one-movement-per-resolved-world-node")
+	}
+	for _, move := range beat.Effects.Movements {
+		if snapshot.Definition.Capabilities["spatial"] != 1 || beat.OffsetMinutes == 0 || !slices.Contains(snapshot.sceneEntities, move.EntityID) {
+			return coordinationInvalid("scene_world_movement_invalid", "effects.movements", "declared-spatial-entity-and-positive-time")
+		}
+		bound := source
+		bound.action.ActorID = move.EntityID
+		movement := movementResult{EntityID: move.EntityID, From: move.From, To: move.To, Route: move.Route, ActionID: source.action.EventID}
+		positions, changes, characters, err := applyMovements(*snapshot, []movementResult{movement}, map[string]mechanicSource{source.action.EventID: bound})
+		if err != nil {
+			return err
+		}
+		out.Positions, out.SceneCharacters = positions, characters
+		out.PositionChanges = append(out.PositionChanges, changes...)
+		snapshot.Positions = clonePositions(positions)
+		for _, c := range changes {
+			snapshot.PositionSources[c.EntityID] = c.SourceEventID
+		}
+	}
+	if len(beat.Effects.Movements) > 0 {
+		return refreshSpatialProjection(snapshot)
+	}
+	return nil
+}
+
+func applySceneLegacyTransition(snapshot *Snapshot, out *Output, beat sceneBeat, source mechanicSource) error {
+	legacy := beat.Effects.LegacyScene
+	if legacy == nil {
+		return nil
+	}
+	if snapshot.Definition.Capabilities["spatial"] == 1 || source.status != "succeeded" && source.status != "partial" || strings.TrimSpace(legacy.Content) == "" || len([]rune(legacy.Content)) > 1200 || legacy.Characters == nil || !uniqueSceneIDs(legacy.Characters) {
+		return coordinationInvalid("scene_legacy_transition_invalid", "effects.legacy_scene", "explicit-resolved-transition-in-nonspatial-world")
+	}
+	for _, id := range legacy.Characters {
+		if _, ok := characterByID(snapshot.Characters, id); !ok {
+			return coordinationInvalid("scene_legacy_presence_invalid", "effects.legacy_scene.characters", "frozen-important-character-ids")
+		}
+	}
+	out.Scene, snapshot.Summary.Scene = legacy.Content, legacy.Content
+	out.SceneCharacters = slices.Clone(legacy.Characters)
+	for i := range snapshot.Characters {
+		snapshot.Characters[i].InScene = slices.Contains(legacy.Characters, snapshot.Characters[i].EntityID)
+	}
+	return nil
 }

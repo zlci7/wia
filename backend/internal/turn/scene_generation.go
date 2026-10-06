@@ -23,6 +23,16 @@ type SceneAttemptReport struct {
 	SelectedEntityIDs  []string
 }
 
+// BuildSceneCandidate is the internal quality/compatibility test entry point.
+// The application has no route or runtime switch to publish these candidates.
+func (s *Service) BuildSceneCandidate(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Output, SceneAttemptReport, error) {
+	snapshot, err := s.load(ctx, store, run, generator)
+	if err != nil {
+		return Output{}, SceneAttemptReport{}, err
+	}
+	return s.generateSceneCandidate(ctx, store, generator, snapshot, run)
+}
+
 // generateSceneCandidate is exercised by the Phase13 candidate tests. Execute
 // keeps its current formal path until the quality and compatibility gates pass.
 // One generator and deadline own all supplements, checkpoints and corrections.
@@ -232,10 +242,28 @@ func (s *Service) generateSceneCandidate(ctx context.Context, store *storage.Wor
 				return finish(Output{}, coordinationInvalid("scene_context_supplement_limit", "selected_entity_ids", "one-shared-context-supplement"))
 			}
 			report.ContextSupplements++
-			selected = append(selected, expansion.EntityID)
+			for _, id := range append([]string{expansion.EntityID}, expansion.EntityIDs...) {
+				if !slices.Contains(selected, id) {
+					selected = append(selected, id)
+				}
+			}
 			if err := validateSceneMemoryOwners(snapshot, selected); err != nil {
 				return finish(Output{}, err)
 			}
+			continue
+		}
+		var materialExpansion *sceneMaterialExpansion
+		if errors.As(validation, &materialExpansion) {
+			if report.ContextSupplements != 0 || len(materialExpansion.IDs) > 4 {
+				return finish(Output{}, coordinationInvalid("scene_context_supplement_limit", "progress_updates", "one-shared-supplement-at-most-four-files"))
+			}
+			for _, id := range materialExpansion.IDs {
+				if _, ok := call.availableMaterials[id]; !ok {
+					return finish(Output{}, ErrContextSourceMissing)
+				}
+			}
+			report.ContextSupplements++
+			readIDs = slices.Clone(materialExpansion.IDs)
 			continue
 		}
 		if report.Repairs != 0 {
