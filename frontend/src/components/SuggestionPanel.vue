@@ -52,7 +52,7 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
       <button type="button" class="quiet-button" :disabled="!set || writing || busy" @click="toggle">{{ set?.enabled === false ? '开启建议' : '关闭建议' }}</button>
     </div>
     <div v-if="set?.status === 'ready' && same(set.basis) && !busy" class="suggestion-items">
-      <button v-for="(item,index) in set.items" :key="index" type="button" :disabled="hasDraft" @click="pick(item)"><span>{{ index+1 }}</span>{{ item }}</button>
+      <button v-for="(item,index) in set.items" :key="index" type="button" :disabled="hasDraft" @click="pick(item)"><span class="suggestion-copy">{{ item }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
     </div>
     <p v-if="hasDraft && set?.status === 'ready'" class="subtle">保留你的输入；清空后可点选建议。</p>
     <p v-if="error" class="subtle" role="status">{{ error }} <button type="button" class="quiet-button" @click="refresh(generation)">刷新状态</button></p>
@@ -61,12 +61,17 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
 </template>
 
 <style scoped>
-.suggestions { margin-bottom:.65rem; }
-.suggestion-heading { display:flex; justify-content:space-between; align-items:center; color:var(--muted,#766f65); font-size:.8rem; }
-.suggestion-heading button { padding:.25rem .5rem; }
-.suggestion-items { display:grid; grid-template-columns:minmax(0,1fr); gap:.4rem; max-height:min(12rem,calc(var(--viewport-height,100dvh) * .24)); overflow-y:auto; }
-.suggestion-items button { min-width:0; width:100%; text-align:left; font:inherit; font-size:.85rem; line-height:1.65; white-space:normal; overflow-wrap:anywhere; color:inherit; background:var(--paper,#fffdf8); border:1px solid var(--border,#ddd2c4); border-radius:8px; padding:.5rem; cursor:pointer; }
-.suggestion-items button:disabled { cursor:default; opacity:.55; }
-.suggestion-items span { color:var(--accent,#ae5440); margin-right:.5rem; }
-.suggestions p { font-size:.8rem; margin:.2rem 0 0; }
+.suggestions { margin: 34px 0 22px; }
+.suggestion-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.suggestion-heading button { padding: 4px 10px; }
+.suggestion-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.suggestion-items button { display: flex; align-items: center; gap: 14px; min-width: 0; width: 100%; min-height: 56px; text-align: left; font: inherit; font-size: 14px; line-height: 1.75; white-space: normal; overflow-wrap: anywhere; color: var(--ink); background: var(--soft-panel); border: 0; border-radius: 20px; padding: 12px 16px; }
+.suggestion-items button:hover:not(:disabled) { background: var(--paper-deep); }
+.suggestion-items button:disabled { cursor: default; opacity: .55; }
+.suggestion-copy { flex: 1; min-width: 0; }
+.suggestion-items svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.suggestions p { font-size: 12px; margin: 8px 0 0; }
+@media (max-width: 720px) {
+  .suggestion-items button { padding: 12px 14px; gap: 9px; font-size: 13px; }
+}
 </style>

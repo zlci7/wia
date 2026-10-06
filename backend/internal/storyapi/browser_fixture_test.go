@@ -32,7 +32,7 @@ func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRe
 	// The suggestion call has its own role and response contract; without this the
 	// generic stub would answer it with an NPC payload.
 	if strings.Contains(request.System, "玩家行动建议助手") {
-		return model.TextResponse{Text: `{"items":["我向眼前的人问候。","我看看周围的环境。","我在原地稍作停留。"]}`, Diagnostic: model.TextDiagnostic{Provider: "fixture", Model: "controlled-fixture", InputKnown: true, OutputKnown: true, ReasoningKnown: true, CacheKnown: true, InputTokens: 100, OutputTokens: 30, ReasoningTokens: 10, CacheHitTokens: 60, CacheMissTokens: 40}}, nil
+		return model.TextResponse{Text: `{"items":["我向眼前的人说明想了解的情况，再问一个具体问题，从回答中核对现有消息与不同人的看法。","我先仔细查看眼前的环境，核对已经看到的细节，看看有哪些事实能帮助我判断接下来该做什么。","我选择当前已知的一处地点，先确认路线与手头物品，再尝试前往，继续寻找可以亲自核实的情况。"]}`, Diagnostic: model.TextDiagnostic{Provider: "fixture", Model: "controlled-fixture", InputKnown: true, OutputKnown: true, ReasoningKnown: true, CacheKnown: true, InputTokens: 100, OutputTokens: 30, ReasoningTokens: 10, CacheHitTokens: 60, CacheMissTokens: 40}}, nil
 	}
 	return g.apiGenerator.GenerateText(ctx, request)
 }

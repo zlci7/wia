@@ -27,6 +27,8 @@ export function useStoryReader(onMissing: (id: string) => void) {
   const worldID = ref("");
   const viewport = ref<HTMLElement>();
   const pending = new Map<string, Promise<void>>();
+  let restoredBox: HTMLElement | undefined;
+  let restoredTop = 0;
   const empty = makeSession();
   function makeSession(): ReadingSession {
     return {
@@ -65,11 +67,13 @@ export function useStoryReader(onMissing: (id: string) => void) {
     const state = session.value;
     state.top = viewport.value.scrollTop;
     state.anchor = anchor();
-    state.bottom =
-      viewport.value.scrollHeight -
-        viewport.value.clientHeight -
-        viewport.value.scrollTop <=
-      80;
+    // Programmatic restores keep the follow mode while async content grows.
+    if (viewport.value !== restoredBox || Math.abs(state.top - restoredTop) > 1)
+      state.bottom =
+        viewport.value.scrollHeight -
+          viewport.value.clientHeight -
+          viewport.value.scrollTop <=
+        80;
     if (state.bottom) state.unread = false;
   }
   function restore() {
@@ -88,6 +92,8 @@ export function useStoryReader(onMissing: (id: string) => void) {
           state.anchor.offset;
       else box.scrollTop = state.top;
     }
+    restoredBox = box;
+    restoredTop = box.scrollTop;
   }
   watch(viewport, (box, _, onCleanup) => {
     if (!box || typeof ResizeObserver === "undefined") return;
@@ -95,6 +101,7 @@ export function useStoryReader(onMissing: (id: string) => void) {
       if (viewport.value === box && worldID.value) restore();
     });
     observer.observe(box);
+    if (box.firstElementChild) observer.observe(box.firstElementChild);
     onCleanup(() => observer.disconnect());
   }, { flush: "post" });
   async function latest() {
@@ -143,7 +150,13 @@ export function useStoryReader(onMissing: (id: string) => void) {
           state.error = "";
           state.before = page.next_before_seq;
           await merge(id, page.messages, false);
+          const current = [...page.messages].reverse().find(message => message.kind === "narrative") ?? page.messages.at(-1);
+          state.bottom = false;
+          state.unread = false;
+          state.top = 0;
+          state.anchor = current ? { id: current.message_id, offset: 0 } : undefined;
           state.initialized = true;
+          if (worldID.value === id) restore();
         } else {
           let after = state.messages.at(-1)?.seq ?? 0;
           for (;;) {

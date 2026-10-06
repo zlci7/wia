@@ -355,11 +355,19 @@ const policyOptions = [
             <strong class="world-clock">{{ formatWorldClock(currentWorld.clock) }}</strong>
             <span class="world-location">{{ currentWorld.location?.name ?? currentWorld.scene }}</span>
           </div>
-          <nav class="information-entry" aria-label="世界与角色资料">
-            <button id="wia-information-character" class="quiet-button" @click="openInformation('character')">角色</button>
-            <button class="quiet-button" @click="openInformation('inventory')">背包</button>
-            <button class="quiet-button" @click="openInformation('map')">地图</button>
-            <button class="quiet-button" @click="openInformation('people')">人物</button>
+          <nav class="information-entry glass" aria-label="世界与角色资料">
+            <button id="wia-information-character" class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'character'" aria-controls="wia-information-panel" @click="openInformation('character')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg><span>角色</span>
+            </button>
+            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'inventory'" aria-controls="wia-information-panel" @click="openInformation('inventory')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="15" rx="4"/><path d="M9 6V4a3 3 0 0 1 6 0v2M8 14h8v4H8z"/></svg><span>背包</span>
+            </button>
+            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'map'" aria-controls="wia-information-panel" @click="openInformation('map')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></svg><span>地图</span>
+            </button>
+            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'people'" aria-controls="wia-information-panel" @click="openInformation('people')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v2"/></svg><span>人物</span>
+            </button>
           </nav>
         </div>
         <div
@@ -369,60 +377,159 @@ const policyOptions = [
           aria-label="故事正文"
           @scroll.passive="reader.remember"
         >
-          <div class="history-control">
-            <button
-              v-if="session.before !== undefined"
-              class="quiet-button"
-              :disabled="session.loading || session.historyLoading"
-              @click="reader.earlier"
-            >
-              {{
-                session.historyLoading ? "正在读取…" : "加载更早内容"
-              }}</button
-            ><span v-else-if="session.initialized" class="subtle"
-              >故事从这里开始</span
-            ><span v-else class="subtle">正在读取故事…</span>
-          </div>
-          <div v-if="session.historyError" class="inline-error" role="alert">
-            {{ session.historyError
-            }}<button @click="reader.earlier()">重试历史</button>
-          </div>
-          <article
-            v-for="message in session.messages"
-            :key="message.message_id"
-            :data-message-id="message.message_id"
-            class="message"
-            :class="
-              message.kind === 'player' ? 'player-message' : 'narrative-message'
-            "
-          >
-            <div class="message-content">{{ message.content }}</div>
-          </article>
-          <div v-if="activeRun" class="run-card" role="status">
-            <p class="pending-input">{{ activeRun.input }}</p>
-            <div class="button-row">
-              <span class="pulse-dot"></span><span>正在组织回应</span
-              ><button
+          <div class="reading-flow">
+            <div class="history-control">
+              <button
+                v-if="session.before !== undefined"
                 class="quiet-button"
-                :disabled="session.sending"
-                @click="stopRun"
+                :disabled="session.loading || session.historyLoading"
+                @click="reader.earlier"
               >
-                取消
+                {{
+                  session.historyLoading ? "正在读取…" : "加载更早内容"
+                }}</button
+              ><span v-else-if="session.initialized" class="subtle"
+                >故事从这里开始</span
+              ><span v-else class="subtle">正在读取故事…</span>
+            </div>
+            <div v-if="session.historyError" class="inline-error" role="alert">
+              {{ session.historyError
+              }}<button @click="reader.earlier()">重试历史</button>
+            </div>
+            <article
+              v-for="message in session.messages"
+              :key="message.message_id"
+              :data-message-id="message.message_id"
+              class="message"
+              :class="
+                message.kind === 'player' ? 'player-message' : 'narrative-message'
+              "
+            >
+              <div class="message-content">{{ message.content }}</div>
+            </article>
+            <div v-if="activeRun" class="run-card" role="status">
+              <p class="pending-input">{{ activeRun.input }}</p>
+              <div class="button-row">
+                <span class="pulse-dot"></span><span>正在组织回应</span
+                ><button
+                  class="quiet-button"
+                  :disabled="session.sending"
+                  @click="stopRun"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+            <div
+              v-if="failedRun && !pendingSubmission"
+              class="run-card failed-card"
+            >
+              <p>{{ failureText(failedRun) }}</p>
+              <button
+                class="secondary-button"
+                :disabled="session.sending"
+                @click="sendInput(true)"
+              >
+                重试本轮
               </button>
             </div>
-          </div>
-          <div
-            v-if="failedRun && !pendingSubmission"
-            class="run-card failed-card"
-          >
-            <p>{{ failureText(failedRun) }}</p>
-            <button
-              class="secondary-button"
-              :disabled="session.sending"
-              @click="sendInput(true)"
-            >
-              重试本轮
-            </button>
+            <SuggestionPanel v-if="currentWorld" :world="currentWorld" :active-revision="status?.active_revision ?? 0" :ready="!!status?.ready" :busy="!!activeRun || session.sending || !!pendingSubmission" :has-draft="!!session.draft.trim()" @choose="chooseSuggestion" />
+            <form class="composer glass" @submit.prevent="sendInput()">
+              <div class="composer-body">
+                <div class="composer-tools">
+                  <span class="composer-label">你的行动</span>
+                  <label
+                    >对谁说
+                    <select v-model="session.addressee" aria-label="交谈对象">
+                      <option value="">自动判断</option>
+                      <option
+                        v-for="character in characters"
+                        :key="character.entity_id"
+                        :value="character.entity_id"
+                      >
+                        {{ character.name }}
+                      </option>
+                    </select></label
+                  ><span class="speech-scope">公开或私下，写在行动里</span
+                  ><button
+                    v-if="addresseeName"
+                    type="button"
+                    class="recipient-chip"
+                    @click="session.addressee = ''"
+                  >
+                    对{{ addresseeName }}说 ×</button
+                  ><span class="save-status">{{
+                    session.sending
+                      ? "正在处理"
+                      : pendingSubmission
+                        ? "提交结果待确认"
+                        : activeRun
+                          ? `正在生成 · 已等待 ${waitingSeconds} 秒`
+                          : failedRun
+                            ? failedRun.status === "cancelled"
+                              ? "本轮已取消"
+                              : "本轮未完成"
+                            : saved
+                              ? "本轮已保存"
+                              : "进度自动保存"
+                  }}</span>
+                </div>
+                <textarea
+                  ref="textarea"
+                  v-model="session.draft"
+                  aria-label="你的行动"
+                  rows="2"
+                  placeholder="说出你的想法，或描述接下来要做的事…"
+                  :disabled="!!activeRun || session.sending"
+                  @keydown="inputKeys"
+                  @input="resizeInput"
+                ></textarea>
+                <p v-if="session.suggestionBasis" class="subtle suggestion-origin">来自行动建议，可修改后提交。
+                  <button type="button" class="quiet-button" @click="session.suggestionBasis = undefined; session.sendError = ''">作为自由输入</button>
+                </p>
+                <p
+                  v-if="session.sendError && !pendingSubmission"
+                  class="inline-error"
+                  role="alert"
+                >
+                  {{ session.sendError }}
+                </p>
+                <div
+                  v-if="pendingSubmission && !session.sending"
+                  class="inline-error"
+                  role="status"
+                >
+                  提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
+                  <button type="button" class="secondary-button" @click="sendInput()">
+                    确认或重发原请求
+                  </button>
+                </div>
+              </div>
+              <div class="composer-footer">
+                <span>{{
+                  currentWorld?.story_ended
+                    ? "本段故事已结束，可另存或开始新故事"
+                    : "Ctrl + Enter 提交"
+                }}</span
+                ><button
+                  class="primary-button"
+                  type="submit"
+                  :disabled="!canSubmit"
+                >
+                  {{
+                    session.sending
+                      ? "正在提交…"
+                      : activeRun
+                        ? "等待回应"
+                        : currentWorld?.story_ended
+                          ? "故事已结束"
+                          : status?.ready
+                            ? "继续故事"
+                            : "连接模型并继续"
+                  }}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
         <div v-if="!session.bottom" class="latest-row">
@@ -430,101 +537,6 @@ const policyOptions = [
             {{ session.unread ? "有新内容 · 回到最新" : "回到最新" }}
           </button>
         </div>
-        <form class="composer" @submit.prevent="sendInput()">
-          <div class="composer-body">
-            <div class="composer-tools">
-              <label
-                >对谁说
-                <select v-model="session.addressee" aria-label="交谈对象">
-                  <option value="">自动判断</option>
-                  <option
-                    v-for="character in characters"
-                    :key="character.entity_id"
-                    :value="character.entity_id"
-                  >
-                    {{ character.name }}
-                  </option>
-                </select></label
-              ><button
-                v-if="addresseeName"
-                type="button"
-                class="recipient-chip"
-                @click="session.addressee = ''"
-              >
-                对{{ addresseeName }}说 ×</button
-              ><span class="save-status">{{
-                session.sending
-                  ? "正在处理"
-                  : pendingSubmission
-                    ? "提交结果待确认"
-                    : activeRun
-                      ? `正在生成 · 已等待 ${waitingSeconds} 秒`
-                      : failedRun
-                        ? failedRun.status === "cancelled"
-                          ? "本轮已取消"
-                          : "本轮未完成"
-                        : saved
-                          ? "本轮已保存"
-                          : "进度自动保存"
-              }}</span>
-            </div>
-            <textarea
-              ref="textarea"
-              v-model="session.draft"
-              aria-label="你的行动"
-              rows="2"
-              placeholder="说出你的想法，或描述接下来要做的事…"
-              :disabled="!!activeRun || session.sending"
-              @keydown="inputKeys"
-              @input="resizeInput"
-            ></textarea>
-            <p v-if="session.suggestionBasis" class="subtle suggestion-origin">来自行动建议，可修改后提交。
-              <button type="button" class="quiet-button" @click="session.suggestionBasis = undefined; session.sendError = ''">作为自由输入</button>
-            </p>
-            <p
-              v-if="session.sendError && !pendingSubmission"
-              class="inline-error"
-              role="alert"
-            >
-              {{ session.sendError }}
-            </p>
-            <div
-              v-if="pendingSubmission && !session.sending"
-              class="inline-error"
-              role="status"
-            >
-              提交结果待确认，输入已保留。系统会继续查询，确认前不会发送新的行动。
-              <button type="button" class="secondary-button" @click="sendInput()">
-                确认或重发原请求
-              </button>
-            </div>
-            <SuggestionPanel v-if="currentWorld" :world="currentWorld" :active-revision="status?.active_revision ?? 0" :ready="!!status?.ready" :busy="!!activeRun || session.sending || !!pendingSubmission" :has-draft="!!session.draft.trim()" @choose="chooseSuggestion" />
-          </div>
-          <div class="composer-footer">
-            <span>{{
-              currentWorld?.story_ended
-                ? "本段故事已结束，可另存或开始新故事"
-                : "Ctrl + Enter 提交"
-            }}</span
-            ><button
-              class="primary-button"
-              type="submit"
-              :disabled="!canSubmit"
-            >
-              {{
-                session.sending
-                  ? "正在提交…"
-                  : activeRun
-                    ? "等待回应"
-                    : currentWorld?.story_ended
-                      ? "故事已结束"
-                      : status?.ready
-                        ? "继续故事"
-                        : "连接模型并继续"
-              }}
-            </button>
-          </div>
-        </form>
       </section>
     </div>
 

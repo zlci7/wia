@@ -33,13 +33,14 @@ function assertSession(draft, addressee, before, label) {
   assert.equal(js(`document.querySelector('select[aria-label="交谈对象"]').value`), addressee, `${label}: addressee`);
   const after = js(anchor);
   assert.equal(after.id, before.id, `${label}: visible message`);
-  assert(Math.abs(after.offset - before.offset) < 3, `${label}: anchor shifted ${after.offset - before.offset}px`);
+  if (before.id) assert(Math.abs(after.offset - before.offset) < 3, `${label}: anchor shifted ${after.offset - before.offset}px`);
   assert(Math.abs(after.scrollTop - before.scrollTop) < 3, `${label}: scroll position`);
 }
-function assertLayout(size) {
+function assertLayout(size, atAction = false) {
   const layout = js(`(()=>{const submit=document.querySelector('.composer button[type=submit]'),box=submit.getBoundingClientRect(),hit=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);return {width:innerWidth,height:innerHeight,bodyWidth:document.body.scrollWidth,documentWidth:document.documentElement.scrollWidth,readerHeight:document.querySelector('.transcript').clientHeight,composerBottom:document.querySelector('.composer').getBoundingClientRect().bottom,submit:{left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:box.width,height:box.height,disabled:submit.disabled,reachable:hit===submit||submit.contains(hit)}}})()`);
   assert(layout.bodyWidth <= layout.width && layout.documentWidth <= layout.width, `${size}: page overflow ${JSON.stringify(layout)}`);
   assert(layout.readerHeight > 0, `${size}: visible reader`);
+  if (!atAction) return;
   assert(layout.composerBottom <= layout.height + 1, `${size}: composer reaches outside the viewport`);
   assert(layout.submit.left >= 0 && layout.submit.right <= layout.width + 1 && layout.submit.top >= 0 && layout.submit.bottom <= layout.height + 1, `${size}: submit outside viewport`);
   assert(layout.submit.width > 0 && layout.submit.height > 0 && layout.submit.reachable && !layout.submit.disabled, `${size}: enabled submit is reachable`);
@@ -76,6 +77,10 @@ try {
   }
   click(".continue-panel button");
   await wait(`document.querySelectorAll('[data-message-id]').length===100`);
+  await wait(`document.querySelectorAll('.suggestion-items button').length===3`);
+  await wait(`(()=>{const box=document.querySelector('.transcript'),message=document.querySelector('[data-message-id="fixture-0-251"]');return message.getBoundingClientRect().top>=box.getBoundingClientRect().top-3 && message.getBoundingClientRect().top<box.getBoundingClientRect().bottom})()`);
+  console.log("PASS first entry begins at the current narrative without skipping its opening");
+  js(`(()=>{const box=document.querySelector('.transcript');box.scrollTop=box.scrollHeight;return true})()`);
   await wait(`(()=>{const box=document.querySelector('.transcript');return box.scrollHeight-box.scrollTop-box.clientHeight<3})()`);
   assert(js(`(()=>{const box=document.querySelector('.transcript');return box.scrollHeight-box.scrollTop-box.clientHeight<3})()`));
   await wait(`!document.querySelector('.suggestion-heading')?.textContent.includes('正在准备')`);
@@ -136,6 +141,9 @@ try {
     if (column === "地图") assert(js(`document.querySelector('.information-content').textContent.includes(${JSON.stringify(snapshot.world.location?.name ?? snapshot.world.scene)})`));
     if (column === "人物") assert(js(`document.querySelector('.information-content').textContent.includes(${JSON.stringify(character.name)})`));
   }
+  assert.equal(js(`document.querySelector('[role=dialog]').getAttribute('aria-modal')`), null, "desktop information is nonmodal");
+  js(`(()=>{document.querySelector('textarea[aria-label="你的行动"]').focus({preventScroll:true});return true})()`);
+  assert(js(`document.activeElement===document.querySelector('textarea[aria-label="你的行动"]')`), "desktop information permits focus in the story input");
   call("press", "Escape");
   await wait(`!document.querySelector('[role=dialog]')`);
   assert(js(`document.activeElement===document.querySelector('#wia-information-character')`), "Escape returns focus to the information entry");
@@ -152,15 +160,20 @@ try {
     const resizedAnchor = js(anchor);
     click('.information-entry button:has-text("背包")');
     await wait(`!!document.querySelector('[role=dialog]')`);
+    assert.equal(js(`document.querySelector('[role=dialog]').getAttribute('aria-modal')`), size.startsWith("390") ? "true" : null, `${size}: correct information modality`);
+    js(`(()=>{document.querySelector('textarea[aria-label="你的行动"]').focus({preventScroll:true});return true})()`);
+    assert.equal(js(`document.querySelector('[role=dialog]').contains(document.activeElement)`), size.startsWith("390"), `${size}: modal focus is contained and desktop focus remains free`);
     assert(js(`(()=>{const panel=document.querySelector('[role=dialog]'),box=panel.getBoundingClientRect();return panel.scrollWidth<=panel.clientWidth&&box.left>=0&&box.right<=innerWidth+1&&box.top>=0&&box.bottom<=innerHeight+1})()`), `${size}: information drawer fits the viewport`);
     call("press", "Escape");
     await wait(`!document.querySelector('[role=dialog]')`);
     assertSession(draft, character.entity_id, resizedAnchor, `${size} return`);
-    assertLayout(size);
+    js(`(()=>{document.querySelector('.composer').scrollIntoView({block:'end'});return true})()`);
+    await pause(300);
+    assertLayout(size, true);
   }
   assert.deepEqual(heads(readWorld(world.world_id)), baseline, "responsive viewing preserves the same committed world");
   assert.deepEqual(js(`window.wiaReadingRequests.filter(request=>request.method!=='GET')`), [], "responsive viewing causes no mutation");
-  console.log("PASS 390x844 and 1440x600 fit the page and retain an enabled, reachable submit control (simulated viewports)");
+  console.log("PASS 390x844 and 1440x600 fit the page and reach an enabled submit control at the end of the reading flow (simulated viewports)");
   console.log("Browser reading checks passed");
 } finally {
   if (opened) {

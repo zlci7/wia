@@ -1,119 +1,133 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-01T19:16:13.640Z",
+  "generatedAt": "2026-10-06T07:56:13.984Z",
   "title": "Design System: World Is Agent",
   "extensions": {
     "colorMeta": {
       "accent": {
         "role": "primary",
-        "displayName": "Ultramarine",
+        "displayName": "Olive Action",
         "tonalRamp": [
-          "oklch(15.00% 0.18458 268.76)",
-          "oklch(26.43% 0.18458 268.76)",
-          "oklch(37.86% 0.18458 268.76)",
-          "oklch(49.29% 0.18458 268.76)",
-          "oklch(60.71% 0.18458 268.76)",
-          "oklch(72.14% 0.18458 268.76)",
-          "oklch(83.57% 0.18458 268.76)",
-          "oklch(95.00% 0.18458 268.76)"
+          "oklch(15.00% 0.04788 129.01)",
+          "oklch(26.43% 0.04788 129.01)",
+          "oklch(37.86% 0.04788 129.01)",
+          "oklch(49.29% 0.04788 129.01)",
+          "oklch(60.71% 0.04788 129.01)",
+          "oklch(72.14% 0.04788 129.01)",
+          "oklch(83.57% 0.04788 129.01)",
+          "oklch(95.00% 0.04788 129.01)"
         ]
       },
       "accent-dark": {
         "role": "primary",
-        "displayName": "Deep Ultramarine",
+        "displayName": "Deep Olive",
         "tonalRamp": [
-          "oklch(15.00% 0.15691 268.25)",
-          "oklch(26.43% 0.15691 268.25)",
-          "oklch(37.86% 0.15691 268.25)",
-          "oklch(49.29% 0.15691 268.25)",
-          "oklch(60.71% 0.15691 268.25)",
-          "oklch(72.14% 0.15691 268.25)",
-          "oklch(83.57% 0.15691 268.25)",
-          "oklch(95.00% 0.15691 268.25)"
+          "oklch(15.00% 0.04343 130.46)",
+          "oklch(26.43% 0.04343 130.46)",
+          "oklch(37.86% 0.04343 130.46)",
+          "oklch(49.29% 0.04343 130.46)",
+          "oklch(60.71% 0.04343 130.46)",
+          "oklch(72.14% 0.04343 130.46)",
+          "oklch(83.57% 0.04343 130.46)",
+          "oklch(95.00% 0.04343 130.46)"
         ]
       },
       "paper": {
         "role": "neutral",
-        "displayName": "Cool Paper",
+        "displayName": "Warm Ivory",
         "tonalRamp": [
-          "oklch(15.00% 0.00828 271.33)",
-          "oklch(26.43% 0.00828 271.33)",
-          "oklch(37.86% 0.00828 271.33)",
-          "oklch(49.29% 0.00828 271.33)",
-          "oklch(60.71% 0.00828 271.33)",
-          "oklch(72.14% 0.00828 271.33)",
-          "oklch(83.57% 0.00828 271.33)",
-          "oklch(95.00% 0.00828 271.33)"
+          "oklch(15.00% 0.01270 86.83)",
+          "oklch(26.43% 0.01270 86.83)",
+          "oklch(37.86% 0.01270 86.83)",
+          "oklch(49.29% 0.01270 86.83)",
+          "oklch(60.71% 0.01270 86.83)",
+          "oklch(72.14% 0.01270 86.83)",
+          "oklch(83.57% 0.01270 86.83)",
+          "oklch(95.00% 0.01270 86.83)"
         ]
       },
       "paper-deep": {
         "role": "neutral",
-        "displayName": "Folded Paper",
+        "displayName": "Soft Sage Paper",
         "tonalRamp": [
-          "oklch(15.00% 0.01704 267.79)",
-          "oklch(26.43% 0.01704 267.79)",
-          "oklch(37.86% 0.01704 267.79)",
-          "oklch(49.29% 0.01704 267.79)",
-          "oklch(60.71% 0.01704 267.79)",
-          "oklch(72.14% 0.01704 267.79)",
-          "oklch(83.57% 0.01704 267.79)",
-          "oklch(95.00% 0.01704 267.79)"
+          "oklch(15.00% 0.02064 121.85)",
+          "oklch(26.43% 0.02064 121.85)",
+          "oklch(37.86% 0.02064 121.85)",
+          "oklch(49.29% 0.02064 121.85)",
+          "oklch(60.71% 0.02064 121.85)",
+          "oklch(72.14% 0.02064 121.85)",
+          "oklch(83.57% 0.02064 121.85)",
+          "oklch(95.00% 0.02064 121.85)"
         ]
       },
       "panel": {
         "role": "neutral",
-        "displayName": "Reading White",
+        "displayName": "Cream Panel",
         "tonalRamp": [
-          "oklch(15.00% 0.00000 0.00)",
-          "oklch(26.43% 0.00000 0.00)",
-          "oklch(37.86% 0.00000 0.00)",
-          "oklch(49.29% 0.00000 0.00)",
-          "oklch(60.71% 0.00000 0.00)",
-          "oklch(72.14% 0.00000 0.00)",
-          "oklch(83.57% 0.00000 0.00)",
-          "oklch(95.00% 0.00000 0.00)"
+          "oklch(15.00% 0.00945 93.57)",
+          "oklch(26.43% 0.00945 93.57)",
+          "oklch(37.86% 0.00945 93.57)",
+          "oklch(49.29% 0.00945 93.57)",
+          "oklch(60.71% 0.00945 93.57)",
+          "oklch(72.14% 0.00945 93.57)",
+          "oklch(83.57% 0.00945 93.57)",
+          "oklch(95.00% 0.00945 93.57)"
+        ]
+      },
+      "soft-panel": {
+        "role": "neutral",
+        "displayName": "Translucent Cream",
+        "tonalRamp": [
+          "oklch(15.00% 0.00668 97.35)",
+          "oklch(26.43% 0.00668 97.35)",
+          "oklch(37.86% 0.00668 97.35)",
+          "oklch(49.29% 0.00668 97.35)",
+          "oklch(60.71% 0.00668 97.35)",
+          "oklch(72.14% 0.00668 97.35)",
+          "oklch(83.57% 0.00668 97.35)",
+          "oklch(95.00% 0.00668 97.35)"
         ]
       },
       "ink": {
         "role": "neutral",
-        "displayName": "Blue Ink",
+        "displayName": "Olive Ink",
         "tonalRamp": [
-          "oklch(15.00% 0.04673 264.85)",
-          "oklch(26.43% 0.04673 264.85)",
-          "oklch(37.86% 0.04673 264.85)",
-          "oklch(49.29% 0.04673 264.85)",
-          "oklch(60.71% 0.04673 264.85)",
-          "oklch(72.14% 0.04673 264.85)",
-          "oklch(83.57% 0.04673 264.85)",
-          "oklch(95.00% 0.04673 264.85)"
+          "oklch(15.00% 0.01827 138.74)",
+          "oklch(26.43% 0.01827 138.74)",
+          "oklch(37.86% 0.01827 138.74)",
+          "oklch(49.29% 0.01827 138.74)",
+          "oklch(60.71% 0.01827 138.74)",
+          "oklch(72.14% 0.01827 138.74)",
+          "oklch(83.57% 0.01827 138.74)",
+          "oklch(95.00% 0.01827 138.74)"
         ]
       },
       "muted": {
         "role": "neutral",
-        "displayName": "Slate Ink",
+        "displayName": "Quiet Olive",
         "tonalRamp": [
-          "oklch(15.00% 0.04486 262.69)",
-          "oklch(26.43% 0.04486 262.69)",
-          "oklch(37.86% 0.04486 262.69)",
-          "oklch(49.29% 0.04486 262.69)",
-          "oklch(60.71% 0.04486 262.69)",
-          "oklch(72.14% 0.04486 262.69)",
-          "oklch(83.57% 0.04486 262.69)",
-          "oklch(95.00% 0.04486 262.69)"
+          "oklch(15.00% 0.01911 122.10)",
+          "oklch(26.43% 0.01911 122.10)",
+          "oklch(37.86% 0.01911 122.10)",
+          "oklch(49.29% 0.01911 122.10)",
+          "oklch(60.71% 0.01911 122.10)",
+          "oklch(72.14% 0.01911 122.10)",
+          "oklch(83.57% 0.01911 122.10)",
+          "oklch(95.00% 0.01911 122.10)"
         ]
       },
       "line": {
         "role": "neutral",
         "displayName": "Paper Rule",
         "tonalRamp": [
-          "oklch(15.00% 0.02057 264.47)",
-          "oklch(26.43% 0.02057 264.47)",
-          "oklch(37.86% 0.02057 264.47)",
-          "oklch(49.29% 0.02057 264.47)",
-          "oklch(60.71% 0.02057 264.47)",
-          "oklch(72.14% 0.02057 264.47)",
-          "oklch(83.57% 0.02057 264.47)",
-          "oklch(95.00% 0.02057 264.47)"
+          "oklch(15.00% 0.02033 112.98)",
+          "oklch(26.43% 0.02033 112.98)",
+          "oklch(37.86% 0.02033 112.98)",
+          "oklch(49.29% 0.02033 112.98)",
+          "oklch(60.71% 0.02033 112.98)",
+          "oklch(72.14% 0.02033 112.98)",
+          "oklch(83.57% 0.02033 112.98)",
+          "oklch(95.00% 0.02033 112.98)"
         ]
       },
       "success": {
@@ -148,14 +162,14 @@
         "role": "secondary",
         "displayName": "Brick Feedback",
         "tonalRamp": [
-          "oklch(15.00% 0.13846 23.74)",
-          "oklch(26.43% 0.13846 23.74)",
-          "oklch(37.86% 0.13846 23.74)",
-          "oklch(49.29% 0.13846 23.74)",
-          "oklch(60.71% 0.13846 23.74)",
-          "oklch(72.14% 0.13846 23.74)",
-          "oklch(83.57% 0.13846 23.74)",
-          "oklch(95.00% 0.13846 23.74)"
+          "oklch(15.00% 0.10575 31.25)",
+          "oklch(26.43% 0.10575 31.25)",
+          "oklch(37.86% 0.10575 31.25)",
+          "oklch(49.29% 0.10575 31.25)",
+          "oklch(60.71% 0.10575 31.25)",
+          "oklch(72.14% 0.10575 31.25)",
+          "oklch(83.57% 0.10575 31.25)",
+          "oklch(95.00% 0.10575 31.25)"
         ]
       },
       "error-surface": {
@@ -171,83 +185,167 @@
           "oklch(83.57% 0.01632 22.08)",
           "oklch(95.00% 0.01632 22.08)"
         ]
+      },
+      "selected-fill": {
+        "role": "neutral",
+        "displayName": "Selected Sage",
+        "tonalRamp": [
+          "oklch(15.00% 0.01756 117.30)",
+          "oklch(26.43% 0.01756 117.30)",
+          "oklch(37.86% 0.01756 117.30)",
+          "oklch(49.29% 0.01756 117.30)",
+          "oklch(60.71% 0.01756 117.30)",
+          "oklch(72.14% 0.01756 117.30)",
+          "oklch(83.57% 0.01756 117.30)",
+          "oklch(95.00% 0.01756 117.30)"
+        ]
+      },
+      "active-fill": {
+        "role": "neutral",
+        "displayName": "Active Sage",
+        "tonalRamp": [
+          "oklch(15.00% 0.01617 118.12)",
+          "oklch(26.43% 0.01617 118.12)",
+          "oklch(37.86% 0.01617 118.12)",
+          "oklch(49.29% 0.01617 118.12)",
+          "oklch(60.71% 0.01617 118.12)",
+          "oklch(72.14% 0.01617 118.12)",
+          "oklch(83.57% 0.01617 118.12)",
+          "oklch(95.00% 0.01617 118.12)"
+        ]
+      },
+      "glass-solid": {
+        "role": "neutral",
+        "displayName": "Solid Glass Fallback",
+        "tonalRamp": [
+          "oklch(15.00% 0.01077 95.16)",
+          "oklch(26.43% 0.01077 95.16)",
+          "oklch(37.86% 0.01077 95.16)",
+          "oklch(49.29% 0.01077 95.16)",
+          "oklch(60.71% 0.01077 95.16)",
+          "oklch(72.14% 0.01077 95.16)",
+          "oklch(83.57% 0.01077 95.16)",
+          "oklch(95.00% 0.01077 95.16)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 89.88)",
+          "oklch(26.43% 0.00000 89.88)",
+          "oklch(37.86% 0.00000 89.88)",
+          "oklch(49.29% 0.00000 89.88)",
+          "oklch(60.71% 0.00000 89.88)",
+          "oklch(72.14% 0.00000 89.88)",
+          "oklch(83.57% 0.00000 89.88)",
+          "oklch(95.00% 0.00000 89.88)"
+        ]
       }
     },
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Home and story-detail headings; locally served WIA Display at weight 700."
+        "purpose": "Home and story-detail headings in locally served WIA Display."
       },
       "cover": {
         "displayName": "Cover",
-        "purpose": "Saturated story title planes; local display lettering."
+        "purpose": "Story title planes in locally served display lettering."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Section headings and their compact mobile variants."
+        "purpose": "Section headings, with compact-width variants."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Smaller headings, reader titles and factual context."
+        "purpose": "Smaller headings and information sections."
       },
       "reading": {
         "displayName": "Narration",
-        "purpose": "Chinese story paragraphs in the installed platform book stack."
+        "purpose": "Narrative text in the shared platform sans stack."
       },
       "player": {
-        "displayName": "Player action",
+        "displayName": "Player",
         "purpose": "Right-aligned submitted player text."
       },
       "body": {
-        "displayName": "UI body",
-        "purpose": "Navigation, descriptions, controls and factual information."
+        "displayName": "Body",
+        "purpose": "Navigation, descriptions, controls and factual context."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Supporting labels, status and metadata; tabular numerals where used."
+        "purpose": "Supporting labels, status and metadata."
       },
       "control": {
-        "displayName": "Action",
-        "purpose": "Primary, secondary and destructive button labels."
+        "displayName": "Control",
+        "purpose": "Primary, secondary and destructive action labels."
+      },
+      "location": {
+        "displayName": "Location",
+        "purpose": "Current location above the reading flow."
+      },
+      "suggestion": {
+        "displayName": "Suggestion",
+        "purpose": "Action suggestion rows, with smaller text at widths at or below 720px."
       }
     },
     "shadows": [
       {
+        "name": "glass-tools",
+        "value": "0 14px 42px #554d391c, 0 3px 8px #554d3910",
+        "purpose": "Diffuse downward depth beneath the information capsule and composer."
+      },
+      {
+        "name": "glass-edge",
+        "value": "inset 0 1px 0 #fff9",
+        "purpose": "Top highlight inside the white glass edge."
+      },
+      {
         "name": "more-menu",
-        "value": "0 12px 35px #24345924",
+        "value": "0 12px 35px #554d3924",
         "purpose": "More menu above the page."
       },
       {
         "name": "latest-content",
-        "value": "0 5px 18px #2434591a",
+        "value": "0 5px 18px #554d391a",
         "purpose": "Return-to-latest control above the transcript."
       },
       {
         "name": "dialog",
-        "value": "0 24px 70px #17234333",
-        "purpose": "Centered dialog above the dimmed page."
+        "value": "0 24px 70px #3d402733",
+        "purpose": "Centered opaque dialog above a dimmed page."
       },
       {
-        "name": "scene-drawer",
-        "value": "-12px 0 40px #17234322",
-        "purpose": "Right-edge scene drawer."
+        "name": "information-panel",
+        "value": "0 24px 80px #3d402737, inset 0 1px 0 #ffffffe0",
+        "purpose": "Warm translucent information surface with a white edge highlight."
+      },
+      {
+        "name": "selected-information-tab",
+        "value": "0 2px 5px #4b543813",
+        "purpose": "Selected tab within the shared information panel."
       }
     ],
     "motion": [
       {
         "name": "ease",
         "value": "cubic-bezier(.16, 1, .3, 1)",
-        "purpose": "Button color and border transitions."
+        "purpose": "Shared exponential ease-out."
       },
       {
         "name": "button-duration",
         "value": "180ms",
-        "purpose": "Background, foreground and border changes; removed for reduced-motion preference."
+        "purpose": "Button foreground, background and border changes; removed for reduced motion."
+      },
+      {
+        "name": "information-sheet-entry",
+        "value": "220ms var(--ease)",
+        "purpose": "One visible entrance from opacity .3 and translateY(12px), enabled only without a reduced-motion preference."
       },
       {
         "name": "waiting-pulse",
         "value": "1.6s ease-in-out infinite",
-        "purpose": "One 7px waiting dot reaches opacity .35 halfway through; static under reduced-motion preference."
+        "purpose": "One 7px waiting dot reaches opacity .35 halfway through; static with reduced motion."
       }
     ],
     "breakpoints": [
@@ -256,8 +354,12 @@
         "value": "1100px"
       },
       {
-        "name": "single-column",
+        "name": "compact-story",
         "value": "859px"
+      },
+      {
+        "name": "narrow-reader",
+        "value": "720px"
       },
       {
         "name": "mobile",
@@ -274,125 +376,130 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The principal story or save action.",
+      "description": "Rounded primary button for its established action role.",
       "html": "<button class=\"ds-primary\" type=\"button\">继续故事</button>",
-      "css": ".ds-primary{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:6px;font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--accent,#354fc4);color:var(--panel,#fff)}.ds-primary:hover:not(:disabled){background:var(--accent-dark,#253b9a)}.ds-primary:active:not(:disabled){background:#1f3181}.ds-primary:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-primary:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+      "css": ".ds-primary{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:16px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--accent,#566447);color:white;}.ds-primary:hover:not(:disabled){background:var(--accent-dark,#424f36);}.ds-primary:active:not(:disabled){background:#36452b;}.ds-primary:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-primary:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none;animation:none}}"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "An adjacent alternative or recovery action.",
+      "description": "Rounded secondary button for its established action role.",
       "html": "<button class=\"ds-secondary\" type=\"button\">开始新的故事</button>",
-      "css": ".ds-secondary{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:6px;font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));border-color:var(--line,#d8dfed);background:var(--panel,#fff);color:var(--ink,#202b43)}.ds-secondary:hover:not(:disabled){border-color:var(--accent,#354fc4);color:var(--accent-dark,#253b9a)}.ds-secondary:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-secondary:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}"
+      "css": ".ds-secondary{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:16px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));border-color:var(--line,#d7d9ca);background:var(--panel,#fffdf6);color:var(--ink,#30372e);}.ds-secondary:hover:not(:disabled){border-color:var(--accent,#566447);color:var(--accent-dark,#424f36);}.ds-secondary:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-secondary:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none;animation:none}}"
     },
     {
       "name": "Destructive Button",
       "kind": "button",
       "refersTo": "button-danger",
-      "description": "Explicit destructive confirmation.",
+      "description": "Rounded destructive button for its established action role.",
       "html": "<button class=\"ds-danger\" type=\"button\">确认删除</button>",
-      "css": ".ds-danger{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:6px;font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--error,#a03838);color:var(--panel,#fff)}.ds-danger:hover:not(:disabled){background:#852b2b}.ds-danger:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-danger:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-danger{transition:none}}"
+      "css": ".ds-danger{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:16px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--error,#914538);color:white;}.ds-danger:hover:not(:disabled){background:#852b2b;}.ds-danger:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-danger:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-danger{transition:none;animation:none}}"
     },
     {
       "name": "Quiet Button",
       "kind": "button",
       "refersTo": "button-quiet",
-      "description": "Compact text actions in navigation or supporting controls.",
+      "description": "Compact supporting text actions.",
       "html": "<button class=\"ds-quiet\" type=\"button\">故事设置</button>",
-      "css": ".ds-quiet{min-height:40px;padding:7px 4px;border:0;background:transparent;color:var(--muted,#596781);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-quiet:hover:not(:disabled){color:var(--accent-dark,#253b9a)}.ds-quiet:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-quiet:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-quiet{transition:none}}"
+      "css": ".ds-quiet{min-height:40px;padding:7px 4px;border:0;border-radius:16px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:transparent;color:var(--muted,#65695d);}.ds-quiet:hover:not(:disabled){color:var(--accent-dark,#424f36);}.ds-quiet:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-quiet:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-quiet{transition:none;animation:none}}"
     },
     {
       "name": "Text Field",
       "kind": "input",
       "refersTo": "field",
-      "description": "A labeled dialog field with visible focus and a themed caret.",
-      "html": "<label class=\"ds-field-label\">存档名称<input class=\"ds-field\" value=\"雾都余烬\" /></label>",
-      "css": ".ds-field-label{display:grid;gap:6px;margin:16px 0;color:var(--ink,#202b43);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);}.ds-field{width:100%;padding:11px 12px;border:1px solid var(--line,#d8dfed);border-radius:6px;background:var(--panel,#fff);color:var(--ink,#202b43);caret-color:var(--accent,#354fc4);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);}.ds-field::placeholder{color:var(--muted,#596781);opacity:1}.ds-field:focus{outline:2px solid var(--accent,#354fc4);outline-offset:1px}"
-    },
-    {
-      "name": "Masthead Navigation",
-      "kind": "nav",
-      "description": "WIA mark and quiet Chinese navigation with compact-width actions.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"主导航\"><span class=\"ds-mark\">WIA</span><strong class=\"ds-brand\">World Is Agent</strong><div class=\"ds-nav-actions\"><button class=\"ds-nav-button\">返回首页</button><button class=\"ds-nav-button\">存档与故事</button><button class=\"ds-nav-button ds-more\">更多</button></div></nav>",
-      "css": ".ds-nav{display:flex;align-items:center;gap:12px;min-height:76px;padding:12px 0;border-bottom:1px solid var(--line,#d8dfed);color:var(--ink,#202b43);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);}.ds-mark{display:grid;place-items:center;width:46px;height:38px;border-radius:6px;background:var(--accent,#354fc4);color:var(--panel,#fff);font-size:13px;font-weight:750;letter-spacing:.02em}.ds-brand{font-size:15px;font-weight:650;letter-spacing:-.015em;white-space:nowrap}.ds-nav-actions{display:flex;align-items:center;gap:14px;margin-left:auto}.ds-nav-button{min-height:40px;padding:7px 4px;border:0;background:transparent;color:var(--muted,#596781);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-more{display:none}.ds-nav-button:hover:not(:disabled){color:var(--accent-dark,#253b9a)}.ds-nav-button:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-nav-button:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-nav-button{transition:none}}@media(max-width:1100px){.ds-more{display:block}}@media(max-width:600px){.ds-brand{display:none}.ds-nav{min-height:62px;padding:8px 0;gap:10px}.ds-nav-actions{gap:12px}.ds-nav-button{font-size:13px}}"
+      "description": "A labeled cream field with an olive caret and visible focus.",
+      "html": "<label class=\"ds-field-label\">存档名称<input class=\"ds-field\" value=\"雾都余烬\" placeholder=\"填写存档名称\" /></label>",
+      "css": ".ds-field-label{display:grid;gap:6px;margin:16px 0;color:var(--ink,#30372e);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);}.ds-field{width:100%;padding:11px 12px;border:1px solid var(--line,#d7d9ca);border-radius:16px;background:var(--panel,#fffdf6);color:var(--ink,#30372e);caret-color:var(--accent,#566447);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);}.ds-field::placeholder{color:var(--muted,#65695d);opacity:1}.ds-field:focus{outline:2px solid var(--accent,#566447);outline-offset:1px}"
     },
     {
       "name": "Recipient Chip",
       "kind": "chip",
       "refersTo": "recipient-chip",
-      "description": "The chosen conversation destination, supplementary to the destination select.",
+      "description": "The explicit recipient, supplementary to the destination select.",
       "html": "<button class=\"ds-recipient\" type=\"button\">对裁缝店老板说</button>",
-      "css": ".ds-recipient{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:3px 8px;border:0;border-radius:4px;background:#e5ebff;color:var(--accent-dark,#253b9a);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-size:12px;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-recipient:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}@media(max-width:600px){.ds-recipient{display:none}}@media(prefers-reduced-motion:reduce){.ds-recipient{transition:none}}"
+      "css": ".ds-recipient{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:3px 9px;background:var(--paper-deep,#e6ebdc);color:var(--accent-dark,#424f36);border:0;border-radius:999px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-size:12px;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-recipient:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-recipient:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-recipient{transition:none;animation:none}}"
     },
     {
       "name": "Story Entry",
       "kind": "card",
       "refersTo": "story-card",
-      "description": "The recurring title plane beside a story description and entry action.",
+      "description": "An olive title plane beside story copy and an entry action.",
       "html": "<article class=\"ds-story\"><div class=\"ds-story-art\"><h2 class=\"ds-cover-title\">雾都余烬</h2><span class=\"ds-story-mode\">开放型</span></div><div class=\"ds-story-body\"><p>人物各有打算，城市不会因你离开而停下。</p><button class=\"ds-story-action\" type=\"button\">进入这个故事</button></div></article>",
-      "css": ".ds-story{display:grid;grid-template-columns:280px minmax(0,1fr);overflow:hidden;border-radius:12px;background:var(--panel,#fff);color:var(--ink,#202b43);font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);}.ds-story-art{position:relative;display:grid;align-content:center;min-height:200px;overflow:hidden;background:var(--accent,#354fc4);color:var(--panel,#fff)}.ds-cover-title{display:block;padding:28px;margin:0;font-family:var(--display-font,\"WIA Display\",\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-size:32px;line-height:1.5;font-weight:700;letter-spacing:.035em;overflow-wrap:anywhere;text-wrap:balance}.ds-story-mode{position:absolute;left:28px;bottom:20px;font-size:12px;color:#edf0ff}.ds-story-body{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px;padding:28px 36px}.ds-story-body p{margin:0;max-width:62ch;color:var(--muted,#596781);line-height:1.9}.ds-story-action{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:6px;font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--accent,#354fc4);color:var(--panel,#fff)}.ds-story-action:hover:not(:disabled){background:var(--accent-dark,#253b9a)}.ds-story-action:active:not(:disabled){background:#1f3181}.ds-story-action:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}.ds-story-action:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-story-action{transition:none}}@media(max-width:859px){.ds-story{grid-template-columns:220px minmax(0,1fr)}.ds-story-body{padding:24px}.ds-cover-title{font-size:27px;padding:24px}.ds-story-mode{left:24px}}@media(max-width:600px){.ds-story{grid-template-columns:1fr}.ds-story-art{min-height:155px}.ds-story-body{gap:16px}.ds-cover-title{padding-bottom:54px}}"
+      "css": ".ds-story{display:grid;grid-template-columns:280px minmax(0,1fr);overflow:hidden;border-radius:12px;background:var(--panel,#fffdf6);color:var(--ink,#30372e);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);}.ds-story-art{position:relative;display:grid;align-content:center;min-height:200px;overflow:hidden;background:var(--accent,#566447);color:white}.ds-cover-title{display:block;padding:28px;margin:0;font-family:var(--display-font,\"WIA Display\",-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-size:32px;line-height:1.5;font-weight:700;letter-spacing:.035em;overflow-wrap:anywhere;text-wrap:balance}.ds-story-mode{position:absolute;left:28px;bottom:20px;font-size:12px;color:#f0f2e6}.ds-story-body{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px;padding:28px 36px}.ds-story-body p{margin:0;max-width:62ch;color:var(--muted,#65695d);line-height:1.9}.ds-story-action{min-height:44px;padding:10px 18px;border:1px solid transparent;border-radius:16px;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));background:var(--accent,#566447);color:white}.ds-story-action:hover:not(:disabled){background:var(--accent-dark,#424f36)}.ds-story-action:active:not(:disabled){background:#36452b}.ds-story-action:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-story-action:disabled{cursor:not-allowed;opacity:.55}@media(prefers-reduced-motion:reduce){.ds-story-action{transition:none;animation:none}}@media(max-width:859px){.ds-story{grid-template-columns:220px minmax(0,1fr)}.ds-story-body{padding:24px}.ds-cover-title{font-size:27px;padding:24px}.ds-story-mode{left:24px}}@media(max-width:600px){.ds-story{grid-template-columns:1fr}.ds-story-art{min-height:155px}.ds-story-body{gap:16px}.ds-cover-title{padding-bottom:54px}}"
     },
     {
-      "name": "Selected Person",
+      "name": "Information Tools",
+      "kind": "nav",
+      "refersTo": "information-tool",
+      "description": "Four labeled SVG tools in a translucent capsule.",
+      "html": "<nav class=\"ds-information-tools\" aria-label=\"世界与角色资料\"><button class=\"ds-information-tool\" type=\"button\" aria-expanded=\"true\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20v-2a7 7 0 0 1 14 0v2\"/></svg><span>角色</span></button><button class=\"ds-information-tool\" type=\"button\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"6\" width=\"14\" height=\"15\" rx=\"4\"/><path d=\"M9 6V4a3 3 0 0 1 6 0v2M8 14h8v4H8z\"/></svg><span>背包</span></button><button class=\"ds-information-tool\" type=\"button\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15\"/></svg><span>地图</span></button><button class=\"ds-information-tool\" type=\"button\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v2\"/></svg><span>人物</span></button></nav>",
+      "css": ".ds-information-tools{display:flex;flex-direction:column;gap:3px;padding:7px;border-radius:999px;width:fit-content;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);background:linear-gradient(145deg,#fffaf2ad,#fffdf46b);border:1px solid #ffffffbf;box-shadow:0 14px 42px #554d391c,0 3px 8px #554d3910,inset 0 1px 0 #fff9;backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%);}.ds-information-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:54px;min-height:62px;padding:6px;border:0;border-radius:999px;background:transparent;color:var(--muted,#65695d);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-size:11px;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-information-tool svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.ds-information-tool:hover,.ds-information-tool[aria-expanded=true]{background:#fafcf2d9;color:var(--accent-dark,#424f36)}.ds-information-tool:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}@media(max-width:720px){.ds-information-tools{flex-direction:row;justify-content:space-between;padding:5px;width:100%}.ds-information-tool{flex:1;min-width:0;min-height:44px;flex-direction:row;gap:6px;padding:5px 8px;font-size:12px}.ds-information-tool svg{width:17px;height:17px}}@supports not(backdrop-filter:blur(1px)){.ds-information-tools{background:#faf8f0}}@media(prefers-reduced-transparency:reduce){.ds-information-tools{background:#faf8f0;backdrop-filter:none;-webkit-backdrop-filter:none}}@media(prefers-reduced-motion:reduce){.ds-information-tool{transition:none;animation:none}}"
+    },
+    {
+      "name": "Action Composer",
       "kind": "custom",
-      "refersTo": "character-selected",
-      "description": "A person row whose state matches the conversation destination.",
-      "html": "<button class=\"ds-person ds-selected\" type=\"button\" aria-pressed=\"true\"><span class=\"ds-avatar\">裁</span><span class=\"ds-person-copy\"><strong>裁缝店老板</strong><small>委托人</small></span></button>",
-      "css": ".ds-person{display:flex;width:100%;align-items:center;gap:12px;padding:12px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink,#202b43);text-align:left;font:14px/1.65 var(--ui-font,\"Microsoft YaHei\",\"PingFang SC\",\"Segoe UI\",sans-serif);cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-person-copy{display:grid;gap:2px}.ds-person-copy small{font-size:12px;color:var(--muted,#596781)}.ds-avatar{display:grid;place-items:center;flex:0 0 34px;width:34px;height:36px;border-radius:5px;background:#dfe5f5;color:var(--accent-dark,#253b9a);font-weight:650}.ds-selected{border-color:var(--accent,#354fc4);background:#e8edff}.ds-selected .ds-avatar{background:var(--accent,#354fc4);color:var(--panel,#fff)}.ds-person:hover:not(.ds-selected){background:var(--paper-deep,#e7ecf8)}.ds-person:focus-visible{outline:2px solid var(--accent,#354fc4);outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-person{transition:none}}"
+      "refersTo": "composer",
+      "description": "The glass draft surface with recipient control, save state and pill submission.",
+      "html": "<form class=\"ds-composer\"><div class=\"ds-composer-tools\"><span class=\"ds-composer-label\">你的行动</span><label class=\"ds-recipient-label\">对谁说<select class=\"ds-recipient-select\" aria-label=\"交谈对象\"><option>自动判断</option><option>裁缝店老板</option></select></label><span class=\"ds-save-state\">进度自动保存</span></div><textarea class=\"ds-draft\" aria-label=\"你的行动\" rows=\"2\" placeholder=\"说出你的想法，或描述接下来要做的事…\"></textarea><div class=\"ds-composer-footer\"><span>Ctrl + Enter 提交</span><button class=\"ds-submit\" type=\"button\">提交行动</button></div></form>",
+      "css": ".ds-composer{display:flex;flex-direction:column;min-height:0;padding:18px 20px;border-radius:30px;margin-top:22px;color:var(--ink,#30372e);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);background:linear-gradient(145deg,#fffaf2ad,#fffdf46b);border:1px solid #ffffffbf;box-shadow:0 14px 42px #554d391c,0 3px 8px #554d3910,inset 0 1px 0 #fff9;backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%);}.ds-composer-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}.ds-composer-label{font-size:14px;font-weight:650;margin-right:auto}.ds-recipient-label{display:flex;align-items:center;gap:8px;margin:0}.ds-recipient-select{width:auto;max-width:160px;padding:5px 8px;border:1px solid transparent;border-radius:999px;background:#e6ebdc;color:var(--ink,#30372e);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-size:12px;caret-color:var(--accent,#566447)}.ds-recipient-select:focus{outline:2px solid var(--accent,#566447);outline-offset:1px}.ds-save-state{margin-left:auto;color:var(--muted,#65695d);font-variant-numeric:tabular-nums}.ds-draft{display:block;width:100%;min-height:83px;max-height:min(180px,30dvh);margin:10px 0;padding:10px 2px;border:0;border-radius:12px;resize:none;overflow-y:auto;background:transparent;color:var(--ink,#30372e);caret-color:var(--accent,#566447);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-size:16px;line-height:1.75}.ds-draft::placeholder{color:var(--muted,#65695d);opacity:1}.ds-draft:focus{outline:2px solid var(--accent,#566447);outline-offset:1px}.ds-composer-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:6px;color:var(--muted,#65695d);font-size:12px}.ds-submit{min-height:44px;min-width:116px;padding:10px 18px;border:1px solid transparent;border-radius:999px;background:var(--accent,#566447);color:white;font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);font-weight:650;cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-submit:hover:not(:disabled){background:var(--accent-dark,#424f36)}.ds-submit:active:not(:disabled){background:#36452b}.ds-submit:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-submit:disabled{cursor:not-allowed;opacity:.55}@media(max-width:720px){.ds-composer{padding:15px 17px;border-radius:27px}.ds-draft{min-height:87px}.ds-save-state{margin-left:0}}@media(max-width:600px){.ds-composer-footer>span{max-width:48%;font-size:11px}.ds-submit{min-width:110px;padding-inline:14px}}@media(max-height:600px){.ds-draft{min-height:48px;max-height:min(100px,30dvh)}}@supports not(backdrop-filter:blur(1px)){.ds-composer{background:#faf8f0}}@media(prefers-reduced-transparency:reduce){.ds-composer{background:#faf8f0;backdrop-filter:none;-webkit-backdrop-filter:none}}@media(prefers-reduced-motion:reduce){.ds-submit{transition:none;animation:none}}"
+    },
+    {
+      "name": "Information Panel",
+      "kind": "custom",
+      "refersTo": "information-panel",
+      "description": "A rounded glass surface with shared information tabs and an authored close SVG.",
+      "html": "<section class=\"ds-panel\" role=\"dialog\" aria-label=\"世界与角色资料\" tabindex=\"-1\"><header class=\"ds-panel-header\"><h2>世界与角色资料</h2><button class=\"ds-close\" type=\"button\" aria-label=\"关闭\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"m6 6 12 12M18 6 6 18\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"/></svg></button></header><nav class=\"ds-panel-tabs\" aria-label=\"资料分类\"><button class=\"ds-tab ds-tab-selected\" type=\"button\">角色</button><button class=\"ds-tab\" type=\"button\">背包</button><button class=\"ds-tab\" type=\"button\">地图</button><button class=\"ds-tab\" type=\"button\">人物</button></nav><div class=\"ds-panel-content\"><h3>角色资料</h3><p>尚无已知资料。</p></div></section>",
+      "css": ".ds-panel{width:min(360px,100%);max-height:calc(100dvh - 136px);overflow-y:auto;padding:20px 24px 24px;border-radius:32px;color:var(--ink,#30372e);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);background:#faf8edcf;border:1px solid #ffffffe0;backdrop-filter:blur(30px) saturate(150%);-webkit-backdrop-filter:blur(30px) saturate(150%);box-shadow:0 24px 80px #3d402737,inset 0 1px 0 #ffffffe0;outline:none}.ds-panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.ds-panel-header h2{margin:0;font-size:24px;line-height:1.4;text-wrap:balance}.ds-close{display:grid;place-items:center;min-height:40px;width:40px;padding:6px;border:0;border-radius:50%;background:#eeefe2bd;color:var(--muted,#65695d);cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-close:hover:not(:disabled){background:var(--paper-deep,#e6ebdc)}.ds-close:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-close:disabled{cursor:not-allowed;opacity:.55}.ds-panel-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;padding:4px;border-radius:999px;background:#e8eadcad}.ds-tab{min-height:40px;padding:6px;border:0;border-radius:999px;background:transparent;color:var(--muted,#65695d);font:14px/1.65 var(--ui-font,-apple-system, BlinkMacSystemFont, \"PingFang SC\", \"Microsoft YaHei\", \"Segoe UI\", sans-serif);cursor:pointer;transition:background-color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),color 180ms var(--ease,cubic-bezier(.16,1,.3,1)),border-color 180ms var(--ease,cubic-bezier(.16,1,.3,1));}.ds-tab-selected{color:var(--accent-dark,#424f36);background:#fffdf3e8;box-shadow:0 2px 5px #4b543813;font-weight:650}.ds-tab:focus-visible{outline:2px solid var(--accent,#566447);outline-offset:3px}.ds-panel-content{padding-top:24px}.ds-panel-content h3{font-size:17px;line-height:1.4;margin:0 0 12px}.ds-panel-content p{margin:0;color:var(--muted,#65695d)}@media(max-width:720px){.ds-panel{width:min(480px,100%);max-height:calc(100dvh - 24px);border-radius:30px;padding:18px 20px 24px}}@media(max-width:600px){.ds-panel-header h2{font-size:22px}}@media(max-height:600px){.ds-panel{max-height:calc(100dvh - 104px)}}@supports not(backdrop-filter:blur(1px)){.ds-panel{background:#faf8f0}}@media(prefers-reduced-transparency:reduce){.ds-panel{background:#faf8f0;backdrop-filter:none;-webkit-backdrop-filter:none}}@media(prefers-reduced-motion:reduce){.ds-tab,.ds-close{transition:none;animation:none}}@media(prefers-reduced-motion:no-preference){.ds-panel{animation:ds-sheet-in 220ms var(--ease,cubic-bezier(.16,1,.3,1))}@keyframes ds-sheet-in{from{opacity:.3;transform:translateY(12px)}}}"
     }
   ],
   "narrative": {
-    "northStar": "Contemporary Novel Jacket",
-    "overview": "WIA pairs saturated title planes with cool white reading pages and dark blue ink. Its visual identity comes from the relationship between the cover, the page and the typography. Chinese story text has the generous leading of a book; navigation, factual context and controls use a familiar platform sans.\n\nSurfaces are quiet and flat. Fine rules separate reading, writing and factual context; softened rectangular controls make actions legible without competing with the story. Player-facing language is Chinese. The name is World Is Agent, abbreviated WIA.",
+    "northStar": "Warm Paper Floating Tools",
+    "overview": "Warm ivory paper carries WIA's narrative, with dark olive ink and generous paragraph leading. Translucent rounded tools sit above that opaque reading ground. Their white edges, softened shadows and restrained olive states give world information and free-form actions a clear, tactile presence.\n\nLocally served display lettering introduces stories; a platform sans carries narration, controls and factual context. Related controls stay compact while reading receives open space. The product name is World Is Agent, abbreviated WIA; player-facing copy is Chinese.",
     "keyCharacteristics": [
-      "Ultramarine cover fields and decisive primary actions.",
-      "White reading surfaces against cool blue-gray paper.",
-      "Locally served display lettering, platform Chinese book text and neutral operational type.",
-      "Wide paragraph spacing, restrained borders and visible keyboard focus.",
-      "Compact state transitions and a single waiting pulse."
+      "Opaque warm paper and dark olive narrative text.",
+      "White-edged glass tools with soft, downward depth.",
+      "An open reading measure, full-width suggestions and a rounded action composer.",
+      "Locally served display lettering and a consistent platform sans for reading and operation.",
+      "Visible focus, themed browser details and reduced-motion and reduced-transparency states."
     ],
     "rules": [
       {
-        "name": "The Cover and Action Rule",
-        "body": "Ultramarine names a story, identifies a primary action or marks an interactive state.",
+        "name": "The Olive Action Rule",
+        "body": "Olive identifies story title planes, primary actions and interactive states; success and error colors retain their explicit feedback meanings.",
         "section": "colors"
       },
       {
-        "name": "The Feedback Rule",
-        "body": "Green and red belong to explicit status and destructive-action semantics.",
-        "section": "colors"
-      },
-      {
-        "name": "The Three Voices Rule",
-        "body": "WIA Display introduces a story, the book stack carries narration, and the UI stack carries actions and factual information.",
+        "name": "The Reading Measure Rule",
+        "body": "Narration uses the reading role within the established 720px measure, preserving intentional line breaks and wrapping long strings.",
         "section": "typography"
       },
       {
-        "name": "The Reading and Submission Rule",
-        "body": "The transcript remains independently scrollable, and the submit footer remains outside the scrollable composer body.",
+        "name": "The Shared Reading Rule",
+        "body": "Narrative, suggestions and the action composer share the transcript scroll surface; the reader retains its anchor and has a separate return-to-latest action.",
         "section": "layout"
       },
       {
-        "name": "The Floating Layer Rule",
-        "body": "Shadows identify controls and panels that float above the reading surface.",
+        "name": "The Paper and Tool Rule",
+        "body": "Narrative text sits on opaque Warm Ivory; glass belongs to information controls, the action composer and the information panel.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do use the global CSS custom properties for shared palette and font roles.",
-      "Do keep WIA Display, its local font asset and its license together.",
-      "Do preserve the distinct display, narration and UI typography roles.",
-      "Do keep reading, composer content and submission controls within their established scroll boundaries.",
-      "Do carry destination selection consistently between person rows and the composer.",
-      "Do preserve visible keyboard focus, Chinese action labels and reduced-motion behavior.",
-      "Do keep this file and its sidecar aligned with durable changes in the implemented styles."
+      "Do use the global palette and font custom properties for shared visual roles.",
+      "Do keep WIA Display with its locally served font asset, notice and license.",
+      "Do preserve opaque prose, its established measure and generous leading.",
+      "Do keep narrative, suggestions and the composer in the shared reading scroll surface.",
+      "Do preserve desktop nonmodal information access and the narrow-screen modal bottom sheet.",
+      "Do carry recipient selection consistently between person rows and the composer.",
+      "Do retain Chinese action labels, drawn SVG icons, visible focus and accessible material preferences."
     ],
     "donts": [
-      "Don't replace the locally served display voice with a platform UI face.",
-      "Don't place the submit footer inside the scrollable composer body.",
-      "Don't use accent, success or error colors without their established story, action or state meaning.",
-      "Don't add shadows to flat reading surfaces or use text glyphs as the reusable icon vocabulary."
+      "Don't replace the locally served display face with a platform display face.",
+      "Don't place translucent material beneath narrative paragraphs.",
+      "Don't add permanent information columns or card frames around prose.",
+      "Don't use feedback colors without their established success, error or destructive-action meaning.",
+      "Don't use text glyphs as the reusable icon vocabulary."
     ]
   }
 }

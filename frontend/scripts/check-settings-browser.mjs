@@ -9,7 +9,13 @@ const call = (...args) =>
   execFileSync(browser, args, { encoding: "utf8", timeout: 20000 }).trim();
 const js = (expression) =>
   JSON.parse(call("js", `(async()=>JSON.stringify(await (${expression})))()`));
-const click = (selector) => call("click", selector);
+const click = (selector) => {
+  if (selector === 'button:has-text("故事设置")') {
+    call("click", "#wia-more-menu");
+    return call("click", '.menu-panel button:has-text("故事设置")');
+  }
+  return call("click", selector);
+};
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function wait(expression) {
   for (let i = 0; i < 60; i++) {
@@ -24,6 +30,7 @@ try {
   opened = true;
   call("viewport", "1280x800");
   await wait(`!!document.querySelector('.continue-panel')`);
+  assert.equal(js(`fetch('/fixture/control',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(v=>v.ok)`), true, "fixture control must be recognized before writes");
   click(".continue-panel button");
   await wait(`!!document.querySelector('.reading-heading')`);
   const id = js(

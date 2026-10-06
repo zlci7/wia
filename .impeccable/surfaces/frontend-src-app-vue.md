@@ -2,23 +2,29 @@
 version: 1
 slug: "frontend-src-app-vue"
 primary_target: "frontend/src/App.vue"
-related_targets: ["frontend/src/style.css"]
+related_targets: ["frontend/src/style.css", "frontend/src/components/AppDialog.vue", "frontend/src/components/SuggestionPanel.vue"]
 ---
 
 # Player surface
 
-Mode: Read. The player follows the current story, writes an action, and checks visible people, places, possessions and saved progress. Scope: existing home, story selection, reader, composer, scene drawer and dialogs. The implementation path is code-led with desktop and mobile browser verification.
+Mode: Read. The player reads an open story, writes freely, and checks their actual situation on demand. Platform: web. Path: code-led, based on approved A “Warm Paper Floating Tools”.
 
 ## Direction contract
 
-THESIS: A contemporary novel jacket opens onto a quiet reading room. The story owns the viewport; operational controls remain familiar.
+THESIS: Warm paper carries the story; translucent, rounded tools provide immediate access to world information.
 
-OWN-WORLD: Ultramarine cover fields, cool white pages, dark blue ink, rectangular label-like controls and generous paragraph spacing. Navigation and factual context share the same neutral sans typography. Reading text uses the platform's Chinese book face.
+OWN-WORLD: Warm ivory #f5f1e8, dark olive ink #30372e, olive action #566447, platform sans typography. Open prose has a 720px measure, 19px type and 1.95 line-height; narrow screens use 18px. Glass controls carry a white edge, blur and soft offset depth. The story stays on an opaque ground.
 
-STORY: Choose an existing story or saved world, read its present moment, write freely, and consult only the information the player can see.
+STORY: Enter a dated scene, follow independently acting people, write a free action, inspect known data and return to the same reading position.
 
-FIRST VIEWPORT: A compact masthead sits above a broad centered reading column and a narrow factual rail. The composer stays at the bottom. Home entries use a saturated title plane beside the real story description. On mobile, the factual rail becomes the existing scene drawer. Signature interaction: choosing a conversation partner visibly marks that person and the input destination together. Motion grammar: short color and focus transitions, one restrained waiting indicator, reduced-motion support.
+FORM: Approved A code prototype, grounded structure 2 from the warm Apple reading study (seed 4027323d). The user selected A for formal integration on 2026-10-06.
 
-FORM: Contemporary novel jacket, candidate 6; seed key 2fd0c899. Grounded order: clothbound reader, city atlas, stationery folder, theatre programme, music score, contemporary novel jacket, screenplay. Challenger verdicts: noir poster competitive in identification; grid specimen competitive in clarity; cutting bench declined, contributing continuity discipline; data field declined, contributing tonal restraint; cyclorama competitive in identification; industrial labels declined, contributing consistent state markings. Grid density calibrates the controls; its visible graph motifs stay outside this surface. The delegated unattended task uses the assigned direction.
+FIRST VIEWPORT: A compact WIA masthead, world date and location frame the open reading column. Four tools occupy a vertical glass capsule on desktop and a horizontal capsule on narrow screens. Story, three full-width suggestions and the rounded composer share one scroll surface. Saved history retains its anchor. “Back to latest” reaches the action area.
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+SIGNATURE INTERACTION: One shared information panel switches between character, inventory, map and people. Desktop viewing is nonmodal; screens at or below 720px use a modal bottom sheet. Closing restores focus without scrolling. Draft, conversation partner and game time persist. Choosing a suggestion fills an editable empty draft; submitting uses the existing run and recovery mechanism.
+
+STATES: Reading, suggestions ready/disabled/unavailable, generation, cancellation, failed run, unknown submission, historic reading, information open, story ended and missing model connection. Model and story settings, saves and retrospective corrections retain their existing workflows.
+
+QUALITY BAR: Match the approved rounded paper and glass language; no permanent information columns or cards around prose. Keep real server-projected date, cash, ownership and knowledge. Desktop, narrow and short-screen controls fit without horizontal overflow. Focus, Escape, draft and scroll recovery are verified against the real client with isolated controlled-model fixture data.
+
+FINISH: Batched desktop/mobile/short-screen evidence, independent finish review and canonical design documentation. Real-model narrative quality and physical phone keyboard behavior remain separate verification boundaries.
