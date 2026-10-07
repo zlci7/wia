@@ -1,20 +1,15 @@
-# WIA documentation
+# WIA 文档
 
-## Current contracts and delivery status
+当前阶段为 **Phase13**，当前执行入口为[共创游玩执行规划](phase13/共创游玩-执行规划.md)，实际交付见[Phase13 开发状态](phase13/开发状态.md)。
 
-- [Architecture](ARCHITECTURE.md): current module responsibilities, dependencies and execution boundaries.
-- [Product](phase12/产品说明.md): player experience and product scope.
-- [Technical contracts](phase12/总体技术方案.md): identity, time, visibility, persistence and recovery contracts.
-- [Development guide](phase12/开发指南.md): work units and verification requirements.
-- [Delivery status](phase12/开发状态.md): implemented capabilities and outstanding validation.
+## 文档归属
 
-## Phase documents
+| 目录 | 内容 |
+| --- | --- |
+| [summary](summary/README.md) | 整体架构、模块职责和跨阶段技术合同 |
+| [phase12](phase12/README.md) | Phase12 技术方案、执行计划、阶段记录、证据和作者资料 |
+| [phase13](phase13/README.md) | Phase13 当前方案、执行规划、开发状态、阶段记录和证据 |
 
-- [Phase12](phase12/README.md): existing stage specifications, story pack templates and reference material.
-- [Phase13](phase13/README.md): proposed centralized scene creation, context composition, migration and acceptance tests. Runtime changes are pending.
+产品目标统一见[产品说明](产品说明.md)。架构规则统一见[整体架构](summary/ARCHITECTURE.md)，通用运行合同见[总体技术方案](summary/总体技术方案.md)。
 
-## Delivery records
-
-- [WIA summaries](summary/README.md): completed execution plans, verification records and supporting evidence.
-
-Specifications describe their implementation status explicitly. Architecture rules belong in `ARCHITECTURE.md`; product scope and technical invariants retain the canonical sources listed above. Moving a verification record does not change its conclusions.
+阶段方案描述该阶段的实现范围；阶段记录保存实际结果和验证限制。各阶段状态分别维护，设计和计划不作为已实现能力。

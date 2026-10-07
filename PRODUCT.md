@@ -8,11 +8,11 @@ web
 
 ## Product Purpose
 
-The authoritative product definition, users, workflows, and scope are in [the Phase12 product specification](docs/phase12/产品说明.md).
+The authoritative product definition, users, workflows, and scope are in [the product specification](docs/产品说明.md).
 
 ## Capabilities and Constraints
 
-Current delivery evidence is in [development status](docs/phase12/开发状态.md). Architecture constraints are in [the architecture specification](docs/ARCHITECTURE.md). The next-stage design is defined by [Phase13](docs/phase13/README.md); centralized scene creation is not implemented yet.
+Current delivery evidence is in [Phase13 development status](docs/phase13/开发状态.md); the preceding delivery baseline is in [Phase12](docs/phase12/开发状态.md). Architecture constraints are in [the architecture specification](docs/summary/ARCHITECTURE.md). [Phase13](docs/phase13/README.md) is the current stage. A centralized scene candidate exists, continuous live preflight has not passed, and the formal turn still uses individual character calls. The current [co-creative gameplay plan](docs/phase13/共创游玩-执行规划.md) is pending implementation.
 
 ## Brand Commitments
 

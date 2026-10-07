@@ -1,6 +1,10 @@
-# WIA delivery records
+# WIA 整体架构设计
 
-- [Phase12 records](phase12/README.md): execution plans, engineering verification, real-model observations and screenshot evidence.
-- [Phase13 records](phase13/README.md): technical design review and implementation estimates.
+| 文档 | 职责 |
+| --- | --- |
+| [整体架构](ARCHITECTURE.md) | 当前模块、依赖、回合主流程、模型和事务边界 |
+| [总体技术方案](总体技术方案.md) | 世界身份、知情范围、上下文、记忆、状态与持久化的通用合同 |
 
-These records preserve their original delivery scope and validation limits. Current behavior and pending work are tracked in [delivery status](../phase12/开发状态.md).
+产品目标见[产品说明](../产品说明.md)。当前 Phase13 的创作合同和执行范围见[Phase13](../phase13/README.md)。
+
+阶段计划、验收记录和截图分别归入[Phase12](../phase12/README.md)与[Phase13](../phase13/README.md)。

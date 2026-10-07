@@ -21,7 +21,7 @@ cd D:\data\project\game-agent\wia
 4. 输入“我沿原路返回调查事务所”，确认裁缝店老板重新成为同场人物。
 5. 退出 Runtime，以相同 `-DataRoot` 重启并继续故事，确认地点、时间、人物与历史保持一致。
 
-v3 最小作者模板位于 [`docs/phase12/templates/story-pack-v3-minimal`](../../../phase12/templates/story-pack-v3-minimal/story.json)。连接是有向的；需要双向通行时，两个 place 都要声明对方。
+v3 最小作者模板位于 [`docs/phase12/templates/story-pack-v3-minimal`](../templates/story-pack-v3-minimal/story.json)。连接是有向的；需要双向通行时，两个 place 都要声明对方。
 
 ## 实现结果
 
