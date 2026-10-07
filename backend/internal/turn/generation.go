@@ -179,6 +179,10 @@ func NewContextGenerator(deps Deps, owner string, generator model.TextGenerator,
 
 // Field and Expected are taken from the local schema, never response values.
 func generatedDecodeError(err error, target any) error {
+	var contract *GenerationError
+	if errors.As(err, &contract) {
+		return err
+	}
 	result := &GenerationError{Code: "json_schema_invalid", Cause: err}
 	var mismatch *json.UnmarshalTypeError
 	if errors.As(err, &mismatch) {

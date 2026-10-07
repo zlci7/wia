@@ -294,8 +294,26 @@ func validateSceneRuleBinding(draft *SceneDraft, parts []InputFragment) error {
 	}
 	for i, part := range parts {
 		actual := draft.InputMap[i]
-		if part.Text != actual.Text || part.IntentType != actual.IntentType || part.WaitMinutes != actual.WaitMinutes || part.ActionRuleID != actual.ActionRuleID || part.AddresseeID != actual.AddresseeID || part.Visibility != actual.Visibility {
-			return coordinationInvalid("scene_rule_binding_changed", fmt.Sprintf("input_map[%d]", i), "unchanged-original-rule-and-scope")
+		bindings := []struct {
+			name string
+			want any
+			got  any
+		}{
+			{"text", part.Text, actual.Text},
+			{"intent_type", part.IntentType, actual.IntentType},
+			{"wait_minutes", part.WaitMinutes, actual.WaitMinutes},
+			{"action_rule_id", part.ActionRuleID, actual.ActionRuleID},
+			{"addressee_id", part.AddresseeID, actual.AddresseeID},
+			{"visibility", part.Visibility, actual.Visibility},
+		}
+		for _, binding := range bindings {
+			if binding.want != binding.got {
+				expected := "unchanged-original-fragment"
+				if binding.name != "text" {
+					expected = wire.MarshalJSON(binding.want)
+				}
+				return coordinationInvalid("scene_rule_binding_changed", fmt.Sprintf("input_map[%d].%s", i, binding.name), expected)
+			}
 		}
 	}
 	return nil

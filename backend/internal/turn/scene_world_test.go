@@ -127,11 +127,12 @@ func TestSceneSelectedWorldMaterialExpansionSharesReadQuota(t *testing.T) {
 			for index := range 4 {
 				s.Definition.Materials = append(s.Definition.Materials, story.Material{ID: fmt.Sprintf("owner-detail-%d", index), Visibility: "owner", OwnerID: "npc:a", Delivery: "detail", Summary: "甲的记录", Body: "PERSONAL_DETAIL", EntityIDs: []string{"npc:a"}, ItemIDs: []string{"unique-tool"}})
 			}
-			s.Definition.Progression.Developments = []plot.Development{{ID: "queue", MaterialIDs: []string{"pressure"}, LocationIDs: []string{"workplace"}}}
+			minute, _ := plot.ClockMinute(s.Summary.Clock)
+			s.Definition.Progression.ExternalSchedules = []plot.ExternalSchedule{{ID: "queue", MaterialID: "pressure", AtMinute: minute + 1}}
 			run := wiaworld.Run{RunID: "world-material", Input: "我问现在有什么变化。"}
-			b := sceneWorldBeat("b1", "船期有所变化。", s.Definition.Materials[0].SourceID(s.Definition.Revision), 0)
+			b := sceneWorldBeat("b1", "船期有所变化。", s.Definition.Materials[0].SourceID(s.Definition.Revision), 1)
 			d := sceneComplete(run.Input, b)
-			d.ProgressUpdates = []sceneProgress{{Type: "development", ID: "queue", Status: "occurred", Content: "船期发生变化。", Basis: []string{"beat:b1"}, BeatIDs: []string{"b1"}}}
+			d.ProgressUpdates = []sceneProgress{{Type: "external_schedule", ID: "queue", Status: "occurred", Content: "船期发生变化。", OffsetMinutes: 1, Basis: []string{"beat:b1"}, BeatIDs: []string{"b1"}}}
 			g := &sceneSequenceGenerator{reply: func(index int, req model.TextRequest) (string, error) {
 				if alreadyRead && index == 1 {
 					return `{"needs_material":["extra"]}`, nil

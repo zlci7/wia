@@ -9,11 +9,12 @@ import (
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/plot"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
-const scenePromptVersion = "story.scene.v1"
+const scenePromptVersion = "story.scene.v2"
 
 // SourceLedger is a request-local permission table. Personal aliases are
 // normalized separately for each owner; an empty scene recipient is never a
@@ -185,6 +186,13 @@ func composeScene(snapshot Snapshot, run wiaworld.Run, selected []string) Materi
 	material.Optional = append(material.Optional, Section{Name: "scene_location_detail", Text: "地点详细环境（未装配的详细背景保持未知）：" + locationContext(snapshot.Definition.Locations), Priority: 50})
 	material.Required += "\n当前权威世界（当前值优先于冻结开场和主观摘要）：" + HostMechanicsContext(snapshot) + "\n完整地点连接（详细环境按整场预算装配）：" + wire.MarshalJSON(graph) + "\n当前位置：" + wire.MarshalJSON(snapshot.Positions) + "\n既有背景实体：" + wire.MarshalJSON(snapshot.Definition.BystanderRefs) + "\n当前同场身份：" + wire.MarshalJSON(CharacterIDs(InScene(snapshot.Characters)))
 	material = appendRequiredMaterial(material, sceneWorldWindow(snapshot))
+	if object := sceneOpeningWorldObject(snapshot); object != nil {
+		for _, id := range object.MaterialIDs {
+			if m, ok := story.MaterialByID(snapshot.Definition, id); ok && materialAuthorized(snapshot, "scene", "", m) {
+				material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
+			}
+		}
+	}
 	for _, owner := range selected {
 		material.Required += "\n本人当前场景 owner=" + owner + "：" + SceneFor(snapshot, owner)
 		for _, view := range snapshot.SceneViews {
@@ -311,14 +319,20 @@ const sceneCreationPrompt = `你负责集中创作玩家此次意图在当前世
 关键说法、承诺、发现、行动与变化进入 beats。正文关键内容引用玩家收到投影的节点。
 schema_revision 固定为 scene-draft.v1；最多24节点、0—120分钟，最后节点偏移等于总时间。
 input_map最多四段连续原文，完整覆盖输入。status为succeeded/failed/partial/not_executed。
+input_map每项完整列出text/intent_type/addressee_id/visibility/beat_ids/status/unexecuted_reason；成功时unexecuted_reason=""，未执行时填写实际原因。
+input_map.intent_type只用speak/observe/act，visibility只用public/private；这些描述玩家输入，不使用节点kind代替。
+wait_minutes只表示玩家明确选择的等待，普通交谈与行动耗时写offset_minutes及elapsed_minutes。
+若提供程序解析的固定规则原文片段，逐段原样复制text/intent_type/addressee_id/visibility/wait_minutes/action_rule_id；只补beat_ids/status/unexecuted_reason。
 每个beat提供local_id/kind/actor_id/offset_minutes/basis/content/recipients/bystanders/projections/effects。
 dialogue只附加scope=public/private：公开recipients=[]，私下列1—4名其他听众；bystanders/projections=[]。
+对白原话与听众由程序生成个人投影，dialogue保持projections=[]；observation/world_change省略scope/status/attempt。
 action_result附加status和attempt={content,input_fragment_index}；索引从0开始，仅玩家尝试填写。
 observation与world_change提供不同人物的实际projections，不把作者根内容广播为个人知识。
 dialogue/observation只可更新有本人basis的关系和计划；移动、钱物变化写实际行动或世界变化。
 effects仅提供已启用的能力字段，不填写action_id，程序绑定正式来源。没有变化填{}。
 无spatial的冻结旧世界在明确场景转换时可填effects.legacy_scene={content,characters}，人物ID来自冻结目录；它不声明空间路线。
 basis使用实际提供的来源或beat:更早local_id；人物的对白、行动和观察引用更早节点只取得自己的投影。
+按人物实际接收选择basis，避免机械串接前一节点。玩家独享观察不能成为NPC依据；NPC可以引用听到的对白、本人档案、旧经历或收到的投影。
 input:索引表示相应原文片段；本人只能引用实际收到的原文，私下第三人只有观察迹象。
 stop.reason为completed/player_choice/interrupted/time_limit，content说明完整结束点。
 有剩余意图时input_map说明未执行原因。已成功原文段不写未执行说明。
@@ -326,7 +340,9 @@ stop.reason为completed/player_choice/interrupted/time_limit，content说明完�
 后段固定规则需前段工作态时只返回{"needs_resolution":{"rule_id":"已选规则","input_fragment_index":0,"prefix_beats":[],"prefix_elapsed_minutes":0}}。
 材料或目的地人物扩展共一次机会，固定检查点一次，结构与业务纠正共一次，核心调用总计最多四次。
 progress_updates每项提供type/id/status/content/offset_minutes/basis/beat_ids；没有变化也有实际评估时间和理由。
+主持的世界进度引用已提供的material:/definition:/fact:或更早beat:，原文input:属于实际收到它的个人，不作为world的来源。
 实际选中的世界事项和到期个人计划须评估，暂缓用deferred且beat_ids=[]，不能静默跳过。
+plan_candidates只是未来窗口；仅在计划到期且owner已装配时复查personal_plan，未到期计划保持原状。
 world_change的actor_id=world，节点须绑定实际选中的非deferred进度或合格event_offer。
 personal_plan进度只标记复查；计划内容仍由effects.plan_updates唯一更新。legacy_node只有guided的合法terminal才有ending。
 新的开放事件只按event_policy，触发是本轮成功或partial的实际移动或显著变化；initial_beat_ids引用后续world_change。

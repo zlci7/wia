@@ -2,12 +2,22 @@ package turn
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 
 	wiaworld "gameagent/backend/internal/world"
 )
+
+func TestSceneNestedBusinessFailureRetainsCorrectionField(t *testing.T) {
+	raw := strings.Replace(sceneDraftFixture(t), `"scope": "public",`, `"scope":"public","status":"succeeded",`, 1)
+	_, err := decodeSceneResponse(raw)
+	var failure *GenerationError
+	if !errors.As(err, &failure) || failure.Code != "scene_dialogue_invalid" || failure.Field != "beats.status" || failure.Expected != "omitted-for-dialogue" {
+		t.Fatalf("nested correction lost its contract: %v", err)
+	}
+}
 
 func sceneDraftFixture(t *testing.T) string {
 	t.Helper()

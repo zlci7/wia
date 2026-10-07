@@ -133,9 +133,15 @@ func selectSceneWorld(snapshot Snapshot, out Output) *sceneWorldObject {
 func sceneWorldWindow(snapshot Snapshot) Section {
 	minute, _ := plot.ClockMinute(snapshot.Summary.Clock)
 	window := map[string]any{"forecast_end_minute": minute + PlotTimeLimit(snapshot), "actual_selection": "按节点实际时间、工作位置、状态、当前轮转确认；预备条目不授予提前执行资格"}
+	if object := sceneOpeningWorldObject(snapshot); object != nil {
+		window["opening_assessment"] = map[string]any{"type": object.Type, "id": object.ID, "material_ids": object.MaterialIDs, "required": "当前起点已经选中；本轮按实际时间评估。没有新变化也写deferred及理由，不省略。后续若外部时点优先，则按实际结束时点重新选择。"}
+	}
 	if def := snapshot.Definition.Progression; def != nil {
 		window["development_candidates"] = def.Developments
 		window["external_candidates"] = def.ExternalSchedules
+		if progress := snapshot.OpenProgress; progress != nil {
+			window["current_progress"] = map[string]any{"external_applied": progress.ExternalApplied, "development_cursor": progress.DevelopmentCursor, "development_checks": progress.DevelopmentChecks}
+		}
 	}
 	plans := newContextTable("id", "owner_id", "next_check", "last_check", "status")
 	owners := plot.DuePlanOwners(snapshot.OpenProgressPlans(), minute+PlotTimeLimit(snapshot), 2)
@@ -159,6 +165,10 @@ func sceneWorldWindow(snapshot Snapshot) Section {
 	}
 	window["event_policy"] = snapshot.Definition.EventGeneration
 	return Section{Name: "scene_world_window", Text: "世界评估候选窗口：" + wire.MarshalJSON(window), Sources: sources}
+}
+
+func sceneOpeningWorldObject(snapshot Snapshot) *sceneWorldObject {
+	return selectSceneWorld(snapshot, Output{Clock: snapshot.Summary.Clock, Positions: snapshot.Positions, States: snapshot.States, Relationships: snapshot.Relationships, Items: snapshot.Items, OpenProgress: snapshot.OpenProgress, GeneratedEvents: &snapshot.GeneratedEvents})
 }
 
 func requireSceneWorldMaterials(snapshot Snapshot, object *sceneWorldObject, ledger *SourceLedger) error {
@@ -402,8 +412,8 @@ func (w *sceneWorldCompiler) finish(snapshot Snapshot, out *Output, run wiaworld
 	if expansion := sceneDueOwnerExpansion(snapshot, out.Clock); expansion != nil {
 		return expansion
 	}
-	if w.selectObject(snapshot, *out) != nil {
-		return coordinationInvalid("scene_world_assessment_missing", "progress_updates", "actual-selected-world-assessment-including-deferred")
+	if object := w.selectObject(snapshot, *out); object != nil {
+		return coordinationInvalid("scene_world_assessment_missing", "progress_updates", "actual-selected-assessment type="+object.Type+" id="+object.ID+"; include deferred with actual time and reason when no change")
 	}
 	for _, p := range w.draft.ProgressUpdates {
 		if p.Type == "personal_plan" && p.Status == "deferred" && plansSeen[p.ID] {

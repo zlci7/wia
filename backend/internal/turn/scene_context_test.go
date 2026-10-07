@@ -6,6 +6,7 @@ import (
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/plot"
 	"gameagent/backend/internal/story"
 	wiaworld "gameagent/backend/internal/world"
 )
@@ -79,6 +80,26 @@ func TestSceneDirectoryHasSelectedOwnerAccessWithoutProvidingTheBody(t *testing.
 	l := sceneLedger(s, s.sceneEntities, report.SelectedSources)
 	if _, err := l.resolve("player", []string{s.Definition.Materials[2].SourceID(s.Definition.Revision)}, true); err == nil {
 		t.Fatal("directory reference counted as provided body")
+	}
+}
+
+func TestSceneOpeningAssessmentProvidesRequiredBodyAndKeepsOtherPlansPrivate(t *testing.T) {
+	s := sceneOpenFixture()
+	s.sceneEntities = []string{"player", "npc:a"}
+	s.Definition.Materials = []story.Material{{ID: "pressure", Visibility: "author", Delivery: "core", Summary: "队列压力", Body: "CURRENT_PRESSURE"}}
+	s.Definition.Progression.Developments = []plot.Development{{ID: "queue", MaterialIDs: []string{"pressure"}}}
+	s.OpenProgress.Plans = []wiaworld.PersonalPlan{{ID: "remote-plan", OwnerID: "npc:c", Content: "UNSELECTED_PRIVATE_PLAN", Status: "active", NextCheck: 9999999999}}
+	m, _ := selectStoryMaterials(s, "scene", "", composeScene(s, wiaworld.Run{Input: "我问甲。"}, s.sceneEntities))
+	req, report, err := (ContextComposer{Scope: ContextScope{Purpose: "scene", SelectedEntityIDs: s.sceneEntities}}).Build(m, m.System, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(req.Input, "opening_assessment") || strings.Count(req.Input, "CURRENT_PRESSURE") != 1 || strings.Contains(req.Input, "UNSELECTED_PRIVATE_PLAN") {
+		t.Fatal("current assessment or owner selection violated")
+	}
+	ledger := sceneLedger(s, s.sceneEntities, report.SelectedSources)
+	if _, err := ledger.resolve("world", []string{s.Definition.Materials[0].SourceID(s.Definition.Revision)}, true); err != nil {
+		t.Fatal("required assessment body has no authorized source", err)
 	}
 }
 

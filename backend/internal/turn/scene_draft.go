@@ -219,8 +219,23 @@ func (b *sceneBeat) validateGeneratedFields() error {
 	}
 	switch b.Kind {
 	case "dialogue":
-		if b.Scope == nil || !slices.Contains([]string{"public", "private"}, *b.Scope) || b.Status != nil || b.Attempt != nil || len(b.Projections) != 0 || len(b.Bystanders) != 0 || len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 || b.Effects.LegacyScene != nil {
-			return coordinationInvalid("scene_dialogue_invalid", "beats", "speech-scope-and-program-derived-projections")
+		if b.Scope == nil || !slices.Contains([]string{"public", "private"}, *b.Scope) {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.scope", "public|private")
+		}
+		if b.Status != nil {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.status", "omitted-for-dialogue")
+		}
+		if b.Attempt != nil {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.attempt", "omitted-for-dialogue")
+		}
+		if len(b.Projections) != 0 {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.projections", "empty-array-program-derives-speech-projections")
+		}
+		if len(b.Bystanders) != 0 {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.bystanders", "empty-array-program-derives-speech-audience")
+		}
+		if len(b.Effects.Movements)+len(b.Effects.StateEffects)+len(b.Effects.ItemTransfers) != 0 || b.Effects.LegacyScene != nil {
+			return coordinationInvalid("scene_dialogue_invalid", "beats.effects", "only-owned-relationship-and-plan-effects")
 		}
 		if *b.Scope == "public" && len(b.Recipients) != 0 || *b.Scope == "private" && (len(b.Recipients) < 1 || len(b.Recipients) > 4 || slices.Contains(b.Recipients, b.ActorID)) {
 			return coordinationInvalid("scene_dialogue_audience_invalid", "beats.recipients", "empty-public-or-one-to-four-private-listeners")

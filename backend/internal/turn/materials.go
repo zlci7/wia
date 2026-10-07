@@ -114,6 +114,9 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 			continue
 		}
 		if m.Delivery == "core" {
+			if slices.Contains(material.RequiredSources, m.SourceID(snapshot.Definition.Revision)) {
+				continue
+			}
 			if purpose == "scene" {
 				material.Prefix = append(material.Prefix, materialSection(m, snapshot.Definition.Revision))
 			} else {
@@ -156,7 +159,7 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		}
 		available[c.m.ID] = c.m
 		directory = append(directory, c.m.ID+": "+c.m.Summary)
-		if c.score > 0 && selected < 4 {
+		if c.score > 0 && selected < 4 && !slices.Contains(material.RequiredSources, c.m.SourceID(snapshot.Definition.Revision)) {
 			section := materialSection(c.m, snapshot.Definition.Revision)
 			if purpose == "scene" {
 				section.Priority = 50
