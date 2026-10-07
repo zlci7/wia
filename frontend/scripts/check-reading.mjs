@@ -5,7 +5,7 @@ import { build } from "esbuild";
 
 const bundle = await build({
   stdin: {
-    contents: `export { useExperience } from './src/useExperience'; export { formatWorldClock, stateDisplayValue } from './src/worldInformation'; export { default as InformationPanel } from './src/components/InformationPanel.vue'; export { createRenderer, nextTick, reactive } from 'vue';`,
+    contents: `export { useExperience } from './src/useExperience'; export { formatWorldClock, stateDisplayValue } from './src/worldInformation'; export { default as InformationPanel } from './src/components/InformationPanel.vue'; export { default as AppDialog } from './src/components/AppDialog.vue'; export { createRenderer, nextTick, reactive } from 'vue';`,
     resolveDir: process.cwd(), loader: "ts",
   },
   plugins: [{ name: "vue-setup", setup(builder) {
@@ -16,7 +16,7 @@ const bundle = await build({
   } }],
   bundle: true, write: false, platform: "node", format: "esm",
 });
-const { useExperience, InformationPanel, formatWorldClock, stateDisplayValue, createRenderer, nextTick, reactive } = await import(
+const { useExperience, InformationPanel, AppDialog, formatWorldClock, stateDisplayValue, createRenderer, nextTick, reactive } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`,
 );
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode() {}, nextSibling() {} });
@@ -65,6 +65,47 @@ props.states = [];
 assert.equal(panel.balances.value.length, 0, "missing currency does not manufacture a zero balance");
 panelApp.unmount();
 
+class TestElement {
+  closest() { return null; }
+}
+globalThis.Element = TestElement;
+const listeners = new Map();
+globalThis.document = {
+  activeElement: null,
+  body: { style: { overflow: "auto" } },
+  addEventListener(type, handler) { listeners.set(type, handler); },
+  removeEventListener(type, handler) { if (listeners.get(type) === handler) listeners.delete(type); },
+  querySelector() { return null; },
+};
+let narrow = false;
+globalThis.window = { matchMedia: () => ({ matches: narrow, addEventListener() {}, removeEventListener() {} }) };
+for (const mobile of [false, true]) {
+  narrow = mobile;
+  const dialogProps = reactive({ title: "角色资料", drawer: true, explicitClose: true, busy: false, destructive: false });
+  let dialog, closed = 0;
+  const dialogApp = renderer.createApp({ setup() { dialog = AppDialog.setup(dialogProps, { expose() {}, emit() { closed++; } }); return () => null; } });
+  dialogApp.mount({});
+  await nextTick();
+  assert.equal(dialog.modal.value, mobile, "desktop drawer and narrow modal keep their existing modes");
+  listeners.get("pointerdown")({ target: new TestElement() });
+  dialog.dismiss();
+  listeners.get("keydown")({ key: "Escape", preventDefault() {}, isComposing: false });
+  assert.equal(closed, 0, "outside clicks, backdrop and Escape preserve an explicitly closed information panel");
+  dialog.close();
+  assert.equal(closed, 1, "the close button dismisses the information panel");
+  dialogProps.busy = true;
+  dialog.close();
+  assert.equal(closed, 1, "busy dialogs retain their existing guard");
+  dialogProps.busy = false;
+  dialogProps.explicitClose = false;
+  dialog.dismiss();
+  listeners.get("keydown")({ key: "Escape", preventDefault() {}, isComposing: false });
+  assert.equal(closed, 3, "ordinary dialogs keep backdrop and Escape dismissal");
+  dialogApp.unmount();
+  assert.equal(listeners.size, 0, "dialog listeners are removed on unmount");
+  assert.equal(document.body.style.overflow, "auto");
+}
+
 globalThis.document = { documentElement: { style: { setProperty() {} } }, body: { classList: { toggle() {}, remove() {} } } };
 globalThis.window = { location: { hash: "" }, innerHeight: 800, scrollTo() {}, addEventListener() {}, removeEventListener() {}, setInterval() { return 1; }, clearInterval() {}, setTimeout };
 const world = { world_id: "A", name: "测试存档", game_id: "demo", context_epoch: 1, message_head: 0, event_head: 0, clock: "2189-12-31 23:59" };
@@ -97,6 +138,8 @@ for (const tab of ["character", "inventory", "map", "people"]) {
   assert.equal(experience.dialog.value, "information");
   assert.equal(experience.informationTab.value, tab);
 }
+experience.chooseCharacter(props.characters[0]);
+assert.equal(experience.dialog.value, "information", "choosing a conversation partner keeps the information panel open");
 experience.closeDialog();
 await nextTick();
 assert.equal(experience.dialog.value, "");

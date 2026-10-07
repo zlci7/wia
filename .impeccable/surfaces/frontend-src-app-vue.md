@@ -21,7 +21,7 @@ FORM: Approved A code prototype, grounded structure 2 from the warm Apple readin
 
 FIRST VIEWPORT: A compact WIA masthead, world date and location frame the open reading column. Four tools occupy a vertical glass capsule on desktop and a horizontal capsule on narrow screens. Story, three full-width suggestions and the rounded composer share one scroll surface. Saved history retains its anchor. “Back to latest” reaches the action area.
 
-SIGNATURE INTERACTION: One shared information panel switches between character, inventory, map and people. Desktop viewing is nonmodal; screens at or below 720px use a modal bottom sheet. Closing restores focus without scrolling. Draft, conversation partner and game time persist. Choosing a suggestion fills an editable empty draft; submitting uses the existing run and recovery mechanism.
+SIGNATURE INTERACTION: One shared information panel switches between character, inventory, map and people. Desktop viewing is nonmodal; screens at or below 720px use a modal bottom sheet. The information panel stays open until its close button is selected; outside clicks, Escape and conversation partner selection preserve it. Closing restores focus without scrolling. Draft, conversation partner and game time persist. Choosing a suggestion fills an editable empty draft; submitting uses the existing run and recovery mechanism.
 
 STATES: Reading, suggestions ready/disabled/unavailable, generation, cancellation, failed run, unknown submission, historic reading, information open, story ended and missing model connection. Model and story settings, saves and retrospective corrections retain their existing workflows.
 

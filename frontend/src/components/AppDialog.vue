@@ -7,9 +7,10 @@ const props = withDefaults(
     busy?: boolean;
     destructive?: boolean;
     drawer?: boolean;
+    explicitClose?: boolean;
     returnFocusTo?: string;
   }>(),
-  { busy: false, destructive: false, drawer: false },
+  { busy: false, destructive: false, drawer: false, explicitClose: false },
 );
 const emit = defineEmits<{ close: [] }>();
 const panel = ref<HTMLElement>();
@@ -26,13 +27,17 @@ function syncMode() {
 function close() {
   if (!props.busy) emit("close");
 }
+function dismiss() {
+  if (!props.explicitClose && !props.destructive) close();
+}
 function outside(event: PointerEvent) {
   if (modal.value || props.destructive || !(event.target instanceof Element)) return;
-  if (!panel.value?.contains(event.target) && !event.target.closest(".information-entry")) close();
+  if (!panel.value?.contains(event.target) && !event.target.closest(".information-entry")) dismiss();
 }
 function keys(event: KeyboardEvent) {
   if (event.isComposing) return;
   if (event.key === "Escape") {
+    if (props.explicitClose) return;
     event.preventDefault();
     close();
     return;
@@ -107,7 +112,7 @@ onUnmounted(() => {
     <div
       class="modal-backdrop"
       :class="{ 'drawer-backdrop': drawer, 'nonmodal-backdrop': !modal }"
-      @click.self="!destructive && close()"
+      @click.self="dismiss"
     >
       <section
         ref="panel"

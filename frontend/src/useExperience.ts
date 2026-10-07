@@ -1180,8 +1180,8 @@ export function useExperience() {
   }
   function chooseCharacter(item: Character) {
     session.value.addressee = item.entity_id;
-    if (dialog.value === "information") closeDialog();
-    void nextTick(() => textarea.value?.focus());
+    if (dialog.value !== "information")
+      void nextTick(() => textarea.value?.focus());
   }
   function chooseSuggestion(text: string, basis: import('./types').SuggestionBasis) {
     const world = currentWorld.value;

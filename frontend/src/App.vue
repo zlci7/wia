@@ -545,6 +545,7 @@ const policyOptions = [
       :busy="dialogBusy"
       :destructive="dialog === 'delete'"
       :drawer="dialog === 'information'"
+      :explicit-close="dialog === 'information'"
       :return-focus-to="dialog === 'information' ? '#wia-information-character' : '#wia-more-menu'"
       @close="closeDialog"
     >
