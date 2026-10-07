@@ -7,7 +7,7 @@ const scope = ref('all'), data = ref<UsagePage>(), loading = ref(false), error =
 let generation = 0;
 const number = (value: number | null | undefined) => value == null ? '未知' : value.toLocaleString('zh-CN');
 const totals = computed(() => data.value?.totals);
-const purposes: Record<string,string> = { intent:'理解输入', npc:'人物决策', coordination:'场景协调', narration:'故事正文', plot:'世界事件', memory_digest:'记忆整理', suggestions:'行动建议', connection:'连接验证', event_generation:'事件生成' };
+const purposes: Record<string,string> = { co_creation:'场景共创', intent:'理解输入', npc:'人物决策', coordination:'场景协调', narration:'故事正文', plot:'世界事件', memory_digest:'记忆整理', suggestions:'行动建议', connection:'连接验证', event_generation:'事件生成' };
 async function load(more = false) {
   const ticket = ++generation;
   loading.value = true; error.value = '';

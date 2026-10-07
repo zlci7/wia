@@ -17,6 +17,25 @@ import {
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
+export function createPlay(payload: { game_id: string; expected_revision: string; request_key: string }): Promise<import('./types').PlaySession> {
+  return request('/api/v1/play-sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+export function fetchPlay(id: string): Promise<import('./types').PlaySession> {
+  return request(`/api/v1/play-sessions/${encodeURIComponent(id)}`);
+}
+export function submitPlay(id: string, payload: import('./types').PlayRequest): Promise<import('./types').PlaySession> {
+  return request(`/api/v1/play-sessions/${encodeURIComponent(id)}/turns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+export function cancelPlay(id: string, run: string): Promise<import('./types').PlaySession> {
+  return request(`/api/v1/play-sessions/${encodeURIComponent(id)}/turns/${encodeURIComponent(run)}/cancel`, { method: 'POST' });
+}
+export function closePlay(id: string): Promise<void> {
+  return request(`/api/v1/play-sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+export function requestPlaySuggestions(id: string, expectedTurn: number, enabled: boolean): Promise<import('./types').PlaySession> {
+  return request(`/api/v1/play-sessions/${encodeURIComponent(id)}/suggestions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_turn: expectedTurn, enabled }) });
+}
+
 export function fetchRunProgress(worldID: string, runID: string, includeThinking = false): Promise<import('./types').RunProgress> {
   return request(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs/${encodeURIComponent(runID)}/progress${includeThinking ? '?include_thinking=1' : ''}`);
 }

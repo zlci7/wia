@@ -4,6 +4,21 @@ export interface ModelInfo {
   configured: boolean
   source?: string
 }
+
+export interface PlayRequest {
+  request_key: string; expected_turn: number; input: string;
+  allow_plot_advance: boolean; transport: 'stream' | 'non_stream';
+}
+export interface PlaySession {
+	version: number;
+  id: string; game_id: string; title: string; revision: string; turn: number;
+  clock: string; location: string; messages: Message[]; characters: Character[];
+  run?: { id: string; request_key: string; input: string; status: string;
+    transport: 'stream' | 'non_stream'; allow_plot_advance: boolean; started_at: string;
+    elapsed_ms: number; candidate?: string; calls: number; repairs: number;
+    error?: string; error_code?: string };
+  suggestions: { turn: number; enabled: boolean; status: string; items: string[] };
+}
 export interface Status {
   ready: boolean
   model: ModelInfo

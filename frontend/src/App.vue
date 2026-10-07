@@ -6,10 +6,13 @@ import InformationPanel from "./components/InformationPanel.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
+import CreationPlay from './components/CreationPlay.vue';
 import { useExperience } from "./useExperience";
 import { formatWorldClock } from "./worldInformation";
 import "./style.css";
 const {
+  creation,
+  startCreation,
   storyEntries,
   packIssues,
   newGame,
@@ -110,7 +113,7 @@ const policyOptions = [
 </script>
 
 <template>
-  <main class="shell" :class="{ 'play-shell': view === 'play' }">
+  <main class="shell" :class="{ 'play-shell': view === 'play' || view === 'creation' }">
     <div class="app-header">
       <header class="topbar">
         <div class="brand">
@@ -287,6 +290,7 @@ const policyOptions = [
             {{ game.player.requirements }}
           </p>
           <div class="button-row">
+            <button v-if="game.available !== false" class="primary-button" :disabled="navigating || creation.state.starting || !!activeRun" @click="startCreation">{{ creation.state.starting ? '正在进入…' : creation.state.active?.game_id === game.id ? '继续共创试玩' : '开始共创试玩' }}</button>
             <button
               v-if="recentWorld"
               class="primary-button"
@@ -296,7 +300,7 @@ const policyOptions = [
               继续最近进度</button
             ><button
               v-if="game.available !== false"
-              :class="recentWorld ? 'secondary-button' : 'primary-button'"
+              class="secondary-button"
               @click="openNewWorld"
             >
               开始新的故事
@@ -349,6 +353,8 @@ const policyOptions = [
         </div>
       </section>
     </section>
+
+    <CreationPlay v-else-if="view === 'creation'" :creation="creation" :streaming-supported="!!status?.generation_transport?.streaming_supported" />
 
     <div v-else-if="currentWorld && view === 'play'" class="game-layout">
       <section class="story-column">
@@ -566,9 +572,9 @@ const policyOptions = [
         @busy="dialogBusy = $event"
         @updated="freshRefresh"
       />
-      <UsagePanel v-if="dialog === 'usage'" :key="currentWorld?.world_id ?? ''" :world-id="currentWorld?.world_id" :world-name="currentWorld?.name" />
+      <UsagePanel v-if="dialog === 'usage'" :key="view === 'creation' ? creation.state.active?.id : currentWorld?.world_id ?? ''" :world-id="view === 'creation' ? undefined : currentWorld?.world_id" :world-name="currentWorld?.name" />
       <template v-if="dialog === 'model'">
-        <form v-if="status?.model.configured" class="transport-settings" @submit.prevent="configureTransport">
+        <form v-if="status?.model.configured && view !== 'creation'" class="transport-settings" @submit.prevent="configureTransport">
           <fieldset :disabled="dialogBusy">
             <label>传输方式<select v-model="transportForm">
               <option value="stream" :disabled="!status.generation_transport?.streaming_supported">流式 · 实时接收</option>

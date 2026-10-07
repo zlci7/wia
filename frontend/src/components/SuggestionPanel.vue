@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue';
+import ActionSuggestionList from './ActionSuggestionList.vue';
 import { fetchSuggestions, requestSuggestions } from '../api';
 import type { SuggestionBasis, SuggestionSet, WorldSummary } from '../types';
 const props = defineProps<{ world: WorldSummary; activeRevision: number; busy: boolean; ready: boolean; hasDraft: boolean }>();
@@ -51,9 +52,7 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
     <div class="suggestion-heading"><span title="建议单独调用模型，用量计入模型用量页；关闭后仍可自由输入。">行动建议<span v-if="set?.status === 'generating'"> · 正在准备</span></span>
       <button type="button" class="quiet-button" :disabled="!set || writing || busy" @click="toggle">{{ set?.enabled === false ? '开启建议' : '关闭建议' }}</button>
     </div>
-    <div v-if="set?.status === 'ready' && same(set.basis) && !busy" class="suggestion-items">
-      <button v-for="(item,index) in set.items" :key="index" type="button" :disabled="hasDraft" @click="pick(item)"><span class="suggestion-copy">{{ item }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
-    </div>
+    <ActionSuggestionList v-if="set?.status === 'ready' && same(set.basis) && !busy" :items="set.items" :disabled="hasDraft" @choose="pick" />
     <p v-if="hasDraft && set?.status === 'ready'" class="subtle">保留你的输入；清空后可点选建议。</p>
     <p v-if="error" class="subtle" role="status">{{ error }} <button type="button" class="quiet-button" @click="refresh(generation)">刷新状态</button></p>
     <p v-else-if="set && ['failed','interrupted'].includes(set.status)" class="subtle">本轮建议未完成，可继续自由输入。</p>
@@ -64,14 +63,5 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
 .suggestions { margin: 34px 0 22px; }
 .suggestion-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
 .suggestion-heading button { padding: 4px 10px; }
-.suggestion-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-.suggestion-items button { display: flex; align-items: center; gap: 14px; min-width: 0; width: 100%; min-height: 56px; text-align: left; font: inherit; font-size: 14px; line-height: 1.75; white-space: normal; overflow-wrap: anywhere; color: var(--ink); background: var(--soft-panel); border: 0; border-radius: 20px; padding: 12px 16px; }
-.suggestion-items button:hover:not(:disabled) { background: var(--paper-deep); }
-.suggestion-items button:disabled { cursor: default; opacity: .55; }
-.suggestion-copy { flex: 1; min-width: 0; }
-.suggestion-items svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .suggestions p { font-size: 12px; margin: 8px 0 0; }
-@media (max-width: 720px) {
-  .suggestion-items button { padding: 12px 14px; gap: 9px; font-size: 13px; }
-}
 </style>

@@ -48,6 +48,7 @@ import {
   type KnownLocation,
 } from "./types";
 import { useStoryReader } from "./useStoryReader";
+import { useCreationPlay } from "./useCreationPlay";
 
 type Dialog =
   | ""
@@ -61,6 +62,7 @@ type Dialog =
   | "usage"
   | "memory";
 export function useExperience() {
+  const creation = useCreationPlay();
   const status = ref<Status | null>(null),
     games = ref<GameSummary[]>([]),
     worlds = ref<WorldSummary[]>([]);
@@ -98,7 +100,7 @@ export function useExperience() {
       }
     return entries;
   });
-  const view = ref<"home" | "story" | "play" | "creator">("home"),
+  const view = ref<"home" | "story" | "play" | "creator" | "creation">("home"),
     gameID = ref(""),
     loaded = ref(false);
   const connectionError = ref(""),
@@ -643,6 +645,17 @@ export function useExperience() {
     view.value = "home";
     moreOpen.value = false;
     if (!dialogBusy.value) showDialog("");
+  }
+
+  async function startCreation() {
+    if (!game.value || navigating.value || activeRun.value) return;
+    if (!status.value?.ready) { openModel(); return; }
+    navigating.value = true;
+    try {
+      if (await creation.start(game.value)) {
+        showDialog(""); view.value = "creation";
+      } else notice.value = creation.state.error;
+    } finally { navigating.value = false; }
   }
 
   // Authoring is its own page: entering it never abandons a running turn, and it
@@ -1203,7 +1216,7 @@ export function useExperience() {
     () => void nextTick(resizeInput),
   );
   watch(view, async (value) => {
-    document.body.classList.toggle("playing", value === "play");
+    document.body.classList.toggle("playing", value === "play" || value === "creation");
     await nextTick();
     if (value === "play") {
       reader.restore();
@@ -1229,6 +1242,10 @@ export function useExperience() {
       modelForm.provider = providers.value[0]?.provider ?? "deepseek";
       changeProvider();
       await refresh();
+      if (await creation.restore()) {
+        gameID.value = creation.state.active!.game_id;
+        view.value = "creation";
+      }
     } catch (error) {
       connectionError.value = describe(error);
       loaded.value = true;
@@ -1247,6 +1264,8 @@ export function useExperience() {
     window.visualViewport?.removeEventListener("resize", resizeViewport);
   });
   return {
+    creation,
+    startCreation,
     storyEntries,
     packIssues,
     newGame,
