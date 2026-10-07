@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/story"
 	"gameagent/backend/internal/turn"
 	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
@@ -65,8 +66,19 @@ type PlayView struct {
 	Location    string                     `json:"location"`
 	Messages    []wiaworld.Message         `json:"messages"`
 	Characters  []wiaworld.PublicCharacter `json:"characters"`
+	World       wiaworld.WorldSummary      `json:"world"`
+	Player      PlayPlayer                 `json:"player"`
+	States      []wiaworld.PublicState     `json:"states"`
+	Items       []wiaworld.PublicItem      `json:"items"`
+	Locations   []wiaworld.KnownLocation   `json:"known_locations"`
+	Bystanders  []story.Bystander          `json:"bystanders"`
 	Run         *PlayRun                   `json:"run,omitempty"`
 	Suggestions PlaySuggestions            `json:"suggestions"`
+}
+
+type PlayPlayer struct {
+	Name    string `json:"name"`
+	Profile string `json:"profile"`
 }
 
 type playJob struct {
@@ -76,7 +88,7 @@ type playJob struct {
 }
 
 // playSession manages browser requests around the existing creation session.
-// It carries no persistent world, resource ledger or alternate memory engine.
+// Its accepted world and resources live only for the lifetime of the application.
 type playSession struct {
 	mu               sync.Mutex
 	id               string
@@ -152,7 +164,10 @@ func (p *playSession) viewLocked() PlayView {
 	snapshot := p.creation.PlayerSnapshot()
 	v := PlayView{Version: p.viewVersion, ID: p.id, GameID: p.create.GameID, Title: snapshot.Definition.Summary.Title, Revision: p.create.Revision,
 		Turn: snapshot.Summary.TurnSeq, Clock: snapshot.Summary.Clock, Location: snapshot.SceneLocation, Messages: snapshot.Messages,
-		Characters: PublicCharacterViews(snapshot.Characters), Suggestions: p.suggestions}
+		Characters: PublicCharacterViews(snapshot.Characters), Suggestions: p.suggestions,
+		World: snapshot.Summary, Player: PlayPlayer{snapshot.PlayerName, snapshot.PlayerProfile},
+		States: turn.PlayerStateProjection(snapshot), Items: turn.PlayerItemProjection(snapshot),
+		Locations: turn.PlayerLocationProjection(snapshot), Bystanders: slices.Clone(snapshot.BystanderRefs)}
 	for _, location := range snapshot.Definition.Locations {
 		if location.ID == snapshot.SceneLocation {
 			v.Location = location.Name
@@ -162,6 +177,12 @@ func (p *playSession) viewLocked() PlayView {
 	v.Suggestions.Items = slices.Clone(p.suggestions.Items)
 	if p.latest != nil {
 		run := p.latest.view
+		// Scene acceptance can precede the worker's final bookkeeping. Publish
+		// the accepted scene and its completed status as one consistent view.
+		if run.Status == "running" && snapshot.Summary.TurnSeq > p.latest.request.ExpectedTurn {
+			run.Status, run.Candidate = "completed", ""
+			run.ElapsedMS = time.Since(run.StartedAt).Milliseconds()
+		}
 		v.Run = &run
 	}
 	return v

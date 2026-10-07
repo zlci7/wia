@@ -25,8 +25,10 @@ type CreationScene struct {
 }
 
 type CreationChanges struct {
-	ElapsedMinutes int               `json:"elapsed_minutes,omitempty"`
-	Positions      map[string]string `json:"positions"`
+	ElapsedMinutes int                   `json:"elapsed_minutes,omitempty"`
+	Positions      map[string]string     `json:"positions"`
+	StateChanges   []CreationStateChange `json:"state_changes,omitempty"`
+	ItemMoves      []CreationItemMove    `json:"item_moves,omitempty"`
 }
 
 // Kind preserves the distinction between an observation, testimony, a belief
@@ -69,8 +71,7 @@ type creationExchange struct {
 	RunID     string `json:"run_id"`
 }
 
-// CreationSession is an internal, in-memory play study. It accepts complete
-// creation results, without manufacturing an Output or a storage transaction.
+// CreationSession accepts complete scenes and their resource changes in memory.
 type CreationSession struct {
 	mu        sync.Mutex
 	busy      bool
@@ -99,13 +100,14 @@ func NewCreationSession(definition story.Definition) (*CreationSession, error) {
 	snapshot := Snapshot{
 		Definition: def, PlayerName: def.Summary.Player.Name, PlayerProfile: def.Summary.Player.Profile,
 		Narrative: def.Settings,
-		Summary:   wiaworld.WorldSummary{GameID: def.Summary.ID, WorldID: wire.NewID("play"), Clock: def.Clock},
+		Summary:   wiaworld.WorldSummary{GameID: def.Summary.ID, WorldID: wire.NewID("play"), Clock: def.Clock, GameTitle: def.Summary.Title, Name: def.Summary.Title, Revision: def.Revision, Mode: def.Summary.Mode, Calendar: def.Calendar, Status: "playing"},
 		Positions: clonePositions(def.InitialLocations), PositionSources: map[string]string{},
 		Characters: slices.Clone(def.Characters),
 	}
 	for id := range snapshot.Positions {
 		snapshot.PositionSources[id] = "definition:" + def.Revision
 	}
+	initializeCreationResources(&snapshot)
 	if err := applySpatialProjection(&snapshot); err != nil {
 		return nil, err
 	}
@@ -161,6 +163,7 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 	var scene CreationScene
 	var positions map[string]string
 	var clock string
+	var resources Snapshot
 	for attempt := 0; attempt < 2; attempt++ {
 		if err := callCtx.Err(); err != nil {
 			return result, err
@@ -186,6 +189,9 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 		if err == nil {
 			positions, clock, err = validateCreationScene(snapshot, selected, scene)
 		}
+		if err == nil {
+			resources, err = applyCreationResources(snapshot, selected, positions, scene.Changes, run.RunID)
+		}
 		call.recordJSONValidation(err)
 		if err == nil {
 			break
@@ -206,7 +212,8 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 	if err := callCtx.Err(); err != nil {
 		return result, err
 	}
-	next := snapshot
+	next := resources
+	next.Summary.TurnSeq = s.turn + 1
 	next.Characters = slices.Clone(snapshot.Characters)
 	next.Bystanders, next.BystanderRefs = nil, nil
 	next.Positions, next.Summary.Clock = positions, clock

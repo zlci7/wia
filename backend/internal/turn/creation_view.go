@@ -31,6 +31,8 @@ func (s *CreationSession) playerSnapshotLocked() Snapshot {
 	snapshot := s.snapshot
 	snapshot.Summary.TurnSeq = s.turn
 	snapshot.Positions = clonePositions(snapshot.Positions)
+	snapshot.States = cloneStates(snapshot.States)
+	snapshot.Items = cloneItems(snapshot.Items)
 	snapshot.Characters = slices.Clone(snapshot.Characters)
 	snapshot.Messages = []wiaworld.Message{{MessageID: "opening", Kind: "narrative", Content: snapshot.Definition.Opening, Seq: 1}}
 	for _, exchange := range s.exchanges {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gameagent/backend/internal/model"
+	"gameagent/backend/internal/turn"
 )
 
 type playProbe struct {
@@ -84,6 +85,54 @@ func awaitPlay(t *testing.T, a *App, id string, done func(PlayView) bool) PlayVi
 	}
 	t.Fatal("play did not settle")
 	return PlayView{}
+}
+
+func TestPlayPublishesOnlyCurrentPublicResources(t *testing.T) {
+	a, view := playFixture(t, &playProbe{})
+	pack, _ := a.Pack("mist-embers")
+	if view.Player.Name != pack.Definition.Summary.Player.Name || view.World.Clock != view.Clock || view.World.Location == nil || len(view.Locations) == 0 {
+		t.Fatal("player and world information missing")
+	}
+	var cash bool
+	for _, state := range view.States {
+		if state.StateID == "mirror_dissonance" {
+			t.Fatal("hidden state published")
+		}
+		if state.StateID == "cash" {
+			cash = state.Value.Integer == 8352 && state.DisplayValue != ""
+		}
+	}
+	if !cash {
+		t.Fatal("authored currency is missing")
+	}
+	for _, item := range view.Items {
+		if item.LocationID == "abandoned-clinic" {
+			t.Fatal("distant item published")
+		}
+	}
+	if len(view.Items) != 5 {
+		t.Fatal("opening possessions and visible desk items missing", view.Items)
+	}
+	encoded, _ := json.Marshal(view)
+	if strings.Contains(string(encoded), "personal_knowledge") || strings.Contains(string(encoded), "author_truth") || strings.Contains(string(encoded), "initial_states") {
+		t.Fatal("internal author material published")
+	}
+}
+
+func TestPlayAcceptedSceneCannotPublishPendingCandidate(t *testing.T) {
+	g := &playProbe{}
+	a, view := playFixture(t, g)
+	p, _ := a.play(view.ID)
+	// Simulate the interval between scene acceptance and worker bookkeeping.
+	_, err := p.creation.Interact(t.Context(), turn.New(nil, turn.Deps{}), g, turn.CreationOptions{Input: "我问来访者。", Reasoning: model.ReasoningOff})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.latest = &playJob{request: PlayRequest{ExpectedTurn: 0}, view: PlayRun{Status: "running", Candidate: "候选正文", StartedAt: time.Now()}}
+	accepted := p.viewLocked()
+	if accepted.Turn != 1 || accepted.Run.Status != "completed" || accepted.Run.Candidate != "" || len(accepted.Messages) != 3 {
+		t.Fatal("accepted scene also published a pending candidate", accepted.Run)
+	}
 }
 
 func TestPlayAcceptsOnceWithFrozenOptionsAndPublicView(t *testing.T) {
