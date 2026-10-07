@@ -19,6 +19,32 @@ import (
 
 var errReferenceRecorded = errors.New("reference recorded without world commit")
 
+func TestCoCreativeConnectionLive(t *testing.T) {
+	if os.Getenv("WIA_LIVE_CONNECTION") != "1" {
+		t.Skip("explicit live connection opt-in required")
+	}
+	provider, settings, err := llm.NewProviderFromConfigFile(os.Getenv("WIA_LIVE_MODEL_CONFIG"))
+	if err != nil || settings.Provider != "deepseek" {
+		t.Fatal("authorized DeepSeek configuration unavailable")
+	}
+	text, ok := provider.(model.TextGenerator)
+	if !ok {
+		t.Fatal("text generation unavailable")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	started := time.Now()
+	response, err := text.GenerateText(ctx, model.TextRequest{Input: "请只回复 OK。", MaxInputTokens: 256, MaxOutputTokens: 64, Reasoning: model.ReasoningOff})
+	if err != nil {
+		var failure *model.TextCallError
+		if errors.As(err, &failure) {
+			t.Fatalf("HTTP=%d code=%s", failure.Diagnostic.HTTPStatus, failure.Diagnostic.Code)
+		}
+		t.Fatalf("code=%s", model.TextErrorCode(err))
+	}
+	t.Logf("model=%s HTTP=%d elapsed_ms=%d input=%d output=%d reasoning=%d result=%q", settings.Model, response.Diagnostic.HTTPStatus, time.Since(started).Milliseconds(), response.Diagnostic.InputTokens, response.Diagnostic.OutputTokens, response.Diagnostic.ReasoningTokens, response.Text)
+}
+
 type creationReference struct {
 	Format        string               `json:"format"`
 	Reasoning     model.ReasoningMode  `json:"reasoning"`

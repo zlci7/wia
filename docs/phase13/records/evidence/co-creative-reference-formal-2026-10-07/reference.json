@@ -1,0 +1,64 @@
+{
+  "model": "deepseek-v4-flash",
+  "input": "连续追问开场",
+  "results": [
+    {
+      "format": "narrative",
+      "reasoning": "off",
+      "input_hash": "68a9ab7040d98d237d773ad73ccfe037866ba918ced51a7ed4a66ba64020e251",
+      "system_hash": "aa9ba06885ce80b29306ffd91ebd0fad11f26fcf028d4a62d896be86a2ce4737",
+      "input_estimate": 11458,
+      "output_limit": 5632,
+      "elapsed_ms": 2996,
+      "text": "马丁没有立刻回答。他低头把帽檐又捻了一圈，指腹反复压过那道折痕，像是在把毛呢重新熨平。\n\n“那天……”他开口，又停住，抬眼看了看墙上的挂钟，“她要去街口送一批改好的外套，说路上顺带看看别家的样式。我说店里这季的账还没结清，别到处跑，耽误活计。”\n\n他把帽子放到膝上，双手交叠按着。\n\n“她回了我一句，说我不是不让她看样式，是不想让她有自己的客人。”他语速慢下来，“最后一句，她说她会证明给我看。然后……就出门了。”\n\n你问诺拉近来有无反常。马丁盯着桌角照片里女儿的脸，过了几秒才继续。\n\n“最近她收工比平时晚，回来也不怎么说话。有一两回我听见她跟人站在店门口低声讲事情，见我就停了。”他把帽子重新攥起来，“我还看见她抽屉里有张收据，写着红烟囱街——那天我当成她又乱接单子，没细问。现在收据还在订单簿里夹着。”\n\n他抿了抿嘴，像是想把后半句咽回去。\n\n“我没报官。她是我女儿，先把她找回来，别的事回来再说。三镑……我可以先给一镑半，剩下的找到人再付。你要是愿意查那张收据从哪来的，我很想知道。”",
+      "diagnostic": {
+        "Provider": "deepseek",
+        "Model": "deepseek-v4-flash",
+        "InputKnown": true,
+        "OutputKnown": true,
+        "ReasoningKnown": false,
+        "CacheKnown": true,
+        "CacheHitTokens": 0,
+        "CacheMissTokens": 6181,
+        "Code": "",
+        "HTTPStatus": 200,
+        "RequestID": "",
+        "FinishReason": "stop",
+        "InputTokens": 6181,
+        "OutputTokens": 298,
+        "ReasoningTokens": 0,
+        "ContentChars": 446,
+        "ReasoningChars": 0
+      }
+    },
+    {
+      "format": "structured",
+      "reasoning": "off",
+      "input_hash": "68a9ab7040d98d237d773ad73ccfe037866ba918ced51a7ed4a66ba64020e251",
+      "system_hash": "39028c4fcc5cd898e26c50f8b692726302d0c6e63319a4b47fe7d8a494b8ad4d",
+      "input_estimate": 11985,
+      "output_limit": 5632,
+      "elapsed_ms": 6205,
+      "text": "{\n  \"schema_revision\": \"scene-draft.v1\",\n  \"input_map\": [\n    {\n      \"text\": \"我先不急着答应，问马丁刚才停顿的那次最后见面究竟发生了什么：诺拉那天说了什么、去了哪里，近来有无反常。\",\n      \"intent_type\": \"speak\",\n      \"addressee_id\": \"npc:tailor\",\n      \"visibility\": \"public\",\n      \"beat_ids\": [\"b1\", \"b2\", \"b3\"],\n      \"status\": \"succeeded\",\n      \"unexecuted_reason\": \"\",\n      \"wait_minutes\": 0\n    }\n  ],\n  \"beats\": [\n    {\n      \"local_id\": \"b1\",\n      \"kind\": \"dialogue\",\n      \"actor_id\": \"player\",\n      \"target_id\": \"npc:tailor\",\n      \"offset_minutes\": 0,\n      \"basis\": [\"input:0\", \"personal:player:message%3Aopening\"],\n      \"content\": \"我没有立刻接话。那张攥皱的帽子和那一下停顿都还留在眼前。我把手搭在桌沿上，说：“三镑的事先放着。你刚才提到最后一次见面的时候，停了一下。那回吧——你和诺拉到底发生了什么？她那天说了什么？”\",\n      \"recipients\": [\"npc:tailor\"],\n      \"bystanders\": [\"bystander:clerk\"],\n      \"projections\": [\n        {\n          \"recipient\": \"npc:tailor\",\n          \"content\": \"调查员没有马上答应，转而追问那场最后见面的具体情况。\"\n        }\n      ],\n      \"effects\": {}\n    },\n    {\n      \"local_id\": \"b2\",\n      \"kind\": \"dialogue\",\n      \"actor_id\": \"npc:tailor\",\n      \"target_id\": \"player\",\n      \"offset_minutes\": 1,\n      \"basis\": [\"input:0\", \"material:mist-embers.pack.v9:tailor-knowledge\", \"material:mist-embers.pack.v9:tailor-profile\"],\n      \"content\": \"马丁的指腹在帽檐上慢慢碾过一圈，像要把那处皱褶压平。他没立刻看你，声音却比刚才低了些：“那天……她裁完一条袖笼，跟我说她想自己接一单。我说不行，顾客面生，赊账收不回来。她说我从来只当她帮忙，不当她能独当一面。说着就说重了。她摔门上了楼，第二天早上我起来，人不在，房里东西也少了几样。”\",\n      \"recipients\": [\"player\"],\n      \"bystanders\": [\"bystander:clerk\"],\n      \"projections\": [\n        {\n          \"recipient\": \"player\",\n          \"content\": \"马丁承认那天为独立接单争执，说了重话，诺拉摔门回房，次日便不见了。\"\n        }\n      ],\n      \"effects\": {}\n    },\n    {\n      \"local_id\": \"b3\",\n      \"kind\": \"dialogue\",\n      \"actor_id\": \"npc:tailor\",\n      \"target_id\": \"player\",\n      \"offset_minutes\": 2,\n      \"basis\": [\"input:0\", \"material:mist-embers.pack.v9:tailor-knowledge\", \"beat:b2\"],\n      \"content\": \"他顿了顿，又补了一句：“要说反常……她最近是有点不对。往常收了活计会跟我说一声，那几天却老一个人趴柜台底下翻单子，翻完也不吭声。我问她看什么，她只说看看。别的我就不知道了。”他说完抬起帽檐，像是忽然警觉自己说多了，又把话收了回去，盯着桌上的近照。\",\n      \"recipients\": [\"player\"],\n      \"bystanders\": [\"bystander:clerk\"],\n      \"projections\": [\n        {\n          \"recipient\": \"player\",\n          \"content\": \"马丁说诺拉那几天反复翻订单簿，被问起只说看看，随后不愿多说，视线落回照片。\"\n        }\n      ],\n      \"effects\": {}\n    }\n  ],\n  \"narrative_blocks\": [\n    {\n      \"text\": \"上午的雾贴在外窗上，事务所里那盏台灯亮着。马丁的手指一直没离开帽檐，像要把那道皱褶慢慢碾回去。\\n\\n“三镑的事先放一放。”你说，“你刚才提最后一次见面的时候，停了一下。那回呢——你和诺拉到底发生了什么？她那天说了什么？”\\n\\n他低了低头，过了好一会儿才开口。那天诺拉刚裁完一条袖笼，说想自己接一单。他说不行，顾客面生，赊账收不回来。她顶了一句，说他从没把她当能独当一面的人，只当她帮手。两人都动了气，她摔门上了楼，第二天一早，人和几样东西就都不在了。\\n\\n他顿了顿，像是不甘心话只说到这里。“反常……也是有的。她往常收了活会跟我讲一声，那几天却一个人蹲在柜台底下翻单子，翻完也不说话。我问她看什么，她只说看看。”帽子被他重新捏回眼前，他才像醒悟自己多说了一句，把话收了回去，目光落回桌上的近照。\"\n    }\n  ],\n  \"elapsed_minutes\": 3,\n  \"stop\": {\n    \"reason\": \"player_choice\",\n    \"content\": \"马丁交代了争执的大致经过，也透露诺拉失踪前几天反常地翻过订单簿，随后收口不再多说。你可以继续追问订单簿、要求看收据，或转向别的调查方向。\"\n  },\n  \"progress_updates\": [\n    {\n      \"type\": \"development_check\",\n      \"id\": \"case-pressure\",\n      \"status\": \"skipped\",\n      \"content\": \"开场评估尚未触发外部世界发展，本轮仅发生面对面的委托问询。\",\n      \"offset_minutes\": 3,\n      \"basis\": [\"input:0\", \"beat:b2\", \"beat:b3\"]\n    }\n  ]\n}",
+      "diagnostic": {
+        "Provider": "deepseek",
+        "Model": "deepseek-v4-flash",
+        "InputKnown": true,
+        "OutputKnown": true,
+        "ReasoningKnown": false,
+        "CacheKnown": true,
+        "CacheHitTokens": 1280,
+        "CacheMissTokens": 5234,
+        "Code": "",
+        "HTTPStatus": 200,
+        "RequestID": "",
+        "FinishReason": "stop",
+        "InputTokens": 6514,
+        "OutputTokens": 1297,
+        "ReasoningTokens": 0,
+        "ContentChars": 3065,
+        "ReasoningChars": 0
+      }
+    }
+  ]
+}
