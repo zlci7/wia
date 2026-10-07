@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { useCreationPlay } from '../useCreationPlay';
 import { formatWorldClock } from '../worldInformation';
 import ActionSuggestionList from './ActionSuggestionList.vue';
-const props = defineProps<{ creation: ReturnType<typeof useCreationPlay>; streamingSupported: boolean }>();
+import InformationTools from './InformationTools.vue';
+import { creationReadingMessages } from '../creationReading';
+const props = defineProps<{ creation: ReturnType<typeof useCreationPlay>; streamingSupported: boolean; informationTab?: 'character' | 'inventory' | 'map' | 'people' }>();
+const emit = defineEmits<{ information: [tab: 'character' | 'inventory' | 'map' | 'people'] }>();
+const messages = computed(() => props.creation.state.active ? creationReadingMessages(props.creation.state.active, props.creation.busy.value) : []);
 const viewport = ref<HTMLElement>(), textarea = ref<HTMLTextAreaElement>();
 const bottom = ref(props.creation.state.readerBottom);
 let top = props.creation.state.readerTop;
@@ -39,23 +43,15 @@ onUnmounted(remember);
           <span class="world-location">{{ creation.state.active.location }}</span>
         </div>
         <span class="subtle session-lifetime">共创试玩 · 应用退出后会话结束</span>
+        <InformationTools :active="informationTab" @choose="emit('information', $event)" />
       </div>
       <div ref="viewport" class="transcript" tabindex="0" aria-label="故事正文" @scroll.passive="remember">
         <div class="reading-flow">
           <div class="history-control"><span class="subtle">故事从这里开始</span></div>
-          <article v-for="message in creation.state.active.messages" :key="message.message_id" :data-message-id="message.message_id" class="message" :class="message.kind === 'player' ? 'player-message' : 'narrative-message'">
-            <div class="message-content">{{ message.content }}</div>
+          <article v-for="message in messages" :key="message.seq" :data-message-id="message.message_id" :data-message-seq="message.seq" class="message" :class="message.kind === 'player' ? 'player-message' : 'narrative-message'">
+            <div v-if="message.content" class="message-content">{{ message.content }}</div>
+            <p v-else class="generation-placeholder" role="status">正在等待正文…</p>
           </article>
-          <div v-if="creation.busy.value" class="run-card" role="status">
-            <p class="pending-input">{{ creation.state.active.run?.input }}</p>
-            <div class="button-row"><span class="pulse-dot"></span><span>正在创作 · {{ creation.waitingSeconds.value }} 秒</span>
-              <button type="button" class="quiet-button" :disabled="creation.state.cancelling" @click="creation.cancel">{{ creation.state.cancelling ? '正在取消…' : '取消生成' }}</button>
-            </div>
-            <div v-if="creation.state.active.run?.candidate" class="candidate-prose">
-              <p class="subtle">正在生成的正文 · 校验后生效</p>
-              <div class="message-content">{{ creation.state.active.run.candidate }}</div>
-            </div>
-          </div>
           <section class="suggestions" aria-label="行动建议">
             <div class="suggestion-heading"><span title="建议单独调用模型，可关闭。">行动建议<span v-if="creation.state.active.suggestions.status === 'generating'"> · 正在准备</span></span>
               <button type="button" class="quiet-button" :disabled="creation.busy.value || creation.state.suggestionWriting || !!creation.state.pending" @click="creation.toggleSuggestions">{{ creation.state.active.suggestions.enabled ? '关闭建议' : '开启建议' }}</button>
@@ -76,8 +72,11 @@ onUnmounted(remember);
               <p v-if="creation.state.error" class="inline-error" role="alert">{{ creation.state.error }} <button type="button" class="quiet-button" @click="creation.refresh">重试连接</button></p>
               <p v-if="creation.state.pending && !creation.state.sending" class="inline-error" role="status">提交结果待确认，输入已保留。<button type="button" class="quiet-button" @click="creation.send">确认原请求</button></p>
             </div>
-            <div class="composer-footer"><span>Ctrl + Enter 提交<span v-if="creation.state.active.run?.status === 'completed'"> · 本轮 {{ (creation.state.active.run.elapsed_ms / 1000).toFixed(1) }} 秒</span></span>
-              <button type="submit" class="primary-button" :disabled="!creation.canSubmit.value">{{ creation.busy.value ? '等待回应' : creation.state.sending ? '正在提交…' : '继续故事' }}</button>
+            <div class="composer-footer">
+              <span v-if="creation.busy.value" role="status">正在创作 · {{ creation.waitingSeconds.value }} 秒</span>
+              <span v-else>Ctrl + Enter 提交<span v-if="creation.state.active.run?.status === 'completed'"> · 本轮 {{ (creation.state.active.run.elapsed_ms / 1000).toFixed(1) }} 秒</span></span>
+              <button v-if="creation.busy.value" type="button" class="quiet-button" :disabled="creation.state.cancelling" @click="creation.cancel">{{ creation.state.cancelling ? '正在取消…' : '取消生成' }}</button>
+              <button v-else type="submit" class="primary-button" :disabled="!creation.canSubmit.value">{{ creation.state.sending ? '正在提交…' : '继续故事' }}</button>
             </div>
           </form>
         </div>
@@ -96,7 +95,6 @@ onUnmounted(remember);
 .suggestions p { font-size: 12px; margin: 8px 0 0; }
 .composer-tools .advance-control { display: flex; align-items: center; gap: 7px; margin: 0; }
 .advance-control input { width: 16px; height: 16px; accent-color: var(--accent); padding: 0; }
-.candidate-prose { margin-top: 18px; }
-.candidate-prose .message-content { white-space: pre-wrap; }
+.generation-placeholder { color: var(--muted); font-size: 13px; margin: 0; }
 @media (max-width: 720px) { .reading-heading { flex-wrap: wrap; } .session-lifetime { width: 100%; } }
 </style>

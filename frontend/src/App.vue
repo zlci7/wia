@@ -3,6 +3,7 @@ import RunProgress from './components/RunProgress.vue';
 import AppDialog from "./components/AppDialog.vue";
 import CreatorView from "./components/CreatorView.vue";
 import InformationPanel from "./components/InformationPanel.vue";
+import InformationTools from "./components/InformationTools.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
@@ -354,7 +355,7 @@ const policyOptions = [
       </section>
     </section>
 
-    <CreationPlay v-else-if="view === 'creation'" :creation="creation" :streaming-supported="!!status?.generation_transport?.streaming_supported" />
+    <CreationPlay v-else-if="view === 'creation'" :creation="creation" :streaming-supported="!!status?.generation_transport?.streaming_supported" :information-tab="dialog === 'information' ? informationTab : undefined" @information="openInformation" />
 
     <div v-else-if="currentWorld && view === 'play'" class="game-layout">
       <section class="story-column">
@@ -364,20 +365,7 @@ const policyOptions = [
             <strong class="world-clock">{{ formatWorldClock(currentWorld.clock) }}</strong>
             <span class="world-location">{{ currentWorld.location?.name ?? currentWorld.scene }}</span>
           </div>
-          <nav class="information-entry glass" aria-label="世界与角色资料">
-            <button id="wia-information-character" class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'character'" aria-controls="wia-information-panel" @click="openInformation('character')">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg><span>角色</span>
-            </button>
-            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'inventory'" aria-controls="wia-information-panel" @click="openInformation('inventory')">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="15" rx="4"/><path d="M9 6V4a3 3 0 0 1 6 0v2M8 14h8v4H8z"/></svg><span>背包</span>
-            </button>
-            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'map'" aria-controls="wia-information-panel" @click="openInformation('map')">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></svg><span>地图</span>
-            </button>
-            <button class="information-tool" :aria-expanded="dialog === 'information' && informationTab === 'people'" aria-controls="wia-information-panel" @click="openInformation('people')">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v2"/></svg><span>人物</span>
-            </button>
-          </nav>
+          <InformationTools :active="dialog === 'information' ? informationTab : undefined" @choose="openInformation" />
         </div>
         <div
           ref="viewport"
@@ -979,6 +967,19 @@ const policyOptions = [
           </button>
         </div></template
       >
+      <InformationPanel
+        v-else-if="dialog === 'information' && view === 'creation' && creation.state.active"
+        v-model:tab="informationTab"
+        :world="creation.state.active.world"
+        :player="creation.state.active.player"
+        :known-locations="creation.state.active.known_locations"
+        :states="creation.state.active.states"
+        :items="creation.state.active.items"
+        :characters="creation.state.active.characters.filter(character => character.in_scene)"
+        :bystanders="creation.state.active.bystanders || []"
+        addressee=""
+        :selectable="false"
+      />
       <InformationPanel
         v-else-if="dialog === 'information' && currentWorld"
         v-model:tab="informationTab"

@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const bundle = await build({ stdin: { contents: `export { useCreationPlay } from './src/useCreationPlay'; export { createRenderer, nextTick } from 'vue';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, platform: 'node', format: 'esm' });
-const { useCreationPlay, createRenderer, nextTick } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const bundle = await build({ stdin: { contents: `export { useCreationPlay } from './src/useCreationPlay'; export { creationReadingMessages } from './src/creationReading'; export { createRenderer, nextTick } from 'vue';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, platform: 'node', format: 'esm' });
+const { useCreationPlay, creationReadingMessages, createRenderer, nextTick } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode() {}, nextSibling() {} });
 const stored = new Map();
 globalThis.window = { sessionStorage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) } };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 async function until(check) { for (let i = 0; i < 100; i++) { if (check()) return; await new Promise(resolve => setTimeout(resolve, 1)); } throw new Error('state did not settle'); }
-const initial = { id: 'P', version: 1, game_id: 'demo', title: '船坞', revision: 'v1', turn: 0, clock: '2040-06-12 23:58', location: '船坞', messages: [{ message_id: 'opening', kind: 'narrative', content: '开场' }], characters: [], suggestions: { turn: 0, enabled: true, status: 'empty', items: [] } };
+const initial = { id: 'P', version: 1, game_id: 'demo', title: '船坞', revision: 'v1', turn: 0, clock: '2040-06-12 23:58', location: '船坞', messages: [{ seq: 1, message_id: 'opening', kind: 'narrative', content: '开场' }], characters: [], suggestions: { turn: 0, enabled: true, status: 'empty', items: [] } };
+const streaming = { ...initial, run: { id: 'R', input: '我接过信', candidate: '工匠递过纸信。', started_at: '' } };
+const pendingReading = creationReadingMessages(streaming, true);
+assert.deepEqual(pendingReading.map(message => message.seq), [1, 2, 3]);
+const completedReading = creationReadingMessages({ ...streaming, messages: pendingReading }, false);
+assert.deepEqual(completedReading, pendingReading, 'acceptance preserves message sequence, kind and prose');
+assert.deepEqual(creationReadingMessages(streaming, false), initial.messages, 'cancelled or failed candidates leave accepted history');
 let version = 1, current = structuredClone(initial), posts = [], failReply = false;
 globalThis.fetch = async (url, init = {}) => {
   if (url === '/api/v1/play-sessions') return json(current, 201);

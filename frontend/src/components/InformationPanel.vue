@@ -14,6 +14,7 @@ const props = defineProps<{
   characters: Character[];
   bystanders: PackBystander[];
   addressee: string;
+  selectable?: boolean;
 }>();
 const emit = defineEmits<{
   "update:tab": [tab: typeof props.tab];
@@ -133,10 +134,14 @@ function adjacent(location: KnownLocation) {
     <template v-else-if="tab === 'people'">
       <h3>眼前的人</h3>
       <article v-for="character in characters" :key="character.entity_id" class="person-information">
-        <button type="button" class="character-row" :class="{ selected: addressee === character.entity_id }" :aria-pressed="addressee === character.entity_id" @click="emit('choose-character', character)">
+        <button v-if="selectable !== false" type="button" class="character-row" :class="{ selected: addressee === character.entity_id }" :aria-pressed="addressee === character.entity_id" @click="emit('choose-character', character)">
           <span class="avatar">{{ character.name.slice(0, 1) }}</span>
           <span><strong>{{ character.name }}</strong><small>{{ character.role }}</small><small>选择交谈对象</small></span>
         </button>
+        <div v-else class="character-row">
+          <span class="avatar">{{ character.name.slice(0, 1) }}</span>
+          <span><strong>{{ character.name }}</strong><small>{{ character.role }}</small></span>
+        </div>
         <StatePanel :states="characterStates(character.entity_id)" :characters="characters" />
         <ul v-if="characterItems(character.entity_id).length" class="item-list">
           <li v-for="item in characterItems(character.entity_id)" :key="item.instance_id">

@@ -13,6 +13,8 @@ export interface PlaySession {
 	version: number;
   id: string; game_id: string; title: string; revision: string; turn: number;
   clock: string; location: string; messages: Message[]; characters: Character[];
+  world: WorldSummary; player: { name: string; profile: string };
+  states: PublicState[]; items: PublicItem[]; known_locations: KnownLocation[]; bystanders: PackBystander[];
   run?: { id: string; request_key: string; input: string; status: string;
     transport: 'stream' | 'non_stream'; allow_plot_advance: boolean; started_at: string;
     elapsed_ms: number; candidate?: string; calls: number; repairs: number;

@@ -30,6 +30,7 @@ type creationBrowserGenerator struct {
 	calls     atomic.Int32
 	delay     atomic.Bool
 	invalid   atomic.Bool
+	resources atomic.Bool
 	dir       string
 	maxCalls  int32
 }
@@ -69,10 +70,18 @@ func (g *creationBrowserGenerator) GenerateText(ctx context.Context, request mod
 		response, err = g.inner.GenerateText(ctx, request)
 	} else {
 		var text string
-		if strings.Contains(request.System, "玩家行动建议助手") {
+		suggestions := strings.Contains(request.System, "玩家行动建议助手")
+		if suggestions {
 			text = `{"items":["我请马丁说明最后一次见面时发生了什么，尤其是他停顿的那一刻，先听完他的说法再决定下一步。","我仔细核对桌上的照片和地址纸条，记下能够确认的细节，再向马丁核实其中不清楚的地方。","我请书记员谈谈刚才注意到的反应，把她的观察与马丁的说法对照，寻找值得继续追问的问题。"]}`
 		} else {
-			data, _ := json.Marshal(map[string]any{"scene_changes": map[string]any{"elapsed_minutes": 2, "positions": g.positions}, "narrative": "马丁把帽子放在膝上。\n\n“她说想自己接一单活计。”他说，“我担心陌生顾客，却没有仔细听她解释。”\n\n书记员抬起头，没有插话。你能接着核对那天的订单与地址。"})
+			changes := map[string]any{"elapsed_minutes": 2, "positions": g.positions}
+			narrative := "马丁把帽子放在膝上。\n\n“她说想自己接一单活计。”他说，“我担心陌生顾客，却没有仔细听她解释。”\n\n书记员抬起头，没有插话。你能接着核对那天的订单与地址。"
+			if g.resources.Load() {
+				changes["state_changes"] = []map[string]any{{"entity_id": "player", "state_id": "cash", "delta": -48, "reason": "玩家付出一苏勒调查开销"}, {"entity_id": "player", "state_id": "fatigue", "delta": 1, "reason": "调查后略感疲倦"}}
+				changes["item_moves"] = []map[string]any{{"instance_id": "case-photo", "holder_id": "player", "reason": "玩家接过马丁放在桌上的照片"}}
+				narrative = "你把一苏勒交给书记员作为调查开销，随后接过马丁放在桌上的照片，收进随身记事本。\n\n马丁把帽子放在膝上。“她说想自己接一单活计。”他说，“我担心陌生顾客，却没有仔细听她解释。”\n\n书记员核对支出记录。短暂的忙碌让你略感疲倦，桌上的地址纸条还没有动过。"
+			}
+			data, _ := json.Marshal(map[string]any{"scene_changes": changes, "narrative": narrative})
 			text = string(data)
 			if g.invalid.Load() {
 				text = `{"narrative":"候选正文","scene_changes":{"positions":{"player":"invalid"}}}`
@@ -91,11 +100,16 @@ func (g *creationBrowserGenerator) GenerateText(ctx context.Context, request mod
 				}
 			}
 		}
-		if err == nil && g.delay.Load() {
-			select {
-			case <-ctx.Done():
-				err = ctx.Err()
-			case <-time.After(60 * time.Second):
+		if err == nil && !suggestions {
+			for deadline := time.Now().Add(60 * time.Second); g.delay.Load() && time.Now().Before(deadline); {
+				select {
+				case <-ctx.Done():
+					err = ctx.Err()
+				case <-time.After(20 * time.Millisecond):
+				}
+				if err != nil {
+					break
+				}
 			}
 		}
 		response.Text = text
@@ -197,14 +211,16 @@ func TestCreationBrowserFixture(t *testing.T) {
 		}
 		if r.Method == "POST" && r.URL.Path == "/fixture/control" && g.inner == nil {
 			var request struct {
-				Delay   bool `json:"delay"`
-				Invalid bool `json:"invalid"`
+				Delay     bool `json:"delay"`
+				Invalid   bool `json:"invalid"`
+				Resources bool `json:"resources"`
 			}
 			if !decodeJSON(w, r, &request) {
 				return
 			}
 			g.delay.Store(request.Delay)
 			g.invalid.Store(request.Invalid)
+			g.resources.Store(request.Resources)
 			w.WriteHeader(204)
 			return
 		}
