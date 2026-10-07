@@ -54,8 +54,9 @@ Engineering tests, browser checks, real-model observations and user acceptance a
 - [Architecture and dependency rules](docs/summary/ARCHITECTURE.md)
 - [Documentation index](docs/README.md)
 - [Phase12 index](docs/phase12/README.md)
-- [Phase13](docs/phase13/README.md): current stage; a centralized scene candidate exists, live continuous preflight has not passed, and the formal turn still uses individual character calls.
-- [Chinese co-creative gameplay execution plan](docs/phase13/共创游玩-执行规划.md): lightweight creation, relevant context and continuous-play acceptance; planned.
+- [Phase13](docs/phase13/README.md): an internal co-creative play entry has two recorded 12-turn live sessions; the formal turn still uses individual character calls.
+- [Co-creative play guide](docs/phase13/轻量共创游玩.md): local console, relevant context, personal records and per-turn plot advancement.
+- [Chinese co-creative gameplay execution plan](docs/phase13/共创游玩-执行规划.md): prototype scope and continuous-play acceptance.
 - [Product scope](docs/产品说明.md)
 - [Cross-stage contracts](docs/summary/总体技术方案.md)
 - [Player workspace design](DESIGN.md)

@@ -1,0 +1,1133 @@
+{
+  "model": "deepseek-v4-flash",
+  "story_revision": "mist-embers.pack.v9",
+  "turns": [
+    {
+      "request": {
+        "input": "我问马丁关于女儿离家前的争执，说明我愿意先了解情况，尚未接受委托。让他把实际知道的事情说清楚。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 3872,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你身子微微前倾，目光落在马丁攥着帽子的手上，声音不急不缓：“维尔先生，先说清楚——我还没接这个案子。但在那之前，我想知道她离家前你们到底发生了什么。你刚才说到最后一次见面时停了一下，那是什么？”\\n\\n马丁的拇指反复搓着帽檐的一角，那顶帽子早已被捏得不成形状。他沉默了几秒，喉结动了一下，像是把话先在里面过了一遍。\\n\\n“那天……她接了一单生意。”他终于开口，语气放得很平，像是在报一块布的价格，“没跟我商量。一个陌生顾客，说是要订一件女式外套，给的地址我没听过。我跟她说，陌生人的赊账单子不能随便接，收了料子收不回钱，出了岔子谁来担。她不听。”\\n\\n他抬起头看你一眼，很快又低下去。“她说我拿她当帮工，说我从来没让她自己做过主。我说会做衣服和会应付外头的人，是两回事。她摔了门。我以为她气两天就回来。”\\n\\n“三天了。”他说完这三个字，帽檐上那道折痕又深了些。\\n\\n书记员在桌后翻动文件的手停了停，又继续。他没插话，只在登记簿上记下几笔。\\n\\n马丁似乎不确定该不该就此打住，补了一句：“那单子……她走后我才在订单簿里看见一张收据。写着个我没什么印象的街名。我——还没来得及去问。”\\n\\n他说这话时目光落在桌面那张写着裁缝店地址的纸条上，像在确认什么。门外上午的雾还贴在窗上，街上的脚步声不紧不慢。你面前现在有三条路可走：先追问那张收据的细节，去裁缝店翻订单簿，或者让马丁自己决定还愿意说多少。他没再催你接案，只是把帽子重新攥紧。\",\"scene_changes\":{\"elapsed_minutes\":8},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁承认最后一次见面是因诺拉擅自接了一笔陌生顾客的订单发生争执，他担心赊账与陌生人风险，诺拉认为自己一直被当帮工。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁提到诺拉走后他在订单簿里发现一张写着陌生街名的收据，尚未去核实。他没有说出具体街名。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"commitment\",\"content\":\"玩家明确表示尚未接受委托，目前只要求马丁把知道的事情说清楚。\",\"recipients\":[\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"player\"}]}",
+          "elapsed_ms": 3871,
+          "input_estimate": 6438,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 256,
+            "CacheMissTokens": 3438,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 3694,
+            "OutputTokens": 620,
+            "ReasoningTokens": 0,
+            "ContentChars": 1134,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你身子微微前倾，目光落在马丁攥着帽子的手上，声音不急不缓：“维尔先生，先说清楚——我还没接这个案子。但在那之前，我想知道她离家前你们到底发生了什么。你刚才说到最后一次见面时停了一下，那是什么？”\n\n马丁的拇指反复搓着帽檐的一角，那顶帽子早已被捏得不成形状。他沉默了几秒，喉结动了一下，像是把话先在里面过了一遍。\n\n“那天……她接了一单生意。”他终于开口，语气放得很平，像是在报一块布的价格，“没跟我商量。一个陌生顾客，说是要订一件女式外套，给的地址我没听过。我跟她说，陌生人的赊账单子不能随便接，收了料子收不回钱，出了岔子谁来担。她不听。”\n\n他抬起头看你一眼，很快又低下去。“她说我拿她当帮工，说我从来没让她自己做过主。我说会做衣服和会应付外头的人，是两回事。她摔了门。我以为她气两天就回来。”\n\n“三天了。”他说完这三个字，帽檐上那道折痕又深了些。\n\n书记员在桌后翻动文件的手停了停，又继续。他没插话，只在登记簿上记下几笔。\n\n马丁似乎不确定该不该就此打住，补了一句：“那单子……她走后我才在订单簿里看见一张收据。写着个我没什么印象的街名。我——还没来得及去问。”\n\n他说这话时目光落在桌面那张写着裁缝店地址的纸条上，像在确认什么。门外上午的雾还贴在窗上，街上的脚步声不紧不慢。你面前现在有三条路可走：先追问那张收据的细节，去裁缝店翻订单簿，或者让马丁自己决定还愿意说多少。他没再催你接案，只是把帽子重新攥紧。",
+          "scene_changes": {
+            "elapsed_minutes": 8
+          },
+          "continuity_notes": [
+            {
+              "kind": "statement",
+              "content": "马丁承认最后一次见面是因诺拉擅自接了一笔陌生顾客的订单发生争执，他担心赊账与陌生人风险，诺拉认为自己一直被当帮工。",
+              "recipients": [
+                "player",
+                "bystander:clerk"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "statement",
+              "content": "马丁提到诺拉走后他在订单簿里发现一张写着陌生街名的收据，尚未去核实。他没有说出具体街名。",
+              "recipients": [
+                "player",
+                "bystander:clerk"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "commitment",
+              "content": "玩家明确表示尚未接受委托，目前只要求马丁把知道的事情说清楚。",
+              "recipients": [
+                "npc:tailor",
+                "bystander:clerk"
+              ],
+              "speaker_id": "player"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 1,
+        "clock": "1358-03-29 09:08",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "office",
+          "player": "office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我问还有什么是他刚才没愿意说的，并给他时间解释，让书记员在确有意见时自然参与，但不要替我接受任何事情。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 5099,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你把手从桌沿收回来，语气没有催逼的意思：“维尔先生，刚才你说‘还没来得及去问’那句的时候停了一下。除了收据上的街名，还有没有别的——你觉得说出来会不好听、或者觉得跟我们没关系的事？你先想想，不用急着答。”\\n\\n马丁的拇指在帽檐上停住。他盯着桌面那张裁缝店的地址纸条，有好一会儿没动。窗外的雾贴着玻璃，隐约有辆马车从街上碾过去。\\n\\n“你是问，我是不是还瞒着什么。”他说这话不像在问你，倒像在跟自己核对。\\n\\n桌后，书记员放下笔，把登记簿往自己这边合了半寸，但没有起身，也没有替你说一句话。他只看了马丁一眼，又低头整理起手边的单据，像是在把空间留出来。\\n\\n马丁终于抬起头。“有件事……我不知道算不算。”他语速慢下来，“她走之前那半个月，人有点不对。回来得晚，说去送布料，可店里那批料子我记得是当天就交出去了。我问过她一次，她说我连她几点回家都要管。”\\n\\n他抿了抿嘴，像是嫌自己这话里带着分辨。“我没敢再追。我那会儿以为是那个订单的事让她心野了——现在想想，也可能是别的。她房里……她东西我没动过，她要是回来，看见我把她桌子翻了，又得吵。”\\n\\n他顿了顿，把帽子往膝盖上按平。“还有，那些天有个男人来店门口问过路，问的是同一片地方，我没理他。这条我拿不准要不要说，怕说岔了把人往错处引。”\\n\\n书记员这时才淡淡开口，声音不高：“维尔先生，您说的这些，我们记的都是您自己的话。接不接、怎么查，是这位调查员决定的，我不替谁应承。”说完又低下头，笔尖悬在纸上没落。\\n\\n马丁看着你，把最后那点犹豫也交了出来：“我知道的就这些了。你要是问收据上具体写的哪儿——就是一张纸，纸在店里。我要真记得清，也不至于拖到现在。”\",\"scene_changes\":{\"elapsed_minutes\":6},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁补充：诺拉离家前约半个月行为异常，晚归并称去送布料，但他记得该批料子当天已交付；他追问过一次，被她顶回，便未再追。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁称诺拉走后他未翻动她的房间，怕她回来再起争执；订单簿中的收据仍在裁缝店，他记不清具体街名。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁提到异常期间曾有陌生男人在店门口问路，问的是红烟囱街一带，他未理会；他拿不准此线索是否可靠。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"书记员声明登记只记录马丁本人的陈述，接案与否由调查员决定，他不替任何一方应承。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"bystander:clerk\"}]}",
+          "elapsed_ms": 5098,
+          "input_estimate": 7722,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 2944,
+            "CacheMissTokens": 1699,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 4643,
+            "OutputTokens": 753,
+            "ReasoningTokens": 0,
+            "ContentChars": 1388,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把手从桌沿收回来，语气没有催逼的意思：“维尔先生，刚才你说‘还没来得及去问’那句的时候停了一下。除了收据上的街名，还有没有别的——你觉得说出来会不好听、或者觉得跟我们没关系的事？你先想想，不用急着答。”\n\n马丁的拇指在帽檐上停住。他盯着桌面那张裁缝店的地址纸条，有好一会儿没动。窗外的雾贴着玻璃，隐约有辆马车从街上碾过去。\n\n“你是问，我是不是还瞒着什么。”他说这话不像在问你，倒像在跟自己核对。\n\n桌后，书记员放下笔，把登记簿往自己这边合了半寸，但没有起身，也没有替你说一句话。他只看了马丁一眼，又低头整理起手边的单据，像是在把空间留出来。\n\n马丁终于抬起头。“有件事……我不知道算不算。”他语速慢下来，“她走之前那半个月，人有点不对。回来得晚，说去送布料，可店里那批料子我记得是当天就交出去了。我问过她一次，她说我连她几点回家都要管。”\n\n他抿了抿嘴，像是嫌自己这话里带着分辨。“我没敢再追。我那会儿以为是那个订单的事让她心野了——现在想想，也可能是别的。她房里……她东西我没动过，她要是回来，看见我把她桌子翻了，又得吵。”\n\n他顿了顿，把帽子往膝盖上按平。“还有，那些天有个男人来店门口问过路，问的是同一片地方，我没理他。这条我拿不准要不要说，怕说岔了把人往错处引。”\n\n书记员这时才淡淡开口，声音不高：“维尔先生，您说的这些，我们记的都是您自己的话。接不接、怎么查，是这位调查员决定的，我不替谁应承。”说完又低下头，笔尖悬在纸上没落。\n\n马丁看着你，把最后那点犹豫也交了出来：“我知道的就这些了。你要是问收据上具体写的哪儿——就是一张纸，纸在店里。我要真记得清，也不至于拖到现在。”",
+          "scene_changes": {
+            "elapsed_minutes": 6
+          },
+          "continuity_notes": [
+            {
+              "kind": "statement",
+              "content": "马丁补充：诺拉离家前约半个月行为异常，晚归并称去送布料，但他记得该批料子当天已交付；他追问过一次，被她顶回，便未再追。",
+              "recipients": [
+                "player",
+                "bystander:clerk"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "statement",
+              "content": "马丁称诺拉走后他未翻动她的房间，怕她回来再起争执；订单簿中的收据仍在裁缝店，他记不清具体街名。",
+              "recipients": [
+                "player",
+                "bystander:clerk"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "statement",
+              "content": "马丁提到异常期间曾有陌生男人在店门口问路，问的是红烟囱街一带，他未理会；他拿不准此线索是否可靠。",
+              "recipients": [
+                "player",
+                "bystander:clerk"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "statement",
+              "content": "书记员声明登记只记录马丁本人的陈述，接案与否由调查员决定，他不替任何一方应承。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "bystander:clerk"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 2,
+        "clock": "1358-03-29 09:14",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "office",
+          "player": "office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我提议先步行去维尔裁缝店看订单簿，马丁同意的话与他一起过去，暂时不承诺后续调查。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 9390,
+      "calls": [
+        {
+          "text": "{\"scene_changes\":{\"elapsed_minutes\":18,\"movements\":[{\"entity_id\":\"player\",\"route\":[\"office\",\"tailor-shop\"]},{\"entity_id\":\"npc:tailor\",\"route\":[\"office\",\"tailor-shop\"]},{\"entity_id\":\"bystander:clerk\",\"route\":[\"office\"]}]},\"narrative\":\"你把话收拢到最实际的一步上：“与其在这儿空想，不如先去店里看订单簿。您带路，我看一眼那张收据——我现在还不接案子，但这一步不耽误您什么。”\\n\\n马丁几乎没有犹豫就站了起来，帽子重新扣回头上，帽檐那道折痕压得比来时更平。“店就在两条街外，这个点已经开门了。”他朝书记员那边点了一下头，对方只回了一个公事化的颔首，在本子上添了一笔，没多问。\\n\\n早雾还压着人行道。你们一路走过两三段湿漉漉的石板路，他走得比谈委托时快，偶尔停在铺面前辨认布庄挂出的样料，像是怕别人觉得他连自家生意都疏忽了。\\n\\n维尔裁缝店的门脸不宽，橱窗里挂着两件改好的成衣，熨得极平整。推门时铜铃响了一声，店里只有缝纫机旁的半成品和一只喝了一半的茶杯。楼下前半是柜台，后半用一道布帘隔开，楼梯通向上面的住家。\\n\\n“订单簿在柜台下头。”马丁绕到柜台里侧，弯腰抽出一个厚硬皮的册子，边角被翻得起了毛。他把它平放在台面上推给你，手指点着最近的一页，“就这几天……你往后翻。”\\n\\n你把册子翻到收据夹页处。纸张边缘微卷，墨色比相邻的订单淡一些，抄得也利落：顾客栏没有姓名，只写了一个模糊的“F.”，货品是一件女式外套，预付一半，地址栏——红烟囱街。\\n\\n马丁在旁边看着你的表情，喉头动了一下：“就是它。我不认识这个字，也不认识这条街。可她那天就是拿这个跟我说，她接的是正经生意。”\\n\\n他的语气里有跟之前不一样的起伏，像终于把这句话憋到了纸面上。“你要是想拿这张收据去问，我不拦你。只是……”他没把后半句说完，转而把柜台上的裁尺往里挪了挪。\\n\\n店门半开，街上有人经过，帘子后头楼上的住家楼梯没有任何声响。收据在此处可见，可核实，离开这家店之后就得靠自己记。你现在可以问马丁这条街上的门牌线索、提出把收据借走或抄下地址，或者干脆在店里等他再想起什么。\"}",
+          "elapsed_ms": 4457,
+          "input_estimate": 10521,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 896,
+            "CacheMissTokens": 5665,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 6561,
+            "OutputTokens": 602,
+            "ReasoningTokens": 0,
+            "ContentChars": 998,
+            "ReasoningChars": 0
+          }
+        },
+        {
+          "text": "{\"scene_changes\":{\"elapsed_minutes\":18,\"movements\":[{\"entity_id\":\"player\",\"route\":[\"office\",\"tailor-shop\"]},{\"entity_id\":\"npc:tailor\",\"route\":[\"office\",\"tailor-shop\"]}]},\"narrative\":\"“在接不接之前，我得先看看那张收据。”你站起来，把外套从椅背上取下，“维尔先生，如果你不介意，我跟你回店里翻一下订单簿。看完再说下一步。”\\n\\n马丁迟疑了一下，帽子的折痕在握紧时又深了一分。最终他点头：“行。你亲眼看，比我在这儿空口讲清楚。”\\n\\n书记员从抽屉里取出一张访客条，写上到访事由和时间，推过柜台。“登记我留一份。调查员是自行了解情况，不算立案。”他语气平平，没有拦你，也没有替马丁作保。\\n\\n店门推开时，街上的雾比上午淡了一些，但煤烟的味道还贴在湿石板路面上。事务所到维尔裁缝店不远，步行穿过一条店铺尚未全开的横街，走了一刻钟出头。马丁走在前头，步子比在事务所里快，像是怕别的顾客等在门口。\\n\\n裁缝店门脸不大，橱窗里挂着一件半旧的深色外套，橱窗玻璃擦得很仔细。进门就是铺面，木案上摊着几块裁剪中的呢料，尺子、剪刀、针插各归其位。后墙一道窄楼梯通向楼上住人的地方，楼梯口挂着一幅装裱过的学徒出师证书，边框有些发黄。\\n\\n“订单簿在柜台下头。”马丁绕到柜台后，弯腰取出一个深棕色硬皮本，“赊账、客户地址、料子去向都记在这上面。”他把本子放到木案上，翻到诺拉经手那几页时，手顿了一下。\\n\\n簿页上的字有两种，一种结体端方，是马丁的；另一种清瘦，笔压偏重，像是写字的人握笔很用力。最近一页记着一笔女式外套订单，客户栏只写了一个姓氏缩写，地址一栏墨迹很新，写着“红烟囱街”，后面没有门牌号。日期正是她离家前大约五天。收据存根还夹在这一页之间，纸边有些卷，能看出被反复翻看过。\\n\\n马丁站在一旁，没碰本子。“就算地址对，能说明什么？她去送货，货没送的话，衣服也不在店里。”他目光往楼梯口扫了一眼，像是在想楼上那间没被动过的房间。\",\"continuity_notes\":[{\"kind\":\"observed\",\"content\":\"订单簿上诺拉经手的女式外套订单地址写有“红烟囱街”，无门牌号，日期约在她离家前五天；收据存根仍夹在该页中。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"player\"},{\"kind\":\"statement\",\"content\":\"马丁表示订单地址即便属实也未必说明异常，并注意到那笔订单的成衣并不在店里。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"commitment\",\"content\":\"玩家只提出先查看订单簿再决定，尚未承诺接受委托或承担后续调查。\",\"recipients\":[\"player\",\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"player\"}]}",
+          "elapsed_ms": 4929,
+          "input_estimate": 10580,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 5888,
+            "CacheMissTokens": 709,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 6597,
+            "OutputTokens": 757,
+            "ReasoningTokens": 0,
+            "ContentChars": 1350,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "“在接不接之前，我得先看看那张收据。”你站起来，把外套从椅背上取下，“维尔先生，如果你不介意，我跟你回店里翻一下订单簿。看完再说下一步。”\n\n马丁迟疑了一下，帽子的折痕在握紧时又深了一分。最终他点头：“行。你亲眼看，比我在这儿空口讲清楚。”\n\n书记员从抽屉里取出一张访客条，写上到访事由和时间，推过柜台。“登记我留一份。调查员是自行了解情况，不算立案。”他语气平平，没有拦你，也没有替马丁作保。\n\n店门推开时，街上的雾比上午淡了一些，但煤烟的味道还贴在湿石板路面上。事务所到维尔裁缝店不远，步行穿过一条店铺尚未全开的横街，走了一刻钟出头。马丁走在前头，步子比在事务所里快，像是怕别的顾客等在门口。\n\n裁缝店门脸不大，橱窗里挂着一件半旧的深色外套，橱窗玻璃擦得很仔细。进门就是铺面，木案上摊着几块裁剪中的呢料，尺子、剪刀、针插各归其位。后墙一道窄楼梯通向楼上住人的地方，楼梯口挂着一幅装裱过的学徒出师证书，边框有些发黄。\n\n“订单簿在柜台下头。”马丁绕到柜台后，弯腰取出一个深棕色硬皮本，“赊账、客户地址、料子去向都记在这上面。”他把本子放到木案上，翻到诺拉经手那几页时，手顿了一下。\n\n簿页上的字有两种，一种结体端方，是马丁的；另一种清瘦，笔压偏重，像是写字的人握笔很用力。最近一页记着一笔女式外套订单，客户栏只写了一个姓氏缩写，地址一栏墨迹很新，写着“红烟囱街”，后面没有门牌号。日期正是她离家前大约五天。收据存根还夹在这一页之间，纸边有些卷，能看出被反复翻看过。\n\n马丁站在一旁，没碰本子。“就算地址对，能说明什么？她去送货，货没送的话，衣服也不在店里。”他目光往楼梯口扫了一眼，像是在想楼上那间没被动过的房间。",
+          "scene_changes": {
+            "elapsed_minutes": 18,
+            "movements": [
+              {
+                "entity_id": "player",
+                "route": [
+                  "office",
+                  "tailor-shop"
+                ]
+              },
+              {
+                "entity_id": "npc:tailor",
+                "route": [
+                  "office",
+                  "tailor-shop"
+                ]
+              }
+            ]
+          },
+          "continuity_notes": [
+            {
+              "kind": "observed",
+              "content": "订单簿上诺拉经手的女式外套订单地址写有“红烟囱街”，无门牌号，日期约在她离家前五天；收据存根仍夹在该页中。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "player"
+            },
+            {
+              "kind": "statement",
+              "content": "马丁表示订单地址即便属实也未必说明异常，并注意到那笔订单的成衣并不在店里。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "commitment",
+              "content": "玩家只提出先查看订单簿再决定，尚未承诺接受委托或承担后续调查。",
+              "recipients": [
+                "player",
+                "npc:tailor",
+                "bystander:clerk"
+              ],
+              "speaker_id": "player"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 2,
+          "repairs": 1,
+          "selected_entity_ids": [
+            "player",
+            "npc:missing-woman",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 3,
+        "clock": "1358-03-29 09:32",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "tailor-shop"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我仔细查看订单簿和收据，再问马丁哪些情况需要核实。我愿意听他自己的建议，但尚未选择新的目的地。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 6237,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你把订单簿拉到光线更好的案头，先看整页布局。诺拉的字迹压得很重，几处数字下笔尤其深。女式外套那笔，选料一栏记着灰色呢料，用量两码半；报价栏写着“十五先令，赊”；客户栏只有一个花体起首字母，像是“V”，又像“N”，末笔拉得很长，看不出全名。地址“红烟囱街”写在收据存根和订单行两处，字迹一致，都没有门牌号。\\n\\n你抽出存根，对着光看：纸张是普通簿用纸，右下角有裁缝店自己的编号，日期落款处是诺拉的名字简称。背面空白，只在边缘有一道折痕，像是曾经被人攥在手里过。\\n\\n“收据是撕下来给客户的，这一联留底。”马丁在旁边开口，手指虚点存根上那行报价，“十五先令，赊账。我第一次看见她敢这么写，心里就不舒服。”\\n\\n你翻回前几页核对诺拉经手的其他订单：都是布料、尺寸、交货日子，写得很省，但每一笔都收得回来，有几件还注了“已结”。唯独这一笔既无全名也无门牌，交货日期空着。你再往前翻了半个月，发现有三四笔订单的日期和马丁说“她晚归说去送布料”的日子重合，送货栏同样只写了街名，没有号数。\\n\\n马丁凑近看了一眼，眉头皱得更紧：“这几笔我记得。她说送完了，我信了。料子也确实出了。”他停顿一下，像在把两件事分开说，“可要是她送的不是我记的那些地方……那我记的这些就都不算数了。”\\n\\n你把簿子合上，放回木案，才开口：“现在有几件事需要核实：这家客户是谁，红烟囱街具体哪一户，这批外套到底做没做完、在不在店里；还有那几天她每天实际去了哪。维尔先生，依你看，先核哪件？”\\n\\n马丁把帽子重新扣到头上，帽檐压得低了些。“先弄清那笔单子是真是假，”他说，声音很稳，“客户是谁、在不在红烟囱街。要是个空壳子，就说明那阵子她一直在往外编——那我就得知道她到底在忙什么。外套的去向我也想知道，但那个得从她手里问，目前没人能替她说。”\\n\\n他没有催你动身，只是站到柜台边，等着你决定是先翻他女儿的账，还是直接去街上问那笔订单。楼上的房间仍没开过门。\",\"scene_changes\":{\"elapsed_minutes\":8},\"continuity_notes\":[{\"kind\":\"observed\",\"content\":\"订单簿上那笔女式外套为灰色呢料两码半，报价十五先令赊账，客户姓名只留一个难以辨认的起首字母，地址仅写“红烟囱街”无门牌，交货日期空白；收据存根仍夹在原页。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"player\"},{\"kind\":\"observed\",\"content\":\"离家前约半个月内另有数笔订单送货栏只写街名不写号数，日期与马丁所说诺拉晚归的日子重合；马丁此前以为料子已按这些单子送出。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"player\"},{\"kind\":\"statement\",\"content\":\"马丁建议优先核实那笔外套订单的客户身份与红烟囱街的具体门牌，若是空壳，说明诺拉那阵子一直在外编事；外套去向需从诺拉本人问。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"commitment\",\"content\":\"玩家未选择新目的地，也未承诺接受委托或承担后续调查，仅提出需核实客户、地址、成衣与诺拉实际行踪。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"player\"}]}",
+          "elapsed_ms": 6236,
+          "input_estimate": 10748,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 2816,
+            "CacheMissTokens": 4071,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 6887,
+            "OutputTokens": 900,
+            "ReasoningTokens": 0,
+            "ContentChars": 1512,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把订单簿拉到光线更好的案头，先看整页布局。诺拉的字迹压得很重，几处数字下笔尤其深。女式外套那笔，选料一栏记着灰色呢料，用量两码半；报价栏写着“十五先令，赊”；客户栏只有一个花体起首字母，像是“V”，又像“N”，末笔拉得很长，看不出全名。地址“红烟囱街”写在收据存根和订单行两处，字迹一致，都没有门牌号。\n\n你抽出存根，对着光看：纸张是普通簿用纸，右下角有裁缝店自己的编号，日期落款处是诺拉的名字简称。背面空白，只在边缘有一道折痕，像是曾经被人攥在手里过。\n\n“收据是撕下来给客户的，这一联留底。”马丁在旁边开口，手指虚点存根上那行报价，“十五先令，赊账。我第一次看见她敢这么写，心里就不舒服。”\n\n你翻回前几页核对诺拉经手的其他订单：都是布料、尺寸、交货日子，写得很省，但每一笔都收得回来，有几件还注了“已结”。唯独这一笔既无全名也无门牌，交货日期空着。你再往前翻了半个月，发现有三四笔订单的日期和马丁说“她晚归说去送布料”的日子重合，送货栏同样只写了街名，没有号数。\n\n马丁凑近看了一眼，眉头皱得更紧：“这几笔我记得。她说送完了，我信了。料子也确实出了。”他停顿一下，像在把两件事分开说，“可要是她送的不是我记的那些地方……那我记的这些就都不算数了。”\n\n你把簿子合上，放回木案，才开口：“现在有几件事需要核实：这家客户是谁，红烟囱街具体哪一户，这批外套到底做没做完、在不在店里；还有那几天她每天实际去了哪。维尔先生，依你看，先核哪件？”\n\n马丁把帽子重新扣到头上，帽檐压得低了些。“先弄清那笔单子是真是假，”他说，声音很稳，“客户是谁、在不在红烟囱街。要是个空壳子，就说明那阵子她一直在往外编——那我就得知道她到底在忙什么。外套的去向我也想知道，但那个得从她手里问，目前没人能替她说。”\n\n他没有催你动身，只是站到柜台边，等着你决定是先翻他女儿的账，还是直接去街上问那笔订单。楼上的房间仍没开过门。",
+          "scene_changes": {
+            "elapsed_minutes": 8
+          },
+          "continuity_notes": [
+            {
+              "kind": "observed",
+              "content": "订单簿上那笔女式外套为灰色呢料两码半，报价十五先令赊账，客户姓名只留一个难以辨认的起首字母，地址仅写“红烟囱街”无门牌，交货日期空白；收据存根仍夹在原页。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "player"
+            },
+            {
+              "kind": "observed",
+              "content": "离家前约半个月内另有数笔订单送货栏只写街名不写号数，日期与马丁所说诺拉晚归的日子重合；马丁此前以为料子已按这些单子送出。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "player"
+            },
+            {
+              "kind": "statement",
+              "content": "马丁建议优先核实那笔外套订单的客户身份与红烟囱街的具体门牌，若是空壳，说明诺拉那阵子一直在外编事；外套去向需从诺拉本人问。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "npc:tailor"
+            },
+            {
+              "kind": "commitment",
+              "content": "玩家未选择新目的地，也未承诺接受委托或承担后续调查，仅提出需核实客户、地址、成衣与诺拉实际行踪。",
+              "recipients": [
+                "player",
+                "npc:tailor"
+              ],
+              "speaker_id": "player"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 4,
+        "clock": "1358-03-29 09:40",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "tailor-shop"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我暂时拒绝刚才可能的催促或新邀请，先把手头资料看完。让相关人物按自己的处境回应这个决定。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 4400,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你把订单簿重新拉回案头，翻到诺拉经手那几页，又逐行看了一遍，才把簿子合上。“维尔先生，我现在不接别的，也不急着出门。”你说，“手上的东西我先吃透——这笔单子是真是假、红烟囱街到底有没有这么一户，都得从这张存根和这几行字里先能对上。”\\n\\n马丁站在柜台边，帽檐压得低，沉默片刻。“行。”他把帽子摘下来，又戴回去，“你不赶着走，我也不能硬催。这店还开着门，中午前有两件取衣的，我得候着。”他绕到案台另一侧，把摊着的呢料往边上收，动作熟练，像是在给自己找点事做，眼睛却总往你手里的簿子瞟。\\n\\n“我不拦你翻。”他补了一句，语气放得很平，“但楼上那间你别动。她回来要是看见房间被人翻过，这笔账得又记我头上。”\\n\\n你点头，把收据存根按原样夹回那页。接下来一段时间，铺面里只有你翻页和马丁裁剪的轻响，偶尔夹着窗外送奶车经过的辘辘声。楼梯口那幅出师证书的边角仍旧发黄，店门上的铜铃在有人经过时会微微一颤，但没有顾客进来。\\n\\n过了约一刻钟，马丁放下剪刀，走到柜台前，像是终于把一件事在心里过够了。“有件事，你查之前该知道，”他压低声音，目光避开你手里的簿子，“那笔外套单子，我后来自己拿料子比过——料子出得不对。两码半的灰呢，我记得那批货总共只进了四码，给另一户做外套用掉一码半。她那一笔，最多只做得出一件半身的料。可她收货的日子，我账上没缺过两码半。”\\n\\n他顿了顿，手指在柜台上敲了一下。“要么是她从别处补了料，要么——这单子原本就没打算做成衣。我没敢往深里想。”\\n\\n院外有送信的从窗下走过，影子在橱窗上晃了一晃。马丁把剪刀重新拿起来，又放下，等你决定是继续核对料账，还是先问别的。\"}",
+          "elapsed_ms": 4399,
+          "input_estimate": 11202,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 896,
+            "CacheMissTokens": 6274,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7170,
+            "OutputTokens": 507,
+            "ReasoningTokens": 0,
+            "ContentChars": 710,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把订单簿重新拉回案头，翻到诺拉经手那几页，又逐行看了一遍，才把簿子合上。“维尔先生，我现在不接别的，也不急着出门。”你说，“手上的东西我先吃透——这笔单子是真是假、红烟囱街到底有没有这么一户，都得从这张存根和这几行字里先能对上。”\n\n马丁站在柜台边，帽檐压得低，沉默片刻。“行。”他把帽子摘下来，又戴回去，“你不赶着走，我也不能硬催。这店还开着门，中午前有两件取衣的，我得候着。”他绕到案台另一侧，把摊着的呢料往边上收，动作熟练，像是在给自己找点事做，眼睛却总往你手里的簿子瞟。\n\n“我不拦你翻。”他补了一句，语气放得很平，“但楼上那间你别动。她回来要是看见房间被人翻过，这笔账得又记我头上。”\n\n你点头，把收据存根按原样夹回那页。接下来一段时间，铺面里只有你翻页和马丁裁剪的轻响，偶尔夹着窗外送奶车经过的辘辘声。楼梯口那幅出师证书的边角仍旧发黄，店门上的铜铃在有人经过时会微微一颤，但没有顾客进来。\n\n过了约一刻钟，马丁放下剪刀，走到柜台前，像是终于把一件事在心里过够了。“有件事，你查之前该知道，”他压低声音，目光避开你手里的簿子，“那笔外套单子，我后来自己拿料子比过——料子出得不对。两码半的灰呢，我记得那批货总共只进了四码，给另一户做外套用掉一码半。她那一笔，最多只做得出一件半身的料。可她收货的日子，我账上没缺过两码半。”\n\n他顿了顿，手指在柜台上敲了一下。“要么是她从别处补了料，要么——这单子原本就没打算做成衣。我没敢往深里想。”\n\n院外有送信的从窗下走过，影子在橱窗上晃了一晃。马丁把剪刀重新拿起来，又放下，等你决定是继续核对料账，还是先问别的。"
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 5,
+        "clock": "1358-03-29 09:40",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "tailor-shop"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我决定步行去贝克兰德晨报社打听公开消息，从维尔裁缝店先回调查事务所，再沿乔伍德街角咖啡馆的路走到报社。不要因此替我接受委托。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 4054,
+      "calls": [
+        {
+          "text": "{\"scene_changes\":{\"elapsed_minutes\":52,\"movements\":[{\"entity_id\":\"player\",\"route\":[\"tailor-shop\",\"office\",\"cafe\",\"newspaper-office\"]}]},\"narrative\":\"你把收据存根重新按原样夹回订单簿，合上簿子。“料账我先不急着对。”你对马丁说，“我想先去晨报社翻翻公开消息——最近有没有红烟囱街一带的失踪、事故或者别的记录。看完再回来跟你说。”\\n\\n马丁的嘴角动了一下，像是想说什么，最后只把剪刀放平。“报社离这儿不近，”他说，又补了一句，“问完要是还有别的，回来就是了。这店下午三点前都有人。”他没有提委托的事，也没有拦你。你走出店门时听见铜铃在身后轻响了一声。\\n\\n你沿来路走回事务所。书记员正低头誊写，听见门响抬了一下眼，认出是你，没有多问，只在登记本边上添了一行“本人返回，未立案”。你没停，从门口折向乔伍德街角的方向。\\n\\n咖啡馆门前支起了两张遮阳的小桌，几个穿灰外套的人端着杯子低声说话。你没进去，只从窗前绕过，往北沿街走。越靠近报社一带，路上夹着报纸捆的推车和印着铅字味的风就越明显。\\n\\n贝克兰德晨报社的分部设在一栋四层砖楼里，底楼是门房和一间对外的阅览室，墙上钉着近几期的报纸合订本。门房是个上了年纪的瘦高男人，正用裁纸刀修一摞边角。你说想查公开消息，他抬手指了指阅览室里面那一排木架。“近三个月都在这儿，登记个名字就能看。翻旧的要交两便士押金，看完退。”\\n\\n阅览室里只有一名年轻职员在整理稿夹，见你进来，把手里那叠纸往桌上一搁：“找什么？失踪、事故、治安，还是广告栏？”他没有追问你的身份，只是把登记簿往你面前推了推，笔也搁在一边。木架上按日期排着装订好的报纸，最早到一月中旬，近两周的还带着未裁开的毛边。\",\"continuity_notes\":[{\"kind\":\"observed\",\"content\":\"调查员从维尔裁缝店返回事务所时未立案，随后经乔伍德街角前往贝克兰德晨报社分部，阅览室可查近三个月报纸，翻旧报需交两便士押金并登记姓名。\",\"recipients\":[\"player\"],\"speaker_id\":\"player\"}]}",
+          "elapsed_ms": 4053,
+          "input_estimate": 11872,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 3072,
+            "CacheMissTokens": 4721,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7793,
+            "OutputTokens": 571,
+            "ReasoningTokens": 0,
+            "ContentChars": 954,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把收据存根重新按原样夹回订单簿，合上簿子。“料账我先不急着对。”你对马丁说，“我想先去晨报社翻翻公开消息——最近有没有红烟囱街一带的失踪、事故或者别的记录。看完再回来跟你说。”\n\n马丁的嘴角动了一下，像是想说什么，最后只把剪刀放平。“报社离这儿不近，”他说，又补了一句，“问完要是还有别的，回来就是了。这店下午三点前都有人。”他没有提委托的事，也没有拦你。你走出店门时听见铜铃在身后轻响了一声。\n\n你沿来路走回事务所。书记员正低头誊写，听见门响抬了一下眼，认出是你，没有多问，只在登记本边上添了一行“本人返回，未立案”。你没停，从门口折向乔伍德街角的方向。\n\n咖啡馆门前支起了两张遮阳的小桌，几个穿灰外套的人端着杯子低声说话。你没进去，只从窗前绕过，往北沿街走。越靠近报社一带，路上夹着报纸捆的推车和印着铅字味的风就越明显。\n\n贝克兰德晨报社的分部设在一栋四层砖楼里，底楼是门房和一间对外的阅览室，墙上钉着近几期的报纸合订本。门房是个上了年纪的瘦高男人，正用裁纸刀修一摞边角。你说想查公开消息，他抬手指了指阅览室里面那一排木架。“近三个月都在这儿，登记个名字就能看。翻旧的要交两便士押金，看完退。”\n\n阅览室里只有一名年轻职员在整理稿夹，见你进来，把手里那叠纸往桌上一搁：“找什么？失踪、事故、治安，还是广告栏？”他没有追问你的身份，只是把登记簿往你面前推了推，笔也搁在一边。木架上按日期排着装订好的报纸，最早到一月中旬，近两周的还带着未裁开的毛边。",
+          "scene_changes": {
+            "elapsed_minutes": 52,
+            "movements": [
+              {
+                "entity_id": "player",
+                "route": [
+                  "tailor-shop",
+                  "office",
+                  "cafe",
+                  "newspaper-office"
+                ]
+              }
+            ]
+          },
+          "continuity_notes": [
+            {
+              "kind": "observed",
+              "content": "调查员从维尔裁缝店返回事务所时未立案，随后经乔伍德街角前往贝克兰德晨报社分部，阅览室可查近三个月报纸，翻旧报需交两便士押金并登记姓名。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "player"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:missing-woman",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 6,
+        "clock": "1358-03-29 10:32",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "newspaper-office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我与报社中确实在场的艾琳打招呼，只询问最近值得核实的公开传闻，不告诉她马丁的家庭私事，给她根据自己兴趣发问的机会。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 4498,
+      "calls": [
+        {
+          "text": "{\n  \"narrative\": \"你走到整理稿夹的年轻职员旁边，先冲他点了个头表示借过，然后转向上次在门房那儿瞥见过一眼的年轻女记者——她正站在报纸合订架前，手里捏着一截铅笔，本子摊在臂弯里。\\n\\n“艾琳·维克？”你放低声音，与她隔了半臂距离，“我叫……搞私人调查的。最近城里有没有什么值得认真核一核的公开传闻？我不打听具体人名，就想知道哪些说法还没被报纸写死。”\\n\\n艾琳抬眼把你从头到脚看了一遍，铅笔尖在本子上顿了顿。“先别急着给我一个‘传闻’。”她的语速比你预想得快，“名字和日期呢？报社这一个月收到的怪话我能列一长串，麻烦的是哪一句能落到具体的人和地点上。”\\n\\n她退开半步，把本子翻到前两页给你看——上面画着竖线，左边一栏标着‘亲见’，右边标着‘转述’，‘待核实’三个字在页脚反复出现。“我最近听到最多的是一个街名，红烟囱街。”她盯着你的反应，“有人在咖啡馆打听，有人在门房留过话，说法各不相同——废弃诊所、夜里有灯、有人搬东西。但这些到现在都还是打听，连报题都算不上。”\\n\\n她合上本子，笔却没有收回去。“你要是手上有一件我能核实的事，我愿意换——你先说你为什么对这个有兴趣。”她的目光没有移开，旁边那名排字工正在收拾旧稿，偶尔抬头看一眼这边，显然听得见你们在说话，却只顾把稿夹摞整齐。\\n\",\n  \"scene_changes\": {\n    \"elapsed_minutes\": 6\n  },\n  \"continuity_notes\": [\n    {\n      \"kind\": \"observed\",\n      \"content\": \"艾琳在报社阅览室当面表示最近最常被议论的地点是红烟囱街，相关说法包括废弃诊所、夜里亮灯、有人搬东西，但均未核实。\",\n      \"recipients\": [\"player\"],\n      \"speaker_id\": \"npc:reporter\"\n    },\n    {\n      \"kind\": \"observed\",\n      \"content\": \"艾琳要求玩家先说明对红烟囱街或相关传闻的兴趣来源，才考虑交换采访线索。\",\n      \"recipients\": [\"player\"],\n      \"speaker_id\": \"npc:reporter\"\n    },\n    {\n      \"kind\": \"observed\",\n      \"content\": \"排字工在阅览室旁整理稿夹，能听见双方交谈，但未参与。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"bystander:printer\"\n    }\n  ]\n}",
+          "elapsed_ms": 4496,
+          "input_estimate": 11660,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 896,
+            "CacheMissTokens": 6607,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7503,
+            "OutputTokens": 599,
+            "ReasoningTokens": 0,
+            "ContentChars": 1157,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你走到整理稿夹的年轻职员旁边，先冲他点了个头表示借过，然后转向上次在门房那儿瞥见过一眼的年轻女记者——她正站在报纸合订架前，手里捏着一截铅笔，本子摊在臂弯里。\n\n“艾琳·维克？”你放低声音，与她隔了半臂距离，“我叫……搞私人调查的。最近城里有没有什么值得认真核一核的公开传闻？我不打听具体人名，就想知道哪些说法还没被报纸写死。”\n\n艾琳抬眼把你从头到脚看了一遍，铅笔尖在本子上顿了顿。“先别急着给我一个‘传闻’。”她的语速比你预想得快，“名字和日期呢？报社这一个月收到的怪话我能列一长串，麻烦的是哪一句能落到具体的人和地点上。”\n\n她退开半步，把本子翻到前两页给你看——上面画着竖线，左边一栏标着‘亲见’，右边标着‘转述’，‘待核实’三个字在页脚反复出现。“我最近听到最多的是一个街名，红烟囱街。”她盯着你的反应，“有人在咖啡馆打听，有人在门房留过话，说法各不相同——废弃诊所、夜里有灯、有人搬东西。但这些到现在都还是打听，连报题都算不上。”\n\n她合上本子，笔却没有收回去。“你要是手上有一件我能核实的事，我愿意换——你先说你为什么对这个有兴趣。”她的目光没有移开，旁边那名排字工正在收拾旧稿，偶尔抬头看一眼这边，显然听得见你们在说话，却只顾把稿夹摞整齐。\n",
+          "scene_changes": {
+            "elapsed_minutes": 6
+          },
+          "continuity_notes": [
+            {
+              "kind": "observed",
+              "content": "艾琳在报社阅览室当面表示最近最常被议论的地点是红烟囱街，相关说法包括废弃诊所、夜里亮灯、有人搬东西，但均未核实。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "observed",
+              "content": "艾琳要求玩家先说明对红烟囱街或相关传闻的兴趣来源，才考虑交换采访线索。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "observed",
+              "content": "排字工在阅览室旁整理稿夹，能听见双方交谈，但未参与。",
+              "recipients": [
+                "player",
+                "npc:reporter"
+              ],
+              "speaker_id": "bystander:printer"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:reporter",
+            "npc:tailor",
+            "bystander:printer"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 7,
+        "clock": "1358-03-29 10:38",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "newspaper-office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我告诉艾琳，暂时不答应共同调查或让她跟随，想先区分她亲眼见过的与别人转述的内容；听听她怎么回应。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 5230,
+      "calls": [
+        {
+          "text": "{\n  \"narrative\": \"你把两只手插回外套口袋，语气没有变：“我不答应一起调查，也不带你走。眼下我只想把话说清楚——你刚才讲的那些，哪些是你自己亲眼见的，哪些是别人告诉你的？我自己分着记，别混到一块儿。”\\n\\n艾琳抬了抬眉毛，像是没料到你会先要这个。她把本子重新展开，铅笔倒过来用尾端压住页脚。“行，我念，你自己看。”她的语速反而慢了下来。\\n\\n“我亲眼见的，只有三件。”她用笔尖点了点“亲见”那一栏，“一，前天下午我在咖啡馆后门附近看见一个戴蜂鸟胸针的人跟一个车夫说话，车夫手里攥着一张纸，纸边上有裁缝铺常用的那种折痕——但这只是我认得的纸样，我不能说那就是哪家店的。二，昨天我去了红烟囱街口一趟，没往里走，街上的旧诊所外墙是新近修过的，门框上一道撬痕还是新的。三，今天早上我来报社，门房转给我一封信，没人署名，里面只有半张纸，写着‘旧诊所地下室，别一个人去’。就这些。”\\n\\n她把铅笔尾端挪到“转述”那一栏。“别人告诉我的：夜里有灯、有人搬东西、有人打听那一带，这是咖啡馆里两三个常客说的，来源我没核。还有人说那诊所从前是个私人医生开的，可他姓什么、什么时候关的门，谁都说不上来。”\\n\\n旁边整理稿夹的排字工把一摞旧报了挪到架子上，弄出一点响动。他头也没回，像是顺口，又像是提醒：“前几天门房还收过一封没署名的信，说的也是那片地方。见过这信的不止一个人，可寄信的人是谁，门房也说不清。”\\n\\n艾琳顿了一下，先看我。她的笔尖在本子上停着，没有去追排字工的话，也没表现出惊讶，像是那封信她早就知道。“我承认，我手里有一件事能落到具体的人身上——但我得先知道你为什么对红烟囱街有兴趣。”她把本子合上一半，“你不用告诉我委托人的名字。你只要说，你是来找线索，还是来查我。”\",\n  \"scene_changes\": {\n    \"elapsed_minutes\": 6\n  },\n  \"continuity_notes\": [\n    {\n      \"kind\": \"statement\",\n      \"content\": \"艾琳区分亲见与转述：亲见三件——戴蜂鸟胸针的人与车夫在咖啡馆后门交谈、车夫手里的纸有裁缝铺纸样折痕（她只认纸样）；她到过红烟囱街口，旧诊所外墙新近修过、门框有新撬痕；今早门房转给她一封无署名信，内写‘旧诊所地下室，别一个人去’。转述部分包括夜里亮灯、有人搬东西、打听那一带，来源未核。\",\n      \"recipients\": [\"player\"],\n      \"speaker_id\": \"npc:reporter\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"排字工称门房前几天还收过另一封关于那片地方的未署名信，见过的人不止一个，寄信者不明。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"bystander:printer\"\n    },\n    {\n      \"kind\": \"commitment\",\n      \"content\": \"艾琳表示手里有一件能落到具体人身上的事，但要求玩家先说明对红烟囱街的兴趣来源，才考虑交换。玩家未承诺合作，未同意她跟随。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"npc:reporter\"\n    }\n  ]\n}",
+          "elapsed_ms": 5227,
+          "input_estimate": 11810,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 896,
+            "CacheMissTokens": 6702,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7598,
+            "OutputTokens": 841,
+            "ReasoningTokens": 0,
+            "ContentChars": 1493,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把两只手插回外套口袋，语气没有变：“我不答应一起调查，也不带你走。眼下我只想把话说清楚——你刚才讲的那些，哪些是你自己亲眼见的，哪些是别人告诉你的？我自己分着记，别混到一块儿。”\n\n艾琳抬了抬眉毛，像是没料到你会先要这个。她把本子重新展开，铅笔倒过来用尾端压住页脚。“行，我念，你自己看。”她的语速反而慢了下来。\n\n“我亲眼见的，只有三件。”她用笔尖点了点“亲见”那一栏，“一，前天下午我在咖啡馆后门附近看见一个戴蜂鸟胸针的人跟一个车夫说话，车夫手里攥着一张纸，纸边上有裁缝铺常用的那种折痕——但这只是我认得的纸样，我不能说那就是哪家店的。二，昨天我去了红烟囱街口一趟，没往里走，街上的旧诊所外墙是新近修过的，门框上一道撬痕还是新的。三，今天早上我来报社，门房转给我一封信，没人署名，里面只有半张纸，写着‘旧诊所地下室，别一个人去’。就这些。”\n\n她把铅笔尾端挪到“转述”那一栏。“别人告诉我的：夜里有灯、有人搬东西、有人打听那一带，这是咖啡馆里两三个常客说的，来源我没核。还有人说那诊所从前是个私人医生开的，可他姓什么、什么时候关的门，谁都说不上来。”\n\n旁边整理稿夹的排字工把一摞旧报了挪到架子上，弄出一点响动。他头也没回，像是顺口，又像是提醒：“前几天门房还收过一封没署名的信，说的也是那片地方。见过这信的不止一个人，可寄信的人是谁，门房也说不清。”\n\n艾琳顿了一下，先看我。她的笔尖在本子上停着，没有去追排字工的话，也没表现出惊讶，像是那封信她早就知道。“我承认，我手里有一件事能落到具体的人身上——但我得先知道你为什么对红烟囱街有兴趣。”她把本子合上一半，“你不用告诉我委托人的名字。你只要说，你是来找线索，还是来查我。”",
+          "scene_changes": {
+            "elapsed_minutes": 6
+          },
+          "continuity_notes": [
+            {
+              "kind": "statement",
+              "content": "艾琳区分亲见与转述：亲见三件——戴蜂鸟胸针的人与车夫在咖啡馆后门交谈、车夫手里的纸有裁缝铺纸样折痕（她只认纸样）；她到过红烟囱街口，旧诊所外墙新近修过、门框有新撬痕；今早门房转给她一封无署名信，内写‘旧诊所地下室，别一个人去’。转述部分包括夜里亮灯、有人搬东西、打听那一带，来源未核。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "statement",
+              "content": "排字工称门房前几天还收过另一封关于那片地方的未署名信，见过的人不止一个，寄信者不明。",
+              "recipients": [
+                "player",
+                "npc:reporter"
+              ],
+              "speaker_id": "bystander:printer"
+            },
+            {
+              "kind": "commitment",
+              "content": "艾琳表示手里有一件能落到具体人身上的事，但要求玩家先说明对红烟囱街的兴趣来源，才考虑交换。玩家未承诺合作，未同意她跟随。",
+              "recipients": [
+                "player",
+                "npc:reporter"
+              ],
+              "speaker_id": "npc:reporter"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:reporter",
+            "bystander:printer"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 8,
+        "clock": "1358-03-29 10:44",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "newspaper-office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我追问艾琳刚才提到的线索，哪些可以核实、她自己最关心什么，让对话继续承接她实际说过的话。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 5048,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你把身子靠在报纸合订架边上，不急着走。“那你手里那件‘能落到具体人身上’的事，先说说什么能核实：时间、能找的人、能查的地方。哪些是你真能拿出来的，哪些只是听起来像？”你顿了一下，“还有，你自己最上心的是哪一件——是报道，还是别的？”\\n\\n艾琳没有立刻翻本子，先看了你两秒，像是在称你的分量。“那件能落到人身上的，不是新闻，是找人的活儿。”她的声音放低了一点，免得被架边经过的人听见，“前天有个男人来报社门房留话，说他要找一个二十岁上下的姑娘，只说在城东走失，没留姓名。他说他会在乔伍德街角咖啡馆后门等回话，昨天、今天都去。他手里那张纸的折痕，就是裁缝铺撕存根那种折法——我只能认纸样，不能认店名。”\\n\\n“可核实的地方有两处。”她竖起铅笔，“一，咖啡馆后门，午后两三点；那个人要是不来，常客里至少有两个见过他。这是他本人出现过的地点，不是我转述的。二，红烟囱街那面新撬的门框——我昨天下午亲眼看的，只要没人补过，今晚也能看。这两件我都能带你去，也能自己再去。至于夜里亮灯、有人搬东西、戴蜂鸟胸针的人，全都没有第二个来源，我不会写进报道。”\\n\\n排字工把架子底层的旧报捆上绳子，动作不慌不忙，插了一句：“要问门房那两封信的事，趁下午换班前问。他值一晚一白，明天就换别人了。”说完他扛起报捆走了，没打算参与更多。\\n\\n艾琳把铅笔收进耳后，看着你：“要说我最上心哪件——是今天早上那封信。写‘别一个人去’，那就不像是给我一个人的话，也不像是善意的提醒。我还没拿定主意，但我不想把这事只当传闻处理掉。”她合上本子，但没有走开，站在原处等你回应。\",\"scene_changes\":{\"elapsed_minutes\":6},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"艾琳称前天有匿名男子来报社门房留话，寻找一名二十岁上下、在城东走失的姑娘，未留姓名，会在乔伍德街角咖啡馆后门等回话；他手里那张纸有裁缝铺存根那种折痕（她只认纸样）。\",\"recipients\":[\"player\"],\"speaker_id\":\"npc:reporter\"},{\"kind\":\"statement\",\"content\":\"艾琳表示可核实的两处：咖啡馆后门午后两三点（匿名男子本人出现过的地点，常客可证）、红烟囱街旧诊所新撬的门框（她昨天下午亲见，若未修补今晚仍可看）。\",\"recipients\":[\"player\"],\"speaker_id\":\"npc:reporter\"},{\"kind\":\"statement\",\"content\":\"艾琳称最上心的是今早那封写‘别一个人去’的无署名信，认为不像只针对她一人的提醒，尚未决定如何行动。\",\"recipients\":[\"player\"],\"speaker_id\":\"npc:reporter\"},{\"kind\":\"statement\",\"content\":\"排字工提醒门房值一晚一白班，问两封信的事要趁下午换班前问，随后扛报捆离开。\",\"recipients\":[\"player\",\"npc:reporter\"],\"speaker_id\":\"bystander:printer\"}]}",
+          "elapsed_ms": 5047,
+          "input_estimate": 11253,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 2432,
+            "CacheMissTokens": 4822,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7254,
+            "OutputTokens": 774,
+            "ReasoningTokens": 0,
+            "ContentChars": 1352,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你把身子靠在报纸合订架边上，不急着走。“那你手里那件‘能落到具体人身上’的事，先说说什么能核实：时间、能找的人、能查的地方。哪些是你真能拿出来的，哪些只是听起来像？”你顿了一下，“还有，你自己最上心的是哪一件——是报道，还是别的？”\n\n艾琳没有立刻翻本子，先看了你两秒，像是在称你的分量。“那件能落到人身上的，不是新闻，是找人的活儿。”她的声音放低了一点，免得被架边经过的人听见，“前天有个男人来报社门房留话，说他要找一个二十岁上下的姑娘，只说在城东走失，没留姓名。他说他会在乔伍德街角咖啡馆后门等回话，昨天、今天都去。他手里那张纸的折痕，就是裁缝铺撕存根那种折法——我只能认纸样，不能认店名。”\n\n“可核实的地方有两处。”她竖起铅笔，“一，咖啡馆后门，午后两三点；那个人要是不来，常客里至少有两个见过他。这是他本人出现过的地点，不是我转述的。二，红烟囱街那面新撬的门框——我昨天下午亲眼看的，只要没人补过，今晚也能看。这两件我都能带你去，也能自己再去。至于夜里亮灯、有人搬东西、戴蜂鸟胸针的人，全都没有第二个来源，我不会写进报道。”\n\n排字工把架子底层的旧报捆上绳子，动作不慌不忙，插了一句：“要问门房那两封信的事，趁下午换班前问。他值一晚一白，明天就换别人了。”说完他扛起报捆走了，没打算参与更多。\n\n艾琳把铅笔收进耳后，看着你：“要说我最上心哪件——是今天早上那封信。写‘别一个人去’，那就不像是给我一个人的话，也不像是善意的提醒。我还没拿定主意，但我不想把这事只当传闻处理掉。”她合上本子，但没有走开，站在原处等你回应。",
+          "scene_changes": {
+            "elapsed_minutes": 6
+          },
+          "continuity_notes": [
+            {
+              "kind": "statement",
+              "content": "艾琳称前天有匿名男子来报社门房留话，寻找一名二十岁上下、在城东走失的姑娘，未留姓名，会在乔伍德街角咖啡馆后门等回话；他手里那张纸有裁缝铺存根那种折痕（她只认纸样）。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "statement",
+              "content": "艾琳表示可核实的两处：咖啡馆后门午后两三点（匿名男子本人出现过的地点，常客可证）、红烟囱街旧诊所新撬的门框（她昨天下午亲见，若未修补今晚仍可看）。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "statement",
+              "content": "艾琳称最上心的是今早那封写‘别一个人去’的无署名信，认为不像只针对她一人的提醒，尚未决定如何行动。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "npc:reporter"
+            },
+            {
+              "kind": "statement",
+              "content": "排字工提醒门房值一晚一白班，问两封信的事要趁下午换班前问，随后扛报捆离开。",
+              "recipients": [
+                "player",
+                "npc:reporter"
+              ],
+              "speaker_id": "bystander:printer"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:reporter",
+            "bystander:printer"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 9,
+        "clock": "1358-03-29 10:50",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "newspaper-office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我确认今天没有接受她的新邀请，问她下一步自己打算做什么。她可以有自己的安排，重要的新决定留给我。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 3412,
+      "calls": [
+        {
+          "text": "{\"scene_changes\":{\"elapsed_minutes\":4},\"narrative\":\"“我没答应跟你一起查。”你把话说在前头，声音仍旧压着，“今天就到这儿。我问一句，你自己接下来打算怎么做？”\\n\\n艾琳没有立刻答，先把耳后的铅笔取下来，在本子空白处点了两下，像是给自己列了个次序。“下午我本来就要去红烟囱街口。”她说，“那面新撬的门框是我唯一亲手看过、又说得清时间地点的东西。我去再看一眼，有没有补过、有没有人进出。我不进诊所——那封信写着别一个人去，我还没莽到那个份上。”\\n\\n“然后两三点，我会绕到咖啡馆后门。”她把本子合上，“那个匿名男人说会在那儿等回话。见不见得到人不好说，常客里至少有人见过他。这两件都在白天，路上有人。”\\n\\n“那两封信，我打算趁门房换班前问清楚。”她朝门房方向偏了偏头，“排字工说得对，值一晚一白，明天就换别人，问晚了那人可能什么都不知道。我只问收信的时间、信封样式、谁经手的，不提信的内容。”\\n\\n她停了停，看你一眼，语气比刚才软了一点：“这些我都能自己去做，不用你点头。你要是哪天改主意，去咖啡馆后门或者红烟囱街口都能碰见我。反过来，我今早那封信的事——你要是先有了别的说法，也算欠我一句。”\\n\\n排字工已经不在这边，架子边只剩几摞刚捆好的旧报。艾琳把本子塞回口袋，冲整理稿夹的职员扬了扬下巴算是打过招呼，往阅览室门口走去。你没有拦她，也没有跟上；她没再回头。\"}",
+          "elapsed_ms": 3411,
+          "input_estimate": 11860,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 3584,
+            "CacheMissTokens": 4174,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7758,
+            "OutputTokens": 390,
+            "ReasoningTokens": 0,
+            "ContentChars": 613,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "“我没答应跟你一起查。”你把话说在前头，声音仍旧压着，“今天就到这儿。我问一句，你自己接下来打算怎么做？”\n\n艾琳没有立刻答，先把耳后的铅笔取下来，在本子空白处点了两下，像是给自己列了个次序。“下午我本来就要去红烟囱街口。”她说，“那面新撬的门框是我唯一亲手看过、又说得清时间地点的东西。我去再看一眼，有没有补过、有没有人进出。我不进诊所——那封信写着别一个人去，我还没莽到那个份上。”\n\n“然后两三点，我会绕到咖啡馆后门。”她把本子合上，“那个匿名男人说会在那儿等回话。见不见得到人不好说，常客里至少有人见过他。这两件都在白天，路上有人。”\n\n“那两封信，我打算趁门房换班前问清楚。”她朝门房方向偏了偏头，“排字工说得对，值一晚一白，明天就换别人，问晚了那人可能什么都不知道。我只问收信的时间、信封样式、谁经手的，不提信的内容。”\n\n她停了停，看你一眼，语气比刚才软了一点：“这些我都能自己去做，不用你点头。你要是哪天改主意，去咖啡馆后门或者红烟囱街口都能碰见我。反过来，我今早那封信的事——你要是先有了别的说法，也算欠我一句。”\n\n排字工已经不在这边，架子边只剩几摞刚捆好的旧报。艾琳把本子塞回口袋，冲整理稿夹的职员扬了扬下巴算是打过招呼，往阅览室门口走去。你没有拦她，也没有跟上；她没再回头。",
+          "scene_changes": {
+            "elapsed_minutes": 4
+          }
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:reporter",
+            "bystander:printer"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 10,
+        "clock": "1358-03-29 10:54",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "newspaper-office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我决定从报社步行回调查事务所，沿咖啡馆通往事务所的路走，回到原来的桌旁整理刚才实际获得的记录。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 3945,
+      "calls": [
+        {
+          "text": "{\"scene_changes\":{\"elapsed_minutes\":22,\"movements\":[{\"entity_id\":\"player\",\"route\":[\"newspaper-office\",\"cafe\",\"office\"]}]},\"narrative\":\"你出了报社分部，没有在门口逗留。三月底的贝克兰德还带着雾气，煤烟和湿冷混在一起，路面上到处是没干透的泥。你没有绕咖啡馆，只从它门口经过——窗里坐着几个看报的人，后门方向被墙挡住，看不见有没有人。\\n\\n进了事务所，门口的挂号铃轻轻响了一声。书记员从登记台后抬头看你一眼，见是你，又低头继续誊他的册子。你回到早上那张桌旁坐下，从怀里摸出记事本和铅笔。\\n\\n你把今天实际拿到的东西一条条写下，逼着自己分栏：\\n\\n亲眼看见的——今天没有。你只去过事务所和报社分部，没到过红烟囱街，没看过门框，也没见过那个匿名男人。\\n\\n亲耳听到、由艾琳自己讲出的——“红烟囱街”这个名字被反复提起；旧诊所外墙新近修过、门框有新撬痕，这是她昨天下午亲见的；今早门房转给她一封无署名信，写着“旧诊所地下室，别一个人去”；前天有男人来报社门房留话，要找一名二十岁上下、在城东走失的姑娘，未留姓名，会在乔伍德街角咖啡馆后门等回话；他手里那张纸有裁缝铺存根那种折痕。\\n\\n别人转述、未经核实的——夜里亮灯、有人搬东西、有人打听那一带；诊所从前是私人医生开的。\\n\\n你翻到早上那页。马丁说过的话里有两条你之前没舍得花时间深挖：诺拉离家前约半个月晚归，说是去送一批布料，而当天那批料子其实已经交付；还有一个陌生男人在店门口问过路，问的正是红烟囱街一带。这两条都出自马丁本人，来源清楚，但都没核实过。你在此处画了个星号——它们和艾琳说的“红烟囱街”对得上，但“对得上”本身不是证据。\\n\\n你合上本子时，书记员正好把一沓登记纸收进柜子，没有谁过来催你。桌上还放着马丁今早留下的那张访客单，边角折着，没人动过。现在是上午将尽的时段，你有一个完整的下午可以安排——是回裁缝店再看那张夹着的收据，还是按艾琳说的午后两三点去咖啡馆后门看看，她说过这两天都会去。\"}",
+          "elapsed_ms": 3944,
+          "input_estimate": 11284,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 896,
+            "CacheMissTokens": 6451,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7347,
+            "OutputTokens": 576,
+            "ReasoningTokens": 0,
+            "ContentChars": 899,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你出了报社分部，没有在门口逗留。三月底的贝克兰德还带着雾气，煤烟和湿冷混在一起，路面上到处是没干透的泥。你没有绕咖啡馆，只从它门口经过——窗里坐着几个看报的人，后门方向被墙挡住，看不见有没有人。\n\n进了事务所，门口的挂号铃轻轻响了一声。书记员从登记台后抬头看你一眼，见是你，又低头继续誊他的册子。你回到早上那张桌旁坐下，从怀里摸出记事本和铅笔。\n\n你把今天实际拿到的东西一条条写下，逼着自己分栏：\n\n亲眼看见的——今天没有。你只去过事务所和报社分部，没到过红烟囱街，没看过门框，也没见过那个匿名男人。\n\n亲耳听到、由艾琳自己讲出的——“红烟囱街”这个名字被反复提起；旧诊所外墙新近修过、门框有新撬痕，这是她昨天下午亲见的；今早门房转给她一封无署名信，写着“旧诊所地下室，别一个人去”；前天有男人来报社门房留话，要找一名二十岁上下、在城东走失的姑娘，未留姓名，会在乔伍德街角咖啡馆后门等回话；他手里那张纸有裁缝铺存根那种折痕。\n\n别人转述、未经核实的——夜里亮灯、有人搬东西、有人打听那一带；诊所从前是私人医生开的。\n\n你翻到早上那页。马丁说过的话里有两条你之前没舍得花时间深挖：诺拉离家前约半个月晚归，说是去送一批布料，而当天那批料子其实已经交付；还有一个陌生男人在店门口问过路，问的正是红烟囱街一带。这两条都出自马丁本人，来源清楚，但都没核实过。你在此处画了个星号——它们和艾琳说的“红烟囱街”对得上，但“对得上”本身不是证据。\n\n你合上本子时，书记员正好把一沓登记纸收进柜子，没有谁过来催你。桌上还放着马丁今早留下的那张访客单，边角折着，没人动过。现在是上午将尽的时段，你有一个完整的下午可以安排——是回裁缝店再看那张夹着的收据，还是按艾琳说的午后两三点去咖啡馆后门看看，她说过这两天都会去。",
+          "scene_changes": {
+            "elapsed_minutes": 22,
+            "movements": [
+              {
+                "entity_id": "player",
+                "route": [
+                  "newspaper-office",
+                  "cafe",
+                  "office"
+                ]
+              }
+            ]
+          }
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:reporter",
+            "bystander:clerk",
+            "bystander:printer"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 11,
+        "clock": "1358-03-29 11:16",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "office"
+        }
+      }
+    },
+    {
+      "request": {
+        "input": "我向书记员简要转述公开可分享的消息，再问他还记得最早我是否接下马丁的委托；在这个边界下收束当前场景。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 3649,
+      "calls": [
+        {
+          "text": "{\"narrative\":\"你从桌旁起身，走到登记台前。书记员正把最后一页册子的墨迹吹干，见你过来，把笔搁在架子上。\\n\\n“报社那边我今天去了一趟。”你没有细说，只挑着能当众讲的部分说，“有个记者在跟红烟囱街那一带的传闻，她本人亲眼看过旧诊所外墙新修过、门框有新撬痕；至于夜里亮灯、有人搬东西，是咖啡馆里听来的说法，她没核实。这些都不算准信。”\\n\\n书记员听完，手指在登记册桌面上敲了两下。“我记一笔在备注里，只记‘调查员从报社获得消息’，不记内容——内容是你跟别人谈的，不是我这儿受理的。”他翻到今早那页，“你问到最早那桩委托。马丁·维尔，裁缝店，找女儿诺拉，进门时提的是三镑报酬，可以谈预付。当时你明确说，先不接，只让他把知道的事讲清楚。这一条我写在登记页边上，白纸黑字。”\\n\\n他把册子转过来一点，让你看那行小字：*调查员暂未接受委托，仅听取委托人陈述。* 字迹是他自己的。\\n\\n“到今天这个点，这个状态没变过。”他说，“你后来去看了订单簿，那是马丁带你去店里看的，算委托前的走访，不算接案。”他顿了顿，看你一眼，声音不高，“你要真想让我改成‘已接’，现在说，我添一笔；不说，就还是原样。事务所不替谁做主，也不把它写成模棱两可。”\\n\\n他重新拿起笔，悬在纸面上等你开口。台子另一头，那沓登记纸已经收进柜里，门外的街上传来马车的辘辘声；你在这里坐了一上午，眼下还有整个下午可以安排。\",\"scene_changes\":{\"elapsed_minutes\":4},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"书记员确认登记状态：马丁的委托至今仍记为“暂未接受，仅听取委托人陈述”。\",\"recipients\":[\"player\"],\"speaker_id\":\"bystander:clerk\"},{\"kind\":\"statement\",\"content\":\"书记员表示备注只记录消息来源，不记录具体内容；改状态需调查员当场明确表态。\",\"recipients\":[\"player\"],\"speaker_id\":\"bystander:clerk\"},{\"kind\":\"statement\",\"content\":\"调查员向书记员转述：艾琳亲见旧诊所外墙新修与门框撬痕；夜里亮灯、有人搬东西等说法未经核实。\",\"recipients\":[\"bystander:clerk\"],\"speaker_id\":\"player\"}]}",
+          "elapsed_ms": 3648,
+          "input_estimate": 11413,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 2560,
+            "CacheMissTokens": 4921,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 7481,
+            "OutputTokens": 593,
+            "ReasoningTokens": 0,
+            "ContentChars": 1044,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": "你从桌旁起身，走到登记台前。书记员正把最后一页册子的墨迹吹干，见你过来，把笔搁在架子上。\n\n“报社那边我今天去了一趟。”你没有细说，只挑着能当众讲的部分说，“有个记者在跟红烟囱街那一带的传闻，她本人亲眼看过旧诊所外墙新修过、门框有新撬痕；至于夜里亮灯、有人搬东西，是咖啡馆里听来的说法，她没核实。这些都不算准信。”\n\n书记员听完，手指在登记册桌面上敲了两下。“我记一笔在备注里，只记‘调查员从报社获得消息’，不记内容——内容是你跟别人谈的，不是我这儿受理的。”他翻到今早那页，“你问到最早那桩委托。马丁·维尔，裁缝店，找女儿诺拉，进门时提的是三镑报酬，可以谈预付。当时你明确说，先不接，只让他把知道的事讲清楚。这一条我写在登记页边上，白纸黑字。”\n\n他把册子转过来一点，让你看那行小字：*调查员暂未接受委托，仅听取委托人陈述。* 字迹是他自己的。\n\n“到今天这个点，这个状态没变过。”他说，“你后来去看了订单簿，那是马丁带你去店里看的，算委托前的走访，不算接案。”他顿了顿，看你一眼，声音不高，“你要真想让我改成‘已接’，现在说，我添一笔；不说，就还是原样。事务所不替谁做主，也不把它写成模棱两可。”\n\n他重新拿起笔，悬在纸面上等你开口。台子另一头，那沓登记纸已经收进柜里，门外的街上传来马车的辘辘声；你在这里坐了一上午，眼下还有整个下午可以安排。",
+          "scene_changes": {
+            "elapsed_minutes": 4
+          },
+          "continuity_notes": [
+            {
+              "kind": "statement",
+              "content": "书记员确认登记状态：马丁的委托至今仍记为“暂未接受，仅听取委托人陈述”。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "bystander:clerk"
+            },
+            {
+              "kind": "statement",
+              "content": "书记员表示备注只记录消息来源，不记录具体内容；改状态需调查员当场明确表态。",
+              "recipients": [
+                "player"
+              ],
+              "speaker_id": "bystander:clerk"
+            },
+            {
+              "kind": "statement",
+              "content": "调查员向书记员转述：艾琳亲见旧诊所外墙新修与门框撬痕；夜里亮灯、有人搬东西等说法未经核实。",
+              "recipients": [
+                "bystander:clerk"
+              ],
+              "speaker_id": "player"
+            }
+          ]
+        },
+        "report": {
+          "core_calls": 1,
+          "repairs": 0,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 12,
+        "clock": "1358-03-29 11:20",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "tailor-shop",
+          "player": "office"
+        }
+      }
+    }
+  ]
+}

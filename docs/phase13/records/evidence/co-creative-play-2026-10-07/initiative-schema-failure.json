@@ -1,0 +1,96 @@
+{
+  "model": "deepseek-v4-flash",
+  "story_revision": "mist-embers.pack.v9",
+  "turns": [
+    {
+      "request": {
+        "input": "我问马丁关于女儿离家前的争执，说明我愿意先了解情况，尚未接受委托。让他把实际知道的事情说清楚。",
+        "allow_plot_advance": true
+      },
+      "reasoning": "off",
+      "streaming": false,
+      "elapsed_ms": 9560,
+      "calls": [
+        {
+          "text": "{\"type\":\"json_object\",\"scene_changes\":{\"elapsed_minutes\":6},\"narrative\":\"你把近照推回桌沿，没有碰那张写着裁缝店地址的纸条。“三镑我还没接，也没拒绝。”你说，“先说清楚。你说最后一次见面时停了一下——那次见面，你们到底发生了什么？”\\n\\n马丁的拇指在帽檐上来回压了两遍，像在把一道褶子压平。“我们争执了。”他终于说，声音比刚才低，“她想独立接一个订单。陌生客人，没见过的，还提到赊账。我说不行——坏账收不回来，铺子经不起，她一个二十岁的姑娘，应付外面的人还太早。”他顿住，改用结论式的语气，“我说得重了点。她也说得重。三天没回来。”\\n\\n你追问细节：客人是谁，谈的是什么活，订单有没有留下记录。马丁的视线往旁边偏了一下，那是裁缝核对尺码时才会出现的迟疑。“我记不清每一个散客。”他说，随即意识到这话太硬，又补了一句，“订单簿在店里。要是你觉得有用，可以去看。我带到你们这儿的是她的照片和住址，别的没带。”\\n\\n桌另一侧，书记员翻登记本的动作停了半拍，笔尖悬着，等你把话说下去。马丁没注意他，只是继续捻着帽檐。你问他这三天自己找过哪些地方、问过哪些人。“店里、楼上、往常她去买料的几处。”他答，“昨天还去了她一个旧同学家，没见着人。”他始终没有主动提到任何字条、收据或具体的街名。\\n\\n“我不指望她马上回来认错。”他最后说，像是对自己讲的，“我只要知道她平安。你先去店里看订单簿也行，或者告诉我，你还想知道什么。”帽檐已经被他攥回原来的形状，他把它放在膝盖上，等着你继续问。\"}",
+          "elapsed_ms": 3998,
+          "input_estimate": 6252,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 0,
+            "CacheMissTokens": 3603,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 3603,
+            "OutputTokens": 416,
+            "ReasoningTokens": 0,
+            "ContentChars": 678,
+            "ReasoningChars": 0
+          }
+        },
+        {
+          "text": "{\"type\":\"json_object\",\"scene_changes\":{\"elapsed_minutes\":12},\"narrative\":\"“争执？”马丁的手指在帽檐上停了一下，像在把一缕跑掉的线头按回去，“你问最后一次见面。那天我们都说了重话。”\\n\\n他把帽子放在膝上，没有立刻继续。书记员在柜台后翻了一页登记簿，笔尖悬着，没有抬头；这说明他听到了，但事务所里没人替马丁补话。\\n\\n“她想自己接一单。”马丁终于说，“一位客人上门，她量了尺寸，报了价，还想按她自己的意思做。我说陌生顾客、赊账，出了岔子谁担？她说她不是帮工了，二十岁的人，连一单都做不了主。”他顿住，把“重话”两个字咽回去，改口道，“我说了些难听的。她也说了。第二天早上她没下来吃早饭，我以为她在楼上赌气。到中午，人不在，衣服和常用的针线包也不在。”\\n\\n“三天。”他又确认了一遍这个数字，像在确认自己有没有数错，“第一天我想她可能去了哪个朋友家。第二天我跑了两个认识的人家，都说没见。昨天我把店里的订单簿翻了一遍，又上楼看她的房间。然后我来了这里。”\\n\\n你说明你愿意先了解情况，还没有接受委托。马丁点头，没有露出被冒犯的样子，只是把帽子重新攥紧。“应该的。三镑不是小数目，我也不会催你立刻答应。你想问什么就问。”\\n\\n“她平时去哪些地方，我大致知道。教堂、市场、送成衣的几家老主顾。可这三天，我越想越觉得，她要是存心不让我找到，就不会去那些地方。”他抬眼看你，像是在掂量你信不信这句，“她裁得出很好的衣服，我知道。可会做衣服和会应付外面的人，是两回事。我不是说她蠢——我是说，她没独自在外面过过日子。”\\n\\n说到这里，他自己停了一下，似乎也听出这话和女儿那句“我不是帮工了”是同一场争执的延续。他把帽檐捻了又捻，最后说：“你要是问我她为什么走，我的答案是——为了那单生意。别的，我不知道。她没留信，也没托人带话给我。”\\n\\n桌上那张近照里，诺拉站在裁缝店的柜台旁，手边搭着一件半成品的外套。纸条上的地址是维尔裁缝店，笔迹是马丁自己的。\",\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁承认最后一次见面时与诺拉发生激烈争执：诺拉想独立接单，马丁以陌生顾客和赊账风险为由反对，双方都说了重话。\",\"speaker_id\":\"npc:tailor\",\"recipients\":[\"player\",\"bystander:clerk\"]},{\"kind\":\"statement\",\"content\":\"诺拉离家已三天，未留信、未托人带话；第二天起马丁走访过两位熟人，均未见到她。\",\"speaker_id\":\"npc:tailor\",\"recipients\":[\"player\",\"bystander:clerk\"]},{\"kind\":\"statement\",\"content\":\"马丁称自己翻查过订单簿和楼上住处后才来事务所；他没有主动提及红烟囱街收据。\",\"speaker_id\":\"npc:tailor\",\"recipients\":[\"player\",\"bystander:clerk\"]},{\"kind\":\"observation\",\"content\":\"马丁对‘冲突是否与失踪有关’的态度出现松动，但仍把女儿离家归因于那单生意，未提赊账交易以外的线索。\",\"recipients\":[\"player\",\"bystander:clerk\"]}]}",
+          "elapsed_ms": 5559,
+          "input_estimate": 6288,
+          "output_limit": 4096,
+          "diagnostic": {
+            "Provider": "deepseek",
+            "Model": "deepseek-v4-flash",
+            "InputKnown": true,
+            "OutputKnown": true,
+            "ReasoningKnown": false,
+            "CacheKnown": true,
+            "CacheHitTokens": 2944,
+            "CacheMissTokens": 679,
+            "Code": "",
+            "HTTPStatus": 200,
+            "RequestID": "",
+            "FinishReason": "stop",
+            "InputTokens": 3623,
+            "OutputTokens": 792,
+            "ReasoningTokens": 0,
+            "ContentChars": 1448,
+            "ReasoningChars": 0
+          }
+        }
+      ],
+      "result": {
+        "scene": {
+          "narrative": ""
+        },
+        "report": {
+          "core_calls": 2,
+          "repairs": 1,
+          "selected_entity_ids": [
+            "player",
+            "npc:tailor",
+            "bystander:clerk"
+          ]
+        }
+      },
+      "accepted_state": {
+        "turn": 0,
+        "clock": "1358-03-29 09:00",
+        "positions": {
+          "bystander:clerk": "office",
+          "bystander:coachman": "red-chimney-street",
+          "bystander:printer": "newspaper-office",
+          "npc:clockmaker": "clock-shop",
+          "npc:missing-woman": "abandoned-clinic",
+          "npc:reporter": "newspaper-office",
+          "npc:tailor": "office",
+          "player": "office"
+        }
+      },
+      "error_code": "json_unknown_field"
+    }
+  ]
+}
