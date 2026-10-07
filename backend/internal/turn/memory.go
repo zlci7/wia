@@ -40,7 +40,7 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 	// can grow when the generation contract or repair instruction is appended.
 	fit := func(inputLimit int, system string, start int) (Material, int) {
 		for {
-			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query, planMemorySources(snapshot, scope))
+			candidate := renderMemoryWindow(base, m, scope, memory.FlattenGroups(groups[start:]), query, planMemorySources(snapshot, scope), memory.MemoryRecordsText)
 			input, _, _ := contextInput(candidate, nil)
 			if model.FramedTextInputTokens(model.TextRequest{System: system, Input: input}) <= inputLimit || len(groups)-start <= 1 {
 				return candidate, start
@@ -59,7 +59,7 @@ func withLongMemory(material Material, snapshot Snapshot, scope, query string) M
 // renderMemoryWindow builds the required block from the untouched base text and an
 // explicit set of groups. Rendering from the parts keeps the digest header, the source
 // list and the declined backlog consistent with what was actually included.
-func renderMemoryWindow(material Material, m MemoryContext, scope string, block []memory.MemorySource, query string, references []string) Material {
+func renderMemoryWindow(material Material, m MemoryContext, scope string, block []memory.MemorySource, query string, references []string, recordText func([]memory.MemorySource) string) Material {
 	material.RequiredSources = append([]string(nil), material.RequiredSources...)
 	material.DeclinedSources = nil
 	material.RecallSources = nil
@@ -75,7 +75,7 @@ func renderMemoryWindow(material Material, m MemoryContext, scope string, block 
 	if declinedCount > 0 {
 		label = fmt.Sprintf("最近的已发生经历（本次提供最近%d组；另有%d条更早经历尚未整理、本次未提供，按需检索，未提供不代表没有发生）", len(groups), declinedCount)
 	}
-	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + memory.DigestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + memory.MemoryRecordsText(block) + "\n本轮职责与刺激：\n" + material.Required
+	material.Required = "已提交的连续个人回顾（非世界客观事实）：" + memory.DigestContext(m.Digest) + "\n" + label + "（均已发生，不重演）：\n" + recordText(block) + "\n本轮职责与刺激：\n" + material.Required
 	material.RequiredSources = append(material.RequiredSources, memory.RetainedStateSources(m.Digest)...)
 	if m.Digest.Revision > 0 {
 		material.RequiredSources = append(material.RequiredSources, fmt.Sprintf("digest:%s:%d", scope, m.Digest.Revision))
@@ -92,7 +92,7 @@ func renderMemoryWindow(material Material, m MemoryContext, scope string, block 
 		}
 	}
 	for i := len(backlog) - 1; i >= 0; i-- {
-		section := Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + memory.MemoryRecordsText(backlog[i])}
+		section := Section{Name: "memory_recent_backlog", Text: "较早的未整理经历（本次未全部提供，可用检索取回）：\n" + recordText(backlog[i])}
 		for _, record := range backlog[i] {
 			section.Sources = append(section.Sources, record.ID)
 			material.DeclinedSources = append(material.DeclinedSources, record.ID)
@@ -104,7 +104,7 @@ func renderMemoryWindow(material Material, m MemoryContext, scope string, block 
 		supplied[record.ID] = true
 	}
 	references = append(append([]string{}, references...), memory.RetainedStateSources(m.Digest)...)
-	return withRecall(material, memoryProjection{Context: m, Supplied: supplied, References: references}, query)
+	return withRecall(material, memoryProjection{Context: m, Supplied: supplied, References: references, RecordText: recordText}, query)
 }
 
 func planMemorySources(snapshot Snapshot, scope string) []string {
@@ -120,7 +120,8 @@ func planMemorySources(snapshot Snapshot, scope string) []string {
 // memoryProjection is what this request already supplies, so retrieval does not offer the
 // same committed group twice.
 type memoryProjection struct {
-	Context MemoryContext
+	Context    MemoryContext
+	RecordText func([]memory.MemorySource) string
 	// Supplied marks the records this request already provides; anything else the
 	// receiver may lawfully recall stays eligible for retrieval.
 	Supplied map[string]bool
@@ -134,6 +135,10 @@ type memoryProjection struct {
 // something.
 func withRecall(material Material, projection memoryProjection, query string) Material {
 	m := projection.Context
+	recordText := projection.RecordText
+	if recordText == nil {
+		recordText = memory.MemoryRecordsText
+	}
 	excluded := make(map[string]bool, len(projection.Supplied)+len(material.RecallSources))
 	for id := range projection.Supplied {
 		excluded[id] = true
@@ -147,7 +152,7 @@ func withRecall(material Material, projection memoryProjection, query string) Ma
 	// Lowest-ranked matches are removed first by the shared budgeter. Search returns
 	// complete committed groups so attempts keep their outcomes.
 	for _, group := range search.Groups {
-		section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + memory.MemoryRecordsText(group)}
+		section := Section{Name: "memory_recall", Text: "检索到的本人旧经历（同一已提交回合）：\n" + recordText(group)}
 		for _, record := range group {
 			section.Sources = append(section.Sources, record.ID)
 			material.RecallSources = append(material.RecallSources, record.ID)

@@ -132,9 +132,9 @@ func selectSceneWorld(snapshot Snapshot, out Output) *sceneWorldObject {
 
 func sceneWorldWindow(snapshot Snapshot) Section {
 	minute, _ := plot.ClockMinute(snapshot.Summary.Clock)
-	window := map[string]any{"forecast_end_minute": minute + PlotTimeLimit(snapshot), "actual_selection": "按节点实际时间、工作位置、状态、当前轮转确认；预备条目不授予提前执行资格"}
+	window := map[string]any{"forecast_end_minute": minute + PlotTimeLimit(snapshot)}
 	if object := sceneOpeningWorldObject(snapshot); object != nil {
-		window["opening_assessment"] = map[string]any{"type": object.Type, "id": object.ID, "material_ids": object.MaterialIDs, "required": "当前起点已经选中；本轮按实际时间评估。没有新变化也写deferred及理由，不省略。后续若外部时点优先，则按实际结束时点重新选择。"}
+		window["opening_assessment"] = map[string]any{"type": object.Type, "id": object.ID, "material_ids": object.MaterialIDs, "required": true}
 	}
 	if def := snapshot.Definition.Progression; def != nil {
 		window["development_candidates"] = def.Developments

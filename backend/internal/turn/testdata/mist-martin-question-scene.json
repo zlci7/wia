@@ -1,0 +1,108 @@
+{
+  "schema_revision": "scene-draft.v1",
+  "input_map": [
+    {
+      "text": "我先不急着答应，问马丁刚才停顿的那次最后见面究竟发生了什么：诺拉那天说了什么、去了哪里，近来有无反常。",
+      "intent_type": "speak",
+      "addressee_id": "npc:tailor",
+      "visibility": "public",
+      "beat_ids": ["b1"],
+      "status": "succeeded",
+      "unexecuted_reason": "",
+      "wait_minutes": 0,
+      "action_rule_id": ""
+    }
+  ],
+  "beats": [
+    {
+      "local_id": "b1",
+      "kind": "dialogue",
+      "actor_id": "player",
+      "target_id": "npc:tailor",
+      "offset_minutes": 0,
+      "basis": ["input:0"],
+      "content": "你没有应下那三镑，只要求马丁把最后一次见面说完整：那天诺拉说了什么、后来去了哪儿、这阵子有没有不对劲的地方。",
+      "recipients": [],
+      "bystanders": [],
+      "projections": [],
+      "effects": {},
+      "scope": "public"
+    },
+    {
+      "local_id": "b2",
+      "kind": "dialogue",
+      "actor_id": "npc:tailor",
+      "target_id": "player",
+      "offset_minutes": 1,
+      "basis": ["beat:b1", "material:mist-embers.pack.v9:tailor-knowledge"],
+      "content": "马丁先答那天下午：三点多，店里来了一位要订外套的客人，诺拉说她来量。他不认得那位客人，账要挂在店里，他说她才二十岁、别急着替全店拿主意。诺拉把软尺放在柜台上，说自己是学徒不是帮工，受够了他什么都替她定。第二天早上她屋里空了，少了几件衣服。她没有留字条，也没说要去哪儿。",
+      "recipients": [],
+      "bystanders": [],
+      "projections": [],
+      "effects": {},
+      "scope": "public"
+    },
+    {
+      "local_id": "b3",
+      "kind": "dialogue",
+      "actor_id": "npc:tailor",
+      "target_id": "player",
+      "offset_minutes": 4,
+      "basis": ["beat:b1", "material:mist-embers.pack.v9:tailor-knowledge"],
+      "content": "被问到近来有没有反常，马丁先说没什么，隔了两息才说诺拉往外跑得比以前多，下午常出门，只说去看料子、问活计；他一问，她嫌他管得太细。说到这里他停住，把帽子在膝盖上转了半圈，最后改口说都是些小事、没别的了。",
+      "recipients": [],
+      "bystanders": [],
+      "projections": [],
+      "effects": {},
+      "scope": "public"
+    },
+    {
+      "local_id": "b4",
+      "kind": "dialogue",
+      "actor_id": "npc:tailor",
+      "target_id": "player",
+      "offset_minutes": 8,
+      "basis": ["beat:b3", "material:mist-embers.pack.v9:tailor-knowledge"],
+      "content": "马丁追问这委托到底接不接，重申三镑、不够可以商量；随后低下头补了一句：要是找着诺拉，别跟她说这活儿是他请人做的。",
+      "recipients": [],
+      "bystanders": [],
+      "projections": [],
+      "effects": {},
+      "scope": "public"
+    }
+  ],
+  "narrative_blocks": [
+    {
+      "text": "你没有把那三镑应下来，也没有把纸条收进本子，只是把近照往桌心推了推。\n\n“先不急着定，”你说，“你刚才说到你们最后一次见面，停了。我想听完整——那天她说了什么？后来去了哪儿？这阵子有没有什么地方不对劲？”",
+      "beat_ids": ["b1"]
+    },
+    {
+      "text": "马丁的手指在变了形的帽檐上收紧了一下。雾贴在窗玻璃上，外间隐约有书记员笔尖划过纸面的声音；他没有立刻接话，像是先在心里把要说的话摆整齐。\n\n“那天是下午，”他终于开口，“三点多，店里。有位客人进来要订件外套，诺拉说她来量。”\n\n“我不认得那位客人，账要挂在店里，我说先把钱的事讲清楚。她说她量得比我仔细。我——”他停了一下，“我说，她才二十岁，别急着替全店拿主意。”\n\n“她把软尺放在柜台上，说她是学徒，不是帮工，说受够了我什么都替她定。”他捏着帽子，“第二天早上，她屋里空着，少了几件衣服。”\n\n“我不知道她去了哪儿，”他补上一句，“她没留字条，也没跟我说。”",
+      "beat_ids": ["b2"]
+    },
+    {
+      "text": "“这阵子……”你把话头递过去，他先是说没什么，隔了两息才往下讲，“她往外跑得比以前多，下午常出去，说去看料子、问活计。我问一句，她嫌我管得太细。”\n\n说到这里他停住，把帽子在膝盖上转了半圈，像要把什么话拧下去，最后只道：“都是些小事。没别的了。”",
+      "beat_ids": ["b3"]
+    },
+    {
+      "text": "“这案子你到底接不接？”他问，声音比刚才急了一点，“三镑。不够可以商量。”\n\n说完他低下头，看着自己那双布满细小旧伤的手：“还有一句——要是找着她，别跟她说是我请的人。”",
+      "beat_ids": ["b4"]
+    }
+  ],
+  "elapsed_minutes": 8,
+  "stop": {
+    "reason": "player_choice",
+    "content": "马丁交代了那天下午的争执、自己不知道诺拉的去向，并在追问下把近期外出说成“小事”，最后提出“别跟她说是我请的人”。委托仍未被接受，答复、继续追问或改用别的做法都还在玩家手里。"
+  },
+  "progress_updates": [
+    {
+      "type": "development",
+      "id": "case-pressure",
+      "status": "deferred",
+      "content": "本轮只发生在事务所内的委托问询，没有出现推动案件的外部变化；马丁的迟疑与保留属人物当下反应，非同场人物的到期行动。",
+      "offset_minutes": 8,
+      "basis": ["material:mist-embers.pack.v9:case-development", "beat:b4"],
+      "beat_ids": []
+    }
+  ]
+}

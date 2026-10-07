@@ -56,6 +56,11 @@ func (p *phase13Probe) TextReasoningReserve() int {
 	return 0
 }
 
+func (p *phase13Probe) SupportsTextStreaming() bool {
+	capability, ok := p.inner.(model.TextStreamingProvider)
+	return ok && capability.SupportsTextStreaming()
+}
+
 func (p *phase13Probe) GenerateText(ctx context.Context, req model.TextRequest) (model.TextResponse, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -69,6 +74,10 @@ func (p *phase13Probe) GenerateText(ctx context.Context, req model.TextRequest) 
 	firstDelta := int64(0)
 	reasoningChars, outputChars := 0, 0
 	if os.Getenv("WIA_PHASE13_STREAM") == "1" {
+		if req.Streaming == nil {
+			streaming := true
+			req.Streaming = &streaming
+		}
 		observer := req.OnDelta
 		req.OnDelta = func(delta model.TextDelta) {
 			if firstDelta == 0 {
@@ -331,6 +340,9 @@ func phase13WorldUnchanged(before, after turn.Snapshot) bool {
 }
 
 func phase13Failure(err error) string {
+	if errors.Is(err, turn.ErrContextCapacity) {
+		return "context_capacity_exceeded"
+	}
 	var invalid *turn.GenerationError
 	if errors.As(err, &invalid) {
 		return strings.Join([]string{invalid.Code, invalid.Field, invalid.Expected}, ":")

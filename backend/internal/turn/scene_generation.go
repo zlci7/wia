@@ -112,7 +112,11 @@ func (s *Service) generateSceneCandidate(ctx context.Context, store *storage.Wor
 			material.Required += "\n已验证前段（完整候选必须原样保留）：" + wire.MarshalJSON(prefix) + "\n程序已准备判定（使用此固定结果）：" + wire.MarshalJSON(resolution)
 		}
 		if intent != nil {
-			material.Required += "\n程序解析的固定规则原文片段（保持text、scope和规则绑定）：" + wire.MarshalJSON(parts)
+			bindings := newContextTable("text", "intent_type", "addressee_id", "visibility", "wait_minutes", "action_rule_id")
+			for _, part := range parts {
+				bindings.add(part.Text, part.IntentType, part.AddresseeID, part.Visibility, part.WaitMinutes, part.ActionRuleID)
+			}
+			material.Required += "\n程序解析的原文绑定（逐段保持全部列值）：" + wire.MarshalJSON(bindings)
 		}
 		if resolutionBlocked {
 			material.Required += "\n已验证前段未满足所选规则条件，判定未准备；保持前段，保留失败或未执行，不改换规则或强行成功。"

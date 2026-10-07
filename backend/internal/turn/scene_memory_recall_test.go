@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"gameagent/backend/internal/memory"
+	"gameagent/backend/internal/wire"
 	wiaworld "gameagent/backend/internal/world"
 )
 
@@ -34,7 +35,7 @@ func TestSceneExplicitPersonalSourcesRecallWithoutKeywordMatch(t *testing.T) {
 	for _, owner := range []string{"npc:a", "npc:b"} {
 		for _, id := range []string{"old-attempt", "old-result"} {
 			alias := scenePersonalID(owner, id)
-			if !slices.Contains(report.SelectedSources, alias) || strings.Count(req.Input, "["+alias+"；") != 1 {
+			if !slices.Contains(report.SelectedSources, alias) || strings.Count(req.Input, "["+wire.MarshalJSON(alias)+",") != 1 {
 				t.Fatalf("complete old group not supplied once for %s: %s", owner, id)
 			}
 			canonical, err := ledger.resolve(owner, []string{alias}, false)
@@ -54,7 +55,7 @@ func TestSceneExplicitPersonalSourcesRecallWithoutKeywordMatch(t *testing.T) {
 func TestSceneRecallDeduplicatesBacklogAndKeepsLimitedReport(t *testing.T) {
 	archive := []memory.MemorySource{{Scope: "npc:a", Seq: 1, ID: "old", RunID: "old", Content: "答应送来封套。"}, {Scope: "npc:a", Seq: 2, ID: "result", RunID: "old", Content: "未能送达。"}, {Scope: "npc:a", Seq: 3, ID: "new", RunID: "new", Content: "晴朗。"}}
 	m := MemoryContext{Archive: archive, Tail: archive}
-	material := renderMemoryWindow(Material{}, m, "npc:a", archive[2:], "没有匹配", []string{"old"})
+	material := renderMemoryWindow(Material{}, m, "npc:a", archive[2:], "没有匹配", []string{"old"}, memory.MemoryRecordsText)
 	req, report, err := (ContextComposer{}).Build(material, material.System, 128)
 	if err != nil || strings.Count(req.Input, "[old；") != 1 || strings.Count(req.Input, "[result；") != 1 || report.RecallIncluded != 2 {
 		t.Fatalf("backlog duplicated referenced group: %+v %v", report, err)

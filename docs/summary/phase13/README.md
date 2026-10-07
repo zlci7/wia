@@ -7,5 +7,6 @@
 - [Live-model preflight](真实模型预检-2026-10-07.md): unsuccessful isolated attempts, failure containment, usage and local contract corrections.
 - [Generation budget and waiting progress](生成预算与等待进度-验收.md): shared 300-second deadline, one successful streamed question and disclosure/browser verification.
 - [Generation transport](传输方式-验收.md): streaming selection, credential-independent persistence and request/browser verification.
+- [Continuation and capacity verification](连续预检与容量-验收.md): resumed investigation, multiplayer/private output-limit failures and complete-memory context replay.
 
 Engineering work is in progress; live preflight did not pass, and formal migration and continuous-play acceptance remain pending. Current delivery status is tracked in [delivery status](../../phase12/开发状态.md).
