@@ -103,7 +103,12 @@ func (g *ContextGenerator) GenerateText(ctx context.Context, request model.TextR
 
 func (g *ContextGenerator) generateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
 	request.System += g.systemSuffix
-	req, report, err := g.composer.Build(g.material, request.System, request.MaxOutputTokens)
+	composer := g.composer
+	if request.Reasoning == model.ReasoningOff {
+		composer.ReasoningReserve = 0
+	}
+	req, report, err := composer.Build(g.material, request.System, request.MaxOutputTokens)
+	req.Reasoning, req.Streaming, req.OnDelta = request.Reasoning, request.Streaming, request.OnDelta
 	g.providedSources = slices.Clone(report.SelectedSources)
 	if g.logger != nil {
 		s := report.Scope

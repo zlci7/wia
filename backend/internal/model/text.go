@@ -16,12 +16,28 @@ const (
 )
 
 var (
-	ErrInvalidTextRequest   = errors.New("invalid text request")
-	ErrTextInputTooLarge    = errors.New("text input exceeds token limit")
-	ErrTextOutputTooLarge   = errors.New("text output exceeds token limit")
-	ErrTextResponseTooLarge = errors.New("text response exceeds byte limit")
-	ErrInvalidTextResponse  = errors.New("invalid or incomplete text response")
+	ErrInvalidTextRequest       = errors.New("invalid text request")
+	ErrTextInputTooLarge        = errors.New("text input exceeds token limit")
+	ErrTextOutputTooLarge       = errors.New("text output exceeds token limit")
+	ErrTextResponseTooLarge     = errors.New("text response exceeds byte limit")
+	ErrInvalidTextResponse      = errors.New("invalid or incomplete text response")
+	ErrTextReasoningUnsupported = errors.New("text reasoning selection is unsupported")
 )
+
+// ReasoningMode selects generation effort independently of transport. Empty
+// preserves the provider default for existing callers.
+type ReasoningMode string
+
+const (
+	ReasoningDefault ReasoningMode = ""
+	ReasoningOff     ReasoningMode = "off"
+	ReasoningLow     ReasoningMode = "low"
+	ReasoningHigh    ReasoningMode = "high"
+)
+
+func (m ReasoningMode) Valid() bool {
+	return m == ReasoningDefault || m == ReasoningOff || m == ReasoningLow || m == ReasoningHigh
+}
 
 // TextRequest is a tool-free generation request. Zero Max* limits use defaults;
 // a zero reasoning reserve allocates no additional tokens. Visible token limits
@@ -35,6 +51,7 @@ type TextRequest struct {
 	ReasoningReserveTokens int
 	MaxResponseBytes       int
 	Streaming              *bool           `json:"streaming,omitempty"`
+	Reasoning              ReasoningMode   `json:"reasoning,omitempty"`
 	OnDelta                func(TextDelta) `json:"-"`
 }
 
@@ -75,6 +92,7 @@ func (r TextRequest) TotalOutputTokens() int { return r.MaxOutputTokens + r.Reas
 func ValidateTextRequest(req TextRequest) (TextRequest, error) {
 	req = textRequestDefaults(req)
 	if req.MaxInputTokens < 0 || req.MaxOutputTokens < 0 || req.MaxResponseBytes < 0 || req.ReasoningReserveTokens < 0 || req.ReasoningReserveTokens > int(^uint(0)>>1)-req.MaxOutputTokens ||
+		!req.Reasoning.Valid() || req.Reasoning == ReasoningOff && req.ReasoningReserveTokens != 0 ||
 		!utf8.ValidString(req.System) || !utf8.ValidString(req.Input) || strings.TrimSpace(req.Input) == "" {
 		return TextRequest{}, ErrInvalidTextRequest
 	}

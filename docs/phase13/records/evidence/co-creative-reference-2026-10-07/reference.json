@@ -1,0 +1,36 @@
+{
+  "model": "deepseek-v4-flash",
+  "input": "连续追问开场",
+  "results": [
+    {
+      "format": "narrative",
+      "reasoning": "off",
+      "input_hash": "68a9ab7040d98d237d773ad73ccfe037866ba918ced51a7ed4a66ba64020e251",
+      "system_hash": "aa9ba06885ce80b29306ffd91ebd0fad11f26fcf028d4a62d896be86a2ce4737",
+      "input_estimate": 11458,
+      "output_limit": 5632,
+      "elapsed_ms": 947,
+      "text": "",
+      "diagnostic": {
+        "Provider": "deepseek",
+        "Model": "deepseek-v4-flash",
+        "InputKnown": false,
+        "OutputKnown": false,
+        "ReasoningKnown": false,
+        "CacheKnown": false,
+        "CacheHitTokens": 0,
+        "CacheMissTokens": 0,
+        "Code": "provider_http",
+        "HTTPStatus": 401,
+        "RequestID": "",
+        "FinishReason": "",
+        "InputTokens": 0,
+        "OutputTokens": 0,
+        "ReasoningTokens": 0,
+        "ContentChars": 0,
+        "ReasoningChars": 0
+      },
+      "error_code": "provider_http"
+    }
+  ]
+}

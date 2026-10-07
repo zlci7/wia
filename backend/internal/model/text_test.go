@@ -39,6 +39,8 @@ func TestValidateTextRequestRejectsInvalidInputAndLimits(t *testing.T) {
 		{"negative input limit", TextRequest{Input: "facts", MaxInputTokens: -1}},
 		{"negative output limit", TextRequest{Input: "facts", MaxOutputTokens: -1}},
 		{"negative byte limit", TextRequest{Input: "facts", MaxResponseBytes: -1}},
+		{"unknown reasoning", TextRequest{Input: "facts", Reasoning: "invalid"}},
+		{"off with reserve", TextRequest{Input: "facts", Reasoning: ReasoningOff, ReasoningReserveTokens: 1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := ValidateTextRequest(tc.req); !errors.Is(err, ErrInvalidTextRequest) {

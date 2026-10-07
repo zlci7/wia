@@ -58,6 +58,15 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		"stream":     req.Streams(),
 		"max_tokens": req.TotalOutputTokens(),
 	}
+	if req.Reasoning != model.ReasoningDefault {
+		mode := "enabled"
+		if req.Reasoning == model.ReasoningOff {
+			mode = "disabled"
+		} else {
+			payload["reasoning_effort"] = string(req.Reasoning)
+		}
+		payload["thinking"] = map[string]string{"type": mode}
+	}
 	if req.Streams() {
 		payload["stream_options"] = map[string]bool{"include_usage": true}
 	}
