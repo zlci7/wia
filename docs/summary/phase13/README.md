@@ -6,5 +6,6 @@
 - [Mechanism matrix](机制矩阵核对.md): evidence and limits for the 43 planned scenarios.
 - [Live-model preflight](真实模型预检-2026-10-07.md): unsuccessful isolated attempts, failure containment, usage and local contract corrections.
 - [Generation budget and waiting progress](生成预算与等待进度-验收.md): shared 300-second deadline, one successful streamed question and disclosure/browser verification.
+- [Generation transport](传输方式-验收.md): streaming selection, credential-independent persistence and request/browser verification.
 
 Engineering work is in progress; live preflight did not pass, and formal migration and continuous-play acceptance remain pending. Current delivery status is tracked in [delivery status](../../phase12/开发状态.md).

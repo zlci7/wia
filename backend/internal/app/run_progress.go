@@ -18,6 +18,7 @@ type RunProgress struct {
 	RunID         string            `json:"run_id"`
 	Status        string            `json:"status"`
 	BudgetSeconds int               `json:"budget_seconds"`
+	Transport     string            `json:"transport,omitempty"`
 	Calls         []RunCallProgress `json:"calls"`
 }
 
@@ -34,9 +35,10 @@ type RunCallProgress struct {
 }
 
 type runProgressState struct {
-	mu    sync.Mutex
-	calls []runCallProgress
-	bytes int
+	mu        sync.Mutex
+	calls     []runCallProgress
+	bytes     int
+	transport string
 }
 
 type runCallProgress struct {
@@ -129,6 +131,7 @@ func (a *App) ReadRunProgress(ctx context.Context, worldID, runID string, includ
 		return progress, nil
 	}
 	if state := a.progressForRun(worldID, runID); state != nil {
+		progress.Transport = state.transport
 		progress.Calls = state.snapshot(includeThinking)
 	}
 	return progress, nil

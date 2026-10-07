@@ -27,6 +27,7 @@ type Provider struct {
 }
 
 func (p *Provider) ModelWindow() model.WindowLimits { return p.window }
+func (p *Provider) SupportsTextStreaming() bool     { return true }
 func WithModelWindow(window model.WindowLimits) Option {
 	return func(p *Provider) { p.window = window }
 }

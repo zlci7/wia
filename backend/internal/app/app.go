@@ -175,8 +175,12 @@ func (a *App) ModelConfigPath() string { return a.modelPath }
 
 func (a *App) Status(ctx context.Context) (Status, error) {
 	a.modelMu.RLock()
-	info, modelErr, ready := a.modelInfo, a.modelError, a.generator != nil
+	info, modelErr, generator := a.modelInfo, a.modelError, a.generator
 	a.modelMu.RUnlock()
+	transport, err := a.generationTransport(ctx, generator)
+	if err != nil {
+		return Status{}, err
+	}
 	activeID, revision, err := a.activeWorldState(ctx)
 	if err != nil {
 		return Status{}, err
@@ -190,7 +194,7 @@ func (a *App) Status(ctx context.Context) (Status, error) {
 			active = &summary
 		}
 	}
-	return Status{Ready: ready, Model: info, ModelError: modelErr, UserID: a.userID, ActiveWorld: active, ActiveRevision: revision, DataRoot: a.dataRoot, ModelConfigPath: a.modelPath}, nil
+	return Status{Ready: generator != nil, Model: info, ModelError: modelErr, GenerationTransport: transport, UserID: a.userID, ActiveWorld: active, ActiveRevision: revision, DataRoot: a.dataRoot, ModelConfigPath: a.modelPath}, nil
 }
 
 func (a *App) ListWorlds(ctx context.Context) ([]wiaworld.WorldSummary, error) {

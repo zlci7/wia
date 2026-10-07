@@ -109,6 +109,10 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if generator == nil {
 		return wiaworld.Run{}, ErrModelNotConfigured
 	}
+	transport, err := a.generationTransport(ctx, generator)
+	if err != nil {
+		return wiaworld.Run{}, err
+	}
 	if worldRT.savePending {
 		return wiaworld.Run{}, ErrWorldBusy
 	}
@@ -155,7 +159,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), turn.GenerationTimeBudget)
 	worldRT.cancelSuggestions()
-	runtime := &runRuntime{Cancel: cancel, Done: make(chan struct{}), WorldID: worldID, RunID: run.RunID, ActiveRevision: activeRevision, Generator: generator}
+	runtime := &runRuntime{Cancel: cancel, Done: make(chan struct{}), WorldID: worldID, RunID: run.RunID, ActiveRevision: activeRevision, Generator: generator, Progress: runProgressState{transport: transport.Mode}}
 	a.runsMu.Lock()
 	a.runs[run.RunID] = runtime
 	a.runsMu.Unlock()

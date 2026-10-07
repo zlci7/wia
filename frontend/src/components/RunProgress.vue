@@ -62,6 +62,7 @@ onUnmounted(() => { generation++; clearTimeout(timer); });
   <div class="run-progress">
     <p class="run-phase" role="status">{{ statusText }}</p>
     <p class="subtle">本轮最多等待 {{ progress?.budget_seconds ?? 300 }} 秒<template v-if="outputChars"> · 已收到 {{ outputChars }} 字响应</template></p>
+    <p v-if="progress?.transport === 'non_stream'" class="subtle">非流式：思考文本随完整响应返回。</p>
     <p v-if="error" class="subtle" role="status">{{ error }}</p>
     <details class="run-thinking" @toggle="toggleThinking">
       <summary>模型思考 · 可能剧透</summary>

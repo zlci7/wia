@@ -121,6 +121,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		s.games(w, r)
 	case "/api/v1/model-profiles":
 		s.modelProfiles(w, r)
+	case "/api/v1/model-profiles/transport":
+		s.generationTransport(w, r)
 	case "/api/v1/worlds":
 		s.worlds(w, r)
 	case "/api/v1/active-world":
@@ -190,6 +192,25 @@ func (s *Server) modelProfiles(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, 405, "method_not_allowed", "model profiles use GET or POST")
 	}
+}
+
+func (s *Server) generationTransport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeError(w, 405, "method_not_allowed", "generation transport uses PUT")
+		return
+	}
+	var request struct {
+		Mode string `json:"mode"`
+	}
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	status, err := s.app.UpdateGenerationTransport(r.Context(), request.Mode)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, 200, status)
 }
 
 func (s *Server) worlds(w http.ResponseWriter, r *http.Request) {

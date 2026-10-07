@@ -18,6 +18,10 @@ func (a *App) meteredText(ctx context.Context, generator model.TextGenerator, re
 	started := time.Now()
 	progress := a.progressForRun(scope.World, scope.Run)
 	if progress != nil {
+		if progress.transport != "" {
+			streaming := progress.transport == transportStream
+			request.Streaming = &streaming
+		}
 		progress.begin(id, scope)
 		observer := request.OnDelta
 		request.OnDelta = func(delta model.TextDelta) {

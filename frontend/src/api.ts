@@ -297,6 +297,12 @@ export async function saveModel(candidate: ModelCandidate): Promise<Status> {
   }, 70000)
 }
 
+export function saveGenerationTransport(mode: 'stream' | 'non_stream'): Promise<Status> {
+  return request('/api/v1/model-profiles/transport', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }),
+  });
+}
+
 async function toApiError(response: Response): Promise<ApiError> {
   try {
     const body = await response.json() as { error?: { code?: string; message?: string } }

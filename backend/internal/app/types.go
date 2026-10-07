@@ -107,14 +107,15 @@ type ModelConfigRequest struct {
 }
 
 type Status struct {
-	Ready           bool                   `json:"ready"`
-	Model           ModelInfo              `json:"model"`
-	ModelError      string                 `json:"model_error,omitempty"`
-	UserID          string                 `json:"user_id"`
-	ActiveWorld     *wiaworld.WorldSummary `json:"active_world"`
-	ActiveRevision  int64                  `json:"active_revision"`
-	DataRoot        string                 `json:"-"`
-	ModelConfigPath string                 `json:"-"`
+	Ready               bool                   `json:"ready"`
+	Model               ModelInfo              `json:"model"`
+	ModelError          string                 `json:"model_error,omitempty"`
+	GenerationTransport GenerationTransport    `json:"generation_transport"`
+	UserID              string                 `json:"user_id"`
+	ActiveWorld         *wiaworld.WorldSummary `json:"active_world"`
+	ActiveRevision      int64                  `json:"active_revision"`
+	DataRoot            string                 `json:"-"`
+	ModelConfigPath     string                 `json:"-"`
 }
 
 // SceneLocation is the current location's identifier. Presence is decided by

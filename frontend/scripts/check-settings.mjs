@@ -112,6 +112,49 @@ async function setup() {
   return app;
 }
 const tests = {
+  async "transport saves independently from credentials and preserves active world"(x) {
+    x.status.value.model = {configured:true,provider:'deepseek',model:'test'};
+    x.status.value.generation_transport = {mode:'stream',streaming_supported:true};
+    x.openModel();
+    assert.equal(x.transportForm.value, 'stream');
+    x.modelForm.api_key = 'unsaved credential';
+    x.transportForm.value = 'non_stream';
+    networkHook = (url,init) => {
+      if(url === '/api/v1/model-profiles/transport') {
+        sent = {method:init.method,body:JSON.parse(init.body)};
+        return response({generation_transport:{mode:'non_stream',streaming_supported:true},active_world:world('B')});
+      }
+    };
+    await x.configureTransport();
+    assert.deepEqual(sent, {method:'PUT',body:{mode:'non_stream'}});
+    assert.equal(x.status.value.generation_transport.mode,'non_stream');
+    assert.equal(x.status.value.active_world.world_id,'A');
+    assert.equal(x.modelForm.api_key,'unsaved credential');
+    assert.equal(x.dialog.value,'model');
+    assert.equal(x.dialogBusy.value,false);
+  },
+  async "failed transport save preserves selection and confirmed mode"(x) {
+    x.status.value.generation_transport = {mode:'stream',streaming_supported:true};
+    x.openModel(); x.transportForm.value='non_stream';
+    networkHook = url => url === '/api/v1/model-profiles/transport' ? response({error:{code:'storage_unavailable',message:'save failed'}},503) : undefined;
+    await x.configureTransport();
+    assert.equal(x.transportForm.value,'non_stream');
+    assert.equal(x.status.value.generation_transport.mode,'stream');
+    assert.ok(x.dialogError.value);
+    assert.equal(x.dialogBusy.value,false);
+  },
+  async "late transport save leaves a newer dialog intact"(x) {
+    x.status.value.generation_transport = {mode:'stream',streaming_supported:true};
+    x.openModel();x.transportForm.value='non_stream';
+    networkHook = url => url === '/api/v1/model-profiles/transport' ? new Promise(resolve => {pending=resolve;}) : undefined;
+    const saving=x.configureTransport();
+    x.showDialog('settings');x.dialogError.value='newer error';
+    pending(response({generation_transport:{mode:'non_stream',streaming_supported:true}}));
+    await saving;
+    assert.equal(x.dialog.value,'settings');
+    assert.equal(x.dialogError.value,'newer error');
+    assert.equal(x.dialogBusy.value,false);
+  },
   async "suggestions fill only on selection and preserve an existing draft"(x) {
     const w = x.currentWorld.value;
     const basis = { world_id:w.world_id,message_head:w.message_head,event_head:w.event_head,context_epoch:w.context_epoch,revision:w.revision };

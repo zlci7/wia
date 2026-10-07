@@ -34,6 +34,7 @@ type TextRequest struct {
 	MaxOutputTokens        int
 	ReasoningReserveTokens int
 	MaxResponseBytes       int
+	Streaming              *bool           `json:"streaming,omitempty"`
 	OnDelta                func(TextDelta) `json:"-"`
 }
 
@@ -52,6 +53,16 @@ type TextResponse struct {
 
 type TextGenerator interface {
 	GenerateText(context.Context, TextRequest) (TextResponse, error)
+}
+
+type TextStreamingProvider interface{ SupportsTextStreaming() bool }
+
+// Streams resolves explicit transport selection independently from observation.
+func (r TextRequest) Streams() bool {
+	if r.Streaming != nil {
+		return *r.Streaming
+	}
+	return r.OnDelta != nil
 }
 
 // TextReasoningProvider declares an additional internal-reasoning allowance.

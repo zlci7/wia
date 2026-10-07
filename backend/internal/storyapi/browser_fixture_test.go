@@ -23,10 +23,12 @@ import (
 
 type browserGenerator struct{ apiGenerator }
 
+func (browserGenerator) SupportsTextStreaming() bool { return true }
+
 func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
 	// This opt-in fixture exercises live waiting UI with controlled provider text.
 	if os.Getenv("WIA_BROWSER_PROGRESS") == "1" && strings.Contains(request.System, "结构化回合意图") {
-		if request.OnDelta != nil {
+		if request.OnDelta != nil && request.Streams() {
 			request.OnDelta(model.TextDelta{Reasoning: "受控测试思考：先核对玩家询问，再衔接人物回应。"})
 		}
 		select {

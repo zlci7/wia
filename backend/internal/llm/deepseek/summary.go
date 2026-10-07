@@ -55,10 +55,10 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 	payload := map[string]any{
 		"model":      p.model,
 		"messages":   messages,
-		"stream":     req.OnDelta != nil,
+		"stream":     req.Streams(),
 		"max_tokens": req.TotalOutputTokens(),
 	}
-	if req.OnDelta != nil {
+	if req.Streams() {
 		payload["stream_options"] = map[string]bool{"include_usage": true}
 	}
 	body, err := json.Marshal(payload)
@@ -91,7 +91,7 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		diagnostic.Code = "provider_http"
 		return model.TextResponse{}, fmt.Errorf("deepseek response failed: status=%d", httpResp.StatusCode)
 	}
-	if req.OnDelta != nil && strings.Contains(strings.ToLower(httpResp.Header.Get("Content-Type")), "text/event-stream") {
+	if req.Streams() && strings.Contains(strings.ToLower(httpResp.Header.Get("Content-Type")), "text/event-stream") {
 		resp, err := parseStreamingTextResponse(ctx, httpResp.Body, req, &diagnostic)
 		if err != nil {
 			return model.TextResponse{}, err

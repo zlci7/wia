@@ -38,6 +38,7 @@ const {
   deleteCandidate,
   newWorld,
   modelForm,
+  transportForm,
   providers,
   modelAdvanced,
   settingsForm,
@@ -79,6 +80,7 @@ const {
   pendingCopy,
   openSettings,
   configureModel,
+  configureTransport,
   configureSettings,
   createOrCopy,
   confirmDelete,
@@ -566,6 +568,19 @@ const policyOptions = [
       />
       <UsagePanel v-if="dialog === 'usage'" :key="currentWorld?.world_id ?? ''" :world-id="currentWorld?.world_id" :world-name="currentWorld?.name" />
       <template v-if="dialog === 'model'">
+        <form v-if="status?.model.configured" class="transport-settings" @submit.prevent="configureTransport">
+          <fieldset :disabled="dialogBusy">
+            <label>传输方式<select v-model="transportForm">
+              <option value="stream" :disabled="!status.generation_transport?.streaming_supported">流式 · 实时接收</option>
+              <option value="non_stream">非流式 · 完成后接收</option>
+            </select></label>
+            <p class="subtle">从下一轮生效，适用于所有存档。正文在完整响应通过校验后显示。</p>
+            <p v-if="!status.generation_transport?.streaming_supported" class="subtle">当前连接在 WIA 中仅支持非流式。</p>
+          </fieldset>
+          <div class="modal-actions">
+            <button type="submit" class="secondary-button" :disabled="dialogBusy || transportForm === status.generation_transport?.mode">保存传输方式</button>
+          </div>
+        </form>
         <p class="subtle">
           凭据仅保存在本机。{{
             status?.model.configured

@@ -28,6 +28,7 @@ import {
   saveAgentSettings,
   saveAs,
   saveModel,
+  saveGenerationTransport,
   submitRun,
 } from "./api";
 import {
@@ -135,6 +136,7 @@ export function useExperience() {
     base_url: "",
     api_key: "",
   });
+  const transportForm = ref<'stream' | 'non_stream'>('non_stream');
   const providers = ref<{ provider: string; model: string }[]>([]),
     modelAdvanced = ref(false);
   const defaults = (): NarrativeSettings => ({
@@ -396,6 +398,7 @@ export function useExperience() {
   function openModel(returnTo: Dialog = "") {
     modelReturn.value = returnTo;
     modelForm.api_key = "";
+    transportForm.value = status.value?.generation_transport?.mode ?? 'non_stream';
     if (status.value?.model.configured && status.value.model.provider) {
       modelForm.provider = status.value.model.provider;
       modelForm.model = status.value.model.model ?? "";
@@ -789,6 +792,25 @@ export function useExperience() {
       notice.value = "模型已连接，可以继续刚才的操作。";
     } catch (error) {
       dialogError.value = describe(error);
+    } finally {
+      dialogBusy.value = false;
+    }
+  }
+  async function configureTransport() {
+    if (dialogBusy.value || dialog.value !== 'model') return;
+    const ticket = dialogSession;
+    const ownsDialog = () => !stopped && dialog.value === 'model' && dialogSession === ticket;
+    dialogBusy.value = true;
+    dialogError.value = '';
+    try {
+      const result = await saveGenerationTransport(transportForm.value);
+      if (status.value) status.value = { ...status.value, generation_transport: result.generation_transport };
+      if (ownsDialog()) {
+        transportForm.value = result.generation_transport?.mode ?? 'non_stream';
+        notice.value = '传输方式已保存，从下一轮生效。';
+      }
+    } catch (error) {
+      if (ownsDialog()) dialogError.value = describe(error);
     } finally {
       dialogBusy.value = false;
     }
@@ -1255,6 +1277,7 @@ export function useExperience() {
     deleteCandidate,
     newWorld,
     modelForm,
+    transportForm,
     providers,
     modelAdvanced,
     settingsForm,
@@ -1296,6 +1319,7 @@ export function useExperience() {
     pendingCopy,
     openSettings,
     configureModel,
+    configureTransport,
     configureSettings,
     createOrCopy,
     confirmDelete,

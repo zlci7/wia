@@ -98,6 +98,22 @@ func TestLocalSessionAndStoryRoutes(t *testing.T) {
 	if response.StatusCode != http.StatusNoContent {
 		t.Fatalf("session status = %d", response.StatusCode)
 	}
+	response, body = requestJSON(t, plainClient, http.MethodPut, server.URL()+"/api/v1/model-profiles/transport", map[string]string{"mode": "non_stream"})
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated transport update: %d", response.StatusCode)
+	}
+	response, body = requestJSON(t, client, http.MethodPut, server.URL()+"/api/v1/model-profiles/transport", map[string]string{"mode": "non_stream"})
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"generation_transport":{"mode":"non_stream"`) {
+		t.Fatalf("transport update: %d/%s", response.StatusCode, body)
+	}
+	response, _ = requestJSON(t, client, http.MethodPut, server.URL()+"/api/v1/model-profiles/transport", map[string]string{"mode": "invalid"})
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid transport: %d", response.StatusCode)
+	}
+	response, _ = requestJSON(t, client, http.MethodGet, server.URL()+"/api/v1/model-profiles/transport", nil)
+	if response.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("transport method: %d", response.StatusCode)
+	}
 	originRequest, err := http.NewRequest(http.MethodGet, server.URL()+"/api/v1/status", nil)
 	if err != nil {
 		t.Fatal(err)

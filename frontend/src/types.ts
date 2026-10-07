@@ -8,6 +8,7 @@ export interface Status {
   ready: boolean
   model: ModelInfo
   model_error?: string
+  generation_transport?: { mode: 'stream' | 'non_stream'; streaming_supported: boolean }
   user_id: string
   active_world: WorldSummary | null
   active_revision: number
@@ -157,6 +158,7 @@ export interface RunProgress {
   run_id: string
   status: string
   budget_seconds: number
+  transport?: 'stream' | 'non_stream'
   calls: {
     id: number
     purpose: string

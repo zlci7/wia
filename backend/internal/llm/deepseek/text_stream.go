@@ -83,7 +83,7 @@ func parseStreamingTextResponse(ctx context.Context, reader io.Reader, req model
 		text.WriteString(delta.Content)
 		diagnostic.ContentChars += utf8.RuneCountInString(delta.Content)
 		diagnostic.ReasoningChars += utf8.RuneCountInString(delta.Reasoning)
-		if delta.Content != "" || delta.Reasoning != "" {
+		if req.OnDelta != nil && (delta.Content != "" || delta.Reasoning != "") {
 			req.OnDelta(model.TextDelta{Text: delta.Content, Reasoning: delta.Reasoning})
 		}
 		if choice.FinishReason != "" {
