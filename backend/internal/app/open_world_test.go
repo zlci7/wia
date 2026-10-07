@@ -197,7 +197,7 @@ func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testin
 		t.Fatalf("due review failed: %s", done.Reason)
 	}
 	snapshot := readContextSnapshot(t, a, world.WorldID)
-	if snapshot.OpenProgress == nil || len(snapshot.OpenProgress.Plans) != 2 || len(snapshot.Definition.Materials) != 19 {
+	if snapshot.OpenProgress == nil || len(snapshot.OpenProgress.Plans) != 2 || len(snapshot.Definition.Materials) != 20 {
 		t.Fatal("frozen material or plan state missing")
 	}
 	if snapshot.OpenProgress.DevelopmentCursor != "case-pressure" {
@@ -254,7 +254,7 @@ func TestV4PlansAndMaterialsFreezeCopyRestartAndProtectConsumedSources(t *testin
 		if saved.OpenProgress.DevelopmentCursor != snapshot.OpenProgress.DevelopmentCursor || wire.MarshalJSON(saved.OpenProgress.DevelopmentChecks) != wire.MarshalJSON(snapshot.OpenProgress.DevelopmentChecks) {
 			t.Fatal("copy/restart lost development evaluation progress")
 		}
-		if saved.Definition.Revision != "mist-plans-test.v1" || len(saved.Definition.Materials) != 19 || saved.OpenProgress.Plans[0].Status != "cancelled" || saved.Items["mirror-3-917"].HolderID != "player" {
+		if saved.Definition.Revision != "mist-plans-test.v1" || len(saved.Definition.Materials) != 20 || saved.OpenProgress.Plans[0].Status != "cancelled" || saved.Items["mirror-3-917"].HolderID != "player" {
 			t.Fatal("copy/restart lost frozen materials, current plan or item placement")
 		}
 	}

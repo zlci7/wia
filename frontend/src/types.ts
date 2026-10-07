@@ -7,16 +7,17 @@ export interface ModelInfo {
 
 export interface PlayRequest {
   request_key: string; expected_turn: number; input: string;
-  allow_plot_advance: boolean; transport: 'stream' | 'non_stream';
+  allow_plot_advance: boolean; transport: 'stream' | 'non_stream'; reasoning: 'low' | 'off';
 }
 export interface PlaySession {
 	version: number;
   id: string; game_id: string; title: string; revision: string; turn: number;
+  starting_option_id?: string;
   clock: string; location: string; messages: Message[]; characters: Character[];
   world: WorldSummary; player: { name: string; profile: string };
   states: PublicState[]; items: PublicItem[]; known_locations: KnownLocation[]; bystanders: PackBystander[];
   run?: { id: string; request_key: string; input: string; status: string;
-    transport: 'stream' | 'non_stream'; allow_plot_advance: boolean; started_at: string;
+    transport: 'stream' | 'non_stream'; reasoning: 'low' | 'off'; allow_plot_advance: boolean; started_at: string;
     elapsed_ms: number; candidate?: string; calls: number; repairs: number;
     error?: string; error_code?: string };
   suggestions: { turn: number; enabled: boolean; status: string; items: string[] };
@@ -46,6 +47,7 @@ export interface GameSummary {
 	cover_url?: string
 	cover_alt?: string
 	player: { name: string; profile: string; requirements: string; editable: boolean }
+	starting_options?: { id: string; title: string; description: string; profile: string }[]
 	available?: boolean
 }
 

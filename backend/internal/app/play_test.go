@@ -144,7 +144,7 @@ func TestPlayAcceptsOnceWithFrozenOptionsAndPublicView(t *testing.T) {
 		t.Fatal(err)
 	}
 	modelRequest := <-g.requests
-	if modelRequest.Reasoning != model.ReasoningOff || !modelRequest.JSON || !modelRequest.Streams() || !strings.Contains(modelRequest.Input, `"allow_plot_advance":true`) {
+	if modelRequest.Reasoning != model.ReasoningLow || view.Run.Reasoning != model.ReasoningLow || !modelRequest.JSON || !modelRequest.Streams() || !strings.Contains(modelRequest.Input, `"allow_plot_advance":true`) {
 		t.Fatal("options not passed", modelRequest.Reasoning)
 	}
 	duplicate, err := a.SubmitPlay(initial.ID, request)
@@ -152,6 +152,11 @@ func TestPlayAcceptsOnceWithFrozenOptionsAndPublicView(t *testing.T) {
 		t.Fatal("duplicate", err)
 	}
 	changed := request
+	changed.Reasoning = model.ReasoningOff
+	if _, err := a.SubmitPlay(initial.ID, changed); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatal("reasoning changed accepted request", err)
+	}
+	changed = request
 	changed.AllowPlotAdvance = false
 	if _, err := a.SubmitPlay(initial.ID, changed); !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatal("changed request", err)
@@ -212,6 +217,56 @@ func TestPlayCancellationAndFailurePreserveAcceptedScene(t *testing.T) {
 	failed := awaitPlay(t, a, initial.ID, func(v PlayView) bool { return v.Run.Status == "failed" })
 	if failed.Turn != 0 || len(failed.Messages) != 1 || failed.Run.Calls != 2 || failed.Run.Repairs != 1 {
 		t.Fatal("failure changed state", failed)
+	}
+}
+
+func TestPlayExplicitThinkingOffAndInvalidMode(t *testing.T) {
+	g := &playProbe{requests: make(chan model.TextRequest, 8)}
+	a, initial := playFixture(t, g)
+	request := PlayRequest{RequestKey: "off", Input: "我问来访者。", Transport: transportNonStream, Reasoning: model.ReasoningOff}
+	view, err := a.SubmitPlay(initial.ID, request)
+	if err != nil || view.Run.Reasoning != model.ReasoningOff {
+		t.Fatal("off mode", err)
+	}
+	if call := <-g.requests; call.Reasoning != model.ReasoningOff || call.ReasoningReserveTokens != 0 {
+		t.Fatal("thinking off not honored")
+	}
+	awaitPlay(t, a, initial.ID, func(v PlayView) bool { return v.Run.Status == "completed" })
+	request.RequestKey, request.ExpectedTurn, request.Reasoning = "invalid", 1, "unsupported"
+	if _, err := a.SubmitPlay(initial.ID, request); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatal("invalid thinking mode accepted", err)
+	}
+}
+
+func TestPlayStartsSelectFrozenAuthoredIdentity(t *testing.T) {
+	a, initial := playFixture(t, &playProbe{})
+	pack, _ := a.Pack("mist-embers")
+	for _, option := range pack.Definition.StartingOptions {
+		request := PlayCreateRequest{GameID: "mist-embers", Revision: pack.Definition.Revision, RequestKey: "create-" + option.ID, StartingOptionID: option.ID}
+		view, err := a.CreatePlay(t.Context(), request)
+		if err != nil || view.StartingOptionID != option.ID || view.Player.Name != option.Player.Name || view.World.Location.ID != option.InitialLocation || view.Messages[0].Content != option.Opening {
+			t.Fatal("starting identity", option.ID, err)
+		}
+		duplicate, err := a.CreatePlay(t.Context(), request)
+		if err != nil || duplicate.ID != view.ID {
+			t.Fatal("creation recovery", err)
+		}
+		request.StartingOptionID = "local-investigator"
+		if option.ID != request.StartingOptionID {
+			if _, err := a.CreatePlay(t.Context(), request); !errors.Is(err, ErrIdempotencyConflict) {
+				t.Fatal("identity changed during retry", err)
+			}
+		}
+		if pack.Definition.InitialLocations["player"] != "office" {
+			t.Fatal("pack mutated")
+		}
+	}
+	if _, err := a.CreatePlay(t.Context(), PlayCreateRequest{GameID: "mist-embers", Revision: pack.Definition.Revision, RequestKey: "unknown", StartingOptionID: "absent"}); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatal("unknown identity", err)
+	}
+	old, err := a.ReadPlay(initial.ID)
+	if err != nil || old.Player != initial.Player || old.Turn != 0 {
+		t.Fatal("existing story changed", err)
 	}
 }
 

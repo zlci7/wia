@@ -8,16 +8,28 @@ import (
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
 	"gameagent/backend/internal/wire"
 )
 
-func TestSceneModelDialogueDurationPreservesProgramWaitBinding(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "turn", "testdata", "mist-first-model-response.json"))
+func currentMistResponseFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	pack, err := content.Load(filepath.Join("..", "content", "packs", "mist-embers"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	raw, err := os.ReadFile(filepath.Join("..", "turn", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Preserve historical text while binding its source references to this pack.
+	return []byte(strings.ReplaceAll(string(raw), "material:mist-embers.pack.v9:", "material:"+pack.Definition.Revision+":"))
+}
+
+func TestSceneModelDialogueDurationPreservesProgramWaitBinding(t *testing.T) {
+	raw := currentMistResponseFixture(t, "mist-first-model-response.json")
 	var draft map[string]any
 	if err := json.Unmarshal(raw, &draft); err != nil {
 		t.Fatal(err)
@@ -37,7 +49,7 @@ func TestSceneModelDialogueDurationPreservesProgramWaitBinding(t *testing.T) {
 			t.Fatal("repair did not identify the mismatched wait binding")
 		}
 		fragment["wait_minutes"] = 0
-		draft["progress_updates"] = []any{map[string]any{"type": "development", "id": "case-pressure", "status": "deferred", "content": "交谈期间尚无外部新变化，保留当前调查压力。", "offset_minutes": 8, "basis": []string{"material:mist-embers.pack.v9:case-development"}, "beat_ids": []string{}}}
+		draft["progress_updates"] = []any{map[string]any{"type": "development", "id": "case-pressure", "status": "deferred", "content": "交谈期间尚无外部新变化，保留当前调查压力。", "offset_minutes": 8, "basis": []string{"material:mist-embers.pack.v10:case-development"}, "beat_ids": []string{}}}
 		return wire.MarshalJSON(draft), nil
 	})
 	a := newTestApp(t, g)
@@ -68,10 +80,7 @@ func TestSceneModelDialogueDurationPreservesProgramWaitBinding(t *testing.T) {
 }
 
 func TestSceneFollowupFitsBudgetWithCompleteCommittedExperience(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "turn", "testdata", "mist-martin-question-scene.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := currentMistResponseFixture(t, "mist-martin-question-scene.json")
 	var first struct {
 		InputMap []struct {
 			Text string `json:"text"`

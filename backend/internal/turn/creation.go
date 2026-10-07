@@ -19,8 +19,8 @@ import (
 )
 
 type CreationScene struct {
+	Changes   *CreationChanges `json:"scene_changes"`
 	Narrative string           `json:"narrative"`
-	Changes   *CreationChanges `json:"scene_changes,omitempty"`
 	Notes     []CreationNote   `json:"continuity_notes,omitempty"`
 }
 
@@ -164,12 +164,13 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 	var positions map[string]string
 	var clock string
 	var resources Snapshot
+	requestSystem := material.System
 	for attempt := 0; attempt < 2; attempt++ {
 		if err := callCtx.Err(); err != nil {
 			return result, err
 		}
 		response, err := call.GenerateText(callCtx, model.TextRequest{
-			System: material.System, MaxOutputTokens: outputTokens, Reasoning: options.Reasoning, JSON: true,
+			System: requestSystem, MaxOutputTokens: outputTokens, Reasoning: options.Reasoning, JSON: true,
 			Streaming: options.Streaming, OnDelta: options.OnDelta,
 		})
 		result.Report.CoreCalls = call.calls
@@ -201,11 +202,11 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 		}
 		result.Report.Repairs++
 		var detail *GenerationError
-		correction := "重新生成满足合同的完整JSON。"
+		correction := "重新生成满足合同的完整JSON。必须同时包含scene_changes和narrative，先填写结束时间与所有已选人物的位置，再写正文。"
 		if errors.As(err, &detail) {
 			correction += fmt.Sprintf("本地校验 code=%s field=%s expected=%s。", detail.Code, detail.Field, detail.Expected)
 		}
-		call.material = appendRequiredMaterial(call.material, Section{Name: "creation_correction", Text: correction})
+		requestSystem = material.System + "\n本次字段纠正：" + correction
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

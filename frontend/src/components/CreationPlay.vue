@@ -64,6 +64,7 @@ onUnmounted(remember);
             <div class="composer-body">
               <div class="composer-tools">
                 <span class="composer-label">你的行动</span>
+                <label class="advance-control" title="让模型在正文生成前进行深度思考，可能增加等待时间。"><input v-model="creation.state.reasoning" true-value="low" false-value="off" type="checkbox" :disabled="creation.busy.value || creation.state.sending || !!creation.state.pending" />深度思考</label>
                 <label class="advance-control"><input v-model="creation.state.advance" type="checkbox" :disabled="creation.busy.value || creation.state.sending || !!creation.state.pending" />允许主动推进剧情</label>
                 <label>传输<select v-model="creation.state.transport" aria-label="传输方式" :disabled="creation.busy.value || creation.state.sending || !!creation.state.pending"><option value="non_stream">非流式</option><option value="stream" :disabled="!streamingSupported">流式</option></select></label>
               </div>

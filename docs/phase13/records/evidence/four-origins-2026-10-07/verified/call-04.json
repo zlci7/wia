@@ -1,0 +1,28 @@
+{
+  "index": 4,
+  "streaming": true,
+  "reasoning": "low",
+  "ElapsedMS": 12971,
+  "FirstTextMS": 9747,
+  "response": "{\"narrative\":\"你退回书架那一侧，停在书记员桌边，声音压得只够两个人听见：你们约定的核对是什么时候？她合上登记簿，指尖按在封面上，没有回头去看马丁的椅子。\\n\\n“后天上午。”她说得同样低，“三月三十一日。这行字只在本子上，我不向他说。”\\n\\n你点头，走回桌边。椅子腿擦过地板，马丁抬起眼。你没有坐下前就开口，声音放回正常的音量：今天只是记录他的口述，不代表你已经接下委托；委托范围和报酬那两栏还空着。\\n\\n“明白。”马丁说。他把帽子在膝上转了半圈，停住。“那你想问什么？”\\n\\n你说：那张单子——诺拉带回来的陌生顾客订单，你是亲眼在店里看见过，还是只听她说过？\\n\\n屋里静了一下。书记员的铅笔没有动。马丁的下颌绷起来，目光落回桌面上那张照片的边缘。他先捻了一遍帽檐，又把手放平。\\n\\n“我看见了。”他说，“就压在柜台上的针线盒底下。她说那是顾客给的订单，要自己报价、自己送。”\\n\\n你等他接下去。他没有接。那半句话后面本来该有的东西——单据上写了什么、顾客是谁、地址在哪——他没有说。他把帽子重新拿起来，指尖按在帽顶的凹痕里，像要把那点皱褶捋平。\\n\\n“手艺上的事，她做得不差。”他说的是这句，声音比刚才低，“你问我看见没看见，我看见了。别的，你先记着口述就行。”\\n\\n书记员翻开登记簿，在第一栏末尾补了一行小字，没有念出声。窗外的街道重新有了车辙声，桌面上的照片还是原样，没有被谁碰过。\",\"scene_changes\":{\"elapsed_minutes\":4,\"positions\":{\"player\":\"office\",\"npc:tailor\":\"office\",\"bystander:clerk\":\"office\"},\"state_changes\":[],\"item_moves\":[]},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"书记员低声向调查员确认：再次核对口述定在后天上午（三月三十一日），此约定不主动向马丁转述。\",\"recipients\":[\"player\"],\"speaker_id\":\"bystander:clerk\"},{\"kind\":\"observed\",\"content\":\"马丁承认那张陌生顾客订单是他亲眼在柜台上见过，而非仅听诺拉转述；但他未主动说出单据上的地址或顾客信息。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"调查员公开向马丁说明：今天只记录口述，不代表已接案，委托与报酬栏保持空白。\",\"recipients\":[\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"player\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": true,
+    "CacheKnown": true,
+    "CacheHitTokens": 2816,
+    "CacheMissTokens": 3330,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 6146,
+    "OutputTokens": 2114,
+    "ReasoningTokens": 1481,
+    "ContentChars": 1211,
+    "ReasoningChars": 2513
+  },
+  "error_code": ""
+}

@@ -48,6 +48,12 @@ func (g *creationBrowserGenerator) ModelWindow() model.WindowLimits {
 	}
 	return model.WindowLimits{}
 }
+func (g *creationBrowserGenerator) TextReasoningReserve() int {
+	if p, ok := g.inner.(model.TextReasoningProvider); ok {
+		return p.TextReasoningReserve()
+	}
+	return 0
+}
 func (g *creationBrowserGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
 	index := g.calls.Add(1)
 	if g.inner != nil && index > g.maxCalls {

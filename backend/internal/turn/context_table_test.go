@@ -71,13 +71,16 @@ func TestHostContextTablesPreserveRuntimeFactsAndPermissions(t *testing.T) {
 				{ID: "secret", Name: "私密状态", Type: "enum", EnumValues: []string{"calm", "alert"}, Projection: "hidden", Knowledge: "host_only", UpdatePolicy: story.StateUpdatePolicy{Kind: "rule_only"}},
 			},
 			RelationDefinitions: []story.RelationDefinition{{ID: "trust", Name: "信任", Minimum: -50, Maximum: 50, Default: 5, MaxChangePerTurn: 3, Projection: "hidden", Description: "有向主观判断"}},
-			ItemDefinitions:     []story.ItemDefinition{{ID: "tool", Name: "扳手", Description: "随身工具", Projection: "holder"}},
+			ItemDefinitions:     []story.ItemDefinition{{ID: "tool", Name: "扳手", Description: "随身工具", Projection: "holder"}, {ID: "unused", Name: "其他开场的物品", Projection: "holder"}},
 		},
 		States:        map[string]map[string]wiaworld.EntityState{"player": {"wallet": {Value: wiaworld.StateValue{Type: "integer", Integer: 0}}, "skill": {Value: wiaworld.StateValue{Type: "boolean", Boolean: false}}, "secret": {Value: wiaworld.StateValue{Type: "enum", Enum: "alert"}}}},
 		Relationships: []wiaworld.Relationship{{SubjectID: "npc:a", TargetID: "player", RelationType: "trust", Value: 5}, {SubjectID: "npc:b", TargetID: "player", RelationType: "trust", Value: 5, UpdatedTurn: 2, SourceEvent: "witness"}},
 		Items:         map[string]wiaworld.ItemInstance{"wrench": {InstanceID: "wrench", DefinitionID: "tool", HolderID: "player", SourceEvent: "transfer"}, "floor": {InstanceID: "floor", DefinitionID: "tool", LocationID: "bay", SourceEvent: "opening"}},
 	}
 	text := HostMechanicsContext(snapshot)
+	if strings.Contains(text, "其他开场的物品") {
+		t.Fatal("uninstantiated item type consumed host context")
+	}
 	decoded := decodeHostContext(t, text)
 	for i, row := range decodeContextRecords(t, decoded["state_definitions"]) {
 		encoded, _ := json.Marshal(row)

@@ -1,0 +1,28 @@
+{
+  "index": 1,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1437,
+  "FirstTextMS": 1437,
+  "response": "{\"items\":[\"我问马丁最后一次见到诺拉时她在做什么、穿什么、带没带行李，把这些记进本子，先分清这是寻常离家还是出了事。\",\"我向马丁确认三镑的支付条件、调查范围和保密要求，并把先不惊动邻居的话写成口头约定，避免以后起争执。\",\"我接下委托后先去裁缝店附近走走，以核对账目或找学徒为由向邻近店铺打听诺拉的去向。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 1152,
+    "CacheMissTokens": 185,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1337,
+    "OutputTokens": 100,
+    "ReasoningTokens": 0,
+    "ContentChars": 161,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

@@ -1,5 +1,5 @@
 import { computed, onUnmounted, reactive } from 'vue';
-import { createPlay, fetchPlay, submitPlay, cancelPlay, closePlay, requestPlaySuggestions } from './api';
+import { createPlay, fetchPlay, submitPlay, cancelPlay, requestPlaySuggestions } from './api';
 import { ApiError, type GameSummary, type PlayRequest, type PlaySession } from './types';
 
 const storageKey = 'wia.creation-session';
@@ -8,6 +8,7 @@ export function useCreationPlay() {
   const state = reactive({
     active: undefined as PlaySession | undefined,
     draft: '', advance: false, transport: 'non_stream' as 'stream' | 'non_stream',
+    reasoning: 'low' as 'low' | 'off',
     starting: false, sending: false, cancelling: false, suggestionWriting: false,
     error: '', suggestionError: '', fromSuggestion: false,
     pending: undefined as PlayRequest | undefined, now: Date.now(),
@@ -104,6 +105,7 @@ export function useCreationPlay() {
         state.draft = state.active.run.input;
         state.advance = state.active.run.allow_plot_advance;
         state.transport = state.active.run.transport;
+        state.reasoning = state.active.run.reasoning ?? 'low';
       }
       schedule(); void prepareSuggestions(); return true;
     } catch (error) {
@@ -112,23 +114,28 @@ export function useCreationPlay() {
       return false;
     }
   }
-  async function start(game: GameSummary) {
+  async function start(game: GameSummary, startingOptionID = '', fresh = false) {
     if (state.starting) return false;
-    if (state.active?.game_id === game.id && state.active.revision === game.revision) { schedule(); return true; }
+    if (!fresh && state.active?.game_id === game.id && state.active.revision === game.revision) { schedule(); return true; }
     if (busy.value || state.pending) { state.error = '当前试玩尚在处理，请先继续当前会话或取消生成。'; return false; }
     state.starting = true; state.error = '';
     try {
-      if (state.active) await closePlay(state.active.id);
-      ticket++; clearTimeout(timer); state.active = undefined; rememberID();
-      if (!pendingCreate || pendingCreate.game_id !== game.id || pendingCreate.expected_revision !== game.revision)
-        pendingCreate = { game_id: game.id, expected_revision: game.revision, request_key: crypto.randomUUID() };
+      // Keep an uncertain creation's original key and identity until it is resolved.
+      pendingCreate ??= { game_id: game.id, expected_revision: game.revision, request_key: crypto.randomUUID(), starting_option_id: startingOptionID };
       const view = await createPlay(pendingCreate);
+      ticket++; clearTimeout(timer);
       pendingCreate = undefined; suggestionAttempt = -1;
+      state.suggestionWriting = false;
       state.draft = ''; state.fromSuggestion = false; state.pending = undefined;
+      state.reasoning = 'low';
+      state.advance = false;
       state.readerTop = 0; state.readerBottom = true;
       state.suggestionError = ''; accept(view); rememberID(view.id); schedule();
       void prepareSuggestions(); return true;
-    } catch (error) { state.error = describe(error); return false; }
+    } catch (error) {
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) pendingCreate = undefined;
+      state.error = describe(error); return false;
+    }
     finally { state.starting = false; }
   }
   async function send() {
@@ -136,7 +143,7 @@ export function useCreationPlay() {
     if (!current || busy.value || state.sending || (!state.pending && !canSubmit.value)) return;
     const epoch = ticket;
     state.pending ??= { request_key: crypto.randomUUID(), expected_turn: current.turn,
-      input: state.draft, allow_plot_advance: state.advance, transport: state.transport };
+      input: state.draft, allow_plot_advance: state.advance, transport: state.transport, reasoning: state.reasoning };
     state.sending = true; state.error = '';
     try {
       const view = await submitPlay(current.id, { ...state.pending });

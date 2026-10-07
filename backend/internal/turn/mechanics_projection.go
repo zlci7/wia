@@ -182,7 +182,14 @@ func HostMechanicsContext(snapshot Snapshot) string {
 	}
 	nonDefaultRelationships.sortRows()
 	itemDefinitions := newContextTable("id", "name", "description", "projection")
+	instantiated := map[string]bool{}
+	for _, item := range snapshot.Items {
+		instantiated[item.DefinitionID] = true
+	}
 	for _, definition := range snapshot.Definition.ItemDefinitions {
+		if !instantiated[definition.ID] {
+			continue
+		}
 		itemDefinitions.add(definition.ID, definition.Name, definition.Description, definition.Projection)
 	}
 	items := newContextTable("instance_id", "definition_id", "holder_id", "location_id", "source_event_id")

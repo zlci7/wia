@@ -1,0 +1,28 @@
+{
+  "index": 8,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1369,
+  "FirstTextMS": 1369,
+  "response": "{\"items\":[\"我先向这位车夫道谢，只说是来查旧诊所是否有人借住，问他昨天看见脚印时的方向、时间和鞋印样式，把这些记进巡查本。\",\"我沿街走到旧诊所外围，不进门，先观察窗板松动处、门缝与脚印，判断是否近日有人出入，再决定是否要正式接触住户。\",\"我以路人问路的口气，找附近还营业的店主或住户闲聊，问问最近谁在提这间诊所、居民究竟在担心什么，先弄清传言从哪来。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 1247,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1375,
+    "OutputTokens": 121,
+    "ReasoningTokens": 0,
+    "ContentChars": 185,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

@@ -1,0 +1,28 @@
+{
+  "index": 5,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1563,
+  "FirstTextMS": 1562,
+  "response": "{\"items\":[\"我先帮排字工把今日校样从头核对一遍，确保不漏行错字，再回头研究艾琳那份红烟囱街笔记；顺便问她采访对象和补充旁证各自是谁。\",\"我想跟艾琳先谈署名和分工：我负责比对笔记中哪些是亲历、哪些是转述，她决定核实方式；之后请她带我去红烟囱街看看那间废弃诊所。\",\"我趁校对间隙翻查分部旧报和地址簿，看红烟囱街或异乡语言的旧消息；若亚瑟·格兰特的钟表铺在附近，就顺路问他最近有没有人打听那间诊所。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 1246,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1374,
+    "OutputTokens": 144,
+    "ReasoningTokens": 0,
+    "ContentChars": 206,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

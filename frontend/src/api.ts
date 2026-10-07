@@ -17,7 +17,7 @@ import {
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
-export function createPlay(payload: { game_id: string; expected_revision: string; request_key: string }): Promise<import('./types').PlaySession> {
+export function createPlay(payload: { game_id: string; expected_revision: string; request_key: string; starting_option_id?: string }): Promise<import('./types').PlaySession> {
   return request('/api/v1/play-sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 }
 export function fetchPlay(id: string): Promise<import('./types').PlaySession> {

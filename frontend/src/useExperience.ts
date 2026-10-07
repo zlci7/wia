@@ -103,6 +103,7 @@ export function useExperience() {
   const view = ref<"home" | "story" | "play" | "creator" | "creation">("home"),
     gameID = ref(""),
     loaded = ref(false);
+  const startingOptionID = ref("");
   const connectionError = ref(""),
     notice = ref(""),
     dialog = ref<Dialog>(""),
@@ -647,12 +648,12 @@ export function useExperience() {
     if (!dialogBusy.value) showDialog("");
   }
 
-  async function startCreation() {
+  async function startCreation(fresh = false) {
     if (!game.value || navigating.value || activeRun.value) return;
     if (!status.value?.ready) { openModel(); return; }
     navigating.value = true;
     try {
-      if (await creation.start(game.value)) {
+      if (await creation.start(game.value, startingOptionID.value, fresh)) {
         showDialog(""); view.value = "creation";
       } else notice.value = creation.state.error;
     } finally { navigating.value = false; }
@@ -670,6 +671,7 @@ export function useExperience() {
     reader.remember();
     gameID.value = item.id;
     selectedGame.value = item;
+    startingOptionID.value = item.starting_options?.[0]?.id ?? "";
     view.value = "story";
     try {
       const world = worlds.value.find((w) => w.game_id === item.id);
@@ -677,8 +679,11 @@ export function useExperience() {
         item.available === false && world
           ? await fetchWorldGame(world.world_id)
           : await fetchGame(item.id);
-      if (gameID.value === item.id && view.value === "story")
+      if (gameID.value === item.id && view.value === "story") {
         selectedGame.value = { ...fresh, available: item.available !== false };
+        if (!fresh.starting_options?.some(option => option.id === startingOptionID.value))
+          startingOptionID.value = fresh.starting_options?.[0]?.id ?? "";
+      }
     } catch (error) {
       if (gameID.value === item.id) notice.value = describe(error);
     }
@@ -1266,6 +1271,7 @@ export function useExperience() {
   return {
     creation,
     startCreation,
+    startingOptionID,
     storyEntries,
     packIssues,
     newGame,

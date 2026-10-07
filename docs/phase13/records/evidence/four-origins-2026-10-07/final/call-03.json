@@ -1,0 +1,28 @@
+{
+  "index": 3,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1522,
+  "FirstTextMS": 1522,
+  "response": "{\"items\":[\"我先完成今天的校样，把谋生放在前头；下午若还有空，再请艾琳把红烟囱街的线索讲细，听她打算怎么署名和分工。\",\"我想和艾琳逐句拆分采访笔记，把转述与亲见标清，只留下能印的事实；同时问她红烟囱街与废弃诊所的地址从何而来。\",\"我利用校对间隙向排字工或艾琳打听贝克兰德有没有怪语言、异乡人的说法，顺便看看废弃诊所是否上过旧报，再决定要不要亲自走一趟。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 1152,
+    "CacheMissTokens": 222,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1374,
+    "OutputTokens": 129,
+    "ReasoningTokens": 0,
+    "ContentChars": 186,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

@@ -25,6 +25,10 @@ SIGNATURE INTERACTION: One shared information panel switches between character, 
 
 STATES: Reading, suggestions ready/disabled/unavailable, generation, cancellation, failed run, unknown submission, historic reading, information open, story ended and missing model connection. Model and story settings, saves and retrospective corrections retain their existing workflows.
 
+STORY ENTRY: Script-authored starting identities use rounded, stacked radio rows with one visible selection and the selected background. Continuing preserves the current session; starting with a selected identity creates a fresh session. Creation failure preserves the current story and draft.
+
+COMPOSER: Deep thinking is a visible checkbox, enabled for a new session. Thinking, voluntary plot advancement and transport are separate controls. A pending request freezes their values. The story keeps the same open prose node during streaming and acceptance.
+
 QUALITY BAR: Match the approved rounded paper and glass language; no permanent information columns or cards around prose. Keep real server-projected date, cash, ownership and knowledge. Desktop, narrow and short-screen controls fit without horizontal overflow. Focus, Escape, draft and scroll recovery are verified against the real client with isolated controlled-model fixture data.
 
 FINISH: Batched desktop/mobile/short-screen evidence, independent finish review and canonical design documentation. Real-model narrative quality and physical phone keyboard behavior remain separate verification boundaries.

@@ -44,6 +44,22 @@
       "minLength": 1,
       "maxLength": 240
     },
+    "starting_options": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$"},
+          "title": {"type": "string", "minLength": 1, "maxLength": 80},
+          "description": {"type": "string", "minLength": 1, "maxLength": 500},
+          "player": {"$ref": "#/properties/player"},
+          "opening": {"type": "string", "minLength": 1, "maxLength": 8000},
+          "initial_location": {"type": "string", "minLength": 1, "maxLength": 80},
+          "items": {"type": "array", "maxItems": 128, "items": {"$ref": "#/properties/item_instances/items"}}
+        },
+        "required": ["id", "title", "description"]
+      }
+    },
     "data_files": {
       "type": "object",
       "additionalProperties": false,
@@ -1055,7 +1071,7 @@
       },
       "else": {
         "required": ["locations"],
-        "not": {"anyOf": [{"required": ["materials_file"]}, {"required": ["data_files"]}]}
+        "not": {"anyOf": [{"required": ["materials_file"]}, {"required": ["data_files"]}, {"required": ["starting_options"]}]}
       }
     }
   ]

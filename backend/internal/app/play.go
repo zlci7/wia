@@ -19,33 +19,36 @@ import (
 var ErrPlayNotFound = errors.New("play session not found")
 
 type PlayCreateRequest struct {
-	GameID     string `json:"game_id"`
-	Revision   string `json:"expected_revision"`
-	RequestKey string `json:"request_key"`
+	GameID           string `json:"game_id"`
+	Revision         string `json:"expected_revision"`
+	RequestKey       string `json:"request_key"`
+	StartingOptionID string `json:"starting_option_id,omitempty"`
 }
 
 type PlayRequest struct {
-	RequestKey       string `json:"request_key"`
-	ExpectedTurn     int64  `json:"expected_turn"`
-	Input            string `json:"input"`
-	AllowPlotAdvance bool   `json:"allow_plot_advance"`
-	Transport        string `json:"transport"`
+	RequestKey       string              `json:"request_key"`
+	ExpectedTurn     int64               `json:"expected_turn"`
+	Input            string              `json:"input"`
+	AllowPlotAdvance bool                `json:"allow_plot_advance"`
+	Transport        string              `json:"transport"`
+	Reasoning        model.ReasoningMode `json:"reasoning"`
 }
 
 type PlayRun struct {
-	RequestKey string    `json:"request_key"`
-	ID         string    `json:"id"`
-	Input      string    `json:"input"`
-	Status     string    `json:"status"`
-	Transport  string    `json:"transport"`
-	Advance    bool      `json:"allow_plot_advance"`
-	StartedAt  time.Time `json:"started_at"`
-	ElapsedMS  int64     `json:"elapsed_ms"`
-	Candidate  string    `json:"candidate,omitempty"`
-	Calls      int       `json:"calls"`
-	Repairs    int       `json:"repairs"`
-	Error      string    `json:"error,omitempty"`
-	ErrorCode  string    `json:"error_code,omitempty"`
+	RequestKey string              `json:"request_key"`
+	ID         string              `json:"id"`
+	Input      string              `json:"input"`
+	Status     string              `json:"status"`
+	Transport  string              `json:"transport"`
+	Reasoning  model.ReasoningMode `json:"reasoning"`
+	Advance    bool                `json:"allow_plot_advance"`
+	StartedAt  time.Time           `json:"started_at"`
+	ElapsedMS  int64               `json:"elapsed_ms"`
+	Candidate  string              `json:"candidate,omitempty"`
+	Calls      int                 `json:"calls"`
+	Repairs    int                 `json:"repairs"`
+	Error      string              `json:"error,omitempty"`
+	ErrorCode  string              `json:"error_code,omitempty"`
 }
 
 type PlaySuggestions struct {
@@ -56,24 +59,25 @@ type PlaySuggestions struct {
 }
 
 type PlayView struct {
-	Version     int64                      `json:"version"`
-	ID          string                     `json:"id"`
-	GameID      string                     `json:"game_id"`
-	Title       string                     `json:"title"`
-	Revision    string                     `json:"revision"`
-	Turn        int64                      `json:"turn"`
-	Clock       string                     `json:"clock"`
-	Location    string                     `json:"location"`
-	Messages    []wiaworld.Message         `json:"messages"`
-	Characters  []wiaworld.PublicCharacter `json:"characters"`
-	World       wiaworld.WorldSummary      `json:"world"`
-	Player      PlayPlayer                 `json:"player"`
-	States      []wiaworld.PublicState     `json:"states"`
-	Items       []wiaworld.PublicItem      `json:"items"`
-	Locations   []wiaworld.KnownLocation   `json:"known_locations"`
-	Bystanders  []story.Bystander          `json:"bystanders"`
-	Run         *PlayRun                   `json:"run,omitempty"`
-	Suggestions PlaySuggestions            `json:"suggestions"`
+	Version          int64                      `json:"version"`
+	ID               string                     `json:"id"`
+	GameID           string                     `json:"game_id"`
+	Title            string                     `json:"title"`
+	Revision         string                     `json:"revision"`
+	StartingOptionID string                     `json:"starting_option_id,omitempty"`
+	Turn             int64                      `json:"turn"`
+	Clock            string                     `json:"clock"`
+	Location         string                     `json:"location"`
+	Messages         []wiaworld.Message         `json:"messages"`
+	Characters       []wiaworld.PublicCharacter `json:"characters"`
+	World            wiaworld.WorldSummary      `json:"world"`
+	Player           PlayPlayer                 `json:"player"`
+	States           []wiaworld.PublicState     `json:"states"`
+	Items            []wiaworld.PublicItem      `json:"items"`
+	Locations        []wiaworld.KnownLocation   `json:"known_locations"`
+	Bystanders       []story.Bystander          `json:"bystanders"`
+	Run              *PlayRun                   `json:"run,omitempty"`
+	Suggestions      PlaySuggestions            `json:"suggestions"`
 }
 
 type PlayPlayer struct {
@@ -85,6 +89,7 @@ type playJob struct {
 	request PlayRequest
 	view    PlayRun
 	cancel  context.CancelFunc
+	done    chan struct{}
 }
 
 // playSession manages browser requests around the existing creation session.
@@ -134,7 +139,11 @@ func (a *App) CreatePlay(ctx context.Context, request PlayCreateRequest) (PlayVi
 	if pack.Definition.Revision != request.Revision {
 		return PlayView{}, ErrVersionConflict
 	}
-	creation, err := turn.NewCreationSession(pack.Definition)
+	definition, err := story.WithStartingOption(pack.Definition, request.StartingOptionID)
+	if err != nil {
+		return PlayView{}, ErrInvalidRequest
+	}
+	creation, err := turn.NewCreationSession(definition)
 	if err != nil {
 		return PlayView{}, err
 	}
@@ -163,7 +172,8 @@ func (p *playSession) viewLocked() PlayView {
 	p.viewVersion++
 	snapshot := p.creation.PlayerSnapshot()
 	v := PlayView{Version: p.viewVersion, ID: p.id, GameID: p.create.GameID, Title: snapshot.Definition.Summary.Title, Revision: p.create.Revision,
-		Turn: snapshot.Summary.TurnSeq, Clock: snapshot.Summary.Clock, Location: snapshot.SceneLocation, Messages: snapshot.Messages,
+		StartingOptionID: p.create.StartingOptionID,
+		Turn:             snapshot.Summary.TurnSeq, Clock: snapshot.Summary.Clock, Location: snapshot.SceneLocation, Messages: snapshot.Messages,
 		Characters: PublicCharacterViews(snapshot.Characters), Suggestions: p.suggestions,
 		World: snapshot.Summary, Player: PlayPlayer{snapshot.PlayerName, snapshot.PlayerProfile},
 		States: turn.PlayerStateProjection(snapshot), Items: turn.PlayerItemProjection(snapshot),
@@ -175,6 +185,9 @@ func (p *playSession) viewLocked() PlayView {
 		}
 	}
 	v.Suggestions.Items = slices.Clone(p.suggestions.Items)
+	if v.StartingOptionID == "" && len(snapshot.Definition.StartingOptions) > 0 {
+		v.StartingOptionID = snapshot.Definition.StartingOptions[0].ID
+	}
 	if p.latest != nil {
 		run := p.latest.view
 		// Scene acceptance can precede the worker's final bookkeeping. Publish
@@ -194,6 +207,13 @@ func (a *App) ReadPlay(id string) (PlayView, error) {
 		return PlayView{}, err
 	}
 	p.mu.Lock()
+	if job := p.latest; job != nil && job.done != nil && job.view.Status == "running" && p.creation.Status().Turn > job.request.ExpectedTurn {
+		// Acceptance is complete; let the worker publish its terminal metadata
+		// before exposing a view that permits the next action.
+		p.mu.Unlock()
+		<-job.done
+		p.mu.Lock()
+	}
 	defer p.mu.Unlock()
 	if p.closed {
 		return PlayView{}, ErrPlayNotFound
@@ -204,6 +224,12 @@ func (a *App) ReadPlay(id string) (PlayView, error) {
 func playBusy(p *playSession) bool { return p.latest != nil && p.latest.view.Status == "running" }
 
 func (a *App) SubmitPlay(id string, request PlayRequest) (PlayView, error) {
+	if request.Reasoning == model.ReasoningDefault {
+		request.Reasoning = model.ReasoningLow
+	}
+	if request.Reasoning != model.ReasoningOff && request.Reasoning != model.ReasoningLow {
+		return PlayView{}, ErrInvalidRequest
+	}
 	if !runtimeID.MatchString(request.RequestKey) || !utf8.ValidString(request.Input) || strings.TrimSpace(request.Input) == "" || utf8.RuneCountInString(request.Input) > 4000 || request.ExpectedTurn < 0 || (request.Transport != transportStream && request.Transport != transportNonStream) {
 		return PlayView{}, ErrInvalidRequest
 	}
@@ -251,7 +277,7 @@ func (a *App) SubmitPlay(id string, request PlayRequest) (PlayView, error) {
 	p.cancelSuggestionsLocked()
 	p.suggestions.Status, p.suggestions.Items = "empty", []string{}
 	ctx, cancel := context.WithTimeout(a.copyCtx, turn.GenerationTimeBudget)
-	job := &playJob{request: request, cancel: cancel, view: PlayRun{ID: wire.NewID("playrun"), RequestKey: request.RequestKey, Input: request.Input, Status: "running", StartedAt: time.Now().UTC(), Transport: request.Transport, Advance: request.AllowPlotAdvance}}
+	job := &playJob{request: request, cancel: cancel, done: make(chan struct{}), view: PlayRun{ID: wire.NewID("playrun"), RequestKey: request.RequestKey, Input: request.Input, Status: "running", StartedAt: time.Now().UTC(), Transport: request.Transport, Advance: request.AllowPlotAdvance, Reasoning: request.Reasoning}}
 	p.jobs[request.RequestKey], p.latest = job, job
 	a.copyWG.Add(1)
 	go a.runPlay(ctx, p, job, generator)
@@ -260,6 +286,7 @@ func (a *App) SubmitPlay(id string, request PlayRequest) (PlayView, error) {
 
 func (a *App) runPlay(ctx context.Context, p *playSession, job *playJob, generator model.TextGenerator) {
 	defer a.copyWG.Done()
+	defer close(job.done)
 	defer job.cancel()
 	deps := a.turnDeps()
 	deps.Meter = func(callCtx context.Context, g model.TextGenerator, request model.TextRequest, scope turn.ContextScope, report turn.ContextBuildReport) (model.TextResponse, error) {
@@ -287,7 +314,7 @@ func (a *App) runPlay(ctx context.Context, p *playSession, job *playJob, generat
 		return a.meteredText(callCtx, g, request, scope, report)
 	}
 	stream := job.request.Transport == transportStream
-	result, err := p.creation.Interact(ctx, turn.New(nil, deps), generator, turn.CreationOptions{Input: job.request.Input, AllowPlotAdvance: job.request.AllowPlotAdvance, Reasoning: model.ReasoningOff, Streaming: &stream})
+	result, err := p.creation.Interact(ctx, turn.New(nil, deps), generator, turn.CreationOptions{Input: job.request.Input, AllowPlotAdvance: job.request.AllowPlotAdvance, Reasoning: job.request.Reasoning, Streaming: &stream})
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	job.view.ElapsedMS, job.view.Repairs = time.Since(job.view.StartedAt).Milliseconds(), result.Report.Repairs

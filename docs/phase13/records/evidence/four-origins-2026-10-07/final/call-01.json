@@ -1,0 +1,28 @@
+{
+  "index": 1,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1317,
+  "FirstTextMS": 1317,
+  "response": "{\"items\":[\"我请马丁详细说说诺拉离家前几天的作息、常去的地方和交往的人，尤其想弄清她最近有没有异常，再决定怎么找。\",\"我翻看诺拉的照片和裁缝店地址，先记下外貌衣着特征，然后去裁缝店附近走走，不进门，只观察周边街面和常来的客人。\",\"我把三镑报酬和调查范围摊开谈清楚：先确认人平安再谈报酬细则，问他能提供哪些名字，也说明我不会主动惊动邻居。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 1152,
+    "CacheMissTokens": 185,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1337,
+    "OutputTokens": 115,
+    "ReasoningTokens": 0,
+    "ContentChars": 178,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

@@ -1,0 +1,28 @@
+{
+  "index": 1,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1850,
+  "FirstTextMS": 1850,
+  "response": "{\"items\":[\"我转向马丁，问他女儿最后一次离家前有没有提到工作、朋友或常去的地方，先把停顿背后的细节听完整再谈委托。\",\"我拿起诺拉的照片和地址纸条，仔细比对上面能看见的衣着、店名和街名，确认线索是否清晰可查。\",\"我向马丁说明可以先接受寻找但需要他配合提供更多日常信息，并当面谈清报酬与调查范围的先后顺序。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 1209,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1337,
+    "OutputTokens": 94,
+    "ReasoningTokens": 0,
+    "ContentChars": 161,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

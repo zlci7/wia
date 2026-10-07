@@ -1,0 +1,1187 @@
+[
+  {
+    "version": 176,
+    "id": "play_1f5f25dcc88d041838d6c745",
+    "game_id": "mist-embers",
+    "title": "雾都余烬",
+    "revision": "mist-embers.pack.v10",
+    "starting_option_id": "local-investigator",
+    "turn": 1,
+    "clock": "1358-03-29 09:12",
+    "location": "调查事务所",
+    "messages": [
+      {
+        "seq": 1,
+        "message_id": "opening",
+        "kind": "narrative",
+        "content": "乔伍德区的店铺正在开门。卖报人的吆喝隔着薄雾传进二楼，车轮碾过潮湿的石板，楼下烘焙铺的热气带着面包味升起来。你把外套挂在熟悉的木钩上，检查了口袋里的钥匙和铅笔，桌上是昨天整理到一半的账单。这间事务所不大，却让你第一次有了一个能把自己的名字写在委托记录上的位置。\n\n你是本地人，知道这座城市怎样把体面与窘迫放在同一条街上。战争留下的空铺面正在换招牌，找工作的人却仍比岗位多。你的现金够维持一段日子，每一个接下的案子既是收入，也会影响别人是否愿意再来找你。靠墙的书记员把登记簿推近了一点，提醒你今天的来访还没有签字。\n\n马丁·维尔坐在访客椅上。他身上的外套裁得很好，帽檐却已经被两只手攥出了折痕。他自称是附近维尔裁缝店的店主，二十岁的女儿诺拉离家三天，邻里还以为她去了亲戚家。他把女孩的近照和裁缝店地址纸条摆到桌上，说愿意付三镑请人把她找回来。那是找到人后的报酬，此刻没有钱交到你手里。\n\n“我只想先知道她平不平安。”他看着照片，说到最后一次见面时停顿了一下，转而问你能不能先别惊动邻居。他想尽快得到一句答应，又怕别人追问家里的事。书记员没有替你接话，只把铅笔放在尚空着的委托栏旁。\n\n你可以先弄清他的停顿、讨论报酬与调查范围，也可以拒绝这份委托，去处理自己的工作。马丁坐在你面前等待，事务所的窗还没有完全关紧，街上的日常生活继续着。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 2,
+        "message_id": "creation_fe97b2f79a3daced302d5354:input",
+        "kind": "player",
+        "content": "我暂时不接委托，也不碰桌上照片和纸条。我先请马丁说明他最后一次与诺拉争吵时亲眼见到什么，再请在场书记员解释未接案的口述如何登记，请两人分别回答。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 3,
+        "message_id": "creation_fe97b2f79a3daced302d5354:narrative",
+        "kind": "narrative",
+        "content": "你把照片和地址纸条留在桌沿，没有伸手去碰，只把记事本摊开。马丁见你没有立刻应下报酬，指节在帽檐上收紧了一下，随即又慢慢松开。\n\n“最后一次见面？”他把帽子放回膝上，先看照片，再看你。“三天前，二十六号，晚饭前。她在楼下裁一件客人定做的外套，我看了几眼，说领口那道线走得太急。她说那是人家自己选的宽领，不是走急。我说会做衣服和会接单子是两回事，她说她既然能裁，为什么不能自己接。”\n\n他停了半拍，像在算这句要不要往下讲。“我们声音都大了些。她说我总把她当帮工。我说外面的人会赊账、会赖账，一笔坏账就是我们半个月的料钱。”他低了一点声，确认书记员还在桌那侧写他自己的东西，“然后我就上楼了。第二天早上，她的床铺没动过。”\n\n“她有没有说要去哪里？”你问。马丁摇头，又补上一句：“平时她要去哪儿都会讲一声，买菜、送样，都会讲。那天什么都没说。”他说的范围很窄，只落在争执本身和第二天早上的空床。至于那三天之间他翻过什么、店里哪本簿子动过，他一句没提。\n\n你转向书记员，问他未接案的口述如何登记。书记员合上手里的本子，把登记簿又推近一点，语气是例行公事的平稳：“按事务所的规矩，来访未受委托，我们只作口述留存。”他指了指那页空着的委托栏：“填来访时间、来访人姓名、事由一句话，还有你本人是否受理。受理了才立案卷、编案号、记报酬与期限。今天这一条，如果不受理，我写‘维尔氏来访，询失踪女，未受案’，你签个名或者拒签都行。拒签的就记‘未签’。”\n\n他顿了顿，补了一句：“口述留存不进入出勤或结案记录，也不会替你对外提。要是以后有人来查同一件事，这页能证明你哪天听过什么——前提是你今天把话记清楚。”\n\n马丁在旁边听着，没插嘴，只把帽子重新拿起来，一边听一边把帽檐那道折痕又捻深了一点。他等着你先说是否受理，桌上那张近照仍朝上放着，女孩在照片里抿着嘴，像刚被人叫住时的神情。",
+        "created_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "characters": [
+      {
+        "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+        "entity_id": "npc:reporter",
+        "definition_id": "reporter.v1",
+        "name": "艾琳·维克",
+        "role": "年轻记者",
+        "in_scene": false
+      },
+      {
+        "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+        "entity_id": "npc:clockmaker",
+        "definition_id": "clockmaker.v1",
+        "name": "亚瑟·格兰特",
+        "role": "钟表匠",
+        "in_scene": false
+      },
+      {
+        "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+        "entity_id": "npc:missing-woman",
+        "definition_id": "missing-woman.v1",
+        "name": "诺拉·维尔",
+        "role": "裁缝店学徒",
+        "in_scene": false
+      },
+      {
+        "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+        "entity_id": "npc:tailor",
+        "definition_id": "tailor.v1",
+        "name": "马丁·维尔",
+        "role": "委托人",
+        "in_scene": true
+      }
+    ],
+    "world": {
+      "game_title": "雾都余烬",
+      "revision": "mist-embers.pack.v10",
+      "game_id": "mist-embers",
+      "world_id": "play_1f5f25dcc88d041838d6c745",
+      "name": "雾都余烬",
+      "mode": "open",
+      "turn_seq": 1,
+      "message_head": 0,
+      "event_head": 0,
+      "context_epoch": 0,
+      "clock": "1358-03-29 09:12",
+      "calendar": {
+        "kind": "gregorian",
+        "era": "第五纪"
+      },
+      "scene": "",
+      "scene_location": "office",
+      "location": {
+        "id": "office",
+        "name": "调查事务所",
+        "description": "两间临街办公室，委托记录、城区地图与访客留言保存在这里。"
+      },
+      "adjacent_locations": [
+        {
+          "id": "cafe",
+          "name": "街角咖啡馆",
+          "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。"
+        },
+        {
+          "id": "tailor-shop",
+          "name": "维尔裁缝店",
+          "description": "一间整洁的临街裁缝店，橱窗陈列着成衣，楼上是住处。"
+        }
+      ],
+      "status": "playing",
+      "story_ended": false,
+      "updated_at": "0001-01-01T00:00:00Z"
+    },
+    "player": {
+      "name": "调查员",
+      "profile": "你在贝克兰德长大，靠抄账、寻人和核对商铺账目积累了基础调查经验，如今在乔伍德区一家私人事务所任职。你熟悉本地礼节、鲁恩币制与普通城市生活，认识事务所书记员。你是普通人，尚未接触真实的非凡力量；能访谈、记笔记、核对账目，不能从表情直接读出秘密。你希望靠可靠的调查站稳脚跟，也需要考虑自己的收入和名声。"
+    },
+    "states": [
+      {
+        "entity_id": "player",
+        "state_id": "basic-investigation",
+        "name": "能力与训练",
+        "value": {
+          "type": "enum",
+          "enum": "基础调查"
+        },
+        "category": "skill",
+        "description": "本人已具备的训练与能力；具体边界见角色经历。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "cash",
+        "name": "随身现金",
+        "value": {
+          "type": "integer",
+          "integer": 8352
+        },
+        "category": "resource",
+        "description": "随身现金，以四分之一便士为整数单位。实际收付改变余额；报价与承诺单独存在。",
+        "currency": {
+          "name": "鲁恩货币",
+          "denominations": [
+            {
+              "name": "金镑",
+              "units": 960
+            },
+            {
+              "name": "苏勒",
+              "units": 48
+            },
+            {
+              "name": "便士",
+              "units": 4
+            },
+            {
+              "name": "四分之一便士",
+              "units": 1
+            }
+          ]
+        },
+        "display_value": "8 金镑 14 苏勒"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "fatigue",
+        "name": "疲劳",
+        "value": {
+          "type": "integer",
+          "integer": 18
+        },
+        "category": "condition",
+        "description": "日常行动、休息和持续压力造成的身体负担。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "investigation_strain",
+        "name": "调查负荷",
+        "value": {
+          "type": "integer"
+        },
+        "category": "condition",
+        "description": "高风险调查行动累积的身体与注意力负荷。"
+      }
+    ],
+    "items": [
+      {
+        "instance_id": "address-note",
+        "definition_id": "address-note",
+        "name": "裁缝店地址纸条",
+        "description": "马丁带来的维尔裁缝店地址。",
+        "location_id": "office"
+      },
+      {
+        "instance_id": "case-photo",
+        "definition_id": "case-photo",
+        "name": "诺拉的近照",
+        "description": "马丁带来的女儿近照。",
+        "location_id": "office"
+      },
+      {
+        "instance_id": "player-notebook",
+        "definition_id": "notebook",
+        "name": "调查记事本",
+        "description": "记录访谈和线索的普通小本。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-office-key",
+        "definition_id": "office-key",
+        "name": "事务所钥匙",
+        "description": "调查事务所交给你的门钥匙。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-pencil",
+        "definition_id": "pencil",
+        "name": "铅笔",
+        "description": "一支日常书写用的铅笔。",
+        "holder_id": "player"
+      }
+    ],
+    "known_locations": [
+      {
+        "id": "bridge",
+        "name": "桥区",
+        "description": "车站、工匠铺和市场交错的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "cafe",
+        "name": "街角咖啡馆",
+        "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "office",
+          "newspaper-office",
+          "clock-shop"
+        ]
+      },
+      {
+        "id": "charwood",
+        "name": "乔伍德区",
+        "description": "事务所、报社与体面商铺集中的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "clock-shop",
+        "name": "格兰特钟表铺",
+        "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。",
+        "kind": "place",
+        "parent": "bridge",
+        "connections": [
+          "cafe"
+        ]
+      },
+      {
+        "id": "newspaper-office",
+        "name": "报社分部",
+        "description": "印刷机声从后间传来，地方新闻和零散线索在记者之间流动。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "cafe"
+        ]
+      },
+      {
+        "id": "office",
+        "name": "调查事务所",
+        "description": "两间临街办公室，委托记录、城区地图与访客留言保存在这里。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "cafe",
+          "tailor-shop"
+        ]
+      },
+      {
+        "id": "tailor-shop",
+        "name": "维尔裁缝店",
+        "description": "一间整洁的临街裁缝店，橱窗陈列着成衣，楼上是住处。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "office"
+        ]
+      }
+    ],
+    "bystanders": [
+      {
+        "bystander_id": "bystander:clerk",
+        "name": "事务所书记员",
+        "description": "负责登记委托和整理来访记录。",
+        "initial_location": "office"
+      }
+    ],
+    "run": {
+      "request_key": "441dfeed-db5b-420e-bec0-60e7ca0b5487",
+      "id": "playrun_8aedfc99f18ddbbfc828dc6a",
+      "input": "我暂时不接委托，也不碰桌上照片和纸条。我先请马丁说明他最后一次与诺拉争吵时亲眼见到什么，再请在场书记员解释未接案的口述如何登记，请两人分别回答。",
+      "status": "completed",
+      "transport": "non_stream",
+      "reasoning": "low",
+      "allow_plot_advance": false,
+      "started_at": "2026-10-07T12:18:27.7668092Z",
+      "elapsed_ms": 7939,
+      "calls": 1,
+      "repairs": 0
+    },
+    "suggestions": {
+      "turn": 1,
+      "enabled": false,
+      "status": "empty",
+      "items": []
+    }
+  },
+  {
+    "version": 268,
+    "id": "play_53cc6cafa5fbabe1a9034721",
+    "game_id": "mist-embers",
+    "title": "雾都余烬",
+    "revision": "mist-embers.pack.v10",
+    "starting_option_id": "earth-transmigrant",
+    "turn": 2,
+    "clock": "1358-03-29 09:55",
+    "location": "报社分部",
+    "messages": [
+      {
+        "seq": 1,
+        "message_id": "opening",
+        "kind": "narrative",
+        "content": "报社分部的排字机已经响了半个上午。墨水味、湿外套和刚煮开的水混在一起，工人把一盘铅字放到桌边，催你看看今天的地方消息有没有漏行。窗外是贝克兰德的车马，眼前是你已经能熟练阅读的鲁恩文字；只有你记事本里偶尔留下的几个汉字，提醒你曾经生活在另一个世界。\n\n你醒来成为这里的人已经几年，起初的恐惧逐渐被房租、饭钱和下一份工作填满。如今这份临时校对工作至少给你一个落脚处。你记得手机、地铁和旧日生活的语言，却没有神奇力量，也不知道是否还有别人像你一样来到这里。所谓“卷毛狒狒”是你对这种境遇的自嘲；这个上午，没人因为你的故乡而自动知道你的秘密。\n\n艾琳·维克从另一张桌前抬头，把一份未定稿的采访笔记移到你面前。她认识你是认真做事的临时同事，今天想借你的文字眼光，看看一则红烟囱街的传闻有没有把猜测写成事实。笔记只提到有人打听一间废弃诊所，身份和目的都没核实，不能直接印成一场犯罪。\n\n“这句像是采访对象说的，那句却是旁人替他补的。”她用笔背点了两处，“你愿意帮我分一分吗？如果要出门核实，我们先谈清署名和怎么分工。”她希望有个愿意较真的帮手，也不愿把一个未经确认的故事送去排版。\n\n排字工敲了敲桌沿：今天的校样还在等你。桌上的个人记事本属于你，里面记录的地球往事并未向别人公开。你可以先完成谋生的工作、与艾琳讨论消息，也可以询问这座城里有没有奇怪的语言或异乡人的传闻。如何使用自己的经历，是你此刻真正能够掌握的事。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 2,
+        "message_id": "creation_a942fb8ed379668a4bb8ee15:input",
+        "kind": "player",
+        "content": "我先做完眼前的校对，把疑点标在原稿边上，不透露自己来自另一个世界。然后请艾琳坐下，说我愿意听她的报纸合作方案，先讲她需要我帮什么、怎么署名、何时截止、有哪些风险；我尚未承诺接下调查，允许她主动提出合理的新发展。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 3,
+        "message_id": "creation_a942fb8ed379668a4bb8ee15:narrative",
+        "kind": "narrative",
+        "content": "你把最后一版地方消息从头到尾读了一遍，遇到人名、数字和引语就停一下。铅字是反的，脑子得自己把它翻正；两处街名拼写和一处日期被你用铅笔在稿边打了小钩，另有一行写着“据一位不愿透露姓名的先生”，你划了双线，旁边注：此人是谁，别让读者自己猜。\n\n排字工接过稿子，翻了一眼注释，哼了声：“至少比昨天那版强。十一点前我还得再拼一盘，你别走远。”他把铅字盘拖回机器边，油墨味又浓了一层。\n\n你合上记事本，没在里面写一个字关于你自己的事。艾琳已经把椅子拖到桌角对面，采访本摊开，铅笔架在指间。\n\n“先说清楚，我不是请你替我写。”她开口就定了边界，“这一页里只有两处我亲手记下：有人说红烟囱街那间废弃诊所最近晚上有灯，还有人说见过一个年轻女人往那个方向去。剩下的都是别人替他们补的话——‘肯定是邪教’‘说不定是私奔’——这类我不印。”她把本子转过来，指尖点在两行铅笔字上，“我得分开记。亲眼看见的、转述的、我猜的，各归各栏。”\n\n她顿了一下，像在排一份提纲。\n\n“我要你帮的有三件。第一，替我把这些笔记重读一遍，哪个句子其实是在替消息源下结论，你圈出来。你最擅长这个。第二，如果真要去街上，我需要一个人跟我分开问——一个人问店家，一个人问住户，回来对一对说法有没有打架。第三，”她把铅笔放下，“走到门口之前，我们先说好什么情况下撤回。我不拿别人的家事当新闻。要是查出来只是个女儿离家几天，我就把稿子压掉，哪怕我白跑。”\n\n“署名的事我也讲明白。”她伸出两根手指，“要是你只是读稿，我在文末写一句‘感谢同事协助整理记录’。要是你跟我一起出去问，问回来的东西进了正文，就并排署。我不占人便宜，但也不替没出力的人抬名声。这是我的规矩。”\n\n“期限——今天不急。晚间版我赶不上，明天的早报也还来得及。但拖久了传闻会先自己长脚。我打算今天下午先去街角咖啡馆，那儿有个跑东区的旧车夫常坐，我不想把他带回报社，人多他就不说了。你要是愿意来，我们分开坐，你先听我怎么问，再决定要不要开口。”\n\n她想了想风险，说得比刚才慢：“东区那边我不熟。那间诊所是封着的，翻窗进去就是另一回事了，我不能让你替我担这个。打听红烟囱街的人我还没查出来是谁，可能是家里人，可能是债主，也可能是冲着传闻来的记者同行。还有——如果我最后写出来，报纸上会出现一些人的名字。被我写进去的人日子还得过下去。这条我宁可慢。”\n\n排字机又响了一轮。艾琳用铅笔尾敲了敲本子边，等你的回答。咖啡馆离这儿两条街，走过去不到十分钟；她没动身，等着你先说愿意帮到哪一步。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 4,
+        "message_id": "creation_3d25fb0c8bcbcc8962b41a23:input",
+        "kind": "player",
+        "content": "我愿意先帮她重读笔记，把今天下午是否同行留待稍后决定。我合上自己的个人记事本，只低声问艾琳是否见过别人写一些陌生文字，形状像几个方块；不说那些文字属于哪里，也不透露自己的地球经历。请承接她刚才提出的署名和撤回条件。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 5,
+        "message_id": "creation_3d25fb0c8bcbcc8962b41a23:narrative",
+        "kind": "narrative",
+        "content": "艾琳听你把话说完，先把采访本翻到新一页，写下日期和“读稿协助”，笔尖在纸上顿了顿。\n\n“行，先这样。”她把本子往你面前一推，“署名那条照刚才说的办。你要是只读稿，文末致谢；真要跟我出去问回来东西进了正文，再并排。撤回条件也一样，查实只是普通离家，稿子压掉，你我都不往外说。”\n\n你拉过她的笔记，从第一行开始重读。她把亲自见闻写在左栏，转述的标“听说”，猜测用括号圈起来。有两句把“肯定”压在消息源身上，其实是她自己的判断，你用铅笔在句末打了个问号。她探过头来看，没说话，把那两行挪到了括号栏。\n\n你合上自己的记事本，低声问了那句。\n\n艾琳的笔停住。\n\n“方块字？”她重复了一遍，眉头拧起来，“你是说像印章刻错了方向那种？还是像外国人写的？”\n\n她翻了翻前面几页笔记，指尖在一条旧记录上停住。“去年冬天我采访码头区一个搬运工，他说在废船板内侧见过一排‘谁也不认识的字’，当时我以为他喝多了。后来没找到实物，这条我没往外写。”她抬眼，语速放慢了，“你怎么想起问这个？是有人拿给你看过，还是你从哪儿听到的？”\n\n她没有等你回答就补了一句：“要是跟这条线无关，我就归到‘待核实杂闻’里，不写进红烟囱街的稿子。要是有关——你得告诉我方向，我才知道该查什么。”\n\n排字工从机器后头探出半张脸，手上还沾着油墨：“十点四十了啊，艾琳。稿子要留版面，你别光顾着聊天。”\n\n艾琳冲他挥了下手，又转向你：“下午咖啡馆那边我一点半到。你要来，就坐靠窗第三张桌，我点黑咖啡，你点你自己的。我不主动喊你，你听我开口问再决定。”她把铅笔别回耳朵后面，“你刚才那个问题，回头告诉我一句就行——是在哪儿见的，还是谁跟你提的。”",
+        "created_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "characters": [
+      {
+        "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+        "entity_id": "npc:reporter",
+        "definition_id": "reporter.v1",
+        "name": "艾琳·维克",
+        "role": "年轻记者",
+        "in_scene": true
+      },
+      {
+        "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+        "entity_id": "npc:clockmaker",
+        "definition_id": "clockmaker.v1",
+        "name": "亚瑟·格兰特",
+        "role": "钟表匠",
+        "in_scene": false
+      },
+      {
+        "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+        "entity_id": "npc:missing-woman",
+        "definition_id": "missing-woman.v1",
+        "name": "诺拉·维尔",
+        "role": "裁缝店学徒",
+        "in_scene": false
+      },
+      {
+        "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+        "entity_id": "npc:tailor",
+        "definition_id": "tailor.v1",
+        "name": "马丁·维尔",
+        "role": "委托人",
+        "in_scene": false
+      }
+    ],
+    "world": {
+      "game_title": "雾都余烬",
+      "revision": "mist-embers.pack.v10",
+      "game_id": "mist-embers",
+      "world_id": "play_53cc6cafa5fbabe1a9034721",
+      "name": "雾都余烬",
+      "mode": "open",
+      "turn_seq": 2,
+      "message_head": 0,
+      "event_head": 0,
+      "context_epoch": 0,
+      "clock": "1358-03-29 09:55",
+      "calendar": {
+        "kind": "gregorian",
+        "era": "第五纪"
+      },
+      "scene": "",
+      "scene_location": "newspaper-office",
+      "location": {
+        "id": "newspaper-office",
+        "name": "报社分部",
+        "description": "印刷机声从后间传来，地方新闻和零散线索在记者之间流动。"
+      },
+      "adjacent_locations": [
+        {
+          "id": "cafe",
+          "name": "街角咖啡馆",
+          "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。"
+        }
+      ],
+      "status": "playing",
+      "story_ended": false,
+      "updated_at": "0001-01-01T00:00:00Z"
+    },
+    "player": {
+      "name": "异乡校对员",
+      "profile": "你来自现代地球，与克莱恩来自同一个故乡，是人们戏称的“卷毛狒狒”。你在数年前醒来成为这个世界的普通人，后来来到贝克兰德，如今靠报社临时校对工作谋生，认识记者艾琳·维克。你保留中文和现代生活经历，已学会鲁恩日常语言、币制与基本礼节。你不是读过原作的全知读者，尚不知道克莱恩在这里的姓名、身份与经历，也没有自动加入同乡组织。你没有非凡能力、灰雾权限或塔罗会联系。现代知识需要当地材料、实践和人脉才能发挥作用；你会校对文字、整理资料，能用生活常识提出新的看法，不能凭记忆制造超时代设备。寻找故乡与同乡是你的个人愿望，是否透露来历由你决定。"
+    },
+    "states": [
+      {
+        "entity_id": "player",
+        "state_id": "basic-investigation",
+        "name": "能力与训练",
+        "value": {
+          "type": "enum",
+          "enum": "校对与现代生活经验"
+        },
+        "category": "skill",
+        "description": "本人已具备的训练与能力；具体边界见角色经历。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "cash",
+        "name": "随身现金",
+        "value": {
+          "type": "integer",
+          "integer": 2208
+        },
+        "category": "resource",
+        "description": "随身现金，以四分之一便士为整数单位。实际收付改变余额；报价与承诺单独存在。",
+        "currency": {
+          "name": "鲁恩货币",
+          "denominations": [
+            {
+              "name": "金镑",
+              "units": 960
+            },
+            {
+              "name": "苏勒",
+              "units": 48
+            },
+            {
+              "name": "便士",
+              "units": 4
+            },
+            {
+              "name": "四分之一便士",
+              "units": 1
+            }
+          ]
+        },
+        "display_value": "2 金镑 6 苏勒"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "fatigue",
+        "name": "疲劳",
+        "value": {
+          "type": "integer",
+          "integer": 18
+        },
+        "category": "condition",
+        "description": "日常行动、休息和持续压力造成的身体负担。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "investigation_strain",
+        "name": "调查负荷",
+        "value": {
+          "type": "integer"
+        },
+        "category": "condition",
+        "description": "高风险调查行动累积的身体与注意力负荷。"
+      }
+    ],
+    "items": [
+      {
+        "instance_id": "player-pencil",
+        "definition_id": "pencil",
+        "name": "铅笔",
+        "description": "一支日常书写用的铅笔。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-personal-journal",
+        "definition_id": "personal-journal",
+        "name": "个人记事本",
+        "description": "记录私人的中文片段和日常开支，内容由本人决定是否公开。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-room-key",
+        "definition_id": "room-key",
+        "name": "租屋钥匙",
+        "description": "报社临时校对员租住房间的普通钥匙。",
+        "holder_id": "player"
+      }
+    ],
+    "known_locations": [
+      {
+        "id": "cafe",
+        "name": "街角咖啡馆",
+        "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "office",
+          "newspaper-office"
+        ]
+      },
+      {
+        "id": "charwood",
+        "name": "乔伍德区",
+        "description": "事务所、报社与体面商铺集中的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "newspaper-office",
+        "name": "报社分部",
+        "description": "印刷机声从后间传来，地方新闻和零散线索在记者之间流动。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "cafe"
+        ]
+      },
+      {
+        "id": "office",
+        "name": "调查事务所",
+        "description": "两间临街办公室，委托记录、城区地图与访客留言保存在这里。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "cafe"
+        ]
+      }
+    ],
+    "bystanders": [
+      {
+        "bystander_id": "bystander:printer",
+        "name": "报社排字工",
+        "description": "忙着处理当天版面，只知道公开流传的消息。",
+        "initial_location": "newspaper-office"
+      }
+    ],
+    "run": {
+      "request_key": "565ecd85-c9a4-470a-8272-af87cc6e38c3",
+      "id": "playrun_1fee717fb170182e291af5db",
+      "input": "我愿意先帮她重读笔记，把今天下午是否同行留待稍后决定。我合上自己的个人记事本，只低声问艾琳是否见过别人写一些陌生文字，形状像几个方块；不说那些文字属于哪里，也不透露自己的地球经历。请承接她刚才提出的署名和撤回条件。",
+      "status": "completed",
+      "transport": "non_stream",
+      "reasoning": "low",
+      "allow_plot_advance": true,
+      "started_at": "2026-10-07T12:23:13.7051245Z",
+      "elapsed_ms": 8550,
+      "calls": 1,
+      "repairs": 0
+    },
+    "suggestions": {
+      "turn": 2,
+      "enabled": false,
+      "status": "empty",
+      "items": []
+    }
+  },
+  {
+    "version": 233,
+    "id": "play_2d1ef113fd241a695307d83c",
+    "game_id": "mist-embers",
+    "title": "雾都余烬",
+    "revision": "mist-embers.pack.v10",
+    "starting_option_id": "accidental-spectator",
+    "turn": 1,
+    "clock": "1358-03-29 09:08",
+    "location": "格兰特钟表铺",
+    "messages": [
+      {
+        "seq": 1,
+        "message_id": "opening",
+        "kind": "narrative",
+        "content": "格兰特钟表铺的门铃比你预想中清晰。墙上的几只钟先后报时，柜台后的人把一枚细小的齿轮放进布垫，等门关好才抬眼看你。你手里的怀表确实需要修理，但真正让你来到这里的，是最近几天那些过于鲜明的细节：顾客避开的话题、邻居说笑时迟了一拍的呼吸，还有你越想忽略就越能注意到的目光。\n\n一场本不属于你的地下交易改变了生活。为了逃命服下那份魔药时，你甚至没有完整理解瓶上“观众”两个字意味着什么。你后来确认它属于序列9，却只知道危险确实存在，没有可靠的人教你怎样生活。你能观察到比以前更多的东西，这不等于知道它们的解释，更不等于能听见人的思想。\n\n亚瑟·格兰特看了看你手里的怀表。他先问故障何时开始，再把一份普通维修说明放在旁边：“留下检查还是等我先看一眼？拆开以后若要换件，我会报价格。”他是你所知道的钟表匠，谨慎，做事有条理；你尚不知道他是否与任何非凡组织有关。\n\n你注意到他听见你说“声音太清楚”时停了一下，随后仍把话题落在表壳有没有进水。这个停顿可能有意义，也可能只是他在判断修理步骤。柜台后的门半掩着，里面传来另一只钟走动的声音，那里属于店主的私人工作间。\n\n你身上有自己的观察笔记和有限现金，怀表仍在你手边，修理尚未成交。你可以先按普通顾客的身份谈维修、谨慎询问最近的异样，或者决定把自己的遭遇告诉他。敏锐的观察为你提供线索，信任和答案仍需要实际交谈。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 2,
+        "message_id": "creation_d44d2368137c225a5ba9f1a4:input",
+        "kind": "player",
+        "content": "我观察亚瑟检查怀表时的表情和手势，只把它当线索，不读心，也不直接断定他在撒谎。先请他报价，暂时不交表也不付款。我低声说自己最近观察细节过于敏锐，想知道有没有可靠的方法分清自己的猜测和真实观察，但暂不说自己的序列或过去经历。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 3,
+        "message_id": "creation_d44d2368137c225a5ba9f1a4:narrative",
+        "kind": "narrative",
+        "content": "亚瑟没有立刻要你的表。他把柜台上的布垫往自己面前挪了半寸，食指与中指并拢，示意你放在他指定的位置上。你看出这是习惯性的动作而非防备——他的拇指始终贴着表壳边缘，力道均匀，是检查承轴之前固定表身的手势，不是掂重量的样子。\n\n“外观看不出泼溅痕迹，表冠倒有松动。”他压低声音时没有跟着你一起压，音量正常，但用语比刚才简短。“可能只是发条疲劳，先报检查费两苏勒；换件另算。”他停了一下，目光从表壳移到你脸上，大约只停留两秒，随后又落回指针位置：“声音太清楚——你是指现场听到的，还是脑子里的？”\n\n你只低声说了最近看细节太清楚，分不清哪些是自己观察到的、哪些是自己推出来的。说这句话时你留意到他右手的无名指微微弯了一下，像要收紧，中途又松开。这个动作可能是被你的话绊住，也可能只是他准备取镊子的前兆。他没有立刻接话，先把螺丝刀放回原处，刀尖朝同一方向摆好。\n\n“有纸笔就分开写。”他说得不快，像在口述一条工艺规则：“左边写你看到或听到的事，右边写你由此推出来的话。隔一天再读，看右栏有多少是左栏撑不住的。”他用指节敲了敲柜台面，是提醒而非催促：“这法子不保证对，但比在脑子里翻来覆去强。”\n\n你问他能不能说得更具体，他扫了一眼半掩的里间门，才继续说：“比方说，你现在看得出我修表前要先看表冠，这是你亲眼看到的。但你要从这一点推出我这人疑心重、或我这店里有别的东西——那就是右栏的事。”他顿了顿，“有些事先搁着比先拆开有用。物件是这样，别的事多半也是。”\n\n你说表先不交，也不付钱。他没有表现出不悦，只把一张写着检查费的小纸片收回抽屉，重新推平布垫，去应付墙上那几只先后报时的钟。你离开前，他补了一句，声音仍是平常的调：“想好了再来。表你不带走我也替你看一眼，不收钱——只是别把检查当成结论。”",
+        "created_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "characters": [
+      {
+        "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+        "entity_id": "npc:reporter",
+        "definition_id": "reporter.v1",
+        "name": "艾琳·维克",
+        "role": "年轻记者",
+        "in_scene": false
+      },
+      {
+        "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+        "entity_id": "npc:clockmaker",
+        "definition_id": "clockmaker.v1",
+        "name": "亚瑟·格兰特",
+        "role": "钟表匠",
+        "in_scene": true
+      },
+      {
+        "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+        "entity_id": "npc:missing-woman",
+        "definition_id": "missing-woman.v1",
+        "name": "诺拉·维尔",
+        "role": "裁缝店学徒",
+        "in_scene": false
+      },
+      {
+        "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+        "entity_id": "npc:tailor",
+        "definition_id": "tailor.v1",
+        "name": "马丁·维尔",
+        "role": "委托人",
+        "in_scene": false
+      }
+    ],
+    "world": {
+      "game_title": "雾都余烬",
+      "revision": "mist-embers.pack.v10",
+      "game_id": "mist-embers",
+      "world_id": "play_2d1ef113fd241a695307d83c",
+      "name": "雾都余烬",
+      "mode": "open",
+      "turn_seq": 1,
+      "message_head": 0,
+      "event_head": 0,
+      "context_epoch": 0,
+      "clock": "1358-03-29 09:08",
+      "calendar": {
+        "kind": "gregorian",
+        "era": "第五纪"
+      },
+      "scene": "",
+      "scene_location": "clock-shop",
+      "location": {
+        "id": "clock-shop",
+        "name": "格兰特钟表铺",
+        "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。"
+      },
+      "adjacent_locations": [
+        {
+          "id": "cafe",
+          "name": "街角咖啡馆",
+          "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。"
+        },
+        {
+          "id": "red-chimney-street",
+          "name": "红烟囱街",
+          "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。"
+        }
+      ],
+      "status": "playing",
+      "story_ended": false,
+      "updated_at": "0001-01-01T00:00:00Z"
+    },
+    "player": {
+      "name": "初入非凡的观众",
+      "profile": "你原本是贝克兰德的普通职员，偶然卷入一场地下交易，为逃离危险服下一份名为“观众”的魔药。后来靠残留说明确认自己成为序列9，却没有加入官方组织，也缺少可靠导师。你仍靠普通工作维持生活，近日因注意力与感官变化而不安，来到格兰特钟表铺修理怀表。观众能力让你更善于观察表情、动作、语气与社交细节，可以提出有依据但可能出错的判断；不能读心、催眠、控制情绪、直接看穿谎言或知道别人私下的事。能力需要你主动观察，不能代替证据。你只认识亚瑟的公开钟表匠身份，不知道他的途径、组织、银镜情报或诺拉行踪。是否坦白自己的遭遇、寻求指导或继续隐藏，由你决定。"
+    },
+    "states": [
+      {
+        "entity_id": "player",
+        "state_id": "basic-investigation",
+        "name": "能力与训练",
+        "value": {
+          "type": "enum",
+          "enum": "序列9观众"
+        },
+        "category": "skill",
+        "description": "本人已具备的训练与能力；具体边界见角色经历。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "cash",
+        "name": "随身现金",
+        "value": {
+          "type": "integer",
+          "integer": 1536
+        },
+        "category": "resource",
+        "description": "随身现金，以四分之一便士为整数单位。实际收付改变余额；报价与承诺单独存在。",
+        "currency": {
+          "name": "鲁恩货币",
+          "denominations": [
+            {
+              "name": "金镑",
+              "units": 960
+            },
+            {
+              "name": "苏勒",
+              "units": 48
+            },
+            {
+              "name": "便士",
+              "units": 4
+            },
+            {
+              "name": "四分之一便士",
+              "units": 1
+            }
+          ]
+        },
+        "display_value": "1 金镑 12 苏勒"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "fatigue",
+        "name": "疲劳",
+        "value": {
+          "type": "integer",
+          "integer": 12
+        },
+        "category": "condition",
+        "description": "日常行动、休息和持续压力造成的身体负担。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "investigation_strain",
+        "name": "调查负荷",
+        "value": {
+          "type": "integer"
+        },
+        "category": "condition",
+        "description": "高风险调查行动累积的身体与注意力负荷。"
+      }
+    ],
+    "items": [
+      {
+        "instance_id": "player-observation-notebook",
+        "definition_id": "observation-notebook",
+        "name": "观察笔记",
+        "description": "记录自己感官变化与日常观察的普通笔记本。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-pencil",
+        "definition_id": "pencil",
+        "name": "铅笔",
+        "description": "一支日常书写用的铅笔。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-pocket-watch",
+        "definition_id": "pocket-watch",
+        "name": "待修怀表",
+        "description": "走时不稳的普通怀表，仍由本人保管。",
+        "holder_id": "player"
+      }
+    ],
+    "known_locations": [
+      {
+        "id": "bridge",
+        "name": "桥区",
+        "description": "车站、工匠铺和市场交错的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "cafe",
+        "name": "街角咖啡馆",
+        "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "clock-shop"
+        ]
+      },
+      {
+        "id": "charwood",
+        "name": "乔伍德区",
+        "description": "事务所、报社与体面商铺集中的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "clock-shop",
+        "name": "格兰特钟表铺",
+        "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。",
+        "kind": "place",
+        "parent": "bridge",
+        "connections": [
+          "cafe",
+          "red-chimney-street"
+        ]
+      },
+      {
+        "id": "east",
+        "name": "东区",
+        "description": "工厂、拥挤住房和廉价店铺之间布满煤烟。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "red-chimney-street",
+        "name": "红烟囱街",
+        "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。",
+        "kind": "place",
+        "parent": "east",
+        "connections": [
+          "clock-shop"
+        ]
+      }
+    ],
+    "bystanders": null,
+    "run": {
+      "request_key": "0ab6e448-33e4-41e4-9b02-cc9d6a715c5f",
+      "id": "playrun_65f721f2402c489f1ae86351",
+      "input": "我观察亚瑟检查怀表时的表情和手势，只把它当线索，不读心，也不直接断定他在撒谎。先请他报价，暂时不交表也不付款。我低声说自己最近观察细节过于敏锐，想知道有没有可靠的方法分清自己的猜测和真实观察，但暂不说自己的序列或过去经历。",
+      "status": "completed",
+      "transport": "stream",
+      "reasoning": "low",
+      "allow_plot_advance": false,
+      "started_at": "2026-10-07T12:27:21.4787467Z",
+      "elapsed_ms": 10712,
+      "calls": 1,
+      "repairs": 0
+    },
+    "suggestions": {
+      "turn": 1,
+      "enabled": false,
+      "status": "empty",
+      "items": []
+    }
+  },
+  {
+    "version": 159,
+    "id": "play_9a4f03ab7d11ed6ba3657e0c",
+    "game_id": "mist-embers",
+    "title": "雾都余烬",
+    "revision": "mist-embers.pack.v10",
+    "starting_option_id": "official-sleepless",
+    "turn": 1,
+    "clock": "1358-03-29 09:08",
+    "location": "红烟囱街",
+    "messages": [
+      {
+        "seq": 1,
+        "message_id": "opening",
+        "kind": "narrative",
+        "content": "红烟囱街的早班人群正往工厂走。车夫在路边整理缰绳，房东打开一扇被煤灰染黑的窗，把昨夜积在窗沿的水扫出去。你从巡查路线走到街口，外套内侧放着黑夜教会的工作证件。昨夜只睡了短短几小时，你依然保持着不眠者的警觉，白昼的嘈杂却并没有因此变成一份自动送到手里的答案。\n\n你是基层值夜者，第一次独立核查这条街的日常报告。简报很短：停用诊所附近最近有人走动，居民不确定是拾荒者、借住者还是别的事情。它不是已经确认的非凡事件，更不是允许你随意闯入每间屋子的命令。你的任务是先辨明事实，再决定是否需要联络组织。\n\n路边车夫见你停下，问是不是来找车。他昨天经过诊所外墙时看见门边有新脚印，没看清里面有没有人；此刻也不知道你是什么身份。“那地方关门有些年了，”他指了指街里，“附近有人住得不安稳，你若要问，最好先说清找谁，别把大家都当成嫌犯。”\n\n你顺着他指的方向看见松动的窗板与紧闭门扉，暂时只能确认建筑外观。身体的警觉、夜间的视力和训练能帮助观察，却不能告诉你屋内是谁，也不能凭陌生气味判定非凡途径。街上还在正常做生意，任何公开盘问都会被旁人注意。\n\n巡查证件和工作笔记由你保管，身上有供日常开支的现金，尚未花钱雇车。你可以先以普通过路人的身份询问、表明职责争取配合、记录外围痕迹，或者联系能够提供帮助的人。如何在谨慎、效率与居民信任之间选择，是这个上午的第一件工作。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 2,
+        "message_id": "creation_e63b32727578146508b5d9c9:input",
+        "kind": "player",
+        "content": "我向车夫表明自己是值夜者巡查人员，语气平和，请他只说亲眼见到的人、时间和方向，把猜测另说。我暂时不进入诊所、不扣押任何物品、不声称已经发现非凡事件，问清后准备把可核实的情况记在自己的巡查本里。",
+        "created_at": "0001-01-01T00:00:00Z"
+      },
+      {
+        "seq": 3,
+        "message_id": "creation_e63b32727578146508b5d9c9:narrative",
+        "kind": "narrative",
+        "content": "你把外套稍稍掀开一角，露出内侧的工作证件，语气放得很平：“我是值夜者的巡查人员，不是来查户口，也不会随便进谁家。你昨天看见的，麻烦只说亲眼见到的——人、时间、方向。猜的部分我自己分辨。”\n\n车夫把缰绳在手上绕了一圈，凑近看了证件上的字样，神情从随意的搭话变成半信半疑的打量。“值夜者……教会的？”他没多追问，只是点了点头，像是对这种身份既说不上陌生也说不上亲近。\n\n“那我照实说。”他朝街里侧了侧身，压低了些声音，“昨天午后吧，得四点往后了，天还亮着。我拉完一趟空车从这边穿过去，走的是诊所外墙那一段。门边那片土松，前两天下过雨，我看见上面有脚印。”\n\n“几双？”\n\n“至少两双，一深一浅，方向是朝门那边进去的。鞋印边还没干透，看着不像清早留的，也不像小孩玩的。就这些，我亲眼见的就是脚印，人我是一个都没瞧见。”他顿了顿，又补上一句，“街那头有老太太说晚上听见响动，我可没听着——这算别人说的，不算我见的，你自己拿捏。”\n\n你问他当时门是开着还是关着。他摇头：“关着的，板子也钉着，眼睛能看见的就是那个样。脚印从路这头斜过去，到门口就断了，再进去我就不知道了。”\n\n“之后有没有生人进出，或者有人搬东西？”\n\n“我没蹲那儿盯着，拉活要紧。”他扯了下嘴角，态度里没有敌意，只是把能给的都给了，“你要是想再问，旁边那几家早起的人知道得比我多。我就是个过路的。”\n\n你没有追问他的猜测，也没有把话题往“里面是不是有怪东西”上引。你从外套内侧取出巡查记录本，翻到空白一页，用铅笔写下：三月二十八日午后四时以后，诊所外墙门侧泥土见至少两对鞋印，朝门向，边缘未干；目击者仅见痕迹，未见人影；未核实是否有人进入。写完后你合上本子，车夫瞟了一眼那行字，像是确认你没打算当场把谁抓走，才重新去理他的缰绳。\n\n“行了，你要是进那地方，当心点。”他最后说了一句，坐回车座，但暂时没赶车走。街上的工人仍在往工厂方向去，诊所的门依旧关着，松动的窗板在墙面上投着一道窄影，还没有任何人从那扇门里走出来。",
+        "created_at": "0001-01-01T00:00:00Z"
+      }
+    ],
+    "characters": [
+      {
+        "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+        "entity_id": "npc:reporter",
+        "definition_id": "reporter.v1",
+        "name": "艾琳·维克",
+        "role": "年轻记者",
+        "in_scene": false
+      },
+      {
+        "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+        "entity_id": "npc:clockmaker",
+        "definition_id": "clockmaker.v1",
+        "name": "亚瑟·格兰特",
+        "role": "钟表匠",
+        "in_scene": false
+      },
+      {
+        "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+        "entity_id": "npc:missing-woman",
+        "definition_id": "missing-woman.v1",
+        "name": "诺拉·维尔",
+        "role": "裁缝店学徒",
+        "in_scene": false
+      },
+      {
+        "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+        "entity_id": "npc:tailor",
+        "definition_id": "tailor.v1",
+        "name": "马丁·维尔",
+        "role": "委托人",
+        "in_scene": false
+      }
+    ],
+    "world": {
+      "game_title": "雾都余烬",
+      "revision": "mist-embers.pack.v10",
+      "game_id": "mist-embers",
+      "world_id": "play_9a4f03ab7d11ed6ba3657e0c",
+      "name": "雾都余烬",
+      "mode": "open",
+      "turn_seq": 1,
+      "message_head": 0,
+      "event_head": 0,
+      "context_epoch": 0,
+      "clock": "1358-03-29 09:08",
+      "calendar": {
+        "kind": "gregorian",
+        "era": "第五纪"
+      },
+      "scene": "",
+      "scene_location": "red-chimney-street",
+      "location": {
+        "id": "red-chimney-street",
+        "name": "红烟囱街",
+        "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。"
+      },
+      "adjacent_locations": [
+        {
+          "id": "tailor-shop",
+          "name": "维尔裁缝店",
+          "description": "一间整洁的临街裁缝店，橱窗陈列着成衣，楼上是住处。"
+        },
+        {
+          "id": "clock-shop",
+          "name": "格兰特钟表铺",
+          "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。"
+        },
+        {
+          "id": "abandoned-clinic",
+          "name": "废弃诊所",
+          "description": "红烟囱街尽头的旧诊所，临街门扉紧闭，窗板松动。"
+        }
+      ],
+      "status": "playing",
+      "story_ended": false,
+      "updated_at": "0001-01-01T00:00:00Z"
+    },
+    "player": {
+      "name": "值夜者",
+      "profile": "你是黑夜教会在贝克兰德的基层值夜者，序列9“不眠者”，正在独立承担有限范围的街区巡查。你掌握基础神秘学、安全观察和事件记录方法；睡眠需求减少，在夜间具有较好的视力和警觉。你仍需要休息，不能操纵梦境、强迫他人入眠、直接感知一切非凡事物或以身份获得他人所有秘密。你携带普通巡查证件与工作记录，不携带封印物。官方身份可以支持合理询问和联系组织，扣押、封锁或危险处置需要具体依据及实际授权。你最初只收到红烟囱街居民反映有人出入旧诊所的简报，不知道诺拉、银镜所在位置或亚瑟的秘密身份，也没有教会高层知识。你希望把异常风险查清，同时避免惊扰居民；与其他人如何协作由实际交流决定。"
+    },
+    "states": [
+      {
+        "entity_id": "player",
+        "state_id": "basic-investigation",
+        "name": "能力与训练",
+        "value": {
+          "type": "enum",
+          "enum": "序列9不眠者"
+        },
+        "category": "skill",
+        "description": "本人已具备的训练与能力；具体边界见角色经历。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "cash",
+        "name": "随身现金",
+        "value": {
+          "type": "integer",
+          "integer": 5280
+        },
+        "category": "resource",
+        "description": "随身现金，以四分之一便士为整数单位。实际收付改变余额；报价与承诺单独存在。",
+        "currency": {
+          "name": "鲁恩货币",
+          "denominations": [
+            {
+              "name": "金镑",
+              "units": 960
+            },
+            {
+              "name": "苏勒",
+              "units": 48
+            },
+            {
+              "name": "便士",
+              "units": 4
+            },
+            {
+              "name": "四分之一便士",
+              "units": 1
+            }
+          ]
+        },
+        "display_value": "5 金镑 10 苏勒"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "fatigue",
+        "name": "疲劳",
+        "value": {
+          "type": "integer",
+          "integer": 12
+        },
+        "category": "condition",
+        "description": "日常行动、休息和持续压力造成的身体负担。"
+      },
+      {
+        "entity_id": "player",
+        "state_id": "investigation_strain",
+        "name": "调查负荷",
+        "value": {
+          "type": "integer"
+        },
+        "category": "condition",
+        "description": "高风险调查行动累积的身体与注意力负荷。"
+      }
+    ],
+    "items": [
+      {
+        "instance_id": "player-duty-notebook",
+        "definition_id": "duty-notebook",
+        "name": "巡查记录本",
+        "description": "记录报告、观察与待核实事项的工作笔记。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-official-badge",
+        "definition_id": "official-badge",
+        "name": "巡查证件",
+        "description": "证明基层值夜者职责的普通证件，权限受具体职责约束。",
+        "holder_id": "player"
+      },
+      {
+        "instance_id": "player-pencil",
+        "definition_id": "pencil",
+        "name": "铅笔",
+        "description": "一支日常书写用的铅笔。",
+        "holder_id": "player"
+      }
+    ],
+    "known_locations": [
+      {
+        "id": "abandoned-clinic",
+        "name": "废弃诊所",
+        "description": "红烟囱街尽头的旧诊所，临街门扉紧闭，窗板松动。",
+        "kind": "place",
+        "parent": "east",
+        "connections": [
+          "red-chimney-street"
+        ]
+      },
+      {
+        "id": "bridge",
+        "name": "桥区",
+        "description": "车站、工匠铺和市场交错的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "cafe",
+        "name": "街角咖啡馆",
+        "description": "记者、职员和附近住户常来吃午餐，报纸架保存着最近几日的新闻。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "office",
+          "clock-shop"
+        ]
+      },
+      {
+        "id": "charwood",
+        "name": "乔伍德区",
+        "description": "事务所、报社与体面商铺集中的城区。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "clock-shop",
+        "name": "格兰特钟表铺",
+        "description": "狭窄店面里挂满不同步的钟，工作台后通向不对顾客开放的修理间。",
+        "kind": "place",
+        "parent": "bridge",
+        "connections": [
+          "cafe",
+          "red-chimney-street"
+        ]
+      },
+      {
+        "id": "east",
+        "name": "东区",
+        "description": "工厂、拥挤住房和廉价店铺之间布满煤烟。",
+        "kind": "region",
+        "connections": []
+      },
+      {
+        "id": "office",
+        "name": "调查事务所",
+        "description": "两间临街办公室，委托记录、城区地图与访客留言保存在这里。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "cafe",
+          "tailor-shop"
+        ]
+      },
+      {
+        "id": "red-chimney-street",
+        "name": "红烟囱街",
+        "description": "煤灰覆盖的长街连接工人酒馆、廉价旅店与一栋封门已久的旧诊所。",
+        "kind": "place",
+        "parent": "east",
+        "connections": [
+          "tailor-shop",
+          "clock-shop",
+          "abandoned-clinic"
+        ]
+      },
+      {
+        "id": "tailor-shop",
+        "name": "维尔裁缝店",
+        "description": "一间整洁的临街裁缝店，橱窗陈列着成衣，楼上是住处。",
+        "kind": "place",
+        "parent": "charwood",
+        "connections": [
+          "office",
+          "red-chimney-street"
+        ]
+      }
+    ],
+    "bystanders": [
+      {
+        "bystander_id": "bystander:coachman",
+        "name": "东区车夫",
+        "description": "在红烟囱街等客，见过来往车辆。",
+        "initial_location": "red-chimney-street"
+      }
+    ],
+    "run": {
+      "request_key": "f5c3df80-1b4a-4c85-809b-9e3dc4728472",
+      "id": "playrun_c5a680e7ca0579e101b795f5",
+      "input": "我向车夫表明自己是值夜者巡查人员，语气平和，请他只说亲眼见到的人、时间和方向，把猜测另说。我暂时不进入诊所、不扣押任何物品、不声称已经发现非凡事件，问清后准备把可核实的情况记在自己的巡查本里。",
+      "status": "completed",
+      "transport": "stream",
+      "reasoning": "low",
+      "allow_plot_advance": false,
+      "started_at": "2026-10-07T12:32:25.8648138Z",
+      "elapsed_ms": 8285,
+      "calls": 1,
+      "repairs": 0
+    },
+    "suggestions": {
+      "turn": 1,
+      "enabled": false,
+      "status": "empty",
+      "items": []
+    }
+  }
+]

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import RunProgress from './components/RunProgress.vue';
 import AppDialog from "./components/AppDialog.vue";
 import CreatorView from "./components/CreatorView.vue";
@@ -8,12 +9,14 @@ import MemoryPanel from "./components/MemoryPanel.vue";
 import UsagePanel from "./components/UsagePanel.vue";
 import SuggestionPanel from "./components/SuggestionPanel.vue";
 import CreationPlay from './components/CreationPlay.vue';
+import StartingOptions from './components/StartingOptions.vue';
 import { useExperience } from "./useExperience";
 import { formatWorldClock } from "./worldInformation";
 import "./style.css";
 const {
   creation,
   startCreation,
+  startingOptionID,
   storyEntries,
   packIssues,
   newGame,
@@ -98,6 +101,7 @@ const {
   bystanders,
   resizeInput,
 } = useExperience();
+const backgroundParagraphs = computed(() => (game.value?.background ?? '').split(/\n\s*\n/).map(paragraph => paragraph.replace(/^#{1,6}\s+[^\n]*(?:\n|$)/, '').trim()).filter(Boolean));
 const policyOptions = [
   {
     key: "coordination",
@@ -285,13 +289,15 @@ const policyOptions = [
             {{ game.mode === "guided" ? "流程型" : "开放型" }} ·
             {{ game.revision }}
           </p>
-          <p v-if="game.background">{{ game.background }}</p>
+          <p v-for="(paragraph, index) in backgroundParagraphs" :key="index">{{ paragraph }}</p>
           <p v-if="game.gameplay">{{ game.gameplay }}</p>
           <p v-if="game.player.requirements" class="subtle">
             {{ game.player.requirements }}
           </p>
+          <StartingOptions v-if="game.starting_options?.length" v-model="startingOptionID" :options="game.starting_options" :disabled="navigating || creation.state.starting || creation.busy.value || !!creation.state.pending" />
           <div class="button-row">
-            <button v-if="game.available !== false" class="primary-button" :disabled="navigating || creation.state.starting || !!activeRun" @click="startCreation">{{ creation.state.starting ? '正在进入…' : creation.state.active?.game_id === game.id ? '继续共创试玩' : '开始共创试玩' }}</button>
+            <button v-if="game.available !== false" class="primary-button" :disabled="navigating || creation.state.starting || !!activeRun" @click="startCreation()">{{ creation.state.starting ? '正在进入…' : creation.state.active?.game_id === game.id ? '继续当前试玩' : '以此身份开始试玩' }}</button>
+            <button v-if="game.available !== false && creation.state.active?.game_id === game.id" class="secondary-button" :disabled="navigating || creation.state.starting || creation.busy.value || !!creation.state.pending || !!activeRun" @click="startCreation(true)">以此身份开始新试玩</button>
             <button
               v-if="recentWorld"
               class="primary-button"

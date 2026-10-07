@@ -1,0 +1,28 @@
+{
+  "index": 3,
+  "streaming": true,
+  "reasoning": "low",
+  "ElapsedMS": 7882,
+  "FirstTextMS": 3302,
+  "response": "{\"narrative\":\"你从桌边退开，沿书架走到事务所靠窗的一侧。那里离马丁的椅子有七八步，中间还隔着一整排账册柜；窗外送面包的车已经拐过街角，屋里的静只剩下笔尖和纸张的声音。马丁仍坐在原处，帽子压在膝上，没有抬头跟过来。\\n\\n你压低声音，只对书记员说：后天上午你还会来，继续核对马丁的口述，请她把这个约定记住；今天的询问如果最终没有接案，能不能只记为一次来访；暂时不要向马丁转述。\\n\\n书记员没有立刻答话。她侧过身，把登记簿往自己这边挪了半寸，让书页正对着你而非门口。她的声音也放得很低，尾音几乎被纸页吸掉。\\n\\n“未接案的询问只落在第一栏，这是所里的规矩，不用我替你遮掩什么。”她说，“来访时间、姓名、地址、本人陈述——今天能记的就是这些。委托范围和报酬那一栏空着，谁来翻都看得出来我们还停在原地。”\\n\\n她顿了一下，铅笔尖在空白行的左侧点了一个小点。\\n\\n“后天上午的事我可以记住。要落到纸上，只能写在这个点后面——‘来访者拟再核对一次口述’，不写你打算查什么，也不写你信不信他。这不属于第二栏的约定，所以不违背规矩。”\\n\\n你点头。她随即把那个点扩成一行小字，写的时候手腕挡着，写完也没把本子转向门口。\\n\\n“至于不转述——”她把铅笔搁下，抬眼看你，“只要他不问，我一个字不说。但若他当面问我今天记了什么，我不会替你编。我会告诉他第一栏填了来访记录，第二栏还是空的。这是实话，也不算把你卖出去。你要的就是这样，对吗？”\\n\\n她说完也没等你多说，只是把登记簿合上，用掌心抹平了封面。窗光落在那页的边角上，字迹很小，站远一步就看不清楚。\\n\\n你回到自己这一侧时，马丁正把帽檐重新捻了一遍。他显然注意到你们说了几句话，但椅子没动，也没有问你说了什么；他只是把目光在你和书记员之间来回移了一次，然后落回桌面上那张没被碰过的照片上。空气里没有催促，只有一段谁都不肯先开口的停顿。\",\"scene_changes\":{\"elapsed_minutes\":3,\"positions\":{\"player\":\"office\",\"npc:tailor\":\"office\",\"bystander:clerk\":\"office\"},\"state_changes\":[],\"item_moves\":[]},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"书记员称：未接案的询问只记第一栏（来访时间、姓名、地址、本人陈述），委托范围与报酬栏保持空白；她可在其上补一行“来访者拟再核对一次口述”。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"bystander:clerk\"},{\"kind\":\"commitment\",\"content\":\"书记员答应记住后日上午的再次核对，并在马丁不问的情况下不向他转述；但若马丁当面问起，她只会说第一栏有来访记录、第二栏空白。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"bystander:clerk\"},{\"kind\":\"commitment\",\"content\":\"调查员约定后天上午再来事务所，与马丁继续核对口述；本次尚未接受委托。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"player\"},{\"kind\":\"observed\",\"content\":\"马丁注意到调查员与书记员低声交谈，未离座、未追问；桌上的近照与地址纸条仍未被动过。\",\"recipients\":[\"player\"],\"speaker_id\":\"npc:tailor\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": true,
+    "CacheKnown": true,
+    "CacheHitTokens": 3840,
+    "CacheMissTokens": 1963,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 5803,
+    "OutputTokens": 1278,
+    "ReasoningTokens": 440,
+    "ContentChars": 1578,
+    "ReasoningChars": 1856
+  },
+  "error_code": ""
+}

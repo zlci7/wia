@@ -63,6 +63,17 @@ type StoryPack struct {
 	ActionRules         []story.ActionRule          `json:"action_rules,omitempty"`
 	MaterialsFile       string                      `json:"materials_file,omitempty"`
 	DataFiles           map[string]string           `json:"data_files,omitempty"`
+	StartingOptions     []PackStartingOption        `json:"starting_options,omitempty"`
+}
+
+type PackStartingOption struct {
+	ID              string              `json:"id"`
+	Title           string              `json:"title"`
+	Description     string              `json:"description"`
+	Player          *PlayerDefaults     `json:"player,omitempty"`
+	Opening         string              `json:"opening,omitempty"`
+	InitialLocation string              `json:"initial_location,omitempty"`
+	Items           *[]PackItemInstance `json:"items,omitempty"`
 }
 
 type PackNPC struct {
@@ -592,6 +603,10 @@ func loadPack(root string) (loadedPack, error) {
 	if err := compileWorldInformation(p, &def, locations); err != nil {
 		return bad("world_info: " + err.Error())
 	}
+	def.StartingOptions, err = compileStartingOptions(p, loadedNPCs, locations)
+	if err != nil {
+		return bad("starting_options: " + err.Error())
+	}
 	def.ActionRules, err = compileActionRules(p, def, seen)
 	if err != nil {
 		return bad("action_rules: " + err.Error())
@@ -643,6 +658,9 @@ func loadPack(root string) (loadedPack, error) {
 		ID: p.GameID, Title: p.Title, Description: p.Description, Revision: p.Revision,
 		Mode: p.Mode, Modes: []string{p.Mode}, DefaultMode: p.Mode, Gameplay: p.Gameplay,
 		Background: p.Background, Player: catalogPlayer, CoverAlt: p.CoverAlt,
+	}
+	for _, option := range def.StartingOptions {
+		result.Catalog.StartingOptions = append(result.Catalog.StartingOptions, StartingOptionSummary{option.ID, option.Title, option.Description, option.Player.Profile})
 	}
 	if p.SchemaVersion == SchemaV4 {
 		for _, material := range materials {

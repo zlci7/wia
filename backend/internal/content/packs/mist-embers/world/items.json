@@ -1,23 +1,104 @@
 {
   "item_definitions": [
-    {"id": "notebook", "name": "调查记事本", "description": "记录访谈和线索的普通小本。", "projection": "holder"},
-    {"id": "pencil", "name": "铅笔", "description": "一支日常书写用的铅笔。", "projection": "holder"},
-    {"id": "office-key", "name": "事务所钥匙", "description": "调查事务所交给你的门钥匙。", "projection": "holder"},
-    {"id": "case-photo", "name": "诺拉的近照", "description": "马丁带来的女儿近照。", "projection": "public"},
-    {"id": "address-note", "name": "裁缝店地址纸条", "description": "马丁带来的维尔裁缝店地址。", "projection": "public"},
+    {
+      "id": "notebook",
+      "name": "调查记事本",
+      "description": "记录访谈和线索的普通小本。",
+      "projection": "holder"
+    },
+    {
+      "id": "pencil",
+      "name": "铅笔",
+      "description": "一支日常书写用的铅笔。",
+      "projection": "holder"
+    },
+    {
+      "id": "office-key",
+      "name": "事务所钥匙",
+      "description": "调查事务所交给你的门钥匙。",
+      "projection": "holder"
+    },
+    {
+      "id": "case-photo",
+      "name": "诺拉的近照",
+      "description": "马丁带来的女儿近照。",
+      "projection": "public"
+    },
+    {
+      "id": "address-note",
+      "name": "裁缝店地址纸条",
+      "description": "马丁带来的维尔裁缝店地址。",
+      "projection": "public"
+    },
     {
       "id": "sealed-mirror-3-917",
       "name": "裂纹银镜",
       "description": "一面有裂痕的小型银镜，来历和作用尚未得到公开确认。",
       "projection": "public"
+    },
+    {
+      "id": "personal-journal",
+      "name": "个人记事本",
+      "description": "记录私人的中文片段和日常开支，内容由本人决定是否公开。",
+      "projection": "holder"
+    },
+    {
+      "id": "room-key",
+      "name": "租屋钥匙",
+      "description": "报社临时校对员租住房间的普通钥匙。",
+      "projection": "holder"
+    },
+    {
+      "id": "observation-notebook",
+      "name": "观察笔记",
+      "description": "记录自己感官变化与日常观察的普通笔记本。",
+      "projection": "holder"
+    },
+    {
+      "id": "pocket-watch",
+      "name": "待修怀表",
+      "description": "走时不稳的普通怀表，仍由本人保管。",
+      "projection": "holder"
+    },
+    {
+      "id": "duty-notebook",
+      "name": "巡查记录本",
+      "description": "记录报告、观察与待核实事项的工作笔记。",
+      "projection": "holder"
+    },
+    {
+      "id": "official-badge",
+      "name": "巡查证件",
+      "description": "证明基层值夜者职责的普通证件，权限受具体职责约束。",
+      "projection": "holder"
     }
   ],
   "item_instances": [
-    {"instance_id": "player-notebook", "definition_id": "notebook", "holder_id": "player"},
-    {"instance_id": "player-pencil", "definition_id": "pencil", "holder_id": "player"},
-    {"instance_id": "player-office-key", "definition_id": "office-key", "holder_id": "player"},
-    {"instance_id": "case-photo", "definition_id": "case-photo", "location_id": "office"},
-    {"instance_id": "address-note", "definition_id": "address-note", "location_id": "office"},
+    {
+      "instance_id": "player-notebook",
+      "definition_id": "notebook",
+      "holder_id": "player"
+    },
+    {
+      "instance_id": "player-pencil",
+      "definition_id": "pencil",
+      "holder_id": "player"
+    },
+    {
+      "instance_id": "player-office-key",
+      "definition_id": "office-key",
+      "holder_id": "player"
+    },
+    {
+      "instance_id": "case-photo",
+      "definition_id": "case-photo",
+      "location_id": "office"
+    },
+    {
+      "instance_id": "address-note",
+      "definition_id": "address-note",
+      "location_id": "office"
+    },
     {
       "instance_id": "mirror-3-917",
       "definition_id": "sealed-mirror-3-917",

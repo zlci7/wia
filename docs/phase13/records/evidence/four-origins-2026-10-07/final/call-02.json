@@ -1,0 +1,28 @@
+{
+  "index": 2,
+  "streaming": false,
+  "reasoning": "low",
+  "ElapsedMS": 7920,
+  "FirstTextMS": 7920,
+  "response": "{\"scene_changes\":{\"elapsed_minutes\":12,\"positions\":{\"bystander:clerk\":\"office\",\"npc:missing-woman\":\"abandoned-clinic\",\"npc:tailor\":\"office\",\"player\":\"office\"}},\"narrative\":\"你把照片和地址纸条留在桌沿，没有伸手去碰，只把记事本摊开。马丁见你没有立刻应下报酬，指节在帽檐上收紧了一下，随即又慢慢松开。\\n\\n“最后一次见面？”他把帽子放回膝上，先看照片，再看你。“三天前，二十六号，晚饭前。她在楼下裁一件客人定做的外套，我看了几眼，说领口那道线走得太急。她说那是人家自己选的宽领，不是走急。我说会做衣服和会接单子是两回事，她说她既然能裁，为什么不能自己接。”\\n\\n他停了半拍，像在算这句要不要往下讲。“我们声音都大了些。她说我总把她当帮工。我说外面的人会赊账、会赖账，一笔坏账就是我们半个月的料钱。”他低了一点声，确认书记员还在桌那侧写他自己的东西，“然后我就上楼了。第二天早上，她的床铺没动过。”\\n\\n“她有没有说要去哪里？”你问。马丁摇头，又补上一句：“平时她要去哪儿都会讲一声，买菜、送样，都会讲。那天什么都没说。”他说的范围很窄，只落在争执本身和第二天早上的空床。至于那三天之间他翻过什么、店里哪本簿子动过，他一句没提。\\n\\n你转向书记员，问他未接案的口述如何登记。书记员合上手里的本子，把登记簿又推近一点，语气是例行公事的平稳：“按事务所的规矩，来访未受委托，我们只作口述留存。”他指了指那页空着的委托栏：“填来访时间、来访人姓名、事由一句话，还有你本人是否受理。受理了才立案卷、编案号、记报酬与期限。今天这一条，如果不受理，我写‘维尔氏来访，询失踪女，未受案’，你签个名或者拒签都行。拒签的就记‘未签’。”\\n\\n他顿了顿，补了一句：“口述留存不进入出勤或结案记录，也不会替你对外提。要是以后有人来查同一件事，这页能证明你哪天听过什么——前提是你今天把话记清楚。”\\n\\n马丁在旁边听着，没插嘴，只把帽子重新拿起来，一边听一边把帽檐那道折痕又捻深了一点。他等着你先说是否受理，桌上那张近照仍朝上放着，女孩在照片里抿着嘴，像刚被人叫住时的神情。\",\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁称最后一次见诺拉是三天前（3月26日）晚饭前，因诺拉想独立接单、他担心坏账而起争执；诺拉次日早晨未动过床铺，此前的行踪未主动说明。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁仅交代争执与第二天早上的空床，未提订单簿中写着红烟囱街的收据，也未交代三天内他曾翻查什么。\",\"recipients\":[\"player\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"书记员说明：未受委托的来访只作口述留存，记来访时间、姓名、事由一句与是否受理；受理才立案卷、编案号并记报酬期限。\",\"recipients\":[\"player\",\"npc:tailor\"],\"speaker_id\":\"bystander:clerk\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": true,
+    "CacheKnown": true,
+    "CacheHitTokens": 640,
+    "CacheMissTokens": 5617,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 6257,
+    "OutputTokens": 1295,
+    "ReasoningTokens": 470,
+    "ContentChars": 1446,
+    "ReasoningChars": 828
+  },
+  "error_code": ""
+}

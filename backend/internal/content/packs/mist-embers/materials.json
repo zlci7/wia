@@ -39,7 +39,7 @@
       "purpose": "background",
       "visibility": "public",
       "delivery": "core",
-      "summary": "战后城市的日常环境与调查员起点。",
+      "summary": "战后贝克兰德的社会生活与身份处境。",
       "file": "world/background/core.md"
     },
     {
@@ -210,6 +210,23 @@
       "delivery": "on_demand",
       "summary": "马丁·维尔的生活背景、动机与说话方式。",
       "file": "npcs/tailor/profile.md"
+    },
+    {
+      "id": "city-interactions",
+      "purpose": "development",
+      "visibility": "author",
+      "delivery": "on_demand",
+      "summary": "工作、生计、合作与不同身份的城市处境。",
+      "location_ids": [
+        "office",
+        "cafe",
+        "newspaper-office",
+        "clock-shop",
+        "tailor-shop",
+        "red-chimney-street",
+        "abandoned-clinic"
+      ],
+      "file": "narrative/city-interactions.md"
     }
   ]
 }

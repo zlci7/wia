@@ -1,0 +1,28 @@
+{
+  "index": 2,
+  "streaming": true,
+  "reasoning": "low",
+  "ElapsedMS": 11018,
+  "FirstTextMS": 7177,
+  "response": "{\n  \"narrative\": \"你没有碰桌上的照片和纸条。“先不急着签。”你说，“马丁先生，我想听您把最后一次见面说清楚。争吵的时候，你们各自说了什么？从那以后，您亲眼见到过什么——在店里、楼上，还是别的地方？”\\n\\n马丁的手在帽檐上停住。他先看了一眼书记员，又看回你，喉结动了一下才开始。\\n\\n“那天下午她拿回来一张单子。”他说得很慢，“是外面一个客人直接找她的，不是店里的老主顾。她说她想自己接、自己报价、自己交货。我说不行——价钱压得没道理，万一赊账，坏的是店里的名声，是吃饭的招牌。”\\n\\n他停了一拍。“她说她做了三年学徒，裁剪和锁边都不比我差，说我从来没让她真正做过一单。我说，会做衣服和会应付外面的人是两回事。”\\n\\n“我们就吵起来了。”他把这句收得很短，随后低头整理了一下袖口，“她说我永远当她是个帮工。我没接话。第二天早上她不在楼上，随身的东西少了一些，我以为她去了早市或者找同学。到今天第三天。”\\n\\n“我亲眼看见的，就是这些。楼上的房间是我自己上去看的，衣服少了几件，平时背的包也不在。别的……我没去问邻居，也没去她常去的地方翻。”\\n\\n他说的“那张单子”之后没有任何下文，但话头到这里就断了。你没有追问收据的事，因为桌上并没有那份东西。\\n\\n你转向书记员。“接委托之前，你们怎么记录口述？”\\n\\n书记员把登记簿翻到空白页，用铅笔点了点栏位。“分两栏。第一栏记来访时间、委托人姓名地址，以及他本人陈述的内容——我们只记他说的，不替他补，也不写推测。第二栏写调查范围和双方约定，比如寻找对象、报酬和支付条件。第二栏要等你和委托人谈拢才填。”\\n\\n她看了一眼马丁，又看回你。“按事务所的规矩，未接的委托只保留第一栏的来访记录。口头陈述在签字接下之前不入档案。现在这一页还是空的。”\\n\\n马丁把帽檐又捻了一下，没有催你，也没有把照片再往前推。窗外送面包的车轮声近了又远，事务所里只剩下铅笔搁在纸边上的轻响。\",\n  \"scene_changes\": {\n    \"elapsed_minutes\": 12,\n    \"positions\": {\n      \"player\": \"office\",\n      \"npc:tailor\": \"office\",\n      \"bystander:clerk\": \"office\"\n    },\n    \"state_changes\": [],\n    \"item_moves\": []\n  },\n  \"continuity_notes\": [\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁声称最后一次见面时，诺拉带回来一张陌生顾客的订单，要求自己报价、自己交货；他因担心赊账与店铺名声反对，两人因此争吵。他称诺拉说他只把她当帮工，他没有接话。\",\n      \"recipients\": [\"player\", \"bystander:clerk\"],\n      \"speaker_id\": \"npc:tailor\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁自称亲眼所见：次日上午诺拉不在楼上，少了几件衣服和平时背的包；他没有向邻居或她常去的地方打听。陈述中未提及红烟囱街收据。\",\n      \"recipients\": [\"player\", \"bystander:clerk\"],\n      \"speaker_id\": \"npc:tailor\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"书记员说明委托登记分两栏：第一栏记来访信息与本人陈述，第二栏记调查范围与报酬约定；未签字接下前口头陈述不入档案，当前委托栏仍为空白。\",\n      \"recipients\": [\"player\", \"npc:tailor\"],\n      \"speaker_id\": \"bystander:clerk\"\n    },\n    {\n      \"kind\": \"observed\",\n      \"content\": \"你注意到马丁提到订单后立即停住，未提及订单对应的地址或收据；你没有追问，桌上的照片与纸条保持原样未动。\",\n      \"recipients\": [\"player\"]\n    }\n  ]\n}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": true,
+    "CacheKnown": true,
+    "CacheHitTokens": 0,
+    "CacheMissTokens": 5064,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 5064,
+    "OutputTokens": 1912,
+    "ReasoningTokens": 972,
+    "ContentChars": 1852,
+    "ReasoningChars": 1663
+  },
+  "error_code": ""
+}

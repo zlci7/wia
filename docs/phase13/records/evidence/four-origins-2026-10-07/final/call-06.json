@@ -1,0 +1,28 @@
+{
+  "index": 6,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1730,
+  "FirstTextMS": 1730,
+  "response": "{\"items\":[\"我打算先以普通顾客身份请亚瑟拆开怀表检查，借着看他报修动作和听他说“声音太清楚”时的反应，试探他是否知道更多。\",\"我想半真半假地向他描述最近感官变敏锐的困扰，不说魔药细节，观察他会不会追问或提醒，以判断他是否与非凡圈子有关。\",\"我准备先不修表，借口想看看店里旧钟，顺势留意那扇半掩门后另一只钟的走声和亚瑟是否阻止我靠近。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 1233,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1361,
+    "OutputTokens": 118,
+    "ReasoningTokens": 0,
+    "ContentChars": 176,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

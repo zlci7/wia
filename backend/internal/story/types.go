@@ -144,6 +144,7 @@ type Definition struct {
 	SettingsSource   string
 	Summary          Summary
 	Opening          string
+	StartingOptions  []StartingOption `json:"starting_options,omitempty"`
 	// Scene is the authored opening scene description, kept beside Opening.
 	Scene string
 	// InitialLocation is the identifier of the scene the story starts in.
@@ -168,4 +169,15 @@ type Definition struct {
 	ActionRules         []ActionRule                              `json:"action_rules,omitempty"`
 	Materials           []Material                                `json:"materials,omitempty"`
 	Progression         *plot.OpenDefinition                      `json:"progression,omitempty"`
+}
+
+// StartingOption is an authored identity and initial situation within one world.
+// World facts, the map, other people's positions and the calendar stay shared.
+type StartingOption struct {
+	ID, Title, Description   string
+	Player                   Player
+	Opening, InitialLocation string
+	KnownLocations           []string
+	States                   map[string]wiaworld.StateValue
+	Items                    []InitialItem
 }

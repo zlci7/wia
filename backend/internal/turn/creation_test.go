@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"gameagent/backend/internal/content"
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/story"
 	wiaworld "gameagent/backend/internal/world"
@@ -17,6 +19,81 @@ import (
 type creationTestGenerator struct {
 	requests []model.TextRequest
 	answer   func(context.Context, model.TextRequest, int) (model.TextResponse, error)
+}
+
+func TestCreationContinuityReservesPersonalFactsWithoutQueryOverlap(t *testing.T) {
+	s := newCreationTestSession(t)
+	s.recordCreation("player", "old", "npc:smith", "commitment", "后天到柜台取修好的桅杆收据")
+	s.recordCreation("npc:merchant", "private", "npc:merchant", "statement", "商人私下准备转卖货物")
+	for i := 0; i < 8; i++ {
+		_, err := s.Interact(t.Context(), New(nil, Deps{}), creationFixedGenerator(creationTestJSON(`{"narrative":"工匠解释普通工序。"}`)), CreationOptions{Input: "请解释加工步骤。"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	material, _ := s.creationMaterial(CreationOptions{Input: "今天的天气怎么样？"})
+	if !strings.Contains(material.Required, "后天到柜台取修好的桅杆收据") || !strings.Contains(material.Required, "commitment") || strings.Contains(material.Required, "商人私下准备转卖货物") {
+		t.Fatal("continuity or ownership lost")
+	}
+	for i := 0; i < 30; i++ {
+		s.recordCreation("player", "long", "", "observed", strings.Repeat("长篇记录", 200))
+	}
+	sections := s.creationContinuity([]string{"player"}, nil)
+	tokens := 0
+	for _, section := range sections {
+		tokens += model.FramedTextInputTokens(model.TextRequest{Input: section.Text})
+	}
+	if len(sections) > 8 || tokens > 1200 {
+		t.Fatal("unbounded personal continuity")
+	}
+}
+
+func TestCreationFourStartsFitContinuousBudget(t *testing.T) {
+	pack, err := content.Load(filepath.Join("..", "content", "packs", "mist-embers"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, option := range pack.Definition.StartingOptions {
+		t.Run(option.ID, func(t *testing.T) {
+			def, err := story.WithStartingOption(pack.Definition, option.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, err := NewCreationSession(def)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 6; i++ {
+				g := &creationTestGenerator{answer: func(_ context.Context, req model.TextRequest, _ int) (model.TextResponse, error) {
+					if req.MaxInputTokens != 12000 || model.FramedTextInputTokens(req) > 12000 {
+						t.Fatal("input budget")
+					}
+					if i == 0 && !strings.Contains(req.Input, option.Opening) {
+						t.Fatal("opening missing")
+					}
+					if !strings.Contains(req.Input, option.Player.Profile) {
+						t.Fatal("identity missing")
+					}
+					speaker := "player"
+					for _, id := range creationEntities(s.snapshot, "") {
+						if id != "player" {
+							speaker = id
+							break
+						}
+					}
+					text, _ := json.Marshal(CreationScene{Narrative: strings.Repeat("人物根据已有经历回答，并说明一个合理的合作条件。", 62), Changes: &CreationChanges{Positions: def.InitialLocations, ElapsedMinutes: 3}, Notes: []CreationNote{{Kind: "commitment", Content: "明天下午再次谈合作，尚未付款", Recipients: []string{"player"}, SpeakerID: "player"}, {Kind: "statement", Content: strings.Repeat("本人说明了工作流程、协作条件和目前的困难。", 7), Recipients: []string{"player"}, SpeakerID: speaker}}})
+					return model.TextResponse{Text: string(text)}, nil
+				}}
+				_, err := s.Interact(t.Context(), New(nil, Deps{}), g, CreationOptions{Input: "我先聊眼前的事情，问问接下来怎样合作。", Reasoning: model.ReasoningLow})
+				if err != nil {
+					t.Fatalf("turn %d: %v", i+1, err)
+				}
+			}
+			if len(s.PersonalSources("player")) != 6*4 {
+				t.Fatal("accepted records lost")
+			}
+		})
+	}
 }
 
 func (g *creationTestGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
@@ -164,7 +241,7 @@ func TestCreationRepairsOnceAndStopsProviderFailure(t *testing.T) {
 		if n == 1 {
 			return model.TextResponse{Text: creationTestJSON(`{"narrative":"一","scene_changes":{"elapsed_minutes":-1}}`)}, nil
 		}
-		if !strings.Contains(req.Input, "creation_contract_invalid") {
+		if !strings.Contains(req.System, "creation_contract_invalid") || !strings.Contains(req.System, "必须同时包含scene_changes和narrative") || strings.Contains(req.Input, "creation_contract_invalid") {
 			t.Fatal("repair lacks safe field diagnosis")
 		}
 		return model.TextResponse{Text: creationTestJSON(`{"narrative":"有效回应"}`)}, nil
@@ -190,6 +267,23 @@ func TestCreationRepairsOnceAndStopsProviderFailure(t *testing.T) {
 	_, err = session.Interact(t.Context(), New(nil, Deps{}), generator, CreationOptions{Input: "继续。"})
 	if !errors.Is(err, model.ErrInvalidTextResponse) || len(generator.requests) != 1 || !reflect.DeepEqual(before, session.Status()) {
 		t.Fatal("truncated response accepted or billed for a repair")
+	}
+}
+
+func TestCreationMissingChangesRepairPreservesFullContract(t *testing.T) {
+	session := newCreationTestSession(t)
+	generator := &creationTestGenerator{answer: func(_ context.Context, req model.TextRequest, n int) (model.TextResponse, error) {
+		if n == 1 {
+			return model.TextResponse{Text: `{"narrative":"人物解释合作条件，尚未承诺。"}`}, nil
+		}
+		if !strings.Contains(req.System, "field=scene_changes") || !strings.Contains(req.System, "json_required_field_missing") || !strings.Contains(req.System, "必须同时包含scene_changes和narrative") {
+			t.Fatal("missing required field diagnosis and complete contract")
+		}
+		return model.TextResponse{Text: creationTestJSON(`{"narrative":"人物说明合作条件，等待玩家选择。"}`)}, nil
+	}}
+	result, err := session.Interact(t.Context(), New(nil, Deps{}), generator, CreationOptions{Input: "说明合作条件。", Reasoning: model.ReasoningLow})
+	if err != nil || result.Report.Repairs != 1 || session.Status().Turn != 1 {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
 

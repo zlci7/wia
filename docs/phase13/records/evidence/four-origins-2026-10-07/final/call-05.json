@@ -1,0 +1,28 @@
+{
+  "index": 5,
+  "streaming": false,
+  "reasoning": "low",
+  "ElapsedMS": 8539,
+  "FirstTextMS": 8539,
+  "response": "{\n  \"scene_changes\": {\n    \"elapsed_minutes\": 20,\n    \"positions\": {\n      \"bystander:printer\": \"newspaper-office\",\n      \"npc:reporter\": \"newspaper-office\",\n      \"player\": \"newspaper-office\"\n    },\n    \"state_changes\": [\n      {\n        \"entity_id\": \"player\",\n        \"state_id\": \"fatigue\",\n        \"delta\": 3,\n        \"reason\": \"持续校对与低声交谈，注意力集中耗费精力。\"\n      }\n    ]\n  },\n  \"narrative\": \"艾琳听你把话说完，先把采访本翻到新一页，写下日期和“读稿协助”，笔尖在纸上顿了顿。\\n\\n“行，先这样。”她把本子往你面前一推，“署名那条照刚才说的办。你要是只读稿，文末致谢；真要跟我出去问回来东西进了正文，再并排。撤回条件也一样，查实只是普通离家，稿子压掉，你我都不往外说。”\\n\\n你拉过她的笔记，从第一行开始重读。她把亲自见闻写在左栏，转述的标“听说”，猜测用括号圈起来。有两句把“肯定”压在消息源身上，其实是她自己的判断，你用铅笔在句末打了个问号。她探过头来看，没说话，把那两行挪到了括号栏。\\n\\n你合上自己的记事本，低声问了那句。\\n\\n艾琳的笔停住。\\n\\n“方块字？”她重复了一遍，眉头拧起来，“你是说像印章刻错了方向那种？还是像外国人写的？”\\n\\n她翻了翻前面几页笔记，指尖在一条旧记录上停住。“去年冬天我采访码头区一个搬运工，他说在废船板内侧见过一排‘谁也不认识的字’，当时我以为他喝多了。后来没找到实物，这条我没往外写。”她抬眼，语速放慢了，“你怎么想起问这个？是有人拿给你看过，还是你从哪儿听到的？”\\n\\n她没有等你回答就补了一句：“要是跟这条线无关，我就归到‘待核实杂闻’里，不写进红烟囱街的稿子。要是有关——你得告诉我方向，我才知道该查什么。”\\n\\n排字工从机器后头探出半张脸，手上还沾着油墨：“十点四十了啊，艾琳。稿子要留版面，你别光顾着聊天。”\\n\\n艾琳冲他挥了下手，又转向你：“下午咖啡馆那边我一点半到。你要来，就坐靠窗第三张桌，我点黑咖啡，你点你自己的。我不主动喊你，你听我开口问再决定。”她把铅笔别回耳朵后面，“你刚才那个问题，回头告诉我一句就行——是在哪儿见的，还是谁跟你提的。”\",\n  \"continuity_notes\": [\n    {\n      \"kind\": \"statement\",\n      \"content\": \"玩家同意先协助重读笔记，下午是否同行暂未决定。署名与撤回条件按艾琳此前提出的规则继续有效。\",\n      \"recipients\": [\"npc:reporter\", \"player\"],\n      \"speaker_id\": \"player\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"玩家低声向艾琳询问是否见过他人书写形状像方块的陌生文字，未说明来源。艾琳追问是在何处见到或听谁提起。\",\n      \"recipients\": [\"npc:reporter\", \"player\"],\n      \"speaker_id\": \"player\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"艾琳提到去年冬天一名码头搬运工称在废船板内侧见过一排无人认识的文字，当时未找到实物，未写入报道，现记在脑中待核实。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"npc:reporter\"\n    },\n    {\n      \"kind\": \"commitment\",\n      \"content\": \"排字工提醒十点四十前需交回版面，艾琳计划下午一点半独自到街角咖啡馆见旧车夫，玩家若来坐靠窗第三张桌。\",\n      \"recipients\": [\"npc:reporter\", \"bystander:printer\", \"player\"],\n      \"speaker_id\": \"npc:reporter\"\n    }\n  ]\n}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": true,
+    "CacheKnown": true,
+    "CacheHitTokens": 3584,
+    "CacheMissTokens": 2354,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 5938,
+    "OutputTokens": 1491,
+    "ReasoningTokens": 544,
+    "ContentChars": 1922,
+    "ReasoningChars": 882
+  },
+  "error_code": ""
+}
