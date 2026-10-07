@@ -1,0 +1,28 @@
+{
+  "index": 2,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 5138,
+  "FirstTextMS": 5138,
+  "response": "{\"narrative\":\"你没有立刻去碰桌上的照片，只把身体往椅背上一靠，看着马丁。\\n\\n“你刚才说到最后一次见面，停了一下。”你说，“先把那天讲清楚。诺拉那天说了什么，去了哪里，近来有没有什么反常。”\\n\\n马丁的手指在帽檐上停住，捻了两下，像要把一块起皱的布料抚平。他没有马上抬眼。\\n\\n“那天……她想自己接一单。”他开口时声音比刚才低，“一个陌生顾客，我没见过。我告诉她，生客、赊账，哪一样都能把一间小店拖垮。她说她受够了只做我分给她的活。我们两个都说了重话。”\\n\\n“重话具体是什么？”你问。\\n\\n“她说她不需要我替她决定。”马丁终于看向你，像是把这句话从嘴里拔出来，“我说……那你就先证明你能分得清谁是真心要衣服，谁是来骗手艺的。”\\n\\n旁边的书记员低头翻着登记页，笔尖悬着，没写下去，显然在等你自己判断这桩委托。\\n\\n“她那天出门前呢？去了哪里？”\\n\\n“她说去送一件改好的外套。之后就没回来。”马丁把帽子搁到膝上，又立刻拿起来，“这几天我把店里的订单簿翻了两遍，该送的都送过，没缺什么。”\\n\\n他这句话说得太快，像是提前备好的。你没接话，只等他继续。\\n\\n“反常……”他皱着眉，似乎在挑一件体面些的说法，“她近来收工后常一个人出门，说是散步。回来也不怎么说话。我问过一次，她答我‘这跟你没关系’。就这一句。”\\n\\n他停顿，把帽檐又捻了一道褶。\\n\\n“她裁得出很好的衣服，我知道。可会做衣服和会应付外面的人，是两回事。”\\n\\n窗外一辆货车碾过湿石板，声音闷闷地传进来。马丁没有提任何写着街名的纸片，也没有提那些出门究竟去了哪个方向。你面前的近照里，女孩侧着脸，手边是一件半成的女式外套。三镑的委托还停在桌上，等你的一句话。\",\"scene_changes\":{\"elapsed_minutes\":12,\"positions\":{\"player\":\"office\",\"npc:tailor\":\"office\",\"bystander:clerk\":\"office\",\"npc:missing-woman\":\"abandoned-clinic\"}},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁承认最后一次见面时，诺拉提出要独立接一单陌生顾客的活；双方都说了重话，他当时说‘那你就先证明你能分得清谁是真心要衣服，谁是来骗手艺的’。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁称诺拉三天前说去送一件改好的外套，之后再没回家；他自称翻过订单簿两遍，认为该送的都送过、没缺什么，且未提及红烟囱街收据。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁称诺拉近来收工后常独自出门、回来少言，被问时只答‘这跟你没关系’。\",\"recipients\":[\"player\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"hypothesis\",\"content\":\"马丁对订单簿的说明来得太快，且完全没提任何写着街名的收据；你可怀疑他对女儿离家前的行踪有所保留。\",\"recipients\":[\"player\"],\"speaker_id\":\"player\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 896,
+    "CacheMissTokens": 3502,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 4398,
+    "OutputTokens": 808,
+    "ReasoningTokens": 0,
+    "ContentChars": 1514,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

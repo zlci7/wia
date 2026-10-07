@@ -1,0 +1,28 @@
+{
+  "index": 8,
+  "streaming": true,
+  "reasoning": "off",
+  "ElapsedMS": 3052,
+  "FirstTextMS": 840,
+  "response": "{\n  \"narrative\": \"你朝窗口偏了偏头，马丁会意，握着帽子跟过来。你背对着书记员的方向，把声音压得很低。\\n\\n“维尔先生。我还没接下这桩委托，但今天中午之前，我一定给你一个答复。”\\n\\n马丁把帽檐在指间抵住，上身微微前倾，回话时也压着嗓音，像怕被墙上的挂钟听见。\\n\\n“中午。好，我等你的准话。”他喉结动了一下，“要是你接，我店随时能开；要是不接，也请你当面告诉我，我好另想办法。别就这么搁着。”\\n\\n“这件事暂时只在我们之间。”\\n\\n“我懂。”他点点头，随即像想起什么似的补一句，“可书记员那边——她的记档，你看着办。我不好开口叫她划。”\\n\\n你没有再应这句话。两人分开时，书记员正把笔尖搁在登记页边缘，既没有抬头，也没有起身。桌面上那张侧脸近照和三镑的委托仍压在原处。离中午还有一段时间，而你手里暂时没有接下它的理由，也还没有拒掉它的决心。\",\n  \"scene_changes\": {\n    \"elapsed_minutes\": 4,\n    \"positions\": {\n      \"player\": \"office\",\n      \"npc:tailor\": \"office\",\n      \"bystander:clerk\": \"office\",\n      \"npc:reporter\": \"newspaper-office\"\n    }\n  },\n  \"continuity_notes\": [\n    {\n      \"kind\": \"commitment\",\n      \"content\": \"调查员向马丁承诺今天中午前给出是否接下委托的答复，并约定此事暂不向书记员与艾琳透露。\",\n      \"recipients\": [\"npc:tailor\", \"player\"],\n      \"speaker_id\": \"player\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁要求无论接与不接都得到当面答复，否则他将另想办法。\",\n      \"recipients\": [\"player\", \"npc:tailor\"],\n      \"speaker_id\": \"npc:tailor\"\n    }\n  ]\n}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 3072,
+    "CacheMissTokens": 4331,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 7403,
+    "OutputTokens": 471,
+    "ReasoningTokens": 0,
+    "ContentChars": 971,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

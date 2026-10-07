@@ -1,0 +1,28 @@
+{
+  "index": 1,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1764,
+  "FirstTextMS": 1764,
+  "response": "{\"items\":[\"我要先仔细端详桌上诺拉的照片，留意衣着、饰品或背景里有没有可追查的细节，再向马丁问清她失踪当天的出门去向。\",\"我打算直接问马丁：上一次见面时他为何停顿，父女之间是否发生过争执，她近期有没有提到陌生人或异常行踪。\",\"我想先收下三镑定金并记下裁缝店地址，然后前往维尔裁缝店，从学徒和邻居口中打听诺拉平日的往来与最后出现的时间。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 0,
+    "CacheMissTokens": 550,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 550,
+    "OutputTokens": 112,
+    "ReasoningTokens": 0,
+    "ContentChars": 177,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

@@ -1,0 +1,28 @@
+{
+  "index": 1,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1548,
+  "FirstTextMS": 1548,
+  "response": "{\"items\":[\"我想再问马丁·维尔最后一次见女儿的具体经过，尤其那个停顿背后的事，看能否问出她失踪前的去向或异常。\",\"我想先检查桌上那张近照和裁缝店地址，看看有没有拍摄时间、背景细节或地址附近的线索可循。\",\"我想去维尔裁缝店实地走一趟，向周边邻居打听诺拉失踪前的行踪和最近接触过的人。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 384,
+    "CacheMissTokens": 166,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 550,
+    "OutputTokens": 90,
+    "ReasoningTokens": 0,
+    "ContentChars": 150,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

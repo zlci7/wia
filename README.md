@@ -42,6 +42,7 @@ A fresh standalone installation seeds the initial pack. An existing developer ca
 - Private conversations, NPC private replies and action results have individual recipient projections. Corrections protect sources already consumed by persistent facts.
 - Authoritative positions determine location, nearby destinations and the people present. State, directed relationships and uniquely owned items share the turn commit. Existing fixed percentile rules remain available.
 - The reading workspace shows authored world dates and action input, with character, cash, possessions, known places and people available on demand. Automatic saves, independent branches, settings, memory review and correction remain available. Generation can be cancelled; failed input remains available for retry.
+- The story page also offers **共创试玩**: one central scene-creation call, per-turn plot advancement, streaming or non-streaming, cancellation and three vertical action suggestions. This play session stays in application memory and ends when the application exits. Existing saves retain their persistent turn flow. Co-creative play currently requires the supported DeepSeek request options.
 
 Developers edit v4 packages as files using the [authoring contract and template](docs/phase12/stages/开发者剧本编写规范与模板.md). Import, publication and export preserve the file package. The structured content editor explicitly rejects formats it cannot fully represent.
 
@@ -54,8 +55,9 @@ Engineering tests, browser checks, real-model observations and user acceptance a
 - [Architecture and dependency rules](docs/summary/ARCHITECTURE.md)
 - [Documentation index](docs/README.md)
 - [Phase12 index](docs/phase12/README.md)
-- [Phase13](docs/phase13/README.md): an internal co-creative play entry has two recorded 12-turn live sessions; the formal turn still uses individual character calls.
-- [Co-creative play guide](docs/phase13/轻量共创游玩.md): local console, relevant context, personal records and per-turn plot advancement.
+- [Phase13](docs/phase13/README.md): browser co-creative play, live observations and the remaining persistent-flow migration.
+- [Co-creative play guide](docs/phase13/轻量共创游玩.md): browser entry, relevant context, personal records and per-turn plot advancement.
+- [Browser co-creative verification](docs/phase13/records/网页共创试玩-验收.md): controlled browser checks, six live turns, one identity follow-up and screenshots.
 - [Chinese co-creative gameplay execution plan](docs/phase13/共创游玩-执行规划.md): prototype scope and continuous-play acceptance.
 - [Product scope](docs/产品说明.md)
 - [Cross-stage contracts](docs/summary/总体技术方案.md)

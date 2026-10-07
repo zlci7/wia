@@ -1,0 +1,85 @@
+{
+  "version": 105,
+  "id": "play_6e7cbd7d6142dcc627124423",
+  "game_id": "mist-embers",
+  "title": "雾都余烬",
+  "revision": "mist-embers.pack.v9",
+  "turn": 1,
+  "clock": "1358-03-29 09:12",
+  "location": "调查事务所",
+  "messages": [
+    {
+      "seq": 1,
+      "message_id": "opening",
+      "kind": "narrative",
+      "content": "上午的雾贴在调查事务所窗外。来访的马丁·维尔自称是维尔裁缝店的店主。他坐在访客椅上，帽子被攥得变了形，说二十岁的女儿已经失踪三天，愿意付三镑请人把她找回来。说到两人最后一次见面时，他明显停顿了一下。桌上放着女孩的近照，以及一张写着裁缝店地址的纸条。",
+      "created_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "seq": 2,
+      "message_id": "creation_a40577aa8dff8f9c150d36da:input",
+      "kind": "player",
+      "content": "我先不急着答应，问马丁刚才停顿的那次最后见面究竟发生了什么：诺拉那天说了什么、去了哪里，近来有无反常。",
+      "created_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "seq": 3,
+      "message_id": "creation_a40577aa8dff8f9c150d36da:narrative",
+      "kind": "narrative",
+      "content": "你没有立刻去碰桌上的照片，只把身体往椅背上一靠，看着马丁。\n\n“你刚才说到最后一次见面，停了一下。”你说，“先把那天讲清楚。诺拉那天说了什么，去了哪里，近来有没有什么反常。”\n\n马丁的手指在帽檐上停住，捻了两下，像要把一块起皱的布料抚平。他没有马上抬眼。\n\n“那天……她想自己接一单。”他开口时声音比刚才低，“一个陌生顾客，我没见过。我告诉她，生客、赊账，哪一样都能把一间小店拖垮。她说她受够了只做我分给她的活。我们两个都说了重话。”\n\n“重话具体是什么？”你问。\n\n“她说她不需要我替她决定。”马丁终于看向你，像是把这句话从嘴里拔出来，“我说……那你就先证明你能分得清谁是真心要衣服，谁是来骗手艺的。”\n\n旁边的书记员低头翻着登记页，笔尖悬着，没写下去，显然在等你自己判断这桩委托。\n\n“她那天出门前呢？去了哪里？”\n\n“她说去送一件改好的外套。之后就没回来。”马丁把帽子搁到膝上，又立刻拿起来，“这几天我把店里的订单簿翻了两遍，该送的都送过，没缺什么。”\n\n他这句话说得太快，像是提前备好的。你没接话，只等他继续。\n\n“反常……”他皱着眉，似乎在挑一件体面些的说法，“她近来收工后常一个人出门，说是散步。回来也不怎么说话。我问过一次，她答我‘这跟你没关系’。就这一句。”\n\n他停顿，把帽檐又捻了一道褶。\n\n“她裁得出很好的衣服，我知道。可会做衣服和会应付外面的人，是两回事。”\n\n窗外一辆货车碾过湿石板，声音闷闷地传进来。马丁没有提任何写着街名的纸片，也没有提那些出门究竟去了哪个方向。你面前的近照里，女孩侧着脸，手边是一件半成的女式外套。三镑的委托还停在桌上，等你的一句话。",
+      "created_at": "0001-01-01T00:00:00Z"
+    }
+  ],
+  "characters": [
+    {
+      "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+      "entity_id": "npc:reporter",
+      "definition_id": "reporter.v1",
+      "name": "艾琳·维克",
+      "role": "年轻记者",
+      "in_scene": false
+    },
+    {
+      "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+      "entity_id": "npc:clockmaker",
+      "definition_id": "clockmaker.v1",
+      "name": "亚瑟·格兰特",
+      "role": "钟表匠",
+      "in_scene": false
+    },
+    {
+      "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+      "entity_id": "npc:missing-woman",
+      "definition_id": "missing-woman.v1",
+      "name": "诺拉·维尔",
+      "role": "裁缝店学徒",
+      "in_scene": false
+    },
+    {
+      "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+      "entity_id": "npc:tailor",
+      "definition_id": "tailor.v1",
+      "name": "马丁·维尔",
+      "role": "委托人",
+      "in_scene": true
+    }
+  ],
+  "run": {
+    "request_key": "338940f9-2ac1-4300-b561-bd4618579b22",
+    "id": "playrun_d069b4ddd2bb920e421720c9",
+    "input": "我先不急着答应，问马丁刚才停顿的那次最后见面究竟发生了什么：诺拉那天说了什么、去了哪里，近来有无反常。",
+    "status": "completed",
+    "transport": "non_stream",
+    "allow_plot_advance": false,
+    "started_at": "2026-10-07T07:40:40.4846867Z",
+    "elapsed_ms": 5146,
+    "calls": 1,
+    "repairs": 0
+  },
+  "suggestions": {
+    "turn": 1,
+    "enabled": true,
+    "status": "generating",
+    "items": []
+  }
+}

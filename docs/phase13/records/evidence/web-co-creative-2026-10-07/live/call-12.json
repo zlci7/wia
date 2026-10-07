@@ -1,0 +1,28 @@
+{
+  "index": 12,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1699,
+  "FirstTextMS": 1699,
+  "response": "{\"items\":[\"我想在中午前先回维尔裁缝店，请马丁打开柜台抽屉翻那本蓝布面订单簿，逐页对照陌生订单的笔迹与日期，弄明白那几页到底是谁写的。\",\"我想在事务所里再找艾琳谈一次，问问她上午在门厅还听见或看到过什么细节，哪怕只是马丁进出的时辰，也帮我在给出答复前多一个旁证。\",\"我打算去附近街面走一圈，向钟表匠等熟识铺面打听诺拉近日常去的地方，核实马丁说的独自外出，看有没有人见过那件灰蓝罩裙。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 2243,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 2371,
+    "OutputTokens": 139,
+    "ReasoningTokens": 0,
+    "ContentChars": 201,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

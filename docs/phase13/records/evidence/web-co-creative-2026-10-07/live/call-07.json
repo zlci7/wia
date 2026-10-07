@@ -1,0 +1,28 @@
+{
+  "index": 7,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1122,
+  "FirstTextMS": 1122,
+  "response": "{\"items\":[\"我请马丁现在带我回裁缝店，亲手翻那本蓝布面订单簿，先确认陌生顾客那页是谁的笔迹，再核对日期和交期。\",\"我留在事务所先和书记员把记录分栏，请她以记者接触面的角度判断诺拉常去的地方，同时问马丁近来有没有人上门打听诺拉。\",\"我向马丁要下诺拉近照，去她常独自散步的方向沿街询问店铺与路人，看她三天前穿灰蓝罩裙是否被人见过。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 1024,
+    "CacheMissTokens": 1266,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 2290,
+    "OutputTokens": 118,
+    "ReasoningTokens": 0,
+    "ContentChars": 173,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

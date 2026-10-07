@@ -1,0 +1,28 @@
+{
+  "index": 11,
+  "streaming": true,
+  "reasoning": "off",
+  "ElapsedMS": 3467,
+  "FirstTextMS": 708,
+  "response": "{\"narrative\":\"你从窗边回到桌旁，抽回椅子的动作不算轻。马丁落后半步跟着，重新坐下时把帽子搁回膝头。书记员的笔停在登记页边缘，抬眼看了一下，又低下去。\\n\\n“艾琳。”你把声音放回正常音量，不回头，只看桌对面那副摊开的采访本，“刚才我和马丁在窗边说了什么，你能复述吗？”\\n\\n艾琳的笔尖在纸面上悬了一瞬。她似乎没料到你先问的是这个，身子往椅背靠了靠，手指把本子压平。\\n\\n“我听见你们挪到窗边，压低声音，”她说，语速不快，“具体说了什么，我复述不了。你和维尔先生背对这边，椅子又挡着，话我接不住。我只记了：你们单独谈过一分钟左右，回来时你手里没拿那三镑。”\\n\\n她顿了一下，用笔杆尾端点点本子上新添的那行字。\\n\\n“如果你要我补一句‘他们谈了委托’，那我记不了。我没听见，就是没听见。”\\n\\n你点点头。她没有反问为什么，也没有追问窗边那几句话，只是把目光从你脸上移到马丁身上，又移回自己的本子。\\n\\n马丁在膝头把帽子转了小半圈，没接话。书记员那边落笔很轻，重新在本栏末尾画了一句，笔帽扣上，视线又回到你和那几张散在桌上的走访资料上。\\n\\n离中午还有几个钟头，桌面上仍是那三镑和近照，你依旧没有接下它，也还没开口拒掉。\",\"scene_changes\":{\"elapsed_minutes\":2,\"positions\":{\"player\":\"office\",\"npc:tailor\":\"office\",\"npc:reporter\":\"newspaper-office\",\"bystander:clerk\":\"office\"}},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"艾琳表示自己没能听清窗边压低嗓音的对话，只能确认两人单独谈过约一分钟，无法复述内容。\",\"recipients\":[\"player\",\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"npc:reporter\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 3072,
+    "CacheMissTokens": 4282,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 7354,
+    "OutputTokens": 482,
+    "ReasoningTokens": 0,
+    "ContentChars": 856,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

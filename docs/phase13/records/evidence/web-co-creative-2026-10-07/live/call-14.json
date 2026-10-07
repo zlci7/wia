@@ -1,0 +1,28 @@
+{
+  "index": 14,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 2237,
+  "FirstTextMS": 2237,
+  "response": "{\"items\":[\"我先把账册摊在柜台上，逐行从前到后翻一遍，特别留意诺拉接手前后的日期、叉记和折痕位置，看看是否还有别的赊账或红烟囱街的条目被夹在寻常生意里。\",\"我合上账册，就着柜台问马丁：诺拉平日和谁搭过话、收工往东边走后有没有提过染坊或某个字号、这半个月有没有生客上门取过货，先把他脑子里的名单和零碎印象榨出来。\",\"我借他钥匙或请他锁好抽屉，自己走到铺面后门或临街窗边站一会儿，看这条街和东向的巷口怎么走、裁缝店熟客通常从哪边来，顺便留意门外有没有谁像在等店里的人。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 2699,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 2827,
+    "OutputTokens": 177,
+    "ReasoningTokens": 0,
+    "ContentChars": 242,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

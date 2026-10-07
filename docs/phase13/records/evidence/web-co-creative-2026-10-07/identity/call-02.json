@@ -1,0 +1,28 @@
+{
+  "index": 2,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 8103,
+  "FirstTextMS": 8103,
+  "response": "{\n  \"narrative\": \"你向书记员说明了意思。他点点头，说维克小姐这会儿应该在报社分部，可以去请；不过一来一回总要些时间。你请他去跑这一趟，并让马丁先留在事务所里等。马丁没有反对，只把帽子在膝盖上又攥紧了些，说等就等，反正店里今天能开的工也不多。\\n\\n约莫过了半个钟头，门上的铃铛响了。一个裹着灰呢外套的年轻女人跟着书记员进来，头发被雾气打湿了几缕，手里捏着一本翻开的记事本——艾琳·维克。她先看了马丁一眼，又看向你，语速很快：“书记员说这里有位裁缝的女儿失踪了三天，你们想让我也听听。我先说清楚，我只是记者，不是警察，也不会替谁把话往报纸上写。”\\n\\n她拉过一把椅子坐下，翻开新的一页，先写下日期，再问马丁全名和店铺地址。马丁一一答了。艾琳把笔尖停住：“维尔先生，你最后一次见到诺拉是哪一天？她在哪儿，穿什么，说了什么？”\\n\\n马丁捻着帽檐，说那是三天前的傍晚，在店里。她穿了件灰蓝色的旧外套，围裙都没解。“她说要自己接一单活，我说那家客人来路不明，她就不高兴了。我们争了几句。第二天早上她没下来吃早饭，房间也空了。”\\n\\n艾琳的笔没停：“争吵的时候，除了接订单，还说了别的吗？她提过要去什么地方，或者见什么人？”\\n\\n马丁沉默了两秒。你注意到他袖口被手指捏出了褶。他说：“她只说了句‘你从来只当我是帮工’。别的……没有。”\\n\\n艾琳抬眼看他：“这是您亲耳听见的原话？”\\n\\n“是。”\\n\\n“那她收到过什么纸条、收据，或者客人留的地址吗？”\\n\\n马丁的目光往旁边偏了一下。“店里订单簿上……有些单子。”他顿住，像在衡量要不要继续说，“她接的那单，我没仔细看过。”\\n\\n艾琳把这几句分开记下，又在页边画了个小记号。她转向你：“调查员先生，到目前为止，哪些是维尔先生亲口说的，哪些是您已经核实过的？我需要分开。”\\n\\n你如实说了：委托、失踪三天、三镑报酬、父女争执，这些目前都出自马丁本人；照片和地址纸条也是他带来的资料，尚无第三方验证。你还没接受委托，也没开始走访。\\n\\n艾琳点头，把“未核实”三个字圈了一下。她又问马丁：“诺拉平时常去哪些地方？有没有要好的朋友、常去的铺子？她带走的东西里，有没有哪件是您觉得不该出现的？”\\n\\n马丁报了两个邻居的名字，说女儿手巧，常去桥区买线，别的想不起来了。至于带走的衣物和工具，他数得清楚，说少了一只旧针线盒和两件换洗衣服。\\n\\n艾琳合上记事本的一角，没急着下结论：“如果这只是家里拌嘴后躲几天，我不会当成报道去追。但如果她接触了什么来历不明的客人，或者那张单子有问题，那就更该查明白。维尔先生，您愿意让调查员去店里看看订单簿吗？”\\n\\n马丁又沉默了一下，才说：“看可以看，别乱翻楼上的东西。诺拉的事……我不想让整条街都知道。”\\n\\n艾琳在本子上记了什么，把笔帽盖上，看向你，等你决定下一步。\",\n  \"scene_changes\": {\n    \"elapsed_minutes\": 40,\n    \"positions\": {\n      \"player\": \"office\",\n      \"npc:tailor\": \"office\",\n      \"bystander:clerk\": \"office\",\n      \"npc:reporter\": \"office\",\n      \"npc:missing-woman\": \"abandoned-clinic\",\n      \"npc:clockmaker\": \"clock-shop\",\n      \"bystander:coachman\": \"red-chimney-street\",\n      \"bystander:printer\": \"newspaper-office\"\n    }\n  },\n  \"continuity_notes\": [\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁称最后一次见诺拉是三天前傍晚，在店里，她穿灰蓝色旧外套，争执中说过『你从来只当我是帮工』；次日早晨发现她不在。\",\n      \"recipients\": [\"player\", \"npc:reporter\", \"npc:tailor\"],\n      \"speaker_id\": \"npc:tailor\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁承认订单簿里可能有与诺拉接单相关的记录，但称自己没有仔细看过；愿意让调查员到店里查看订单簿，条件是别乱翻楼上、别让整条街知道。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"npc:tailor\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"马丁称诺拉带走一只旧针线盒和两件换洗衣服，常去桥区买线，并报了两个邻居名字。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"npc:tailor\"\n    },\n    {\n      \"kind\": \"statement\",\n      \"content\": \"艾琳表示自己不是警察、不替人写稿；若只是家务事不会追报道，若牵涉来历不明客人或可疑单据则更该查明白。\",\n      \"recipients\": [\"player\", \"npc:tailor\"],\n      \"speaker_id\": \"npc:reporter\"\n    },\n    {\n      \"kind\": \"observed\",\n      \"content\": \"艾琳要求区分亲耳听见的话与未经核实的推测，并把委托内容、照片、地址纸条标记为目前仅出自马丁本人。\",\n      \"recipients\": [\"player\", \"npc:reporter\"],\n      \"speaker_id\": \"npc:reporter\"\n    }\n  ]\n}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 0,
+    "CacheMissTokens": 5179,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 5179,
+    "OutputTokens": 1340,
+    "ReasoningTokens": 0,
+    "ContentChars": 2584,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

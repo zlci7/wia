@@ -1,0 +1,63 @@
+{
+  "version": 84,
+  "id": "play_6e7cbd7d6142dcc627124423",
+  "game_id": "mist-embers",
+  "title": "雾都余烬",
+  "revision": "mist-embers.pack.v9",
+  "turn": 0,
+  "clock": "1358-03-29 09:00",
+  "location": "调查事务所",
+  "messages": [
+    {
+      "seq": 1,
+      "message_id": "opening",
+      "kind": "narrative",
+      "content": "上午的雾贴在调查事务所窗外。来访的马丁·维尔自称是维尔裁缝店的店主。他坐在访客椅上，帽子被攥得变了形，说二十岁的女儿已经失踪三天，愿意付三镑请人把她找回来。说到两人最后一次见面时，他明显停顿了一下。桌上放着女孩的近照，以及一张写着裁缝店地址的纸条。",
+      "created_at": "0001-01-01T00:00:00Z"
+    }
+  ],
+  "characters": [
+    {
+      "appearance": "常带着记事本，帽檐下露出被雾气打湿的浅色头发。",
+      "entity_id": "npc:reporter",
+      "definition_id": "reporter.v1",
+      "name": "艾琳·维克",
+      "role": "年轻记者",
+      "in_scene": false
+    },
+    {
+      "appearance": "深色马甲的口袋里插着放大镜，手指留有机油与金属粉末。",
+      "entity_id": "npc:clockmaker",
+      "definition_id": "clockmaker.v1",
+      "name": "亚瑟·格兰特",
+      "role": "钟表匠",
+      "in_scene": false
+    },
+    {
+      "appearance": "二十岁上下，衣袖上留着反复拆改针脚的痕迹。",
+      "entity_id": "npc:missing-woman",
+      "definition_id": "missing-woman.v1",
+      "name": "诺拉·维尔",
+      "role": "裁缝店学徒",
+      "in_scene": false
+    },
+    {
+      "appearance": "穿着做工考究却已经起皱的外套，双手因长期裁剪布料而布满细小旧伤。",
+      "entity_id": "npc:tailor",
+      "definition_id": "tailor.v1",
+      "name": "马丁·维尔",
+      "role": "委托人",
+      "in_scene": true
+    }
+  ],
+  "suggestions": {
+    "turn": 0,
+    "enabled": true,
+    "status": "ready",
+    "items": [
+      "我要先仔细端详桌上诺拉的照片，留意衣着、饰品或背景里有没有可追查的细节，再向马丁问清她失踪当天的出门去向。",
+      "我打算直接问马丁：上一次见面时他为何停顿，父女之间是否发生过争执，她近期有没有提到陌生人或异常行踪。",
+      "我想先收下三镑定金并记下裁缝店地址，然后前往维尔裁缝店，从学徒和邻居口中打听诺拉平日的往来与最后出现的时间。"
+    ]
+  }
+}

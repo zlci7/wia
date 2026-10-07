@@ -1,0 +1,28 @@
+{
+  "index": 9,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1779,
+  "FirstTextMS": 1779,
+  "response": "{\"items\":[\"我打算先不表态，趁离中午还有时间，翻一翻事务所里近几天的街头案卷或报纸，看有没有与失踪年轻女裁缝相关的记录，核实马丁的话外之意。\",\"我想单独再找马丁谈一次，这次只问他诺拉近来独自出门的时间和方向，以及那件改好外套的布料样式，看能否套出他没提过的细节。\",\"我准备坐到书记员身边，请她把刚才那几页记录借我看，特别是马丁前后说法不一之处，借此判断哪些是真话、哪些是他临时编的。\"],\"type\":\"json_object\"}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 1536,
+    "CacheMissTokens": 1050,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 2586,
+    "OutputTokens": 129,
+    "ReasoningTokens": 0,
+    "ContentChars": 222,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

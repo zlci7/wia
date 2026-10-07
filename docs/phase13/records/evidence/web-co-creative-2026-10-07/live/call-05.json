@@ -1,0 +1,28 @@
+{
+  "index": 5,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1313,
+  "FirstTextMS": 1313,
+  "response": "{\"items\":[\"我想请马丁现在带我回裁缝店翻订单簿，先确认那笔陌生订单是谁的字迹、写了什么，再对照送货簿上有无对应的签收记录。\",\"我想留在所里先把诺拉的近照和缺失信息记全，去问附近邮差或街口摊贩，看三天前是否见过她往哪个方向走。\",\"我想当面追问马丁，诺拉收工后独自出门的时间是否固定、有没有提过具体去处，同时观察他答话时的手上动作。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 640,
+    "CacheMissTokens": 1055,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1695,
+    "OutputTokens": 114,
+    "ReasoningTokens": 0,
+    "ContentChars": 174,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

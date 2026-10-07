@@ -1,0 +1,28 @@
+{
+  "index": 3,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1119,
+  "FirstTextMS": 1119,
+  "response": "{\"items\":[\"我要请马丁把订单簿留在事务所，让我对照诺拉那件改好的外套查一查送货记录和收据存根。\",\"我想问马丁，诺拉平时散步爱往哪边走，有没有哪家铺子或哪个人她近来提得格外多。\",\"我要拿起桌上那张近照，仔细看诺拉手边半成品的样式和料子，问她做这件活时有没有留下自己的记样。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 128,
+    "CacheMissTokens": 1044,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 1172,
+    "OutputTokens": 97,
+    "ReasoningTokens": 0,
+    "ContentChars": 145,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

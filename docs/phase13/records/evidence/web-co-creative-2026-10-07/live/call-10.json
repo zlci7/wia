@@ -1,0 +1,28 @@
+{
+  "index": 10,
+  "streaming": false,
+  "reasoning": "off",
+  "ElapsedMS": 1688,
+  "FirstTextMS": 1688,
+  "response": "{\"items\":[\"我想让马丁现在就带我去店里，趁中午前翻那本蓝布面订单簿，看看陌生顾客那页的字迹和日期是否对得上。\",\"我打算去街面上打听诺拉近来独自出门的方向，问附近店主或车夫是否见过穿灰蓝罩裙的年轻女子。\",\"我想先不碰委托，去查开春前后本地是否有赊账或生客骗手艺的纠纷记录，核实马丁那句重话是否另有所指。\"]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 0,
+    "CacheMissTokens": 2644,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 2644,
+    "OutputTokens": 106,
+    "ReasoningTokens": 0,
+    "ContentChars": 160,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}

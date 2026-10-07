@@ -1,0 +1,28 @@
+{
+  "index": 6,
+  "streaming": true,
+  "reasoning": "off",
+  "ElapsedMS": 5119,
+  "FirstTextMS": 775,
+  "response": "{\"narrative\":\"你没急着碰那张三镑的纸币，反而侧身看向柜台后面。\\n\\n“书记员，你也过来听听。”你说，“记录稿先别合。”\\n\\n书记员的笔悬了一下，才点点头，把自己那把椅子挪到桌角。马丁看着她搬椅子，帽檐在指间又捻了半圈——他显然没料到这桩私事会在第三个人面前摊开。\\n\\n“先把你能确认的事说清楚。”你转向马丁，“哪个是你亲眼见的，哪个是你翻簿子想出来的，分开讲。”\\n\\n马丁把帽子搁在膝头，像要腾出手来数。\\n\\n“亲眼见的：她三天前早上出门，说去送一件改好的外套。那天她穿的是灰蓝罩裙。她没回来，到今天整三天。”他顿了一下，“她最近收工后常一个人出去，回来话少。这个也是我见的。剩下的——订单送到没送到、那笔是谁写的，都是我回店里翻想出来的，我说过了。”\\n\\n你看向书记员。她把登记页翻到新的一栏，笔尖很快。\\n\\n“维尔先生，”书记员开口时没抬头，笔却停了，“你说她替店里记过几页。那几页从什么时候开始的？她记之前，店里谁记账，用的是哪支笔、哪本簿子？”\\n\\n马丁愣了一下，似乎没料到问的是这个。“开春前后吧。以前我自己记，她字好，我就让她接着写。用的是店里那支铜杆蘸水笔。簿子只有一本，蓝布面的。”\\n\\n“那本簿子现在在店里？”书记员问。\\n\\n“在。锁在柜台下的抽屉里。”\\n\\n“你说那笔陌生顾客的订单不是你经手的。”书记员把笔尖重新落下去，“那是她写的，还是别人代记的？日期、尺寸、交期，有没有对不上的地方？”\\n\\n马丁沉默了几秒。这一次他没有立刻捻帽子。\\n\\n“我没细看那一页。”他终于说，“我怕翻出来，自己也说不清。”\\n\\n书记员记完这一句，抬眼看了你一下，又落回纸上。她没有替马丁辩解，也没有追问得更凶。桌面上的近照和委托还压在原处——你仍没有开口接下它。\",\"scene_changes\":{\"elapsed_minutes\":6,\"positions\":{\"player\":\"office\",\"npc:tailor\":\"office\",\"bystander:clerk\":\"office\",\"npc:reporter\":\"newspaper-office\"}},\"continuity_notes\":[{\"kind\":\"statement\",\"content\":\"马丁亲眼确认：诺拉三天前早上穿灰蓝罩裙出门，称去送一件改好的外套；她近来收工后常独自外出、回来少言。其余为翻簿子后的推断。\",\"recipients\":[\"player\",\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"statement\",\"content\":\"马丁称诺拉开春前后开始替店里记账，蓝布面订单簿锁在柜台下抽屉，此前由他用铜杆蘸水笔记录；那笔陌生顾客订单的具体页他未曾细看。\",\"recipients\":[\"player\",\"npc:tailor\",\"bystander:clerk\"],\"speaker_id\":\"npc:tailor\"},{\"kind\":\"observed\",\"content\":\"书记员在登记页上增设一栏，记录了艾琳尚未到场、马丁的私事陈述已在第三人面前展开这一情形。\",\"recipients\":[\"player\",\"bystander:clerk\",\"npc:tailor\"],\"speaker_id\":\"bystander:clerk\"}]}",
+  "diagnostic": {
+    "Provider": "deepseek",
+    "Model": "deepseek-v4-flash",
+    "InputKnown": true,
+    "OutputKnown": true,
+    "ReasoningKnown": false,
+    "CacheKnown": true,
+    "CacheHitTokens": 896,
+    "CacheMissTokens": 5655,
+    "Code": "",
+    "HTTPStatus": 200,
+    "RequestID": "",
+    "FinishReason": "stop",
+    "InputTokens": 6551,
+    "OutputTokens": 790,
+    "ReasoningTokens": 0,
+    "ContentChars": 1445,
+    "ReasoningChars": 0
+  },
+  "error_code": ""
+}
