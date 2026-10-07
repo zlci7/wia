@@ -22,6 +22,7 @@ var (
 	ErrTextResponseTooLarge     = errors.New("text response exceeds byte limit")
 	ErrInvalidTextResponse      = errors.New("invalid or incomplete text response")
 	ErrTextReasoningUnsupported = errors.New("text reasoning selection is unsupported")
+	ErrTextFormatUnsupported    = errors.New("text JSON output selection is unsupported")
 )
 
 // ReasoningMode selects generation effort independently of transport. Empty
@@ -52,6 +53,7 @@ type TextRequest struct {
 	MaxResponseBytes       int
 	Streaming              *bool           `json:"streaming,omitempty"`
 	Reasoning              ReasoningMode   `json:"reasoning,omitempty"`
+	JSON                   bool            `json:"json,omitempty"`
 	OnDelta                func(TextDelta) `json:"-"`
 }
 

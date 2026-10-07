@@ -58,6 +58,9 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		"stream":     req.Streams(),
 		"max_tokens": req.TotalOutputTokens(),
 	}
+	if req.JSON {
+		payload["response_format"] = map[string]string{"type": "json_object"}
+	}
 	if req.Reasoning != model.ReasoningDefault {
 		mode := "enabled"
 		if req.Reasoning == model.ReasoningOff {

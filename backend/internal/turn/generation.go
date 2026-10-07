@@ -109,6 +109,7 @@ func (g *ContextGenerator) generateText(ctx context.Context, request model.TextR
 	}
 	req, report, err := composer.Build(g.material, request.System, request.MaxOutputTokens)
 	req.Reasoning, req.Streaming, req.OnDelta = request.Reasoning, request.Streaming, request.OnDelta
+	req.JSON = request.JSON
 	g.providedSources = slices.Clone(report.SelectedSources)
 	if g.logger != nil {
 		s := report.Scope
@@ -204,6 +205,7 @@ func generatedDecodeError(err error, target any) error {
 		}
 	} else if strings.HasPrefix(err.Error(), "json: unknown field ") {
 		result.Code = "json_unknown_field"
+		result.Expected = generatedFieldContract(reflect.TypeOf(target))
 	}
 	return result
 }
@@ -319,6 +321,8 @@ func generatedFieldContract(t reflect.Type) string {
 		return "{" + strings.Join(fields, ",") + "}"
 	case reflect.Slice:
 		return "[" + generatedFieldContract(t.Elem()) + "]"
+	case reflect.Map:
+		return "{" + generatedFieldContract(t.Key()) + ":" + generatedFieldContract(t.Elem()) + "}"
 	case reflect.String:
 		return "string"
 	case reflect.Bool:

@@ -15,7 +15,7 @@ import (
 
 // Material authorization applies equally to the directory and the full text.
 func materialAuthorized(snapshot Snapshot, purpose, recipient string, m story.Material) bool {
-	if purpose == "scene" {
+	if purpose == "scene" || purpose == "co_creation" {
 		if m.Purpose == "npc_plan" {
 			return false
 		}
@@ -100,7 +100,7 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		material = personalPlanContext(snapshot, recipient, material)
 	}
 	switch purpose {
-	case "npc", "intent", "coordination", "plot", "plot_actions", "event_generation", "narration", "scene":
+	case "npc", "intent", "coordination", "plot", "plot_actions", "event_generation", "narration", "scene", "co_creation":
 	default:
 		return material, available
 	}
@@ -113,11 +113,11 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		if !materialAuthorized(snapshot, purpose, recipient, m) {
 			continue
 		}
-		if m.Delivery == "core" {
+		if m.Delivery == "core" || purpose == "co_creation" && m.Visibility == "owner" {
 			if slices.Contains(material.RequiredSources, m.SourceID(snapshot.Definition.Revision)) {
 				continue
 			}
-			if purpose == "scene" {
+			if purpose == "scene" || purpose == "co_creation" {
 				material.Prefix = append(material.Prefix, materialSection(m, snapshot.Definition.Revision))
 			} else {
 				material = appendRequiredMaterial(material, materialSection(m, snapshot.Definition.Revision))
@@ -132,7 +132,7 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		if materialAtLocation(snapshot, m, place) {
 			score += 4
 		}
-		if m.OwnerID != "" && (m.OwnerID == recipient || purpose == "scene" && slices.Contains(snapshot.sceneEntities, m.OwnerID)) {
+		if m.OwnerID != "" && (m.OwnerID == recipient || (purpose == "scene" || purpose == "co_creation") && slices.Contains(snapshot.sceneEntities, m.OwnerID)) {
 			score += 6
 		}
 		for _, id := range append(slices.Clone(m.EntityIDs), m.ItemIDs...) {
@@ -142,6 +142,10 @@ func selectStoryMaterials(snapshot Snapshot, purpose, recipient string, material
 		}
 		if strings.Contains(material.Required, m.ID) {
 			score += 8
+		}
+		if purpose == "co_creation" && score > 0 && (m.Purpose == "author_facts" || m.Purpose == "development") {
+			material.Prefix = append(material.Prefix, materialSection(m, snapshot.Definition.Revision))
+			continue
 		}
 		candidates = append(candidates, candidate{m, score})
 	}

@@ -45,7 +45,7 @@ func TestGeneratedJSONDiagnosticIsSafeAndSpecific(t *testing.T) {
 	for _, tc := range []struct{ response, code, field, expected string }{
 		{`{"scene": {"PRIVATE":"secret"}}`, "json_field_type", "scene", "string"},
 		{`{"outcomes": [{"recipients":"PRIVATE"}]}`, "json_field_type", "outcomes.recipients", "array"},
-		{`{"PRIVATE_FIELD":"secret"}`, "json_unknown_field", "", ""},
+		{`{"PRIVATE_FIELD":"secret"}`, "json_unknown_field", "", `{"scene":string,"outcomes":[{"recipients":[string]}]}`},
 		{`{"scene":"PRIVATE`, "json_syntax_invalid", "", ""},
 		{`{}`, "json_required_field_missing", "scene", ""},
 		{`{"scene":null}`, "json_required_field_null", "scene", ""},

@@ -37,6 +37,9 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 	if req.Reasoning != model.ReasoningDefault {
 		return model.TextResponse{}, model.ErrTextReasoningUnsupported
 	}
+	if req.JSON {
+		return model.TextResponse{}, model.ErrTextFormatUnsupported
+	}
 	if p.apiKey == "" {
 		return model.TextResponse{}, errors.New("openai api key is empty")
 	}

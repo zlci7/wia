@@ -19,3 +19,14 @@ func TestExplicitReasoningFailsBeforeUnsupportedProviderRequest(t *testing.T) {
 		t.Fatalf("calls=%d err=%v", calls, err)
 	}
 }
+
+func TestJSONOutputFailsBeforeUnsupportedProviderRequest(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++ }))
+	defer server.Close()
+	provider := NewProvider("test", "test", WithBaseURL(server.URL))
+	_, err := provider.GenerateText(t.Context(), model.TextRequest{Input: "JSON facts", JSON: true})
+	if !errors.Is(err, model.ErrTextFormatUnsupported) || calls != 0 {
+		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}

@@ -78,6 +78,10 @@ func TextErrorCode(err error) string {
 		return "input_limit"
 	case errors.Is(err, ErrInvalidTextRequest):
 		return "invalid_request"
+	case errors.Is(err, ErrTextReasoningUnsupported):
+		return "reasoning_unsupported"
+	case errors.Is(err, ErrTextFormatUnsupported):
+		return "format_unsupported"
 	default:
 		return "unknown"
 	}
