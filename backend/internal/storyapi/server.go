@@ -340,6 +340,20 @@ func (s *Server) handleWorldRoute(w http.ResponseWriter, r *http.Request) {
 		s.cancel(w, r, worldID, parts[5])
 		return
 	}
+	if len(parts) == 7 && parts[4] == "runs" && parts[6] == "progress" {
+		if r.Method != http.MethodGet {
+			writeError(w, 405, "method_not_allowed", "run progress uses GET")
+			return
+		}
+		progress, err := s.app.ReadRunProgress(r.Context(), worldID, parts[5], r.URL.Query().Get("include_thinking") == "1")
+		if err != nil {
+			writeAppError(w, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, 200, progress)
+		return
+	}
 	if len(parts) == 7 && parts[4] == "runs" && parts[6] == "retry" {
 		s.retry(w, r, worldID, parts[5])
 		return

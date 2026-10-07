@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"gameagent/backend/internal/llm"
 	"gameagent/backend/internal/model"
@@ -22,12 +23,15 @@ import (
 )
 
 type phase13Call struct {
-	Request     model.TextRequest
-	Diagnostic  model.TextDiagnostic
-	Response    string
-	ElapsedMS   int64
-	ErrorCode   string
-	InputTokens int
+	Request        model.TextRequest
+	Diagnostic     model.TextDiagnostic
+	Response       string
+	ElapsedMS      int64
+	ErrorCode      string
+	InputTokens    int
+	FirstDeltaMS   int64
+	ReasoningChars int
+	OutputChars    int
 }
 
 type phase13Probe struct {
@@ -62,8 +66,23 @@ func (p *phase13Probe) GenerateText(ctx context.Context, req model.TextRequest) 
 		return model.TextResponse{}, errors.New("live evaluation request budget exhausted")
 	}
 	started := time.Now()
+	firstDelta := int64(0)
+	reasoningChars, outputChars := 0, 0
+	if os.Getenv("WIA_PHASE13_STREAM") == "1" {
+		observer := req.OnDelta
+		req.OnDelta = func(delta model.TextDelta) {
+			if firstDelta == 0 {
+				firstDelta = max(1, time.Since(started).Milliseconds())
+			}
+			reasoningChars += utf8.RuneCountInString(delta.Reasoning)
+			outputChars += utf8.RuneCountInString(delta.Text)
+			if observer != nil {
+				observer(delta)
+			}
+		}
+	}
 	response, err := p.inner.GenerateText(ctx, req)
-	call := phase13Call{Request: req, Diagnostic: response.Diagnostic, Response: response.Text, ElapsedMS: time.Since(started).Milliseconds(), ErrorCode: model.TextErrorCode(err), InputTokens: model.FramedTextInputTokens(req)}
+	call := phase13Call{Request: req, Diagnostic: response.Diagnostic, Response: response.Text, ElapsedMS: time.Since(started).Milliseconds(), ErrorCode: model.TextErrorCode(err), InputTokens: model.FramedTextInputTokens(req), FirstDeltaMS: firstDelta, ReasoningChars: reasoningChars, OutputChars: outputChars}
 	var failure *model.TextCallError
 	if errors.As(err, &failure) {
 		call.Diagnostic = failure.Diagnostic

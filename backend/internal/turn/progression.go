@@ -112,7 +112,7 @@ func (s *Service) advanceGeneratedEvents(ctx context.Context, generator model.Te
 	working.Positions, working.States, working.Relationships, working.Items = output.Positions, output.States, output.Relationships, output.Items
 	material.Required += "\n最新权威状态、关系、物品及定义（初始材料不覆盖当前事实）：" + HostMechanicsContext(working)
 	call := s.generator(generator, material, snapshot, run, "event_generation", "coordinator", 4, "story.events.v3")
-	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	var response struct {
 		Candidates []eventCandidate `json:"candidates"`
@@ -247,7 +247,7 @@ func (s *Service) advancePlot(ctx context.Context, generator model.TextGenerator
 		material.Required += fmt.Sprintf("\n程序条件结论：met=%t，evidence=%s。条件成立时依据作者条件继续判断；条件不成立时 status 必须为 %s，source_ids 必须包含全部 evidence。程序条件结论不可被自然语言覆盖。", requirementsMet, wire.MarshalJSON(requirementEvidence), onUnmet)
 	}
 	call := s.generator(generator, material, snapshot, run, "plot", "coordinator", 4, "story.plot.v4")
-	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	var result plotResolution
 	if err = GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "status", "content", "source_ids", "projections", "decision_requests", "ending"); err != nil {
@@ -579,7 +579,7 @@ func (s *Service) respondToPlot(ctx context.Context, generator model.TextGenerat
 		}
 		call := s.generator(generator, material, base, run, "plot_actions", "coordinator", 6, "story.plot-actions.v14")
 		var resolved plotActionResolution
-		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 		required := []string{"outcomes", "scene_updates"}
 		if snapshot.Definition.Progression != nil {
 			required = append(required, "time_minutes")

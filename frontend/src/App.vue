@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RunProgress from './components/RunProgress.vue';
 import AppDialog from "./components/AppDialog.vue";
 import CreatorView from "./components/CreatorView.vue";
 import InformationPanel from "./components/InformationPanel.vue";
@@ -407,7 +408,7 @@ const policyOptions = [
             >
               <div class="message-content">{{ message.content }}</div>
             </article>
-            <div v-if="activeRun" class="run-card" role="status">
+            <div v-if="activeRun" class="run-card">
               <p class="pending-input">{{ activeRun.input }}</p>
               <div class="button-row">
                 <span class="pulse-dot"></span><span>正在组织回应</span
@@ -419,6 +420,7 @@ const policyOptions = [
                   取消
                 </button>
               </div>
+              <RunProgress :world-i-d="currentWorld!.world_id" :run="activeRun" :characters="characters" />
             </div>
             <div
               v-if="failedRun && !pendingSubmission"

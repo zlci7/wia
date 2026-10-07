@@ -25,7 +25,8 @@ var (
 
 // TextRequest is a tool-free generation request. Zero Max* limits use defaults;
 // a zero reasoning reserve allocates no additional tokens. Visible token limits
-// use tokenestimate, and MaxResponseBytes bounds the full response body.
+// use tokenestimate. MaxResponseBytes bounds a non-streamed envelope or total
+// decoded streaming text; providers also bound streaming transport framing.
 type TextRequest struct {
 	System                 string
 	Input                  string
@@ -33,6 +34,15 @@ type TextRequest struct {
 	MaxOutputTokens        int
 	ReasoningReserveTokens int
 	MaxResponseBytes       int
+	OnDelta                func(TextDelta) `json:"-"`
+}
+
+// TextDelta carries provider-returned text while a response is incomplete.
+// Providers invoke OnDelta synchronously before GenerateText returns. Deltas
+// are observation only: consumers still validate the final TextResponse.
+type TextDelta struct {
+	Reasoning string
+	Text      string
 }
 
 type TextResponse struct {

@@ -10,6 +10,7 @@
     "embed-dist": "node scripts/embed-dist.mjs",
     "type-check": "vue-tsc --noEmit",
     "test:reading": "node scripts/check-reading.mjs",
+	"test:progress": "node scripts/check-run-progress.mjs",
     "test:settings": "node scripts/check-settings.mjs",
     "test:memory": "node scripts/check-memory.mjs",
     "test:creator": "node scripts/check-creator.mjs",

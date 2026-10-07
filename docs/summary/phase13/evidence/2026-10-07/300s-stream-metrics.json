@@ -1,0 +1,107 @@
+{
+  "date": "2026-10-07",
+  "provider": "deepseek",
+  "model": "deepseek-v4-flash",
+  "budget_seconds": 300,
+  "scenario": "investigation",
+  "attempts": [
+    {
+      "status": "failed",
+      "elapsed_ms": 20672,
+      "requests": 2,
+      "error": "output_limit",
+      "failed_world_unchanged": true,
+      "clock_before": "1358-03-29 09:00",
+      "clock_after": "1358-03-29 09:00",
+      "turn_seq_before": 0,
+      "turn_seq_after": 0,
+      "report": {
+        "CoreCalls": 1,
+        "ContextSupplements": 0,
+        "ResolutionChecks": 0,
+        "Repairs": 0,
+        "SelectedEntityIDs": [
+          "player",
+          "npc:tailor"
+        ]
+      }
+    },
+    {
+      "status": "completed",
+      "elapsed_ms": 58487,
+      "requests": 2,
+      "error": "",
+      "failed_world_unchanged": null,
+      "clock_before": "1358-03-29 09:00",
+      "clock_after": "1358-03-29 09:08",
+      "turn_seq_before": 0,
+      "turn_seq_after": 1,
+      "report": {
+        "CoreCalls": 1,
+        "ContextSupplements": 0,
+        "ResolutionChecks": 0,
+        "Repairs": 0,
+        "SelectedEntityIDs": [
+          "player",
+          "npc:tailor"
+        ]
+      }
+    }
+  ],
+  "calls": [
+    {
+      "elapsed_ms": 1590,
+      "first_delta_ms": 615,
+      "reasoning_chars": 802,
+      "output_chars": 110,
+      "error": "",
+      "finish_reason": "stop",
+      "input_tokens": 1541,
+      "output_tokens": 227,
+      "reasoning_tokens": 191,
+      "max_output_tokens": 4096,
+      "reasoning_reserve": 8192
+    },
+    {
+      "elapsed_ms": 19041,
+      "first_delta_ms": 257,
+      "reasoning_chars": 12964,
+      "output_chars": 0,
+      "error": "output_limit",
+      "finish_reason": "",
+      "input_tokens": null,
+      "output_tokens": null,
+      "reasoning_tokens": null,
+      "max_output_tokens": 5632,
+      "reasoning_reserve": 7168
+    },
+    {
+      "elapsed_ms": 1112,
+      "first_delta_ms": 470,
+      "reasoning_chars": 251,
+      "output_chars": 110,
+      "error": "",
+      "finish_reason": "stop",
+      "input_tokens": 1541,
+      "output_tokens": 95,
+      "reasoning_tokens": 59,
+      "max_output_tokens": 4096,
+      "reasoning_reserve": 8192
+    },
+    {
+      "elapsed_ms": 57312,
+      "first_delta_ms": 567,
+      "reasoning_chars": 33141,
+      "output_chars": 3523,
+      "error": "",
+      "finish_reason": "stop",
+      "input_tokens": 6312,
+      "output_tokens": 11068,
+      "reasoning_tokens": 9572,
+      "max_output_tokens": 5632,
+      "reasoning_reserve": 7168
+    }
+  ],
+  "usage_note": "Three calls have usage; the interrupted stream has unknown usage. No charge is inferred.",
+  "scope": "One candidate question only; formal migration and continuous-play acceptance remain pending."
+}

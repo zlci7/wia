@@ -3,7 +3,6 @@ package turn
 import (
 	"context"
 	"errors"
-	"time"
 
 	"gameagent/backend/internal/memory"
 	"gameagent/backend/internal/model"
@@ -121,7 +120,7 @@ func (s *Service) SummarizeMemory(ctx context.Context, g model.TextGenerator, sn
 		Content string                   `json:"content"`
 		States  []memory.SubjectiveState `json:"states"`
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	if err := GenerateJSON(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, "content", "states"); err != nil {
 		return d, err

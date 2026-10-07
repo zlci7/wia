@@ -17,6 +17,10 @@ import {
 } from './types'
 import type { MemoryView, CorrectionRequest } from './types'
 
+export function fetchRunProgress(worldID: string, runID: string, includeThinking = false): Promise<import('./types').RunProgress> {
+  return request(`/api/v1/worlds/${encodeURIComponent(worldID)}/runs/${encodeURIComponent(runID)}/progress${includeThinking ? '?include_thinking=1' : ''}`);
+}
+
 export function fetchSuggestions(world: string): Promise<import('./types').SuggestionSet> {
   return request(`/api/v1/worlds/${encodeURIComponent(world)}/suggestions`);
 }

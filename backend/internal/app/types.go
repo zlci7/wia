@@ -177,6 +177,7 @@ type runRuntime struct {
 	RunID          string
 	ActiveRevision int64
 	Generator      model.TextGenerator
+	Progress       runProgressState
 }
 
 type worldRuntime struct {

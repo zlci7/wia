@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/plot"
@@ -74,7 +73,7 @@ func (s *Service) advanceOpenWorld(ctx context.Context, generator model.TextGene
 		}
 		call := s.generator(generator, material, working, run, "plot", "coordinator", 4, "story.open-world.v3")
 		var result plotResolution
-		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 		_, err = GenerateJSONCheckedMetrics(callCtx, call, material.System, material.Required, &result, structuredTurnOutputTokens, nil, []string{"status", "content", "source_ids", "projections", "decision_requests", "ending"}, func() error { return validateOpenResolution(working, result, call.(*ContextGenerator)) })
 		cancel()
 		if err != nil {

@@ -24,6 +24,17 @@ import (
 type browserGenerator struct{ apiGenerator }
 
 func (g browserGenerator) GenerateText(ctx context.Context, request model.TextRequest) (model.TextResponse, error) {
+	// This opt-in fixture exercises live waiting UI with controlled provider text.
+	if os.Getenv("WIA_BROWSER_PROGRESS") == "1" && strings.Contains(request.System, "结构化回合意图") {
+		if request.OnDelta != nil {
+			request.OnDelta(model.TextDelta{Reasoning: "受控测试思考：先核对玩家询问，再衔接人物回应。"})
+		}
+		select {
+		case <-ctx.Done():
+			return model.TextResponse{}, ctx.Err()
+		case <-time.After(90 * time.Second):
+		}
+	}
 	select {
 	case <-ctx.Done():
 		return model.TextResponse{}, ctx.Err()

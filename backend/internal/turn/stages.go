@@ -131,7 +131,7 @@ func (a *Service) resolveTurnIntent(ctx context.Context, generator model.TextGen
 	generator = a.generator(generator, material, snapshot, run, "intent", "player", 0, intentPromptVersion)
 	input := material.Required
 	var intent TurnIntent
-	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	checkRecipient := func() error {
 		if len(intent.Fragments) > 0 {
@@ -352,7 +352,7 @@ func (a *Service) decideNPCs(ctx context.Context, generator model.TextGenerator,
 			input := material.Required
 			var decision NPCDecision
 			started := time.Now()
-			callCtx, callCancel := context.WithTimeout(npcCtx, 60*time.Second)
+			callCtx, callCancel := context.WithTimeout(npcCtx, GenerationTimeBudget)
 			defer callCancel()
 			required := []string{"speech", "action_intent", "silent", "memory"}
 			if snapshot.Definition.Capabilities["relations"] == 1 {
@@ -442,7 +442,7 @@ func (a *Service) narrateVisible(ctx context.Context, generator model.TextGenera
 	}
 	generator = a.generator(generator, material, snapshot, run, "narration", "player", stage, narrationPromptVersion)
 	input := material.Required
-	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, callCancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer callCancel()
 	narrative, repairCount, err := generateNarrativeText(callCtx, generator, material.System, input, maxOutputTokens)
 	if err != nil {

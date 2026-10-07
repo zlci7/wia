@@ -153,6 +153,23 @@ export interface Run {
   updated_at: string
 }
 
+export interface RunProgress {
+  run_id: string
+  status: string
+  budget_seconds: number
+  calls: {
+    id: number
+    purpose: string
+    recipient?: string
+    phase: 'waiting' | 'thinking' | 'writing' | 'received' | 'failed'
+    started_at: string
+    reasoning?: string
+    reasoning_chars: number
+    reasoning_limited?: boolean
+    output_chars: number
+  }[]
+}
+
 export interface SaveOperation {
   operation_id: string
   request_key: string

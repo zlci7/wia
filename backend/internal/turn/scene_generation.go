@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"gameagent/backend/internal/model"
 	"gameagent/backend/internal/storage"
@@ -26,6 +25,8 @@ type SceneAttemptReport struct {
 // BuildSceneCandidate is the internal quality/compatibility test entry point.
 // The application has no route or runtime switch to publish these candidates.
 func (s *Service) BuildSceneCandidate(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Output, SceneAttemptReport, error) {
+	ctx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
+	defer cancel()
 	snapshot, err := s.load(ctx, store, run, generator)
 	if err != nil {
 		return Output{}, SceneAttemptReport{}, err
@@ -41,7 +42,7 @@ func (s *Service) generateSceneCandidate(ctx context.Context, store *storage.Wor
 	if generator == nil {
 		return Output{}, report, ErrModelNotConfigured
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	var intent *TurnIntent
 	var parts []InputFragment

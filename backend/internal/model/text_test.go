@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestValidateTextRequestAppliesDefaultsAndPreservesContent(t *testing.T) {
 
 	req.MaxInputTokens, req.MaxOutputTokens, req.MaxResponseBytes = 256, 32, 1024
 	got, err = ValidateTextRequest(req)
-	if err != nil || got != req {
+	if err != nil || !reflect.DeepEqual(got, req) {
 		t.Fatalf("custom limits = %+v, %v; want %+v", got, err, req)
 	}
 }

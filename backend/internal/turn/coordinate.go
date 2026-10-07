@@ -449,7 +449,7 @@ func (s *Service) coordinateTurn(ctx context.Context, generator model.TextGenera
 	input := material.Required
 	var result hostResult
 	var resolved coordinatedTurn
-	callCtx, callCancel := context.WithTimeout(ctx, 60*time.Second)
+	callCtx, callCancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer callCancel()
 	check := func() error {
 		if err := validateCoordination(&result, snapshot, run, intent, output.Events); err != nil {

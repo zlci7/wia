@@ -52,12 +52,16 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		messages = append(messages, map[string]string{"role": "system", "content": req.System})
 	}
 	messages = append(messages, map[string]string{"role": "user", "content": req.Input})
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"model":      p.model,
 		"messages":   messages,
-		"stream":     false,
+		"stream":     req.OnDelta != nil,
 		"max_tokens": req.TotalOutputTokens(),
-	})
+	}
+	if req.OnDelta != nil {
+		payload["stream_options"] = map[string]bool{"include_usage": true}
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return model.TextResponse{}, model.ErrInvalidTextRequest
 	}
@@ -86,6 +90,16 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		diagnostic.Code = "provider_http"
 		return model.TextResponse{}, fmt.Errorf("deepseek response failed: status=%d", httpResp.StatusCode)
+	}
+	if req.OnDelta != nil && strings.Contains(strings.ToLower(httpResp.Header.Get("Content-Type")), "text/event-stream") {
+		resp, err := parseStreamingTextResponse(ctx, httpResp.Body, req, &diagnostic)
+		if err != nil {
+			return model.TextResponse{}, err
+		}
+		if err := model.ValidateTextResponse(req, resp); err != nil {
+			return model.TextResponse{}, err
+		}
+		return resp, ctx.Err()
 	}
 
 	readLimit := int64(req.MaxResponseBytes)
@@ -127,6 +141,9 @@ func (p *Provider) GenerateText(ctx context.Context, req model.TextRequest) (res
 		finish = envelope.Choices[0].FinishReason
 		diagnostic.ContentChars = utf8.RuneCountInString(envelope.Choices[0].Message.Content)
 		diagnostic.ReasoningChars = utf8.RuneCountInString(envelope.Choices[0].Message.Reasoning)
+		if req.OnDelta != nil {
+			req.OnDelta(model.TextDelta{Reasoning: envelope.Choices[0].Message.Reasoning, Text: envelope.Choices[0].Message.Content})
+		}
 	}
 	diagnostic.SetUsage(envelope.Usage.Input, envelope.Usage.Output, envelope.Usage.Details.Reasoning, envelope.Usage.Hit, envelope.Usage.Miss)
 	diagnostic.FinishReason = model.SafeFinishReason(finish)

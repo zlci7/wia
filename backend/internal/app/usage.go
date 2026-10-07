@@ -16,7 +16,21 @@ func (a *App) meteredText(ctx context.Context, generator model.TextGenerator, re
 		return model.TextResponse{}, err
 	}
 	started := time.Now()
+	progress := a.progressForRun(scope.World, scope.Run)
+	if progress != nil {
+		progress.begin(id, scope)
+		observer := request.OnDelta
+		request.OnDelta = func(delta model.TextDelta) {
+			progress.delta(id, delta)
+			if observer != nil {
+				observer(delta)
+			}
+		}
+	}
 	response, callErr := generator.GenerateText(ctx, request)
+	if progress != nil {
+		progress.finish(id, callErr)
+	}
 	diagnostic := response.Diagnostic
 	var failure *model.TextCallError
 	if errors.As(callErr, &failure) {

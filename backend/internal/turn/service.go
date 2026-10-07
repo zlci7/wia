@@ -11,6 +11,9 @@ import (
 	wiaworld "gameagent/backend/internal/world"
 )
 
+// GenerationTimeBudget is shared by the turn and its model-call stages.
+const GenerationTimeBudget = 300 * time.Second
+
 // Host observes stage completion. The turn owns all stage implementations.
 type Host interface {
 	// LogStage records one stage of a turn: what it was for, which model version it used,
@@ -39,6 +42,8 @@ func New(host Host, deps Deps) *Service { return &Service{host: host, deps: deps
 // been resolved. A stage that fails stops the turn and reports which stage it was, so a
 // caller can tell a model failure from a storage one.
 func (s *Service) Execute(ctx context.Context, store *storage.WorldStore, run wiaworld.Run, generator model.TextGenerator) (Output, error) {
+	ctx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
+	defer cancel()
 	snapshot, err := s.load(ctx, store, run, generator)
 	if err != nil {
 		return Output{}, err

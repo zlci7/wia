@@ -153,7 +153,7 @@ func (a *App) SubmitRun(ctx context.Context, worldID string, request RunRequest)
 	if err != nil {
 		return wiaworld.Run{}, err
 	}
-	runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	runCtx, cancel := context.WithTimeout(context.Background(), turn.GenerationTimeBudget)
 	worldRT.cancelSuggestions()
 	runtime := &runRuntime{Cancel: cancel, Done: make(chan struct{}), WorldID: worldID, RunID: run.RunID, ActiveRevision: activeRevision, Generator: generator}
 	a.runsMu.Lock()
