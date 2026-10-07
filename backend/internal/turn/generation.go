@@ -265,6 +265,13 @@ func GenerateJSONWithNullableFieldsMetrics(ctx context.Context, generator model.
 }
 
 func GenerateJSONCheckedMetrics(ctx context.Context, generator model.TextGenerator, system, input string, target any, maxOutput int, nullableFields, requiredFields []string, check func() error) (int, error) {
+	return GenerateJSONRequestCheckedMetrics(ctx, generator, model.TextRequest{System: system, Input: input, MaxInputTokens: 12000, MaxOutputTokens: maxOutput, MaxResponseBytes: 1 << 20}, target, nullableFields, requiredFields, check)
+}
+
+// GenerateJSONRequestCheckedMetrics preserves explicit transport and reasoning
+// options while using the shared field contract, decoder and repair budget.
+func GenerateJSONRequestCheckedMetrics(ctx context.Context, generator model.TextGenerator, request model.TextRequest, target any, nullableFields, requiredFields []string, check func() error) (int, error) {
+	system := request.System
 	if t := reflect.TypeOf(target); t != nil && t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
 		system += "\n机器可读字段合同（对象只使用以下字段；string表示字符串，[]表示数组，boolean表示布尔值，integer表示整数）：" + generatedFieldContract(t)
 	}
@@ -278,7 +285,8 @@ func GenerateJSONCheckedMetrics(ctx context.Context, generator model.TextGenerat
 				requestSystem += "\n本地字段校验：" + detail.Error() + "。按本地字段类型生成；只使用输出合同列出的字段。"
 			}
 		}
-		response, err := generator.GenerateText(ctx, model.TextRequest{System: requestSystem, Input: input, MaxInputTokens: 12000, MaxOutputTokens: maxOutput, MaxResponseBytes: 1 << 20})
+		request.System = requestSystem
+		response, err := generator.GenerateText(ctx, request)
 		if err != nil {
 			if attempt == 0 && errors.Is(err, model.ErrInvalidTextResponse) {
 				continue

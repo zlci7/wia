@@ -88,6 +88,8 @@ type App struct {
 	memoryWorkers   map[string]bool
 	memoryWake      map[string]bool
 	closing         bool
+	playMu          sync.Mutex
+	playSessions    map[string]*playSession
 	logger          Logger
 	closed          chan struct{}
 }

@@ -205,16 +205,11 @@ func (a *App) generateSuggestions(ctx context.Context, cancel context.CancelFunc
 		Items []string `json:"items"`
 	}
 	check := func() error {
-		if len(result.Items) != 3 {
-			return ErrInvalidRequest
+		if err := turn.ValidateSuggestions(result.Items); err != nil {
+			return err
 		}
-		seen := map[string]bool{}
 		for i, item := range result.Items {
 			item = wire.Clean(item)
-			if item == "" || len([]rune(item)) > 120 || seen[item] {
-				return ErrInvalidRequest
-			}
-			seen[item] = true
 			result.Items[i] = item
 		}
 		return nil

@@ -15,6 +15,7 @@ import (
 const creationSystem = `你是开放叙事游戏的场景作者。一次创作当前互动中的相关人物、自然对白、行动后果和完整正文。
 充分承接玩家原文中已经选择的普通步骤。人物有自己的动机，可以拒绝、追问、互相回应，也可以出现自然的多轮交谈；无需每个人发言。每轮应有实际回答、发现、态度变化或清楚的障碍，停在有意义的节点。已选择的普通步骤没有实际障碍就直接完成，不因为额外询问无关同伴是否参加而停住玩家已经选择的行动。
 固定真相、现有位置和已接受经历是约束。人物证词、推测、约定各有性质，承诺不等于已经完成。作者知道的背景不是人物共有知识；人物只依身份、本人经历和实际获知的信息行动。私聊限定听众，旁观者不知私聊内容，玩家未说出口的念头不是对白。
+人物ID、姓名、身份和当前地点共同确定是谁。玩家称谓与资料冲突时按已有人物身份承接，不能把已有重要人物的姓名赋给另一个路人。提及异地人物不会使其到场；现场角色可以回应找人请求或澄清误认，异地人物参加现场互动须先有符合时间与位置的到场过程。正文同场资格以本轮权威在场清单为准，不从历史对白推定仍在现场。
 保留玩家对新任务、承诺、支出、危险选择和新目的地的决定权；可以描写已授权动作和自然结果。玩家对白忠实表达原文已经选择的意思；条件式讨论不等于接受委托，不能擅自添加“我答应替你找人”等新的承诺。
 玩家明确限定听众且采取合理的低声、避开等方法时，该私聊范围成立。旁观者可以看见交谈，却听不到内容。现场确实无法私聊时，先呈现障碍与待选择行动，不能让旁人暗中听见并在后续复述。
 当前权威位置与时间就是上一轮结束后的状态。历史只解释经历，已经完成的行动不再执行。正文从当前地点承接，结束时每个人的实际位置与scene_changes.positions一致；包括人物离开、返回和不随行的情况。
@@ -164,6 +165,20 @@ func (s *CreationSession) creationMaterial(options CreationOptions) (Material, [
 		Input   string `json:"input"`
 		Advance bool   `json:"allow_plot_advance"`
 	}{options.Input, options.AllowPlotAdvance})
+	var present, remote []string
+	for _, person := range people {
+		ref := person.ID + "：" + person.Name
+		if person.Role != "" {
+			ref += "（" + person.Role + "）"
+		}
+		ref += " @ " + snapshot.Positions[person.ID]
+		if snapshot.Positions[person.ID] == snapshot.SceneLocation {
+			present = append(present, ref)
+		} else {
+			remote = append(remote, ref)
+		}
+	}
+	material.Final += "\n本轮权威在场清单（姓名对应同一ID，按实际身份回应）：" + wire.MarshalJSON(present) + "\n本轮异地人物（当前不能当面交谈）：" + wire.MarshalJSON(remote)
 	return material, selected
 }
 

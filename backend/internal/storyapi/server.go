@@ -112,6 +112,10 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/api/v1/play-sessions" || strings.HasPrefix(r.URL.Path, "/api/v1/play-sessions/") {
+		s.playRoute(w, r)
+		return
+	}
 	switch r.URL.Path {
 	case "/api/v1/status":
 		s.status(w, r)
@@ -754,6 +758,8 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.Is(err, app.ErrRunNotFound):
 		status = 404
 		code = "run_not_found"
+	case errors.Is(err, app.ErrPlayNotFound):
+		status, code = 404, "play_session_not_found"
 	case errors.Is(err, app.ErrWorldNotReady):
 		status = 409
 		code = "world_not_ready"

@@ -74,6 +74,7 @@ type creationExchange struct {
 type CreationSession struct {
 	mu        sync.Mutex
 	busy      bool
+	cancel    context.CancelFunc
 	snapshot  Snapshot
 	exchanges []creationExchange
 	sources   map[string][]memory.MemorySource
@@ -98,7 +99,7 @@ func NewCreationSession(definition story.Definition) (*CreationSession, error) {
 	snapshot := Snapshot{
 		Definition: def, PlayerName: def.Summary.Player.Name, PlayerProfile: def.Summary.Player.Profile,
 		Narrative: def.Settings,
-		Summary:   wiaworld.WorldSummary{GameID: def.Summary.ID, WorldID: "creation-study", Clock: def.Clock},
+		Summary:   wiaworld.WorldSummary{GameID: def.Summary.ID, WorldID: wire.NewID("play"), Clock: def.Clock},
 		Positions: clonePositions(def.InitialLocations), PositionSources: map[string]string{},
 		Characters: slices.Clone(def.Characters),
 	}
@@ -134,6 +135,8 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 		return CreationResult{}, ErrCreationBusy
 	}
 	s.busy = true
+	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
+	s.cancel = cancel
 	// While busy, the accepted state stays immutable. Getters can still inspect it.
 	snapshot := s.snapshot
 	material, selected := s.creationMaterial(options)
@@ -141,9 +144,9 @@ func (s *CreationSession) Interact(ctx context.Context, service *Service, genera
 	defer func() {
 		s.mu.Lock()
 		s.busy = false
+		s.cancel = nil
 		s.mu.Unlock()
 	}()
-	callCtx, cancel := context.WithTimeout(ctx, GenerationTimeBudget)
 	defer cancel()
 	snapshot.sceneEntities = selected
 	snapshot.materialReads = newMaterialReadBudget()
